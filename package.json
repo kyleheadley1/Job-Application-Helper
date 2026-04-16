@@ -1,0 +1,23 @@
+{
+  "name": "job-application-helper",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace api",
+    "dev:web": "npm run dev --workspace web",
+    "build": "npm run build --workspace api && npm run build --workspace web",
+    "test": "npm run test --workspace api",
+    "eval:seed": "tsx scripts/seed-eval.ts",
+    "eval:run": "tsx scripts/eval-regression.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "tsx": "^4.21.0"
+  }
+}

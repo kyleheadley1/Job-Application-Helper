@@ -1,0 +1,18 @@
+[
+  {
+    "name": "Product full-stack AI app role",
+    "input": {
+      "companyHint": "AppFlow",
+      "rawText": "Software Engineer - Product. Build TypeScript/Node APIs and React interfaces for AI-enabled workflows."
+    },
+    "expectedBand": [70, 90]
+  },
+  {
+    "name": "Strict finance senior role",
+    "input": {
+      "companyHint": "Heritage Bank",
+      "rawText": "Senior Backend Engineer in banking. 6+ years required. Bachelor's degree required. US citizenship required."
+    },
+    "expectedBand": [30, 65]
+  }
+]
