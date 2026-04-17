@@ -6,6 +6,7 @@ import type {
   RuleEvaluation,
   ScoreBreakdown,
 } from '../../types/scoring.js';
+import type { ResumeContextSet } from "../../types/resumeContext.js";
 import type { UserProfile } from '../../types/userProfile.js';
 import { normalizeText } from '../../lib/text.js';
 import { logger } from '../../lib/logger.js';
@@ -146,10 +147,95 @@ const deterministicFallback = (
   };
 };
 
+const clamp = (n: number, min: number, max: number): number => Math.max(min, Math.min(max, n));
+
+const hardBlockersDominate = (rules: RuleEvaluation): boolean =>
+  Boolean(
+    rules.explicitDegreeRisk ||
+      rules.citizenshipMismatch ||
+      rules.clearanceMismatch ||
+      rules.strictNewGradPipeline ||
+      rules.seniorityOverreach ||
+      rules.domainMismatch,
+  );
+
+const supportingResumeSignals = (extracted: ExtractedJobData, resumeContexts?: ResumeContextSet): number => {
+  if (!resumeContexts) return 0;
+  const text = normalizeText(
+    [
+      extracted.title,
+      ...(extracted.stack ?? []),
+      ...(extracted.requiredSkills ?? []),
+      ...(extracted.preferredSkills ?? []),
+      ...(extracted.responsibilities ?? []),
+      ...(extracted.requirements ?? []),
+    ].join(" "),
+  );
+  const normalizedWords = text
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.replace(/[^a-z0-9+]/gi, "").toLowerCase())
+    .filter(Boolean);
+  const words = new Set(normalizedWords);
+  const hasWordLike = (needle: string): boolean => {
+    const n = needle.toLowerCase();
+    if (words.has(n)) return true;
+    return normalizedWords.some((w) => w.startsWith(n) || n.startsWith(w));
+  };
+  let best = 0;
+  for (const type of ["SWE", "SIE", "EARLY_CAREER"] as const) {
+    const ctx = resumeContexts[type];
+    if (!ctx) continue;
+    const keywordOverlap = ctx.metadata.keywords.filter((k) => hasWordLike(k)).length;
+    const themeOverlap = ctx.metadata.strongestThemes.filter((t) =>
+      normalizeText(t)
+        .split(/\s+/)
+        .some((w) => hasWordLike(w)),
+    ).length;
+    const claimOverlap = ctx.metadata.claimSupport.filter((c) => {
+      const claimWords = normalizeText(c.claim).split(/\s+/).filter(Boolean);
+      return claimWords.some((w) => hasWordLike(w)) && c.evidenceSnippets.length > 0;
+    }).length;
+    const signal = keywordOverlap + themeOverlap * 2 + claimOverlap * 2;
+    if (signal > best) best = signal;
+  }
+  return best;
+};
+
+export const applyResumeSupportAdjustments = (params: {
+  score: ScoreBreakdown;
+  extracted: ExtractedJobData;
+  rules: RuleEvaluation;
+  resumeContexts?: ResumeContextSet;
+}): ScoreBreakdown => {
+  const { score, extracted, rules, resumeContexts } = params;
+  if (hardBlockersDominate(rules)) return score;
+  const signal = supportingResumeSignals(extracted, resumeContexts);
+  const storyDelta = signal >= 10 ? 2 : signal >= 5 ? 1 : signal === 0 ? -1 : 0;
+  const overlapDelta = signal >= 8 ? 1 : signal === 0 ? -1 : 0;
+  const next = {
+    ...score,
+    resumeStoryClarity: clamp(score.resumeStoryClarity + clamp(storyDelta, -2, 2), 0, 15),
+    functionalOverlap: clamp(score.functionalOverlap + clamp(overlapDelta, -1, 1), 0, 10),
+  };
+  return {
+    ...next,
+    total:
+      next.stackFit +
+      next.levelFit +
+      next.domainFit +
+      next.resumeStoryClarity +
+      next.functionalOverlap +
+      next.recruiterFriendliness +
+      next.careerValue,
+  };
+};
+
 export const scoreJob = async (params: {
   extracted: ExtractedJobData;
   rules: RuleEvaluation;
   userProfile: UserProfile;
+  resumeContexts?: ResumeContextSet;
 }): Promise<{
   scoring: ScoringResult;
   scoringDiagnostics: StructuredCallDiagnostics;
@@ -188,13 +274,18 @@ export const scoreJob = async (params: {
     llmResult.score.recruiterFriendliness +
     llmResult.score.careerValue;
   const boundedTotal = Math.max(0, Math.min(100, Math.round(categoryTotal)));
-  const recommendation = mapRecommendationFromScore(boundedTotal);
+  const adjustedScore = applyResumeSupportAdjustments({
+    score: { ...llmResult.score, total: boundedTotal },
+    extracted: params.extracted,
+    rules: params.rules,
+    resumeContexts: params.resumeContexts,
+  });
 
   return {
     scoring: {
       ...llmResult,
-      score: { ...llmResult.score, total: boundedTotal },
-      recommendation,
+      score: adjustedScore,
+      recommendation: mapRecommendationFromScore(adjustedScore.total),
     },
     scoringDiagnostics: scoredRun.diagnostics,
     scoringLlmSucceeded: scoredRun.success,

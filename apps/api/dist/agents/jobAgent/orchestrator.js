@@ -10,6 +10,7 @@ import { fetchJobPosting } from '../../tools/fetchJobPosting.js';
 import { parseJobText } from '../../tools/parseJobText.js';
 import { extractJobData } from '../../tools/extractJobData.js';
 import { listMissingCriticalFields } from '../../tools/deterministicRawTextExtract.js';
+import { resumeContextService } from '../../services/resume/resumeContext.js';
 export const triageJob = async (input) => {
     const fetchedText = input.url
         ? await fetchJobPosting(input.url).catch(() => undefined)
@@ -24,7 +25,8 @@ export const triageJob = async (input) => {
         companyHint: input.companyHint,
     });
     const rules = evaluateRules(extracted, userProfile);
-    const { scoring: scored, scoringDiagnostics, scoringLlmSucceeded, } = await scoreJob({ extracted, rules, userProfile });
+    const resumeContexts = await resumeContextService.getAvailableContexts();
+    const { scoring: scored, scoringDiagnostics, scoringLlmSucceeded, } = await scoreJob({ extracted, rules, userProfile, resumeContexts });
     const salaryAsk = computeSalaryAsk({
         extracted,
         score: scored.score,
@@ -37,6 +39,7 @@ export const triageJob = async (input) => {
         topMatch: scored.topMatch,
         mainRisk: scored.mainRisk,
         userProfile,
+        resumeContexts,
     });
     const now = new Date().toISOString();
     const initialRecord = {

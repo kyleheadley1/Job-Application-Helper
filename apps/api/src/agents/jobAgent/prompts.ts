@@ -1,5 +1,6 @@
 import type { ExtractedJobData, JobRecord } from '../../types/job.js';
 import type { ResumeType } from '../../types/resume.js';
+import type { ResumeContext } from "../../types/resumeContext.js";
 import type { RuleEvaluation, ScoreBreakdown } from '../../types/scoring.js';
 import type { UserProfile } from '../../types/userProfile.js';
 
@@ -297,6 +298,22 @@ export function buildCoverLetterGuidance(job: JobRecord, userProfile: UserProfil
 export const buildAssetGuidanceJson = (job: JobRecord, userProfile: UserProfile): string =>
   JSON.stringify(buildCoverLetterGuidance(job, userProfile), null, 2);
 
+export const buildSelectedResumeContextJson = (selectedResumeContext?: ResumeContext): string => {
+  if (!selectedResumeContext) return "none";
+  return JSON.stringify(
+    {
+      type: selectedResumeContext.type,
+      strongestThemes: selectedResumeContext.metadata.strongestThemes,
+      projectEvidence: selectedResumeContext.metadata.projectEvidence,
+      claimSupport: selectedResumeContext.metadata.claimSupport,
+      bestFitRoleShapes: selectedResumeContext.metadata.bestFitRoleShapes,
+      avoidUseCases: selectedResumeContext.metadata.avoidUseCases,
+    },
+    null,
+    2,
+  );
+};
+
 export const buildAssetJobContextJson = (job: JobRecord): string =>
   JSON.stringify(
     {
@@ -335,6 +352,7 @@ Output valid JSON only with a single key "coverLetter".
 export const buildCoverLetterAssetUserPrompt = (params: {
   job: JobRecord;
   userProfile: UserProfile;
+  selectedResumeContext?: ResumeContext;
 }): string =>
   `
 ${buildResumeAngleBlock(params.job.recommendedResume)}
@@ -343,6 +361,9 @@ ${ASSET_EVIDENCE_DIVERSITY}
 
 Cover-letter guidance:
 ${JSON.stringify(buildCoverLetterGuidance(params.job, params.userProfile), null, 2)}
+
+Selected resume context (ONLY grounding resume to use):
+${buildSelectedResumeContextJson(params.selectedResumeContext)}
 
 User profile:
 ${JSON.stringify(params.userProfile, null, 2)}
@@ -369,6 +390,7 @@ Contract:
 export const buildWhyCompanyAssetUserPrompt = (params: {
   job: JobRecord;
   userProfile: UserProfile;
+  selectedResumeContext?: ResumeContext;
 }): string =>
   `
 ${buildResumeAngleBlock(params.job.recommendedResume)}
@@ -377,6 +399,9 @@ ${ASSET_EVIDENCE_DIVERSITY}
 
 Shared generation guidance:
 ${buildAssetGuidanceJson(params.job, params.userProfile)}
+
+Selected resume context (ONLY grounding resume to use):
+${buildSelectedResumeContextJson(params.selectedResumeContext)}
 
 User profile:
 ${JSON.stringify(params.userProfile, null, 2)}
@@ -406,6 +431,7 @@ Output valid JSON: { "talkingPoints": string[] } with length 3–5.
 export const buildTalkingPointsAssetUserPrompt = (params: {
   job: JobRecord;
   userProfile: UserProfile;
+  selectedResumeContext?: ResumeContext;
 }): string =>
   `
 ${buildResumeAngleBlock(params.job.recommendedResume)}
@@ -414,6 +440,9 @@ ${ASSET_EVIDENCE_DIVERSITY}
 
 Shared generation guidance:
 ${buildAssetGuidanceJson(params.job, params.userProfile)}
+
+Selected resume context (ONLY grounding resume to use):
+${buildSelectedResumeContextJson(params.selectedResumeContext)}
 
 User profile:
 ${JSON.stringify(params.userProfile, null, 2)}
@@ -441,6 +470,7 @@ Output valid JSON: { "tailoredBulletCandidates": string[] } with length 3–5.
 export const buildTailoredBulletsAssetUserPrompt = (params: {
   job: JobRecord;
   userProfile: UserProfile;
+  selectedResumeContext?: ResumeContext;
 }): string =>
   `
 ${buildResumeAngleBlock(params.job.recommendedResume)}
@@ -449,6 +479,9 @@ ${ASSET_EVIDENCE_DIVERSITY}
 
 Shared generation guidance:
 ${buildAssetGuidanceJson(params.job, params.userProfile)}
+
+Selected resume context (ONLY grounding resume to use):
+${buildSelectedResumeContextJson(params.selectedResumeContext)}
 
 User profile:
 ${JSON.stringify(params.userProfile, null, 2)}
@@ -473,6 +506,7 @@ Use 3–6 items in each array when risks warrant it; fewer if the role is clean.
 export const buildApplicationStrategyAssetUserPrompt = (params: {
   job: JobRecord;
   userProfile: UserProfile;
+  selectedResumeContext?: ResumeContext;
 }): string =>
   `
 ${buildResumeAngleBlock(params.job.recommendedResume)}
@@ -481,6 +515,9 @@ ${ASSET_EVIDENCE_DIVERSITY}
 
 User profile:
 ${JSON.stringify(params.userProfile, null, 2)}
+
+Selected resume context (ONLY grounding resume to use):
+${buildSelectedResumeContextJson(params.selectedResumeContext)}
 
 Job + evaluation context:
 ${buildAssetJobContextJson(params.job)}

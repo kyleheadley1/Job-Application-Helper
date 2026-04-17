@@ -157,4 +157,28 @@ describe("Phase 2.2 prompts", () => {
     const p = buildTailoredBulletsAssetUserPrompt({ job: minimalJob({ recommendedResume: "SIE" }), userProfile });
     expect(p).toContain("Shared generation guidance:");
   });
+
+  it("generation prompts include only selected resume grounding context", () => {
+    const p = buildWhyCompanyAssetUserPrompt({
+      job: minimalJob({ recommendedResume: "SIE" }),
+      userProfile,
+      selectedResumeContext: {
+        type: "SIE",
+        sourcePath: "apps/api/data/resumes/sie_resume.txt",
+        sourceKind: "txt",
+        loadedAt: "2026-01-01T00:00:00.000Z",
+        rawText: "Implementation and integrations",
+        metadata: {
+          strongestThemes: ["implementation delivery"],
+          projectEvidence: [],
+          keywords: ["implementation"],
+          bestFitRoleShapes: ["implementation"],
+          avoidUseCases: [],
+          claimSupport: [{ claim: "Implementation delivery", evidenceSnippets: ["Led integration rollout"] }],
+        },
+      },
+    });
+    expect(p).toContain("Selected resume context (ONLY grounding resume to use):");
+    expect(p).toContain('"type": "SIE"');
+  });
 });

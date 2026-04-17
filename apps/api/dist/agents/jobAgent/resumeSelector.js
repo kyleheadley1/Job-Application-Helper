@@ -10,7 +10,7 @@ const ResumeSelectionSchema = z.object({
     confidence: z.number().min(0).max(1),
     rationale: z.array(z.string()).default([]),
 });
-const deterministicResumeSelection = (job) => {
+const deterministicResumeSelection = (job, resumeContexts) => {
     const text = normalizeText([
         job.title,
         job.rawText ?? "",
@@ -40,12 +40,28 @@ const deterministicResumeSelection = (job) => {
     const sieHits = sieSignals.filter((needle) => text.includes(needle)).length;
     const earlyHits = earlySignals.filter((needle) => text.includes(needle)).length;
     const sweHits = sweSignals.filter((needle) => text.includes(needle)).length;
-    const ambiguous = [sieHits, earlyHits, sweHits].filter((count) => count > 0).length > 1;
-    let recommendedResume = "SWE";
-    if (sieHits > 0 && sieHits >= earlyHits)
-        recommendedResume = "SIE";
-    if (earlyHits > 0 && earlyHits > sieHits)
-        recommendedResume = "EARLY_CAREER";
+    const metaScoreByType = { SWE: 0, SIE: 0, EARLY_CAREER: 0 };
+    if (resumeContexts) {
+        const stackAndNeeds = normalizeText([...job.stack, ...job.requiredSkills, ...job.preferredSkills, ...job.responsibilities, ...job.requirements].join(" "));
+        const words = new Set(stackAndNeeds.split(/\s+/).filter(Boolean));
+        const types = ["SWE", "SIE", "EARLY_CAREER"];
+        for (const type of types) {
+            const ctx = resumeContexts[type];
+            if (!ctx)
+                continue;
+            const keywordOverlap = ctx.metadata.keywords.filter((k) => words.has(k)).length;
+            const themeOverlap = ctx.metadata.strongestThemes.filter((t) => stackAndNeeds.includes(normalizeText(t))).length;
+            metaScoreByType[type] = keywordOverlap + themeOverlap * 2;
+        }
+    }
+    const combinedByType = {
+        SWE: metaScoreByType.SWE * 2 + sweHits,
+        SIE: metaScoreByType.SIE * 2 + sieHits,
+        EARLY_CAREER: metaScoreByType.EARLY_CAREER * 2 + earlyHits,
+    };
+    const ordered = Object.entries(combinedByType).sort((a, b) => b[1] - a[1]);
+    const ambiguous = Math.abs((ordered[0]?.[1] ?? 0) - (ordered[1]?.[1] ?? 0)) <= 1;
+    const recommendedResume = ordered[0]?.[0] ?? "SWE";
     const profile = resumeProfiles.find((r) => r.type === recommendedResume);
     return {
         recommendedResume,
@@ -55,7 +71,7 @@ const deterministicResumeSelection = (job) => {
     };
 };
 export const selectResume = async (params) => {
-    const deterministic = deterministicResumeSelection(params.extracted);
+    const deterministic = deterministicResumeSelection(params.extracted, params.resumeContexts);
     if (!deterministic.ambiguous || !env.openAiApiKey) {
         return {
             recommendedResume: deterministic.recommendedResume,

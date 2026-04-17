@@ -3,6 +3,7 @@ import { env } from "../../config/env.js";
 import { resumeProfiles } from "../../config/resumeProfiles.js";
 import type { ExtractedJobData } from "../../types/job.js";
 import type { ResumeSelection, ResumeType } from "../../types/resume.js";
+import type { ResumeContextSet } from "../../types/resumeContext.js";
 import type { ScoreBreakdown } from "../../types/scoring.js";
 import type { UserProfile } from "../../types/userProfile.js";
 import { responsesClient } from "../../services/llm/responsesClient.js";
@@ -16,7 +17,10 @@ const ResumeSelectionSchema = z.object({
   rationale: z.array(z.string()).default([]),
 });
 
-const deterministicResumeSelection = (job: ExtractedJobData): ResumeSelection & { ambiguous: boolean } => {
+const deterministicResumeSelection = (
+  job: ExtractedJobData,
+  resumeContexts?: ResumeContextSet,
+): ResumeSelection & { ambiguous: boolean } => {
   const text = normalizeText(
     [
       job.title,
@@ -50,10 +54,30 @@ const deterministicResumeSelection = (job: ExtractedJobData): ResumeSelection & 
   const earlyHits = earlySignals.filter((needle) => text.includes(needle)).length;
   const sweHits = sweSignals.filter((needle) => text.includes(needle)).length;
 
-  const ambiguous = [sieHits, earlyHits, sweHits].filter((count) => count > 0).length > 1;
-  let recommendedResume: ResumeType = "SWE";
-  if (sieHits > 0 && sieHits >= earlyHits) recommendedResume = "SIE";
-  if (earlyHits > 0 && earlyHits > sieHits) recommendedResume = "EARLY_CAREER";
+  const metaScoreByType: Record<ResumeType, number> = { SWE: 0, SIE: 0, EARLY_CAREER: 0 };
+  if (resumeContexts) {
+    const stackAndNeeds = normalizeText(
+      [...job.stack, ...job.requiredSkills, ...job.preferredSkills, ...job.responsibilities, ...job.requirements].join(" "),
+    );
+    const words = new Set(stackAndNeeds.split(/\s+/).filter(Boolean));
+    const types: ResumeType[] = ["SWE", "SIE", "EARLY_CAREER"];
+    for (const type of types) {
+      const ctx = resumeContexts[type];
+      if (!ctx) continue;
+      const keywordOverlap = ctx.metadata.keywords.filter((k) => words.has(k)).length;
+      const themeOverlap = ctx.metadata.strongestThemes.filter((t) => stackAndNeeds.includes(normalizeText(t))).length;
+      metaScoreByType[type] = keywordOverlap + themeOverlap * 2;
+    }
+  }
+
+  const combinedByType: Record<ResumeType, number> = {
+    SWE: metaScoreByType.SWE * 2 + sweHits,
+    SIE: metaScoreByType.SIE * 2 + sieHits,
+    EARLY_CAREER: metaScoreByType.EARLY_CAREER * 2 + earlyHits,
+  };
+  const ordered = (Object.entries(combinedByType) as Array<[ResumeType, number]>).sort((a, b) => b[1] - a[1]);
+  const ambiguous = Math.abs((ordered[0]?.[1] ?? 0) - (ordered[1]?.[1] ?? 0)) <= 1;
+  const recommendedResume: ResumeType = ordered[0]?.[0] ?? "SWE";
 
   const profile = resumeProfiles.find((r) => r.type === recommendedResume);
   return {
@@ -70,8 +94,9 @@ export const selectResume = async (params: {
   topMatch: string;
   mainRisk: string;
   userProfile: UserProfile;
+  resumeContexts?: ResumeContextSet;
 }): Promise<ResumeSelection> => {
-  const deterministic = deterministicResumeSelection(params.extracted);
+  const deterministic = deterministicResumeSelection(params.extracted, params.resumeContexts);
   if (!deterministic.ambiguous || !env.openAiApiKey) {
     return {
       recommendedResume: deterministic.recommendedResume,

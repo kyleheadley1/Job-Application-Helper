@@ -249,6 +249,18 @@ export function buildCoverLetterGuidance(job, userProfile) {
     };
 }
 export const buildAssetGuidanceJson = (job, userProfile) => JSON.stringify(buildCoverLetterGuidance(job, userProfile), null, 2);
+export const buildSelectedResumeContextJson = (selectedResumeContext) => {
+    if (!selectedResumeContext)
+        return "none";
+    return JSON.stringify({
+        type: selectedResumeContext.type,
+        strongestThemes: selectedResumeContext.metadata.strongestThemes,
+        projectEvidence: selectedResumeContext.metadata.projectEvidence,
+        claimSupport: selectedResumeContext.metadata.claimSupport,
+        bestFitRoleShapes: selectedResumeContext.metadata.bestFitRoleShapes,
+        avoidUseCases: selectedResumeContext.metadata.avoidUseCases,
+    }, null, 2);
+};
 export const buildAssetJobContextJson = (job) => JSON.stringify({
     extracted: job.extracted,
     rules: job.rules,
@@ -285,6 +297,9 @@ ${ASSET_EVIDENCE_DIVERSITY}
 Cover-letter guidance:
 ${JSON.stringify(buildCoverLetterGuidance(params.job, params.userProfile), null, 2)}
 
+Selected resume context (ONLY grounding resume to use):
+${buildSelectedResumeContextJson(params.selectedResumeContext)}
+
 User profile:
 ${JSON.stringify(params.userProfile, null, 2)}
 
@@ -312,6 +327,9 @@ ${ASSET_EVIDENCE_DIVERSITY}
 
 Shared generation guidance:
 ${buildAssetGuidanceJson(params.job, params.userProfile)}
+
+Selected resume context (ONLY grounding resume to use):
+${buildSelectedResumeContextJson(params.selectedResumeContext)}
 
 User profile:
 ${JSON.stringify(params.userProfile, null, 2)}
@@ -342,6 +360,9 @@ ${ASSET_EVIDENCE_DIVERSITY}
 Shared generation guidance:
 ${buildAssetGuidanceJson(params.job, params.userProfile)}
 
+Selected resume context (ONLY grounding resume to use):
+${buildSelectedResumeContextJson(params.selectedResumeContext)}
+
 User profile:
 ${JSON.stringify(params.userProfile, null, 2)}
 
@@ -371,6 +392,9 @@ ${ASSET_EVIDENCE_DIVERSITY}
 Shared generation guidance:
 ${buildAssetGuidanceJson(params.job, params.userProfile)}
 
+Selected resume context (ONLY grounding resume to use):
+${buildSelectedResumeContextJson(params.selectedResumeContext)}
+
 User profile:
 ${JSON.stringify(params.userProfile, null, 2)}
 
@@ -396,6 +420,9 @@ ${ASSET_EVIDENCE_DIVERSITY}
 
 User profile:
 ${JSON.stringify(params.userProfile, null, 2)}
+
+Selected resume context (ONLY grounding resume to use):
+${buildSelectedResumeContextJson(params.selectedResumeContext)}
 
 Job + evaluation context:
 ${buildAssetJobContextJson(params.job)}

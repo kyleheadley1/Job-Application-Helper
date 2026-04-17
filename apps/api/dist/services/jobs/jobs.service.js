@@ -4,6 +4,7 @@ import { AssetGenerationSkippedError, generateJobAssets, } from "../../agents/jo
 import { userProfile } from "../../config/userProfile.js";
 import { getTrackerColor, shouldShortlist } from "../../config/scoringPolicy.js";
 import { jobsRepository } from "./jobs.repository.js";
+import { resumeContextService } from "../resume/resumeContext.js";
 export class JobNotFoundError extends Error {
     code = "JOB_NOT_FOUND";
     constructor() {
@@ -48,7 +49,8 @@ export class JobsService {
         const job = tracked ?? draft;
         if (!job)
             throw new JobNotFoundError();
-        const result = await generateJobAssets({ job, userProfile, force: input?.force });
+        const selectedResumeContext = (await resumeContextService.getContext(job.recommendedResume)) ?? undefined;
+        const result = await generateJobAssets({ job, userProfile, selectedResumeContext, force: input?.force });
         if (result.skipped) {
             throw new AssetGenerationSkippedError(result.skipReason ?? "Asset generation skipped.");
         }
@@ -71,7 +73,8 @@ export class JobsService {
     }
     async generateAssetsFromJobBody(body) {
         const { job, persist, force } = body;
-        const result = await generateJobAssets({ job, userProfile, force });
+        const selectedResumeContext = (await resumeContextService.getContext(job.recommendedResume)) ?? undefined;
+        const result = await generateJobAssets({ job, userProfile, selectedResumeContext, force });
         if (result.skipped) {
             throw new AssetGenerationSkippedError(result.skipReason ?? "Asset generation skipped.");
         }

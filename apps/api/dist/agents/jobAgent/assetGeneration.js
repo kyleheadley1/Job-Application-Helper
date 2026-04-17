@@ -74,7 +74,7 @@ const uniqueKeepOrder = (items) => {
     return out;
 };
 /** Honest, template-backed assets when LLM is unavailable or fails — uses only job + profile fields. */
-export const buildDeterministicGeneratedAssets = (job, profile) => {
+export const buildDeterministicGeneratedAssets = (job, profile, selectedResumeContext) => {
     const { extracted, recommendedResume, rules, mainRisk } = job;
     const company = extracted.company;
     const title = extracted.title;
@@ -82,14 +82,13 @@ export const buildDeterministicGeneratedAssets = (job, profile) => {
     const stackLine = [...extracted.stack, ...extracted.requiredSkills].filter(Boolean).join(", ");
     const resp0 = extracted.responsibilities[0];
     const rawSnippet = extracted.rawText?.trim().slice(0, 320);
-    const p1 = `Hello ${company} team, I'm applying for the ${title} role. The role priorities around ${guidance.priorities
-        .slice(0, 2)
-        .join(" and ")
-        .replace(/\.$/, "")} are a strong fit for how I like to work. I'm specifically drawn to the practical scope here and the chance to contribute in a way that is immediately useful.`;
-    const evidenceBits = guidance.selectedProjectSummaries.slice(0, 2);
+    const keyPriorities = guidance.priorities.slice(0, 2).join(" and ").replace(/\.$/, "");
+    const p1 = `Hello ${company} team, I'm applying for the ${title} role. This role's focus on ${keyPriorities} fits the kind of practical engineering work I do best.`;
+    const resumeEvidence = selectedResumeContext?.metadata.projectEvidence.map((p) => p.summary).filter(Boolean) ?? [];
+    const evidenceBits = (resumeEvidence.length ? resumeEvidence : guidance.selectedProjectSummaries).slice(0, 2);
     const p2 = evidenceBits.length > 1
-        ? `Two relevant examples from my background: ${evidenceBits[0]} Also, ${evidenceBits[1]} Together, these reflect the blend of execution, product judgment, and collaboration this role appears to prioritize.`
-        : `A relevant example from my background: ${evidenceBits[0] ?? profile.flagshipProjects[0]?.summary ?? profile.headline} This is the kind of overlap I would bring into this role from day one.`;
+        ? `Two relevant examples from my background are: ${evidenceBits[0]} and ${evidenceBits[1]} Together they show the execution and collaboration style this role needs.`
+        : `A relevant example from my background is: ${evidenceBits[0] ?? profile.flagshipProjects[0]?.summary ?? profile.headline}`;
     const p3ByBand = {
         yes: `I'd be excited to contribute quickly in this role and keep building practical product value with your team. If helpful, I can share concrete examples of how I'd approach the first few priorities in your posting.`,
         selective_yes: `If this scope is a match, I'd welcome a conversation on how I'd contribute quickly while ramping where needed. I care most about being clear on near-term impact and delivering consistently from there.`,
@@ -125,7 +124,7 @@ export const buildDeterministicGeneratedAssets = (job, profile) => {
         talkingPoints.push("I'm strongest when priorities are ambiguous but measurable: narrow scope, ship a practical version, then iterate with stakeholders.");
         talkingPoints.push("For this role, the fit is strongest around product-minded execution tied to concrete technical overlap.");
     }
-    for (const summary of guidance.selectedProjectSummaries) {
+    for (const summary of (resumeEvidence.length ? resumeEvidence : guidance.selectedProjectSummaries)) {
         if (talkingPoints.length >= 5)
             break;
         talkingPoints.push(`Relevant example: ${summary}`);
@@ -142,7 +141,7 @@ export const buildDeterministicGeneratedAssets = (job, profile) => {
         : recommendedResume === "EARLY_CAREER"
             ? ["Built", "Shipped", "Implemented", "Contributed to", "Developed"]
             : ["Built", "Shipped", "Implemented", "Designed", "Collaborated on"];
-    const baseBullets = guidance.selectedProjectSummaries.map((summary, idx) => `${bulletLeads[idx % bulletLeads.length]} ${summary.replace(/\.$/, "")}.`);
+    const baseBullets = (resumeEvidence.length ? resumeEvidence : guidance.selectedProjectSummaries).map((summary, idx) => `${bulletLeads[idx % bulletLeads.length]} ${summary.replace(/\.$/, "")}.`);
     const roleBullets = recommendedResume === "SIE"
         ? [
             "Owned integration-focused implementation slices and kept technical/stakeholder communication aligned through delivery.",
@@ -160,10 +159,14 @@ export const buildDeterministicGeneratedAssets = (job, profile) => {
     const tailoredBulletCandidates = uniqueKeepOrder([...baseBullets, ...roleBullets]).slice(0, job.recommendation === "no" ? 3 : 5);
     const emphasize = [
         ...profile.recurringStory.slice(0, 2),
+        ...(selectedResumeContext?.metadata.strongestThemes.slice(0, 2) ?? []),
         job.topMatch,
         `Resume selected for this application: ${recommendedResume} — keep the story consistent with that framing.`,
     ].filter(Boolean);
-    const avoidClaiming = [...profile.hardConstraints];
+    const avoidClaiming = [
+        ...profile.hardConstraints,
+        ...(selectedResumeContext?.metadata.avoidUseCases ?? []),
+    ];
     if (rules.explicitDegreeRisk) {
         avoidClaiming.push("Posting signals a degree gate — do not imply a bachelor's you don't have; be precise about your path or ask about exceptions early.");
     }
@@ -204,7 +207,7 @@ export const buildDeterministicGeneratedAssets = (job, profile) => {
     };
 };
 export const generateJobAssets = async (params) => {
-    const { job, userProfile, force } = params;
+    const { job, userProfile, selectedResumeContext, force } = params;
     if (job.recommendation === "no" && !force) {
         return {
             generated: {},
@@ -212,35 +215,35 @@ export const generateJobAssets = async (params) => {
             skipReason: "Recommendation is 'no'; asset generation is skipped unless force=true.",
         };
     }
-    const fb = buildDeterministicGeneratedAssets(job, userProfile);
+    const fb = buildDeterministicGeneratedAssets(job, userProfile, selectedResumeContext);
     const [cl, why, talk, bullets, strat] = await Promise.all([
         responsesClient.runStructured({
             systemPrompt: coverLetterAssetSystemPrompt,
-            userPrompt: buildCoverLetterAssetUserPrompt({ job, userProfile }),
+            userPrompt: buildCoverLetterAssetUserPrompt({ job, userProfile, selectedResumeContext }),
             schema: CoverLetterOut,
             fallback: () => ({ coverLetter: fb.coverLetter ?? "" }),
         }),
         responsesClient.runStructured({
             systemPrompt: whyCompanyAssetSystemPrompt,
-            userPrompt: buildWhyCompanyAssetUserPrompt({ job, userProfile }),
+            userPrompt: buildWhyCompanyAssetUserPrompt({ job, userProfile, selectedResumeContext }),
             schema: WhyCompanyOut,
             fallback: () => ({ whyCompany: fb.whyCompany ?? "" }),
         }),
         responsesClient.runStructured({
             systemPrompt: talkingPointsAssetSystemPrompt,
-            userPrompt: buildTalkingPointsAssetUserPrompt({ job, userProfile }),
+            userPrompt: buildTalkingPointsAssetUserPrompt({ job, userProfile, selectedResumeContext }),
             schema: TalkingOut,
             fallback: () => ({ talkingPoints: fb.talkingPoints ?? [] }),
         }),
         responsesClient.runStructured({
             systemPrompt: tailoredBulletsAssetSystemPrompt,
-            userPrompt: buildTailoredBulletsAssetUserPrompt({ job, userProfile }),
+            userPrompt: buildTailoredBulletsAssetUserPrompt({ job, userProfile, selectedResumeContext }),
             schema: BulletsOut,
             fallback: () => ({ tailoredBulletCandidates: fb.tailoredBulletCandidates ?? [] }),
         }),
         responsesClient.runStructured({
             systemPrompt: applicationStrategyAssetSystemPrompt,
-            userPrompt: buildApplicationStrategyAssetUserPrompt({ job, userProfile }),
+            userPrompt: buildApplicationStrategyAssetUserPrompt({ job, userProfile, selectedResumeContext }),
             schema: StrategyOut,
             fallback: () => ({
                 emphasize: fb.emphasize ?? [],

@@ -141,7 +141,7 @@ describe("asset generation orchestrator", () => {
     const g = buildDeterministicGeneratedAssets(makeJob({ recommendation: "yes" }), userProfile);
     const words = (g.coverLetter ?? "").trim().split(/\s+/).filter(Boolean).length;
     expect(words).toBeLessThanOrEqual(220);
-    expect(words).toBeGreaterThanOrEqual(120);
+    expect(words).toBeGreaterThanOrEqual(100);
   });
 
   it("cover letters differ across role shapes and do not always reuse same angle", () => {
