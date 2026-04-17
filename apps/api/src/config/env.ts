@@ -44,6 +44,7 @@ export const env = {
   mongoDbName: process.env.MONGO_DB_NAME ?? "job_agent_mvp",
   openAiApiKey: process.env.OPENAI_API_KEY,
   openAiModel: process.env.OPENAI_MODEL ?? "gpt-5-mini",
+  resumeContextDir: process.env.RESUME_CONTEXT_DIR,
   /** Resolved path used for dotenv (audit / support). */
   rootEnvPath,
   rootEnvFileExists: fs.existsSync(rootEnvPath),
