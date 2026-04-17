@@ -13,6 +13,14 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   return (await response.json()) as T;
 };
 
+const fetchCsv = async (path: string): Promise<string> => {
+  const response = await fetch(`${API_BASE}${path}`);
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status}`);
+  }
+  return response.text();
+};
+
 export const api = {
   triage: (payload: { url?: string; rawText?: string; companyHint?: string; fullPrep?: boolean }) =>
     request<JobRecord>("/jobs/triage", { method: "POST", body: JSON.stringify(payload) }),
@@ -20,6 +28,28 @@ export const api = {
   getJob: (id: string) => request<JobRecord & { statusHistory?: unknown[] }>(`/jobs/${id}`),
   updateStatus: (id: string, status: JobStatus, note?: string) =>
     request<JobRecord>(`/jobs/${id}/status`, { method: "PATCH", body: JSON.stringify({ status, note }) }),
+  updateNotes: (id: string, notes: string) =>
+    request<JobRecord>(`/jobs/${id}/notes`, { method: "PATCH", body: JSON.stringify({ notes }) }),
+  exportJobs: (query = "") =>
+    request<{
+      rows: Array<{
+        Company: string;
+        Role: string;
+        "Latest Score": number;
+        "Recommended Action": string;
+        "Salary Ask": string;
+        "Top Match": string;
+        "Main Risk": string;
+        Resume: JobRecord["recommendedResume"];
+        "Status / Outcome": string;
+        Shortlist: boolean;
+        Notes: string;
+        "Created At": string;
+        "Updated At": string;
+      }>;
+      total: number;
+    }>(`/jobs/export${query}`),
+  exportJobsCsv: (query = "") => fetchCsv(`/jobs/export${query}${query ? "&" : "?"}format=csv`),
   regenerateAssets: (id: string, force = true) =>
     request<JobRecord>(`/jobs/${id}/generate-assets`, { method: "POST", body: JSON.stringify({ force }) }),
 };

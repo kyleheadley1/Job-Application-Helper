@@ -81,10 +81,7 @@ export type StructuredCallResult<T> = {
   diagnostics: StructuredCallDiagnostics;
 };
 
-const diag = (partial: StructuredCallDiagnostics): StructuredCallDiagnostics => ({
-  fallbackUsed: partial.fallbackUsed,
-  ...partial,
-});
+const diag = (partial: StructuredCallDiagnostics): StructuredCallDiagnostics => ({ ...partial });
 
 export class ResponsesClient {
   async runStructured<T>(request: StructuredRequest<T>): Promise<StructuredCallResult<T>> {

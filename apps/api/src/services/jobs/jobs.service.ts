@@ -1,4 +1,4 @@
-import type { JobRecord } from "../../types/job.js";
+import type { JobExportRow, JobListFilters, JobRecord, JobStatus } from "../../types/job.js";
 import { triageJob } from "../../agents/jobAgent/orchestrator.js";
 import {
   AssetGenerationSkippedError,
@@ -28,6 +28,14 @@ export class JobsService {
 
   async getById(id: string): Promise<JobRecord | null> {
     return jobsRepository.getById(id);
+  }
+
+  async list(filters: JobListFilters): Promise<{ items: JobRecord[]; total: number }> {
+    return jobsRepository.list(filters);
+  }
+
+  async exportRows(filters: JobListFilters): Promise<{ rows: JobExportRow[]; total: number }> {
+    return jobsRepository.exportRows(filters);
   }
 
   async generateAssetsForJobId(jobId: string, input?: { force?: boolean }): Promise<JobRecord> {
@@ -68,6 +76,18 @@ export class JobsService {
       return jobsRepository.upsertJob(merged);
     }
     return merged;
+  }
+
+  async updateStatus(id: string, status: JobStatus, note?: string): Promise<JobRecord> {
+    const updated = await jobsRepository.updateStatus(id, status, note);
+    if (!updated) throw new JobNotFoundError();
+    return updated;
+  }
+
+  async updateNotes(id: string, notes: string): Promise<JobRecord> {
+    const updated = await jobsRepository.updateNotes(id, notes);
+    if (!updated) throw new JobNotFoundError();
+    return updated;
   }
 }
 

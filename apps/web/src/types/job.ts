@@ -101,4 +101,17 @@ export type JobRecord = {
   status: JobStatus;
   createdAt: string;
   updatedAt: string;
+  scoreHistory?: Array<{
+    scoredAt: string;
+    score: ScoreBreakdown;
+    recommendation: Recommendation;
+  }>;
+  statusHistory?: Array<{
+    id: string;
+    jobId: string;
+    fromStatus?: JobStatus;
+    toStatus: JobStatus;
+    note?: string;
+    createdAt: string;
+  }>;
 };

@@ -21,14 +21,14 @@ export const triageJob = async (input: {
   const mergedText = [input.rawText, fetchedText].filter(Boolean).join("\n\n");
   const parsedText = mergedText ? parseJobText(mergedText).normalized : undefined;
 
-  const { extracted, llmExtractionSucceeded, heuristicInferredFields } = await extractJobData({
+  const { extracted, llmExtractionSucceeded, extractionDiagnostics, heuristicInferredFields } = await extractJobData({
     url: input.url,
     rawText: parsedText,
     companyHint: input.companyHint,
   });
 
   const rules = evaluateRules(extracted, userProfile);
-  const scored = await scoreJob({ extracted, rules, userProfile });
+  const { scoring: scored, scoringDiagnostics, scoringLlmSucceeded } = await scoreJob({ extracted, rules, userProfile });
   const salaryAsk = computeSalaryAsk({
     extracted,
     score: scored.score,
@@ -60,6 +60,26 @@ export const triageJob = async (input: {
     generated: {},
     debugExtraction: {
       fallbackUsed: !llmExtractionSucceeded,
+      extraction: {
+        success: llmExtractionSucceeded,
+        fallbackUsed: extractionDiagnostics.fallbackUsed,
+        httpStatus: extractionDiagnostics.httpStatus,
+        errorCode: extractionDiagnostics.errorCode,
+        errorType: extractionDiagnostics.errorType,
+        errorMessage: extractionDiagnostics.errorMessage,
+        parseStage: extractionDiagnostics.parseStage,
+        reason: extractionDiagnostics.reason,
+      },
+      scoring: {
+        success: scoringLlmSucceeded,
+        fallbackUsed: scoringDiagnostics.fallbackUsed,
+        httpStatus: scoringDiagnostics.httpStatus,
+        errorCode: scoringDiagnostics.errorCode,
+        errorType: scoringDiagnostics.errorType,
+        errorMessage: scoringDiagnostics.errorMessage,
+        parseStage: scoringDiagnostics.parseStage,
+        reason: scoringDiagnostics.reason,
+      },
       extractedFromRawText: heuristicInferredFields,
       missingCriticalFields: listMissingCriticalFields(extracted),
     },

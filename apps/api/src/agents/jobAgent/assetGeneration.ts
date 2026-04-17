@@ -15,6 +15,7 @@ import {
   talkingPointsAssetSystemPrompt,
   whyCompanyAssetSystemPrompt,
 } from "./prompts.js";
+import { formatWhyCompanyForSIE, stripPastedJdHeaderFromCoverLetter } from "../../tools/triageStructuredNormalize.js";
 
 const CoverLetterOut = z.object({ coverLetter: z.string().min(1) });
 const WhyCompanyOut = z.object({ whyCompany: z.string().min(1) });
@@ -242,9 +243,19 @@ export const generateJobAssets = async (params: GenerateJobAssetsParams): Promis
 
   const pick = <T,>(ok: boolean, primary: T, alt: T): T => (ok ? primary : alt);
 
+  let coverLetter = pick(cl.success, cl.data.coverLetter, fb.coverLetter);
+  if (typeof coverLetter === "string" && coverLetter.trim()) {
+    coverLetter = stripPastedJdHeaderFromCoverLetter(job, coverLetter);
+  }
+
+  let whyCompany = pick(why.success, why.data.whyCompany, fb.whyCompany);
+  if (typeof whyCompany === "string" && whyCompany.trim() && job.recommendedResume === "SIE") {
+    whyCompany = formatWhyCompanyForSIE(whyCompany);
+  }
+
   const generated: GeneratedAssets = {
-    coverLetter: pick(cl.success, cl.data.coverLetter, fb.coverLetter),
-    whyCompany: pick(why.success, why.data.whyCompany, fb.whyCompany),
+    coverLetter,
+    whyCompany,
     talkingPoints: pick(talk.success, talk.data.talkingPoints, fb.talkingPoints),
     tailoredBulletCandidates: pick(bullets.success, bullets.data.tailoredBulletCandidates, fb.tailoredBulletCandidates),
     emphasize: pick(strat.success, strat.data.emphasize, fb.emphasize),

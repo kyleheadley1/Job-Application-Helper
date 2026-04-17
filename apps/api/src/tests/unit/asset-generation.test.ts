@@ -102,7 +102,7 @@ describe("asset generation orchestrator", () => {
     const job = makeJob({});
     const g = buildDeterministicGeneratedAssets(job, userProfile);
     expect(g.whyCompany).toContain("Acme");
-    expect(g.whyCompany.toLowerCase()).toMatch(/ship internal|posting|role/);
+    expect((g.whyCompany ?? "").toLowerCase()).toMatch(/ship internal|posting|role/);
   });
 
   it("avoidClaiming warns on visa and degree gates from rules", () => {
