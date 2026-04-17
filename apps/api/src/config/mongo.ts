@@ -11,6 +11,10 @@ const ensureIndexes = async (targetDb: Db): Promise<void> => {
   if (indexesEnsured) return;
   const jobs = targetDb.collection("jobs");
   await Promise.all([
+    jobs.createIndex(
+      { importKey: 1 },
+      { unique: true, sparse: true },
+    ),
     jobs.createIndex({ status: 1, updatedAt: -1 }),
     jobs.createIndex({ "tracker.shortlist": 1, updatedAt: -1 }),
     jobs.createIndex({ recommendedResume: 1, updatedAt: -1 }),

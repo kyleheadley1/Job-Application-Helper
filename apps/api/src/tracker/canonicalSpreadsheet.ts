@@ -1,0 +1,295 @@
+import type { JobRecord, JobStatus } from '../types/job.js';
+import type { TrackerSpreadsheetFields } from '../types/trackerSpreadsheet.js';
+import type { ResumeType } from '../types/resume.js';
+import type { Recommendation, ScoreBreakdown } from '../types/scoring.js';
+import { mapRecommendationFromScore } from '../agents/jobAgent/scoring.js';
+
+/** Exact spreadsheet column labels and export order (canonical tracker). */
+export const TRACKER_EXPORT_HEADERS = [
+  'Rank',
+  'Discussed',
+  'Company',
+  'Role',
+  'Latest Score',
+  'Original / Alt Score',
+  'Priority',
+  'Recommended Action',
+  'Status / Outcome',
+  'Salary Ask',
+  'JD Input',
+  'Top Match',
+  'Main Risk',
+  'Notes',
+  'Resume',
+] as const;
+
+export type TrackerExportHeader = (typeof TRACKER_EXPORT_HEADERS)[number];
+
+/** One export row: all string cells, same keys/order as the spreadsheet. */
+export type JobExportRow = Record<TrackerExportHeader, string>;
+
+export const emptyJobExportRow = (): JobExportRow =>
+  Object.fromEntries(
+    TRACKER_EXPORT_HEADERS.map((h) => [h, '']),
+  ) as JobExportRow;
+
+function formatSalaryAskDisplay(job: JobRecord): string {
+  const s = job.salaryAsk;
+  if (typeof s.number === 'number') return String(s.number);
+  if (typeof s.rangeMin === 'number' || typeof s.rangeMax === 'number') {
+    const min = typeof s.rangeMin === 'number' ? String(s.rangeMin) : '';
+    const max = typeof s.rangeMax === 'number' ? String(s.rangeMax) : '';
+    return [min, max].filter(Boolean).join(' - ');
+  }
+  return '';
+}
+
+function pickCell(
+  ts: Partial<TrackerSpreadsheetFields> | undefined,
+  key: keyof TrackerSpreadsheetFields,
+  fallback: string,
+): string {
+  if (ts && ts[key] !== undefined) return String(ts[key]);
+  return fallback;
+}
+
+/** Populate `trackerSpreadsheet` from current internal fields (e.g. after triage). */
+export function buildTrackerSpreadsheetFromJob(job: JobRecord): TrackerSpreadsheetFields {
+  const jd =
+    job.extracted.rawText?.trim() ||
+    (job.extracted.url ? `URL: ${job.extracted.url}` : '') ||
+    '';
+  const statusOutcome = job.tracker.statusOutcome ?? job.status;
+  return {
+    rank: '',
+    discussed: '',
+    company: job.extracted.company,
+    role: job.extracted.title,
+    latestScore: String(job.score.total),
+    originalAltScore: '',
+    priority: job.tracker.priority ?? '',
+    recommendedAction: job.tracker.recommendedAction ?? '',
+    statusOutcome,
+    salaryAsk: formatSalaryAskDisplay(job),
+    jdInput: jd,
+    topMatch: job.topMatch,
+    mainRisk: job.mainRisk,
+    notes: job.tracker.notes ?? '',
+    resume: job.recommendedResume,
+  };
+}
+
+/** JSON/CSV export: canonical columns; spreadsheet subobject overrides when a field is present. */
+export function buildJobExportRow(job: JobRecord): JobExportRow {
+  const base = buildTrackerSpreadsheetFromJob(job);
+  const ts = job.trackerSpreadsheet;
+  return {
+    Rank: pickCell(ts, 'rank', base.rank),
+    Discussed: pickCell(ts, 'discussed', base.discussed),
+    Company: pickCell(ts, 'company', base.company),
+    Role: pickCell(ts, 'role', base.role),
+    'Latest Score': pickCell(ts, 'latestScore', base.latestScore),
+    'Original / Alt Score': pickCell(ts, 'originalAltScore', base.originalAltScore),
+    Priority: pickCell(ts, 'priority', base.priority),
+    'Recommended Action': pickCell(ts, 'recommendedAction', base.recommendedAction),
+    'Status / Outcome': pickCell(ts, 'statusOutcome', base.statusOutcome),
+    'Salary Ask': pickCell(ts, 'salaryAsk', base.salaryAsk),
+    'JD Input': pickCell(ts, 'jdInput', base.jdInput),
+    'Top Match': pickCell(ts, 'topMatch', base.topMatch),
+    'Main Risk': pickCell(ts, 'mainRisk', base.mainRisk),
+    Notes: pickCell(ts, 'notes', base.notes),
+    Resume: pickCell(ts, 'resume', base.resume),
+  };
+}
+
+export function exportRowToObjectInHeaderOrder(row: JobExportRow): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const h of TRACKER_EXPORT_HEADERS) {
+    out[h] = row[h] ?? '';
+  }
+  return out;
+}
+
+const normHeader = (s: string): string =>
+  s
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+
+/** Normalized header → camelCase trackerSpreadsheet key. */
+export const sheetHeaderToField: Record<string, keyof TrackerSpreadsheetFields> = {
+  rank: 'rank',
+  discussed: 'discussed',
+  company: 'company',
+  role: 'role',
+  'latest score': 'latestScore',
+  'original / alt score': 'originalAltScore',
+  'original/alt score': 'originalAltScore',
+  priority: 'priority',
+  'recommended action': 'recommendedAction',
+  'status / outcome': 'statusOutcome',
+  'status/outcome': 'statusOutcome',
+  'salary ask': 'salaryAsk',
+  'jd input': 'jdInput',
+  'top match': 'topMatch',
+  'main risk': 'mainRisk',
+  notes: 'notes',
+  resume: 'resume',
+};
+
+export function parseHeaderRow(row: unknown[]): Map<number, keyof TrackerSpreadsheetFields> {
+  const map = new Map<number, keyof TrackerSpreadsheetFields>();
+  row.forEach((cell, idx) => {
+    const field = sheetHeaderToField[normHeader(String(cell ?? ''))];
+    if (field) map.set(idx, field);
+  });
+  return map;
+}
+
+export function cellToSpreadsheetString(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
+  return String(value);
+}
+
+const STATUS_KEYWORDS: Array<{ re: RegExp; status: JobStatus }> = [
+  { re: /\bto[_\s]?review\b|pending|\bnew\b/i, status: 'to_review' },
+  { re: /\bapplied\b|submitted\b/i, status: 'applied' },
+  { re: /\bskip\b|pass(ed)?\b|declined\b|withdrew\b/i, status: 'skip' },
+  { re: /\breject/i, status: 'rejected' },
+  { re: /\binterview/i, status: 'interviewing' },
+  { re: /\bassessment\b|oa\b|take[-\s]?home/i, status: 'assessment' },
+  { re: /\bclosed\b|filled\b|cancelled\b|canceled\b/i, status: 'closed' },
+  { re: /\boffer\b/i, status: 'offer' },
+];
+
+export function mapSpreadsheetStatusToJobStatus(text: string): JobStatus {
+  const t = text.trim();
+  if (!t) return 'to_review';
+  const direct = [
+    'to_review',
+    'applied',
+    'skip',
+    'rejected',
+    'interviewing',
+    'assessment',
+    'closed',
+    'offer',
+  ] as const;
+  if ((direct as readonly string[]).includes(t)) return t as JobStatus;
+  for (const { re, status } of STATUS_KEYWORDS) {
+    if (re.test(t)) return status;
+  }
+  return 'to_review';
+}
+
+export function parseResumeColumn(text: string): ResumeType {
+  const t = text.trim().toUpperCase();
+  if (t.includes('SIE')) return 'SIE';
+  if (t.includes('EARLY') || t.includes('NEW GRAD')) return 'EARLY_CAREER';
+  return 'SWE';
+}
+
+export function parseLatestScore(text: string): number {
+  const t = text.trim().replace(/[^\d.-]/g, '');
+  if (!t) return 0;
+  const n = Number(t);
+  return Number.isFinite(n) ? Math.round(Math.max(0, Math.min(100, n))) : 0;
+}
+
+const SCORE_KEYS: (keyof Omit<ScoreBreakdown, 'total'>)[] = [
+  'stackFit',
+  'levelFit',
+  'domainFit',
+  'resumeStoryClarity',
+  'functionalOverlap',
+  'recruiterFriendliness',
+  'careerValue',
+];
+
+const SCORE_CAPS: Record<(typeof SCORE_KEYS)[number], number> = {
+  stackFit: 25,
+  levelFit: 15,
+  domainFit: 10,
+  resumeStoryClarity: 15,
+  functionalOverlap: 10,
+  recruiterFriendliness: 15,
+  careerValue: 10,
+};
+
+/** Deterministic breakdown summing exactly to `total` (0–100), within category caps. */
+export function scoreBreakdownFromTotal(totalIn: number): ScoreBreakdown {
+  const total = Math.round(Math.max(0, Math.min(100, totalIn)));
+  const weights = SCORE_KEYS.map((k) => SCORE_CAPS[k]);
+  const sumW = weights.reduce((a, b) => a + b, 0);
+  const floors = weights.map((w) => Math.floor((total * w) / sumW));
+  const parts = [...floors];
+  let sum = parts.reduce((a, b) => a + b, 0);
+  let diff = total - sum;
+  let guard = 0;
+  while (diff !== 0 && guard < 500) {
+    guard++;
+    if (diff > 0) {
+      let bestI = -1;
+      let bestRoom = -1;
+      for (let i = 0; i < SCORE_KEYS.length; i++) {
+        const key = SCORE_KEYS[i];
+        const cap = SCORE_CAPS[key];
+        const room = cap - parts[i];
+        if (room > bestRoom) {
+          bestRoom = room;
+          bestI = i;
+        }
+      }
+      if (bestI < 0 || bestRoom <= 0) break;
+      parts[bestI]++;
+      diff--;
+    } else {
+      let bestI = -1;
+      let bestGive = -1;
+      for (let i = 0; i < SCORE_KEYS.length; i++) {
+        const give = parts[i];
+        if (give > bestGive) {
+          bestGive = give;
+          bestI = i;
+        }
+      }
+      if (bestI < 0 || bestGive <= 0) break;
+      parts[bestI]--;
+      diff++;
+    }
+  }
+  return {
+    stackFit: parts[0],
+    levelFit: parts[1],
+    domainFit: parts[2],
+    resumeStoryClarity: parts[3],
+    functionalOverlap: parts[4],
+    recruiterFriendliness: parts[5],
+    careerValue: parts[6],
+    total,
+  };
+}
+
+export function recommendationFromScoreTotal(total: number): Recommendation {
+  return mapRecommendationFromScore(total);
+}
+
+/** Best-effort parse of salary text into `salaryAsk` number fields. */
+export function parseSalaryAskFromText(text: string): {
+  number?: number;
+  rangeMin?: number;
+  rangeMax?: number;
+} {
+  const raw = text.trim();
+  if (!raw) return {};
+  const nums = raw.match(/\d[\d,]*/g);
+  if (!nums?.length) return {};
+  const parsed = nums.map((n) => Number(n.replace(/,/g, ''))).filter((n) => Number.isFinite(n));
+  if (parsed.length === 0) return {};
+  if (parsed.length === 1) return { number: parsed[0] };
+  const sorted = [...parsed].sort((a, b) => a - b);
+  return { rangeMin: sorted[0], rangeMax: sorted[sorted.length - 1] };
+}

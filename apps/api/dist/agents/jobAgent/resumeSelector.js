@@ -4,14 +4,37 @@ import { resumeProfiles } from "../../config/resumeProfiles.js";
 import { responsesClient } from "../../services/llm/responsesClient.js";
 import { buildResumeSelectionPrompt, resumeSelectionSystemPrompt } from "./prompts.js";
 import { normalizeText } from "../../lib/text.js";
+import { logger } from "../../lib/logger.js";
 const ResumeSelectionSchema = z.object({
     recommendedResume: z.enum(["SWE", "SIE", "EARLY_CAREER"]),
     confidence: z.number().min(0).max(1),
     rationale: z.array(z.string()).default([]),
 });
 const deterministicResumeSelection = (job) => {
-    const text = normalizeText(`${job.title} ${(job.requirements ?? []).join(" ")} ${(job.responsibilities ?? []).join(" ")}`);
-    const sieSignals = ["forward deployed", "implementation", "integrations", "solutions engineer", "customer-facing"];
+    const text = normalizeText([
+        job.title,
+        job.rawText ?? "",
+        (job.requirements ?? []).join(" "),
+        (job.responsibilities ?? []).join(" "),
+    ].join(" "));
+    const sieSignals = [
+        "forward deployed",
+        "solutions engineer",
+        "customer-facing implementation",
+        "implementation",
+        "integrations",
+        "customer deployment",
+        "technical onboarding",
+        "solution design",
+        "delivery timelines",
+        "integration timelines",
+        "partner engineering",
+        "pre-sales",
+        "post-sales",
+        "api integration",
+        "workflow implementation",
+        "technical implementation",
+    ];
     const earlySignals = ["new grad", "entry level", "early career", "rotational", "associate"];
     const sweSignals = ["software engineer", "full-stack", "backend", "api", "product engineer"];
     const sieHits = sieSignals.filter((needle) => text.includes(needle)).length;
@@ -45,11 +68,20 @@ export const selectResume = async (params) => {
         confidence: deterministic.confidence,
         rationale: deterministic.rationale,
     });
-    const { data } = await responsesClient.runStructured({
+    const selected = await responsesClient.runStructured({
         systemPrompt: resumeSelectionSystemPrompt,
         userPrompt: buildResumeSelectionPrompt(params),
         schema: ResumeSelectionSchema,
         fallback,
     });
-    return data;
+    if (!selected.success) {
+        logger.warn("Resume selection used deterministic fallback", {
+            fallbackUsed: selected.diagnostics.fallbackUsed,
+            httpStatus: selected.diagnostics.httpStatus,
+            errorCode: selected.diagnostics.errorCode,
+            parseStage: selected.diagnostics.parseStage,
+            reason: selected.diagnostics.reason,
+        });
+    }
+    return selected.data;
 };

@@ -12,6 +12,23 @@ const CITIZENSHIP = /\b(us\s+)?citizenship\s+(is\s+)?required\b|\bcitizenship\s+
 const VISA_NO_SPONSOR = /\bno\s+(visa\s+)?sponsorship\b|\bunable\s+to\s+sponsor\b|\bmust\s+be\s+authorized\s+to\s+work\s+in\s+the\s+u\.?s\.?\b|\bauthorized\s+to\s+work\s+in\s+the\s+u\.?s\.?\s+without\s+sponsorship\b/i;
 const CLEARANCE = /\b(security\s+clearance|ts\/sci|top\s+secret|clearance\s+required|dod\s+clearance)\b/i;
 const SENIOR = /\b(senior|sr\.|staff|principal|lead\s+engineer|architect)\b/i;
+/** Deterministic hints that a role is implementation / integration shaped (helps resume + rules when stack is thin). */
+const SIE_IMPLEMENTATION_HINTS = [
+    /\bcustomer-facing implementation\b/i,
+    /\btechnical implementation\b/i,
+    /\bcustomer deployment\b/i,
+    /\btechnical onboarding\b/i,
+    /\bsolution design\b/i,
+    /\bdelivery timelines?\b/i,
+    /\bintegration timelines?\b/i,
+    /\bintegrations?\s+with\b/i,
+    /\bpartner engineering\b/i,
+    /\bpre[-\s]?sales\b[^.\n]{0,80}\btechnical\b/i,
+    /\bpost[-\s]?sales\b[^.\n]{0,80}\btechnical\b/i,
+    /\bapi integration\b/i,
+    /\bworkflow implementation\b/i,
+    /\bimplementation and integrations?\b/i,
+];
 const STACK_KEYS = [
     { re: /\btypescript\b/i, label: "TypeScript" },
     { re: /\bjavascript\b|\bjs\b/i, label: "JavaScript" },
@@ -297,7 +314,14 @@ export const extractFromRawText = (normalizedText, companyHint) => {
         ...bullets.filter((b) => /required|must have|minimum/i.test(b)),
         ...keywordReqLines,
     ]);
-    const responsibilities = dedupeStrings([...respSection, ...bullets.filter((b) => /build|ship|design|implement|collaborate/i.test(b))]);
+    let responsibilities = dedupeStrings([...respSection, ...bullets.filter((b) => /build|ship|design|implement|collaborate/i.test(b))]);
+    if (SIE_IMPLEMENTATION_HINTS.some((re) => re.test(text))) {
+        responsibilities = dedupeStrings([
+            ...responsibilities,
+            "Posting highlights customer-side implementation, onboarding, or integration delivery work.",
+        ]);
+        inferredFields.push("sieImplementationHints");
+    }
     if (requirements.length) {
         partial.requirements = requirements.slice(0, 15);
         inferredFields.push("requirements");

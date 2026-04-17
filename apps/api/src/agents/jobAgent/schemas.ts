@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TRACKER_EXPORT_HEADERS } from '../../tracker/canonicalSpreadsheet.js';
 import { preprocessExtractionInput } from '../../tools/triageStructuredNormalize.js';
 
 export const ResumeTypeSchema = z.enum(['SWE', 'SIE', 'EARLY_CAREER']);
@@ -170,6 +171,33 @@ export const StatusHistoryRecordSchema = z.object({
   createdAt: z.string(),
 });
 
+export const JobImportSourceSchema = z.object({
+  spreadsheetPath: z.string(),
+  sheetName: z.string(),
+  rowNumber: z.number(),
+  fileFingerprint: z.string(),
+});
+
+export const TrackerSpreadsheetFieldsSchema = z
+  .object({
+    rank: z.string().optional(),
+    discussed: z.string().optional(),
+    company: z.string().optional(),
+    role: z.string().optional(),
+    latestScore: z.string().optional(),
+    originalAltScore: z.string().optional(),
+    priority: z.string().optional(),
+    recommendedAction: z.string().optional(),
+    statusOutcome: z.string().optional(),
+    salaryAsk: z.string().optional(),
+    jdInput: z.string().optional(),
+    topMatch: z.string().optional(),
+    mainRisk: z.string().optional(),
+    notes: z.string().optional(),
+    resume: z.string().optional(),
+  })
+  .optional();
+
 export const JobRecordSchema = z.object({
   id: z.string(),
   extracted: ExtractedJobDataSchema,
@@ -202,6 +230,9 @@ export const JobRecordSchema = z.object({
       notes: z.string().optional(),
     })
     .default({}),
+  trackerSpreadsheet: TrackerSpreadsheetFieldsSchema,
+  importKey: z.string().optional(),
+  importSource: JobImportSourceSchema.optional(),
   status: JobStatusSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -274,21 +305,11 @@ export const JobExportQuerySchema = JobListQuerySchema.extend({
   format: ExportFormatSchema.optional(),
 });
 
-export const JobExportRowSchema = z.object({
-  Company: z.string(),
-  Role: z.string(),
-  'Latest Score': z.number(),
-  'Recommended Action': z.string(),
-  'Salary Ask': z.string(),
-  'Top Match': z.string(),
-  'Main Risk': z.string(),
-  Resume: ResumeTypeSchema,
-  'Status / Outcome': z.string(),
-  Shortlist: z.boolean(),
-  Notes: z.string(),
-  'Created At': z.string(),
-  'Updated At': z.string(),
-});
+const jobExportRowShape = Object.fromEntries(
+  TRACKER_EXPORT_HEADERS.map((h) => [h, z.string()]),
+) as Record<(typeof TRACKER_EXPORT_HEADERS)[number], z.ZodString>;
+
+export const JobExportRowSchema = z.object(jobExportRowShape);
 
 export const TriageResponseSchema = JobRecordSchema;
 

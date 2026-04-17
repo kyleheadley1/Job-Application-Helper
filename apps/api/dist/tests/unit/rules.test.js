@@ -33,9 +33,19 @@ describe("rule engine", () => {
         const rules = evaluateRules(makeJob({ remoteType: "onsite", location: "Dallas, TX", locationIsCommutable: false }), userProfile);
         expect(rules.locationMismatch).toBe(true);
     });
-    it("flags explicit new-grad penalty", () => {
-        const rules = evaluateRules(makeJob({ requirements: ["This is a new grad rotational program"] }), userProfile);
-        expect(rules.newGradPenalty).toBe(true);
+    it("applies strong new-grad pipeline penalty only with harsh employer or degree gate", () => {
+        const soft = evaluateRules(makeJob({ requirements: ["This is a new grad rotational program"] }), userProfile);
+        expect(soft.strictNewGradPipeline).toBe(false);
+        expect(soft.earlyCareerFriendlyRole).toBe(true);
+        expect(soft.newGradPenalty).toBe(false);
+        const strict = evaluateRules(makeJob({
+            company: "Heritage Bank",
+            requirements: ["This is a new graduate rotational program"],
+            degreeRequirement: { level: "required", raw: "Bachelor's required" },
+        }), userProfile);
+        expect(strict.strictNewGradPipeline).toBe(true);
+        expect(strict.newGradPenalty).toBe(true);
+        expect(strict.earlyCareerFriendlyRole).toBe(false);
     });
     it("flags startup founding mismatch", () => {
         const rules = evaluateRules(makeJob({ title: "Founding Engineer", requirements: ["first engineer at startup"] }), userProfile);

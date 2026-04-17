@@ -7,11 +7,12 @@ import { getDb } from "../../config/mongo.js";
 import type {
   DebugAssetGeneration,
   GeneratedAssets,
-  JobExportRow,
   JobListFilters,
   JobRecord,
   JobStatus,
 } from "../../types/job.js";
+import type { JobExportRow } from "../../tracker/canonicalSpreadsheet.js";
+import { buildJobExportRow } from "../../tracker/canonicalSpreadsheet.js";
 import type { Filter, WithId } from "mongodb";
 
 export class JobsRepository {
@@ -23,17 +24,6 @@ export class JobsRepository {
   private fromDoc(doc: WithId<JobRecord & { _id: string }>): JobRecord {
     const { _id, ...rest } = doc;
     return { ...rest, id: rest.id ?? _id };
-  }
-
-  private formatSalaryAsk(job: JobRecord): string {
-    const s = job.salaryAsk;
-    if (typeof s.number === "number") return String(s.number);
-    if (typeof s.rangeMin === "number" || typeof s.rangeMax === "number") {
-      const min = typeof s.rangeMin === "number" ? String(s.rangeMin) : "";
-      const max = typeof s.rangeMax === "number" ? String(s.rangeMax) : "";
-      return [min, max].filter(Boolean).join(" - ");
-    }
-    return "";
   }
 
   private upsertTrackerFields(prev: JobRecord, nextStatus: JobStatus): JobRecord["tracker"] {
@@ -142,12 +132,17 @@ export class JobsRepository {
       ...this.upsertTrackerFields(prevJob, status),
       ...(prevJob.tracker.notes !== undefined ? { notes: prevJob.tracker.notes } : {}),
     };
+    const nextSpreadsheet = {
+      ...prevJob.trackerSpreadsheet,
+      statusOutcome: status,
+    };
     await col.updateOne(
       { _id: id },
       {
         $set: {
           status,
           tracker: nextTracker,
+          trackerSpreadsheet: nextSpreadsheet,
           updatedAt: now,
         },
         $push: { statusHistory: historyItem },
@@ -163,11 +158,16 @@ export class JobsRepository {
     if (!prev) return null;
     const prevJob = this.fromDoc(prev);
     const now = new Date().toISOString();
+    const nextSpreadsheet = {
+      ...prevJob.trackerSpreadsheet,
+      notes: notes.trim(),
+    };
     await col.updateOne(
       { _id: id },
       {
         $set: {
           tracker: { ...prevJob.tracker, notes: notes.trim() },
+          trackerSpreadsheet: nextSpreadsheet,
           updatedAt: now,
         },
       },
@@ -178,22 +178,37 @@ export class JobsRepository {
 
   async exportRows(filters: JobListFilters = {}): Promise<{ rows: JobExportRow[]; total: number }> {
     const { items } = await this.list(filters);
-    const rows: JobExportRow[] = items.map((job) => ({
-      Company: job.extracted.company,
-      Role: job.extracted.title,
-      "Latest Score": job.score.total,
-      "Recommended Action": job.tracker.recommendedAction ?? "",
-      "Salary Ask": this.formatSalaryAsk(job),
-      "Top Match": job.topMatch,
-      "Main Risk": job.mainRisk,
-      Resume: job.recommendedResume,
-      "Status / Outcome": job.tracker.statusOutcome ?? job.status,
-      Shortlist: Boolean(job.tracker.shortlist),
-      Notes: job.tracker.notes ?? "",
-      "Created At": job.createdAt,
-      "Updated At": job.updatedAt,
-    }));
+    const rows: JobExportRow[] = items.map((job) => buildJobExportRow(job));
     return { rows, total: rows.length };
+  }
+
+  /** Upsert by `importKey` (XLSX seed). Preserves `id` / `createdAt` when the key already exists. */
+  async upsertByImportKey(record: JobRecord): Promise<JobRecord> {
+    if (!record.importKey) {
+      throw new Error("importKey is required for upsertByImportKey");
+    }
+    const col = await this.collection();
+    const existing = await col.findOne({ importKey: record.importKey });
+    const now = new Date().toISOString();
+    if (existing) {
+      const id = String(existing._id);
+      const prev = this.fromDoc(existing);
+      const next: JobRecord = {
+        ...record,
+        id,
+        createdAt: prev.createdAt,
+        updatedAt: now,
+      };
+      await col.replaceOne(
+        { _id: id },
+        { ...next, _id: id } as JobRecord & { _id: string },
+      );
+      const saved = await col.findOne({ _id: id });
+      return saved ? this.fromDoc(saved) : next;
+    }
+    const next: JobRecord = { ...record, updatedAt: now };
+    await col.insertOne({ ...next, _id: next.id });
+    return next;
   }
 }
 

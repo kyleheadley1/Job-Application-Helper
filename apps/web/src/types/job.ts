@@ -78,6 +78,24 @@ export type DebugAssetGeneration = {
   slices: Record<string, AssetGenerationSliceDebug>;
 };
 
+export type TrackerSpreadsheetFields = {
+  rank?: string;
+  discussed?: string;
+  company?: string;
+  role?: string;
+  latestScore?: string;
+  originalAltScore?: string;
+  priority?: string;
+  recommendedAction?: string;
+  statusOutcome?: string;
+  salaryAsk?: string;
+  jdInput?: string;
+  topMatch?: string;
+  mainRisk?: string;
+  notes?: string;
+  resume?: string;
+};
+
 export type JobRecord = {
   id: string;
   extracted: ExtractedJobData;
@@ -93,7 +111,12 @@ export type JobRecord = {
   risks: string[];
   generated: GeneratedAssets;
   debugAssetGeneration?: DebugAssetGeneration;
+  trackerSpreadsheet?: Partial<TrackerSpreadsheetFields>;
+  importKey?: string;
   tracker: {
+    priority?: string;
+    recommendedAction?: string;
+    statusOutcome?: string;
     color?: "green" | "yellow" | "red" | "blue";
     shortlist?: boolean;
     notes?: string;

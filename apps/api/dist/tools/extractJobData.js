@@ -1,6 +1,7 @@
 import { extractionSystemPrompt, buildExtractionPrompt } from "../agents/jobAgent/prompts.js";
-import { ExtractedJobDataSchema } from "../agents/jobAgent/schemas.js";
+import { ExtractedJobFromModelSchema } from "../agents/jobAgent/schemas.js";
 import { responsesClient } from "../services/llm/responsesClient.js";
+import { logger } from "../lib/logger.js";
 import { parseJobText } from "./parseJobText.js";
 import { extractFromRawText, mergeExtractedWithHeuristics, } from "./deterministicRawTextExtract.js";
 const fallbackExtraction = (input) => ({
@@ -18,13 +19,24 @@ const fallbackExtraction = (input) => ({
 });
 export const extractJobData = async (input) => {
     const fallback = () => fallbackExtraction(input);
-    const { success: llmExtractionSucceeded, data: baseExtracted } = await responsesClient.runStructured({
+    const extractedRun = await responsesClient.runStructured({
         systemPrompt: extractionSystemPrompt,
         userPrompt: buildExtractionPrompt(input),
-        schema: ExtractedJobDataSchema,
+        schema: ExtractedJobFromModelSchema,
         fallback,
     });
-    let extracted = baseExtracted;
+    const llmExtractionSucceeded = extractedRun.success;
+    if (!llmExtractionSucceeded) {
+        logger.warn("Job extraction used deterministic fallback", {
+            fallbackUsed: extractedRun.diagnostics.fallbackUsed,
+            httpStatus: extractedRun.diagnostics.httpStatus,
+            errorCode: extractedRun.diagnostics.errorCode,
+            parseStage: extractedRun.diagnostics.parseStage,
+            reason: extractedRun.diagnostics.reason,
+            errorMessage: extractedRun.diagnostics.errorMessage,
+        });
+    }
+    let extracted = extractedRun.data;
     let heuristicInferredFields = [];
     if (input.rawText?.trim()) {
         const normalized = parseJobText(input.rawText.replace(/\r\n/g, "\n")).normalized;
@@ -33,5 +45,5 @@ export const extractJobData = async (input) => {
         extracted = mergeExtractedWithHeuristics(extracted, heur);
         extracted.rawText = extracted.rawText ?? input.rawText;
     }
-    return { extracted, llmExtractionSucceeded, heuristicInferredFields };
+    return { extracted, llmExtractionSucceeded, extractionDiagnostics: extractedRun.diagnostics, heuristicInferredFields };
 };

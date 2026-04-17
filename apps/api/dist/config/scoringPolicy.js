@@ -19,6 +19,7 @@ export const scoringPolicy = {
         degreeRequiredTraditional: 16,
         degreeRequiredGeneral: 10,
         newGradPipelineMismatch: 14,
+        earlyCareerSoftMismatch: 4,
         seniorityOverreach: 12,
         locationMismatch: 18,
         sponsorshipMismatch: 25,

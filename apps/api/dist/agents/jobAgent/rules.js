@@ -1,15 +1,27 @@
-import { scoringPolicy } from "../../config/scoringPolicy.js";
-import { normalizeText } from "../../lib/text.js";
+import { scoringPolicy } from '../../config/scoringPolicy.js';
+import { normalizeText } from '../../lib/text.js';
 const includesAny = (haystack, needles) => needles.some((needle) => haystack.includes(needle));
 const RAW_CITIZENSHIP = /\b(us\s+)?citizenship\s+(is\s+)?required\b|\bcitizenship\s+required\b|\bonly\s+u\.?s\.?\s+citizens\b/i;
 const RAW_VISA = /\bno\s+(visa\s+)?sponsorship\b|\bunable\s+to\s+sponsor\b|\bmust\s+be\s+authorized\s+to\s+work\s+in\s+the\s+u\.?s\.?\b|\bauthorized\s+to\s+work\s+in\s+the\s+u\.?s\.?\b/i;
 const RAW_CLEARANCE = /\b(security\s+clearance|ts\/sci|top\s+secret|clearance\s+required|dod\s+clearance)\b/i;
 const RAW_DEGREE = /\b(bachelor'?s?\s+degree|bachelors\s+degree|bs\s+in|b\.s\.|ba\s+in)[^.\n]{0,160}\brequired\b|\bdegree\s+in\s+(computer science|cs|engineering)\s+required\b/i;
+const NEW_GRAD_WORD = /\b(new\s+graduate|new\s+grad)\b/i;
+/** Language that usually indicates a formal campus / graduate / rotation hiring track. */
+const hasStrongPipelineMarkers = (combinedText) => NEW_GRAD_WORD.test(combinedText) ||
+    includesAny(combinedText, [
+        'graduate program',
+        'campus hire',
+        'campus recruiting',
+        'rotational program',
+        'rotation program',
+        'university graduate',
+        'early career program',
+    ]);
 export const evaluateRules = (job, _profile) => {
     const notes = [];
     const penaltyVector = {};
-    const raw = normalizeText(job.rawText ?? "");
-    const companyNorm = normalizeText(job.company ?? "");
+    const raw = normalizeText(job.rawText ?? '');
+    const companyNorm = normalizeText(job.company ?? '');
     const structuredParts = [
         job.title,
         job.seniority,
@@ -23,130 +35,160 @@ export const evaluateRules = (job, _profile) => {
         ...(job.responsibilities ?? []),
     ]
         .filter(Boolean)
-        .join(" ");
-    const combinedText = normalizeText([companyNorm, structuredParts, raw].filter(Boolean).join(" "));
+        .join(' ');
+    const combinedText = normalizeText([companyNorm, structuredParts, raw].filter(Boolean).join(' '));
     const financeNeedles = [
-        "finance",
-        "trading",
-        "capital markets",
-        "banking",
-        "bank",
-        "insurance",
-        "wealth management",
-        "investment bank",
-        "hedge fund",
-        "financial services",
-        "financial institution",
+        'finance',
+        'trading',
+        'capital markets',
+        'banking',
+        'bank',
+        'insurance',
+        'wealth management',
+        'investment bank',
+        'hedge fund',
+        'financial services',
+        'financial institution',
     ];
     const traditionalNeedles = [
-        "fortune 500",
-        "regulated industry",
-        "institution",
-        "government",
-        "federal",
-        "bank",
-        "financial",
-        "insurance",
-        "capital markets",
+        'fortune 500',
+        'regulated industry',
+        'institution',
+        'government',
+        'federal',
+        'bank',
+        'financial',
+        'insurance',
+        'capital markets',
     ];
-    const isFinance = includesAny(combinedText, financeNeedles) || includesAny(companyNorm, ["bank", "capital", "financial", "insurance"]);
-    const isTraditionalCompany = includesAny(combinedText, traditionalNeedles) || includesAny(companyNorm, ["bank", "insurance", "government"]);
-    const explicitNewGrad = includesAny(combinedText, [
-        "new grad",
-        "new graduate",
-        "graduate program",
-        "campus hire",
-        "campus recruiting",
-        "rotational program",
-        "rotation program",
-        "early career program",
-        "university graduate",
-        "associate engineer",
-        "associate software",
-    ]);
-    const seniorityOverreach = includesAny(combinedText, ["senior", "staff", "principal"]) || (job.yearsExperience?.min ?? 0) >= 4;
-    const locationMismatch = (job.remoteType === "onsite" || job.remoteType === "hybrid") && job.locationIsCommutable === false;
-    const visaMismatch = includesAny(normalizeText(job.visaRequirement ?? ""), [
-        "no sponsorship",
-        "must be authorized",
-        "unable to sponsor",
-    ]) || RAW_VISA.test(job.rawText ?? "");
-    const citizenshipMismatch = Boolean(job.citizenshipRequirement) || RAW_CITIZENSHIP.test(job.rawText ?? "");
-    const clearanceMismatch = Boolean(job.clearanceRequirement) || RAW_CLEARANCE.test(job.rawText ?? "");
-    const stackMismatch = !includesAny(combinedText, ["typescript", "javascript", "node", "react", "api", "full-stack"]) &&
-        includesAny(combinedText, ["sre", "infrastructure", "devops", "observability", "platform"]);
+    const isFinance = includesAny(combinedText, financeNeedles) ||
+        includesAny(companyNorm, ['bank', 'capital', 'financial', 'insurance']);
+    const isTraditionalCompany = includesAny(combinedText, traditionalNeedles) ||
+        includesAny(companyNorm, ['bank', 'insurance', 'government']);
+    const harshEmployerContext = isTraditionalCompany || isFinance;
+    const degreeLevel = job.degreeRequirement?.level ?? 'unknown';
+    const degreeRaw = normalizeText(job.degreeRequirement?.raw ?? '');
+    const explicitDegreeRisk = degreeLevel === 'required' ||
+        degreeRaw.includes('bachelor') ||
+        degreeRaw.includes('bs in computer science') ||
+        RAW_DEGREE.test(job.rawText ?? '');
+    const strictNewGradPipeline = hasStrongPipelineMarkers(combinedText) &&
+        (harshEmployerContext || explicitDegreeRisk);
+    const earlyCareerShape = includesAny(combinedText, [
+        'early career',
+        'entry level',
+        'entry-level',
+        'software engineer i',
+        'engineer i',
+        'swe i',
+        'associate engineer',
+        'associate software',
+    ]) ||
+        (hasStrongPipelineMarkers(combinedText) &&
+            !harshEmployerContext &&
+            !explicitDegreeRisk);
+    const earlyCareerFriendlyRole = earlyCareerShape && !strictNewGradPipeline;
+    const seniorityOverreach = includesAny(combinedText, ['senior', 'staff', 'principal']) ||
+        (job.yearsExperience?.min ?? 0) >= 4;
+    const locationMismatch = (job.remoteType === 'onsite' || job.remoteType === 'hybrid') &&
+        job.locationIsCommutable === false;
+    const visaMismatch = includesAny(normalizeText(job.visaRequirement ?? ''), [
+        'no sponsorship',
+        'must be authorized',
+        'unable to sponsor',
+    ]) || RAW_VISA.test(job.rawText ?? '');
+    const citizenshipMismatch = Boolean(job.citizenshipRequirement) ||
+        RAW_CITIZENSHIP.test(job.rawText ?? '');
+    const clearanceMismatch = Boolean(job.clearanceRequirement) || RAW_CLEARANCE.test(job.rawText ?? '');
+    const stackMismatch = !includesAny(combinedText, [
+        'typescript',
+        'javascript',
+        'node',
+        'react',
+        'api',
+        'full-stack',
+    ]) &&
+        includesAny(combinedText, [
+            'sre',
+            'infrastructure',
+            'devops',
+            'observability',
+            'platform',
+        ]);
     const domainMismatch = includesAny(combinedText, [
-        "medical billing",
-        "quantitative research",
-        "actuarial",
-        "embedded firmware",
+        'medical billing',
+        'quantitative research',
+        'actuarial',
+        'embedded firmware',
     ]);
     const startupFounderMismatch = includesAny(combinedText, [
-        "founding engineer",
-        "first engineer",
-        "build from scratch with no support",
+        'founding engineer',
+        'first engineer',
+        'build from scratch with no support',
     ]);
-    const degreeLevel = job.degreeRequirement?.level ?? "unknown";
-    const degreeRaw = normalizeText(job.degreeRequirement?.raw ?? "");
-    const explicitDegreeRisk = degreeLevel === "required" ||
-        degreeRaw.includes("bachelor") ||
-        degreeRaw.includes("bs in computer science") ||
-        RAW_DEGREE.test(job.rawText ?? "");
     if (explicitDegreeRisk) {
-        penaltyVector.degree = isTraditionalCompany || explicitNewGrad
-            ? scoringPolicy.hardPenalties.degreeRequiredTraditional
-            : scoringPolicy.hardPenalties.degreeRequiredGeneral;
-        notes.push("Explicit degree requirement may be a first-pass recruiter filter.");
+        penaltyVector.degree =
+            isTraditionalCompany || strictNewGradPipeline
+                ? scoringPolicy.hardPenalties.degreeRequiredTraditional
+                : scoringPolicy.hardPenalties.degreeRequiredGeneral;
+        notes.push('Explicit degree requirement may be a first-pass recruiter filter.');
     }
     if (isTraditionalCompany) {
         penaltyVector.traditional = 4;
-        notes.push("Traditional employer signal suggests stricter screening behavior.");
+        notes.push('Traditional employer signal suggests stricter screening behavior.');
     }
     if (isFinance) {
         penaltyVector.finance = 5;
-        notes.push("Finance/banking role context typically screens more strictly.");
+        notes.push('Finance/banking role context typically screens more strictly.');
     }
-    if (explicitNewGrad) {
+    if (strictNewGradPipeline) {
         penaltyVector.newGrad = scoringPolicy.hardPenalties.newGradPipelineMismatch;
-        notes.push("Explicit new-grad pipeline appears mismatched to target profile.");
+        notes.push('Traditional new-grad / campus pipeline language appears mismatched to target profile.');
+    }
+    else if (earlyCareerFriendlyRole) {
+        penaltyVector.earlyCareerSoft =
+            scoringPolicy.hardPenalties.earlyCareerSoftMismatch;
+        notes.push('Early-career framing adds junior-screen realism without a harsh pipeline gate.');
     }
     if (seniorityOverreach) {
         penaltyVector.seniority = scoringPolicy.hardPenalties.seniorityOverreach;
-        notes.push("Role may overreach current level story for recruiter screen.");
+        notes.push('Role may overreach current level story for recruiter screen.');
     }
     if (locationMismatch) {
         penaltyVector.location = scoringPolicy.hardPenalties.locationMismatch;
-        notes.push("Onsite/hybrid requirement appears non-commutable.");
+        notes.push('Onsite/hybrid requirement appears non-commutable.');
     }
     if (visaMismatch) {
         penaltyVector.visa = scoringPolicy.hardPenalties.sponsorshipMismatch;
-        notes.push("Visa/sponsorship language indicates risk for first-pass progression.");
+        notes.push('Visa/sponsorship language indicates risk for first-pass progression.');
     }
     if (citizenshipMismatch) {
         penaltyVector.citizenship = scoringPolicy.hardPenalties.citizenshipMismatch;
-        notes.push("Citizenship requirement is a likely hard gate.");
+        notes.push('Citizenship requirement is a likely hard gate.');
     }
     if (clearanceMismatch) {
         penaltyVector.clearance = scoringPolicy.hardPenalties.clearanceMismatch;
-        notes.push("Security clearance requirement is a likely hard gate.");
+        notes.push('Security clearance requirement is a likely hard gate.');
     }
     if (stackMismatch) {
         penaltyVector.stack = scoringPolicy.hardPenalties.stackMismatch;
-        notes.push("Core technical story does not align with role stack shape.");
+        notes.push('Core technical story does not align with role stack shape.');
     }
     if (domainMismatch) {
         penaltyVector.domain = scoringPolicy.hardPenalties.domainMismatch;
-        notes.push("Specialized domain requirements look materially mismatched.");
+        notes.push('Specialized domain requirements look materially mismatched.');
     }
     if (startupFounderMismatch) {
         penaltyVector.founding = scoringPolicy.hardPenalties.startupFounderMismatch;
-        notes.push("Founding-style expectations do not match strongest current story.");
+        notes.push('Founding-style expectations do not match strongest current story.');
     }
     return {
         explicitDegreeRisk,
         traditionalCompanyPenalty: isTraditionalCompany,
         financePenalty: isFinance,
-        newGradPenalty: explicitNewGrad,
+        strictNewGradPipeline,
+        earlyCareerFriendlyRole,
+        newGradPenalty: strictNewGradPipeline,
         seniorityOverreach,
         locationMismatch,
         visaMismatch,
@@ -159,10 +201,4 @@ export const evaluateRules = (job, _profile) => {
         penaltyVector,
     };
 };
-export const isLikelyTraditionalEmployer = (job) => includesAny(normalizeText(`${job.company} ${job.title} ${(job.domainTags ?? []).join(" ")} ${job.rawText ?? ""}`), [
-    "bank",
-    "financial",
-    "insurance",
-    "institution",
-    "government",
-]);
+export const isLikelyTraditionalEmployer = (job) => includesAny(normalizeText(`${job.company} ${job.title} ${(job.domainTags ?? []).join(' ')} ${job.rawText ?? ''}`), ['bank', 'financial', 'insurance', 'institution', 'government']);
