@@ -7,11 +7,10 @@ import { ScoreBadge } from "../components/ScoreBadge";
 import { StatusBadge } from "../components/StatusBadge";
 import { FilterBar } from "../components/FilterBar";
 import {
-  formatUpdatedAtCompact,
   hasJdSource,
   salaryAskCompact,
   salaryAskLabel,
-  trackerListDateIso,
+  trackerDisplayDate,
   tsOnly,
 } from "../lib/jobDisplay";
 
@@ -87,7 +86,7 @@ function statusSecondaryText(job: JobRecord): string {
 }
 
 function trackerDateMs(job: JobRecord): number {
-  const t = new Date(trackerListDateIso(job)).getTime();
+  const t = new Date(trackerDisplayDate(job).sortIso).getTime();
   return Number.isFinite(t) ? t : 0;
 }
 
@@ -188,24 +187,6 @@ const queryString = (params: Record<string, string | boolean | undefined>): stri
   return out ? `?${out}` : "";
 };
 
-function hasActiveFilters(p: {
-  status: string;
-  company: string;
-  resume: string;
-  recommendation: string;
-  minScore: string;
-  shortlistOnly: boolean;
-}): boolean {
-  return Boolean(
-    p.status ||
-      p.company.trim() ||
-      p.resume ||
-      p.recommendation ||
-      p.minScore.trim() ||
-      p.shortlistOnly,
-  );
-}
-
 export const TrackerPage = () => {
   const navigate = useNavigate();
   const [jobs, setJobs] = useState<JobRecord[]>([]);
@@ -267,19 +248,6 @@ export const TrackerPage = () => {
   const shortlistInView = useMemo(
     () => jobs.filter((j) => j.tracker.shortlist).length,
     [jobs],
-  );
-
-  const filtersActive = useMemo(
-    () =>
-      hasActiveFilters({
-        status,
-        company,
-        resume,
-        recommendation,
-        minScore,
-        shortlistOnly,
-      }),
-    [status, company, resume, recommendation, minScore, shortlistOnly],
   );
 
   const exportFilename = (ext: string) => {
@@ -412,15 +380,21 @@ export const TrackerPage = () => {
         );
       case "updatedAt":
         {
-          const mainDate = trackerListDateIso(job);
-          const mainMs = new Date(mainDate).getTime();
+          const main = trackerDisplayDate(job);
+          const mainMs = new Date(main.sortIso).getTime();
           const updatedMs = new Date(job.updatedAt).getTime();
           const mainIso = Number.isFinite(mainMs) ? new Date(mainMs).toISOString() : "—";
           const updatedIso = Number.isFinite(updatedMs) ? new Date(updatedMs).toISOString() : "—";
-          const title = `Workflow date: ${mainIso} · Last updated: ${updatedIso}`;
+          const source =
+            main.source === "applied"
+              ? "Applied"
+              : main.source === "discussed"
+                ? "Discussed (spreadsheet)"
+                : "Added / triaged";
+          const title = `${source}: ${main.sourceValue} · Workflow ISO: ${mainIso} · Last updated: ${updatedIso}`;
         return (
           <span className="muted tracker-updated" title={title}>
-            {formatUpdatedAtCompact(mainDate)}
+              {main.displayText}
           </span>
         );
         }
@@ -475,13 +449,7 @@ export const TrackerPage = () => {
 
   const metaLine = () => {
     const n = sortedJobs.length;
-    const parts = [`Showing ${n} role${n === 1 ? "" : "s"}`, `Shortlist: ${shortlistInView}`];
-    if (filtersActive) {
-      parts.push(`Filtered from ${totalAll} in database`);
-    } else if (totalAll > 0) {
-      parts.push(`${totalAll} in database`);
-    }
-    return parts.join(" · ");
+    return `${n} shown · ${shortlistInView} shortlisted · ${totalAll} total`;
   };
 
   return (
@@ -545,14 +513,16 @@ export const TrackerPage = () => {
           shortlistOnly={shortlistOnly}
           onShortlistChange={setShortlistOnly}
         />
-        <label className="checkboxRow muted tracker-extras-toggle">
-          <input
-            type="checkbox"
-            checked={showExtras}
-            onChange={(e) => setShowExtras(e.target.checked)}
-          />
-          Show sheet columns (Rank, Discussed, Orig/alt, Priority)
-        </label>
+        <div className="tracker-filter-footer">
+          <label className="checkboxRow muted tracker-extras-toggle">
+            <input
+              type="checkbox"
+              checked={showExtras}
+              onChange={(e) => setShowExtras(e.target.checked)}
+            />
+            Show sheet columns (Rank, Discussed, Orig/alt, Priority)
+          </label>
+        </div>
       </div>
 
       <div className="tracker-table-section card">
