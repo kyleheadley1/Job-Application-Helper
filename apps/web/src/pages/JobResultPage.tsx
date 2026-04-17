@@ -6,6 +6,7 @@ import { ScoreBadge } from "../components/ScoreBadge";
 import { StatusBadge } from "../components/StatusBadge";
 import { JsonPanel } from "../components/JsonPanel";
 import { salaryAskLabel } from "../lib/jobDisplay";
+import { decisionSummaryLine, selectDistinctRisks, selectTopFits } from "../lib/resultSummary";
 
 type AssetTab = "cover" | "why" | "points" | "bullets" | "raw";
 
@@ -80,6 +81,9 @@ export const JobResultPage = () => {
 
   if (error) return <p className="error">{error}</p>;
   if (!job) return <p>Loading...</p>;
+  const topFits = selectTopFits(job, 2);
+  const topRisks = selectDistinctRisks(job, 2);
+  const summaryLine = decisionSummaryLine(job);
 
   return (
     <section className="stack">
@@ -88,7 +92,7 @@ export const JobResultPage = () => {
           <h2>
             {job.extracted.company} - {job.extracted.title}
           </h2>
-          <p className="muted">{job.topMatch}</p>
+          <p className="muted">{summaryLine}</p>
         </div>
         <div className="row">
           <ScoreBadge score={job.score.total} />
@@ -113,8 +117,10 @@ export const JobResultPage = () => {
           {confirmMsg ? <p className="muted">{confirmMsg}</p> : null}
           <p>Salary ask: {salaryAskLabel(job) || "N/A"}</p>
           <p>Recommended resume: {job.recommendedResume}</p>
-          <p>Main risk: {job.mainRisk}</p>
-          <ul>{job.rationale.map((item) => <li key={item}>{item}</li>)}</ul>
+          <h4>Why consider</h4>
+          <ul>{topFits.map((item) => <li key={item}>{item}</li>)}</ul>
+          <h4>Key risks</h4>
+          <ul>{topRisks.map((item) => <li key={item}>{item}</li>)}</ul>
         </article>
         <article className="card">
           <h3>Score Breakdown</h3>

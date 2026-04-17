@@ -111,6 +111,20 @@ const deterministicFallback = (
   if (/\bproduct\s+engineer\b/i.test(fitBlob))
     careerValue = Math.min(10, careerValue + 1);
 
+  // Calibration: for junior-builder roles that mention broad internet-scale / revenue / data-science scope,
+  // keep optimism measured unless direct evidence is stronger.
+  const earlyCareerBuilderLike = /\b(junior|entry[-\s]?level|early[-\s]?career|associate|1[-\s]?3 years)\b/i.test(
+    fitBlob,
+  );
+  const aspirationalScopeSignals =
+    (fitBlob.match(/\b(internet[-\s]?scale|global scale|millions|revenue|growth|data science|ml platform|optimiz(e|ation))\b/gi)
+      ?.length ?? 0);
+  if (earlyCareerBuilderLike && aspirationalScopeSignals > 0) {
+    careerValue = Math.max(0, careerValue - 1);
+    recruiterFriendliness = Math.max(0, recruiterFriendliness - 1);
+    functionalOverlap = Math.max(0, functionalOverlap - 1);
+  }
+
   const subtotal =
     stackFit +
     levelFit +
@@ -146,6 +160,12 @@ const deterministicFallback = (
     risks: rules.notes,
   };
 };
+
+/** Deterministic scoring path exported for calibration tests. */
+export const scoreJobDeterministicPreview = (params: {
+  extracted: ExtractedJobData;
+  rules: RuleEvaluation;
+}): ScoringResult => deterministicFallback(params.extracted, params.rules);
 
 const clamp = (n: number, min: number, max: number): number => Math.max(min, Math.min(max, n));
 
