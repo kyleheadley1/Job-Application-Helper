@@ -44,6 +44,62 @@ const enforceCoverLetterWordBand = (text, fallback, opts) => {
         return `${words.slice(0, opts.max).join(" ")}...`;
     return out;
 };
+const splitSentences = (text) => (text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? []).map((s) => s.trim()).filter(Boolean);
+const polishCoverLetterTextbox = (text, recommendation) => {
+    let cleaned = text
+        .replace(/\r\n/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .replace(/\s{2,}/g, " ")
+        .replace(/\bIn a recent project I\b/gi, "Recently, I")
+        .replace(/\bA relevant example from my background is:\s*/gi, "")
+        .replace(/\bTwo relevant examples from my background are:\s*/gi, "")
+        .trim();
+    if (!cleaned)
+        return cleaned;
+    const caveatRe = /\b(don['’]t|do not|lack|missing|without|no\s+\w+\s+experience|don['’]t yet have)\b/i;
+    const caveatHelpfulRe = /\b(learn|ramp|pick up|eager|quickly)\b/i;
+    const allSentences = splitSentences(cleaned);
+    const keptSentences = [];
+    let keptCaveat = false;
+    for (const sentence of allSentences) {
+        if (!caveatRe.test(sentence)) {
+            keptSentences.push(sentence);
+            continue;
+        }
+        if (recommendation === "yes")
+            continue;
+        if (recommendation === "selective_yes") {
+            if (!keptCaveat && caveatHelpfulRe.test(sentence)) {
+                keptSentences.push(sentence);
+                keptCaveat = true;
+            }
+            continue;
+        }
+        if (!keptCaveat) {
+            keptSentences.push(sentence);
+            keptCaveat = true;
+        }
+    }
+    const sourceSentences = keptSentences.length ? keptSentences : allSentences;
+    if (!sourceSentences.length)
+        return cleaned;
+    const paraCount = sourceSentences.length >= 5 ? 3 : 2;
+    const maxPerPara = paraCount === 3 ? 2 : 3;
+    const paragraphs = [];
+    let idx = 0;
+    for (let p = 0; p < paraCount && idx < sourceSentences.length; p += 1) {
+        const take = Math.min(maxPerPara, sourceSentences.length - idx);
+        paragraphs.push(sourceSentences.slice(idx, idx + take).join(" ").trim());
+        idx += take;
+    }
+    if (idx < sourceSentences.length) {
+        paragraphs[paragraphs.length - 1] = `${paragraphs[paragraphs.length - 1]} ${sourceSentences
+            .slice(idx)
+            .join(" ")}`.trim();
+    }
+    cleaned = paragraphs.filter(Boolean).join("\n\n");
+    return cleaned;
+};
 const caveatPatterns = [
     /\bdon['’]t have\b/gi,
     /\black\b/gi,
@@ -73,6 +129,21 @@ const uniqueKeepOrder = (items) => {
     }
     return out;
 };
+const LEAD_VERB_RE = /^(built|shipped|implemented|designed|delivered|translated|coordinated|drove|developed|led|created|contributed)\b/i;
+const normalizeSnippetStart = (snippet) => {
+    const s = snippet.trim().replace(/^[\s,.;:!?-]+/, "");
+    if (!s)
+        return "";
+    return s[0].toUpperCase() + s.slice(1);
+};
+const withLeadVerb = (leadVerb, snippet) => {
+    const normalized = normalizeSnippetStart(snippet).replace(/\.$/, "");
+    if (!normalized)
+        return `${leadVerb}.`;
+    if (LEAD_VERB_RE.test(normalized))
+        return `${normalized}.`;
+    return `${leadVerb} ${normalized}.`;
+};
 /** Honest, template-backed assets when LLM is unavailable or fails — uses only job + profile fields. */
 export const buildDeterministicGeneratedAssets = (job, profile, selectedResumeContext) => {
     const { extracted, recommendedResume, rules, mainRisk } = job;
@@ -87,16 +158,17 @@ export const buildDeterministicGeneratedAssets = (job, profile, selectedResumeCo
     const resumeEvidence = selectedResumeContext?.metadata.projectEvidence.map((p) => p.summary).filter(Boolean) ?? [];
     const evidenceBits = (resumeEvidence.length ? resumeEvidence : guidance.selectedProjectSummaries).slice(0, 2);
     const p2 = evidenceBits.length > 1
-        ? `Two relevant examples from my background are: ${evidenceBits[0]} and ${evidenceBits[1]} Together they show the execution and collaboration style this role needs.`
-        : `A relevant example from my background is: ${evidenceBits[0] ?? profile.flagshipProjects[0]?.summary ?? profile.headline}`;
+        ? `${normalizeSnippetStart(evidenceBits[0]).replace(/\.$/, "")}. ${normalizeSnippetStart(evidenceBits[1]).replace(/\.$/, "")}.`
+        : `${normalizeSnippetStart(evidenceBits[0] ?? profile.flagshipProjects[0]?.summary ?? profile.headline).replace(/\.$/, ".")}`;
     const p3ByBand = {
         yes: `I'd be excited to contribute quickly in this role and keep building practical product value with your team. If helpful, I can share concrete examples of how I'd approach the first few priorities in your posting.`,
         selective_yes: `If this scope is a match, I'd welcome a conversation on how I'd contribute quickly while ramping where needed. I care most about being clear on near-term impact and delivering consistently from there.`,
         no: `I recognize this role may be a stretch in parts, but I'd still bring practical execution and clear communication from day one. If there is flexibility on exact background profile, I'd be glad to discuss where I can add immediate value.`,
     };
-    const coverLetter = enforceCoverLetterWordBand([p1, p2, p3ByBand[job.recommendation]].join("\n\n"), [p1, p2, p3ByBand[job.recommendation]].join("\n\n"), {
-        min: 140,
-        max: 220,
+    const rawCoverLetter = [p1, p2, p3ByBand[job.recommendation]].join("\n\n");
+    const coverLetter = enforceCoverLetterWordBand(polishCoverLetterTextbox(rawCoverLetter, job.recommendation), rawCoverLetter, {
+        min: 120,
+        max: 200,
     });
     const whyTone = {
         yes: "This aligns with the direction I want to keep building in.",
@@ -141,7 +213,7 @@ export const buildDeterministicGeneratedAssets = (job, profile, selectedResumeCo
         : recommendedResume === "EARLY_CAREER"
             ? ["Built", "Shipped", "Implemented", "Contributed to", "Developed"]
             : ["Built", "Shipped", "Implemented", "Designed", "Collaborated on"];
-    const baseBullets = (resumeEvidence.length ? resumeEvidence : guidance.selectedProjectSummaries).map((summary, idx) => `${bulletLeads[idx % bulletLeads.length]} ${summary.replace(/\.$/, "")}.`);
+    const baseBullets = (resumeEvidence.length ? resumeEvidence : guidance.selectedProjectSummaries).map((summary, idx) => withLeadVerb(bulletLeads[idx % bulletLeads.length], summary));
     const roleBullets = recommendedResume === "SIE"
         ? [
             "Owned integration-focused implementation slices and kept technical/stakeholder communication aligned through delivery.",
@@ -256,7 +328,8 @@ export const generateJobAssets = async (params) => {
     let coverLetter = pick(cl.success, cl.data.coverLetter, fb.coverLetter);
     if (typeof coverLetter === "string" && coverLetter.trim()) {
         coverLetter = stripPastedJdHeaderFromCoverLetter(job, coverLetter);
-        coverLetter = enforceCoverLetterWordBand(coverLetter, fb.coverLetter ?? "", { min: 120, max: 220 });
+        coverLetter = polishCoverLetterTextbox(coverLetter, job.recommendation);
+        coverLetter = enforceCoverLetterWordBand(coverLetter, fb.coverLetter ?? "", { min: 110, max: 200 });
         if (hasExcessiveCaveatLanguage(coverLetter, job.recommendation)) {
             coverLetter = fb.coverLetter ?? coverLetter;
         }

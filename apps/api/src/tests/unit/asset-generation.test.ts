@@ -140,8 +140,16 @@ describe("asset generation orchestrator", () => {
   it("deterministic cover letter stays textbox-sized by default", () => {
     const g = buildDeterministicGeneratedAssets(makeJob({ recommendation: "yes" }), userProfile);
     const words = (g.coverLetter ?? "").trim().split(/\s+/).filter(Boolean).length;
-    expect(words).toBeLessThanOrEqual(220);
-    expect(words).toBeGreaterThanOrEqual(100);
+    expect(words).toBeLessThanOrEqual(200);
+    expect(words).toBeGreaterThanOrEqual(90);
+  });
+
+  it("deterministic cover letter is concise multi-paragraph textbox format", () => {
+    const g = buildDeterministicGeneratedAssets(makeJob({ recommendation: "selective_yes" }), userProfile);
+    const paras = (g.coverLetter ?? "").split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+    expect(paras.length).toBeGreaterThanOrEqual(2);
+    expect(paras.length).toBeLessThanOrEqual(3);
+    expect((g.coverLetter ?? "").toLowerCase()).not.toMatch(/in a recent project i|two relevant examples from my background are/);
   });
 
   it("cover letters differ across role shapes and do not always reuse same angle", () => {
@@ -205,6 +213,28 @@ describe("asset generation orchestrator", () => {
     expect(caveatHits(yes.coverLetter ?? "")).toBeLessThanOrEqual(1);
     expect(caveatHits(selective.coverLetter ?? "")).toBeLessThanOrEqual(2);
     expect((forcedNo.coverLetter ?? "").toLowerCase()).not.toMatch(/i should not apply|i am not qualified|reject me/);
+  });
+
+  it("selective_yes cover letter stays role-focused without foregrounding stack-gap caveats", () => {
+    const job = makeJob({
+      recommendation: "selective_yes",
+      extracted: {
+        company: "BuilderCo",
+        title: "Junior Full-Stack Engineer",
+        stack: ["TypeScript", "React", "Node.js"],
+        requiredSkills: ["Full-stack product delivery", "Collaboration with PM/design"],
+        preferredSkills: ["Go", "AI tooling"],
+        domainTags: [],
+        responsibilities: ["Own features end-to-end and iterate quickly with product/design"],
+        requirements: ["1-3 years experience", "early-career growth mindset"],
+        rawText:
+          "Junior builder role emphasizing AI tooling acceleration, full-stack product ownership, collaboration, and scaling.",
+      },
+    });
+    const g = buildDeterministicGeneratedAssets(job, userProfile);
+    const cover = (g.coverLetter ?? "").toLowerCase();
+    expect(cover).toMatch(/full-stack|product|collaborat|ai/);
+    expect(cover).not.toMatch(/i don't have go|missing go|lack go/);
   });
 
   it("whyCompany stays specific and avoids generic praise filler", () => {

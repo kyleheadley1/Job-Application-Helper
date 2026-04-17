@@ -46,6 +46,7 @@ Rules:
 - Be strict with senior title claims and hard qualification gates.
 - Do not infer experience or accomplishments not present.
 - Degree requirements can be major filters in traditional/new-grad contexts.
+- For junior/early-career roles, do not over-credit aspirational language (internet-scale, broad business-impact, data-science exposure) unless evidence in profile/rules supports it.
 - Output ONE flat JSON object with ONLY the keys listed in the user message — no extra keys, no nested wrapper, no markdown.
 `.trim();
 
@@ -80,6 +81,9 @@ Return EXACTLY these keys (and no others):
 Notes:
 - "score.total" must equal the sum of the seven category scores (integer math).
 - "topMatch" and "mainRisk" must be human-readable strings, not booleans or numbers.
+- Keep rationale decision-useful: first two rationale bullets should be strongest fit reasons; first two risk bullets should be main realistic risks.
+- For junior-builder roles, collaboration and growth-potential language are positive but should not be treated as proof of proven internet-scale/data/business-impact ownership.
+- "topMatch" should be a role-specific one-line decision summary tied to concrete JD priorities; avoid generic profile-only phrasing.
 
 Extracted job:
 ${JSON.stringify(params.extracted, null, 2)}
@@ -100,6 +104,8 @@ Rules:
 - Use role shape and expected recruiter screen.
 - Do not choose based only on title.
 - EARLY_CAREER is for explicit junior pipeline pitch, not low score fallback.
+- Junior builder/product/full-stack roles should generally favor EARLY_CAREER or SWE.
+- Reserve SIE for implementation/onboarding/customer-facing integration-heavy role shapes.
 - Output valid JSON only.
 `;
 
@@ -340,12 +346,16 @@ Formatting:
 - Start with a normal greeting ("Hello {company} team", "Dear hiring team", etc.).
 - Never begin with a raw job-description header line (e.g. "{company} — {title}" copied from the posting).
 Default output contract:
-- 140–220 words.
-- 3 short paragraphs.
+- 130–200 words.
+- 2–3 short paragraphs (prefer short textbox-ready flow, not dense blocks).
 - Paragraph 1: direct role interest + why this company/role fit based on real JD priorities.
 - Paragraph 2: 1–2 strongest relevant examples only (no laundry list).
 - Paragraph 3: concise close tied to role value/growth.
+- Keep each paragraph concise (usually 1–2 sentences).
+- Avoid heavy project-dump framing ("In a recent project I...") and avoid compressed resume-summary tone.
 - Keep caveats brief and subordinate; never make them the center of the letter.
+- For selective_yes: keep tone positive but measured; do not foreground stack-gap disclaimers unless they are central blockers.
+- For selective_yes: include at most one brief caveat sentence and keep it in the close when needed.
 Output valid JSON only with a single key "coverLetter".
 `.trim();
 

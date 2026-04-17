@@ -7,6 +7,7 @@ import {
   buildTailoredBulletsAssetUserPrompt,
   buildScoringPrompt,
   buildWhyCompanyAssetUserPrompt,
+  coverLetterAssetSystemPrompt,
   talkingPointsAssetSystemPrompt,
   tailoredBulletsAssetSystemPrompt,
   whyCompanyAssetSystemPrompt,
@@ -138,6 +139,10 @@ describe("Phase 2.2 prompts", () => {
     });
     expect(p).toContain("Cover-letter guidance:");
     expect(p).toContain('"priorities"');
+    expect(coverLetterAssetSystemPrompt).toContain("130–200 words");
+    expect(coverLetterAssetSystemPrompt).toContain("2–3 short paragraphs");
+    expect(coverLetterAssetSystemPrompt).toContain("Avoid heavy project-dump framing");
+    expect(coverLetterAssetSystemPrompt).toContain("selective_yes");
   });
 
   it("whyCompany contract emphasizes specificity and rejects generic praise", () => {

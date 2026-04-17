@@ -36,10 +36,22 @@ const deterministicResumeSelection = (job, resumeContexts) => {
         "technical implementation",
     ];
     const earlySignals = ["new grad", "entry level", "early career", "rotational", "associate"];
-    const sweSignals = ["software engineer", "full-stack", "backend", "api", "product engineer"];
+    const sweSignals = ["software engineer", "full-stack", "backend", "api", "product engineer", "builder"];
+    const juniorBuilderSignals = [
+        "junior",
+        "entry-level",
+        "entry level",
+        "early-career",
+        "early career",
+        "associate",
+        "product engineer",
+        "full-stack",
+        "internal tools",
+    ];
     const sieHits = sieSignals.filter((needle) => text.includes(needle)).length;
     const earlyHits = earlySignals.filter((needle) => text.includes(needle)).length;
     const sweHits = sweSignals.filter((needle) => text.includes(needle)).length;
+    const juniorBuilderHits = juniorBuilderSignals.filter((needle) => text.includes(needle)).length;
     const metaScoreByType = { SWE: 0, SIE: 0, EARLY_CAREER: 0 };
     if (resumeContexts) {
         const stackAndNeeds = normalizeText([...job.stack, ...job.requiredSkills, ...job.preferredSkills, ...job.responsibilities, ...job.requirements].join(" "));
@@ -59,6 +71,16 @@ const deterministicResumeSelection = (job, resumeContexts) => {
         SIE: metaScoreByType.SIE * 2 + sieHits,
         EARLY_CAREER: metaScoreByType.EARLY_CAREER * 2 + earlyHits,
     };
+    // Calibration: junior builder/product roles should default to EARLY_CAREER or SWE,
+    // unless clear SIE implementation/onboarding/customer-delivery signals are present.
+    if (juniorBuilderHits > 0 && sieHits < 2) {
+        combinedByType.SWE += 2;
+        combinedByType.EARLY_CAREER += 2;
+        combinedByType.SIE -= 2;
+    }
+    if (sieHits >= 2 && /customer[-\s]?facing|onboarding|implementation|integration/.test(text)) {
+        combinedByType.SIE += 2;
+    }
     const ordered = Object.entries(combinedByType).sort((a, b) => b[1] - a[1]);
     const ambiguous = Math.abs((ordered[0]?.[1] ?? 0) - (ordered[1]?.[1] ?? 0)) <= 1;
     const recommendedResume = ordered[0]?.[0] ?? "SWE";
