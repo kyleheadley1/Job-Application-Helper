@@ -195,7 +195,7 @@ button {
 }
 
 .tracker-filters-card {
-  padding: 1rem 1.1rem;
+  padding: 0.9rem 1.05rem 0.75rem;
 }
 
 .tracker-filters-heading {
@@ -218,11 +218,18 @@ button {
   grid-column: 1 / -1;
   flex-direction: row;
   align-items: center;
-  margin-top: 0.25rem;
+  margin-top: 0.2rem;
+}
+
+.tracker-filter-footer {
+  margin-top: 0.35rem;
+  display: flex;
+  justify-content: flex-start;
 }
 
 .tracker-extras-toggle {
-  margin-top: 0.85rem;
+  margin-top: 0;
+  font-size: 0.82rem;
 }
 
 .tracker-table-section {
@@ -353,19 +360,21 @@ tbody .tracker-sticky-left {
 }
 
 .tracker-assets-inline {
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 0.15rem 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 500;
+  padding: 0.1rem 0.35rem;
   border-radius: 4px;
-  background: #21262d;
-  border: 1px solid #30363d;
-  color: #c9d1d9;
+  background: transparent;
+  border: 1px solid #30363d66;
+  color: #8b949e;
   text-decoration: none;
+  opacity: 0.9;
 }
 
 .tracker-assets-inline:hover {
-  color: #f0f6fc;
-  border-color: #58a6ff;
+  color: #c9d1d9;
+  border-color: #8b949e;
+  opacity: 1;
 }
 
 .cell-lines-2 {
@@ -388,7 +397,8 @@ tbody .tracker-sticky-left {
 }
 
 .cell-lines-action {
-  font-size: 0.82rem;
+  font-size: 0.78rem;
+  color: #8b949e;
 }
 
 .cell-lines-main-risk {

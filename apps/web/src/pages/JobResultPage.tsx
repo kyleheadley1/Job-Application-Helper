@@ -5,6 +5,7 @@ import type { JobRecord } from "../types/job";
 import { ScoreBadge } from "../components/ScoreBadge";
 import { StatusBadge } from "../components/StatusBadge";
 import { JsonPanel } from "../components/JsonPanel";
+import { salaryAskLabel } from "../lib/jobDisplay";
 
 export const JobResultPage = () => {
   const { id = "" } = useParams();
@@ -38,7 +39,7 @@ export const JobResultPage = () => {
         <article className="card">
           <h3>Decision</h3>
           <p>Apply: {job.recommendation}</p>
-          <p>Salary ask: {job.salaryAsk.number ?? "N/A"} ({job.salaryAsk.rangeMin ?? "-"} - {job.salaryAsk.rangeMax ?? "-"})</p>
+          <p>Salary ask: {salaryAskLabel(job) || "N/A"}</p>
           <p>Recommended resume: {job.recommendedResume}</p>
           <p>Main risk: {job.mainRisk}</p>
           <ul>{job.rationale.map((item) => <li key={item}>{item}</li>)}</ul>

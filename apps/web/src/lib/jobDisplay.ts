@@ -85,22 +85,97 @@ function earliestValidIso(values: Array<string | undefined>): string {
 
 function appliedAtIso(job: JobRecord): string {
   if (!APPLICATION_STATUSES.has(job.status)) return "";
-  const fromHistory = earliestValidIso(
+  return earliestValidIso(
     (job.statusHistory ?? [])
       .filter((h) => APPLICATION_STATUSES.has(h.toStatus))
       .map((h) => h.createdAt),
   );
-  return fromHistory || job.createdAt;
 }
 
+function parseDiscussedDate(raw: string): Date | null {
+  const text = raw.trim();
+  if (!text) return null;
+
+  // Excel serial dates are commonly imported as numeric strings.
+  const asNum = Number(text);
+  if (Number.isFinite(asNum) && asNum > 20000 && asNum < 90000) {
+    const excelEpochMs = Date.UTC(1899, 11, 30);
+    return new Date(excelEpochMs + Math.round(asNum) * 24 * 60 * 60 * 1000);
+  }
+
+  const mdY = text.match(/^(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2}|\d{4}))?$/);
+  if (mdY) {
+    const month = Number(mdY[1]);
+    const day = Number(mdY[2]);
+    const yearRaw = mdY[3];
+    const year =
+      yearRaw === undefined ? new Date().getFullYear() : yearRaw.length === 2 ? 2000 + Number(yearRaw) : Number(yearRaw);
+    const d = new Date(Date.UTC(year, month - 1, day));
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+
+  const t = new Date(text);
+  if (!Number.isNaN(t.getTime())) return t;
+  return null;
+}
+
+export function formatTrackerDateCompact(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const now = new Date();
+  const opts: Intl.DateTimeFormatOptions = { month: "numeric", day: "numeric" };
+  if (d.getFullYear() !== now.getFullYear()) opts.year = "2-digit";
+  return new Intl.DateTimeFormat(undefined, opts).format(d);
+}
+
+export type TrackerDisplayDate = {
+  displayText: string;
+  sortIso: string;
+  source: "applied" | "discussed" | "added";
+  sourceValue: string;
+};
+
 /**
- * Workflow date shown in tracker list:
- * - applied pipeline statuses => first application-related timestamp
- * - otherwise => earliest scored/added timestamp
+ * Tracker-facing workflow date precedence:
+ * 1) appliedAt (status history) when job has truly progressed to applied pipeline stage
+ * 2) imported spreadsheet Discussed date (parsed when possible; raw text preserved)
+ * 3) added/triaged timestamp (createdAt)
  */
-export function trackerListDateIso(job: JobRecord): string {
+export function trackerDisplayDate(job: JobRecord): TrackerDisplayDate {
   const applied = appliedAtIso(job);
-  if (applied) return applied;
-  const scoredAt = earliestValidIso((job.scoreHistory ?? []).map((s) => s.scoredAt));
-  return scoredAt || job.createdAt;
+  if (applied) {
+    return {
+      displayText: formatTrackerDateCompact(applied),
+      sortIso: applied,
+      source: "applied",
+      sourceValue: applied,
+    };
+  }
+
+  const discussedRaw = tsOnly(job, "discussed").trim();
+  if (discussedRaw) {
+    const parsed = parseDiscussedDate(discussedRaw);
+    if (parsed) {
+      const iso = parsed.toISOString();
+      return {
+        displayText: formatTrackerDateCompact(iso),
+        sortIso: iso,
+        source: "discussed",
+        sourceValue: discussedRaw,
+      };
+    }
+    return {
+      displayText: discussedRaw,
+      sortIso: job.createdAt,
+      source: "discussed",
+      sourceValue: discussedRaw,
+    };
+  }
+
+  return {
+    displayText: formatTrackerDateCompact(job.createdAt),
+    sortIso: job.createdAt,
+    source: "added",
+    sourceValue: job.createdAt,
+  };
 }
