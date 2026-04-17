@@ -5,6 +5,7 @@ import type {
   SalaryAsk,
   ScoreBreakdown,
 } from './scoring.js';
+import type { JobImportSource, TrackerSpreadsheetFields } from './trackerSpreadsheet.js';
 
 export type JobStatus =
   | 'to_review'
@@ -127,6 +128,11 @@ export type JobRecord = {
     shortlist?: boolean;
     notes?: string;
   };
+  /** Spreadsheet-shaped cells (camelCase); export maps to exact column labels. */
+  trackerSpreadsheet?: Partial<TrackerSpreadsheetFields>;
+  /** Stable idempotency key for XLSX import upserts. */
+  importKey?: string;
+  importSource?: JobImportSource;
   status: JobStatus;
   createdAt: string;
   updatedAt: string;
@@ -156,18 +162,3 @@ export type JobListFilters = {
   company?: string;
 };
 
-export type JobExportRow = {
-  Company: string;
-  Role: string;
-  'Latest Score': number;
-  'Recommended Action': string;
-  'Salary Ask': string;
-  'Top Match': string;
-  'Main Risk': string;
-  Resume: ResumeType;
-  'Status / Outcome': string;
-  Shortlist: boolean;
-  Notes: string;
-  'Created At': string;
-  'Updated At': string;
-};

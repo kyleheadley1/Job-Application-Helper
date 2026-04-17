@@ -108,27 +108,32 @@ describe("tracker routes", () => {
     expect(byShortlist.body.items.every((i: { tracker: { shortlist?: boolean } }) => i.tracker.shortlist)).toBe(true);
   });
 
-  it("GET /api/jobs/export returns spreadsheet row shape", async () => {
+  it("GET /api/jobs/export returns canonical 15-column tracker shape", async () => {
     await triage(STARTUP_RAW, "Nimbus Labs");
     const res = await request(app).get("/api/jobs/export");
     expect(res.status).toBe(200);
     expect(res.body.total).toBeGreaterThanOrEqual(1);
     const row = res.body.rows[0];
-    expect(row).toMatchObject({
-      Company: expect.any(String),
-      Role: expect.any(String),
-      "Latest Score": expect.any(Number),
-      "Recommended Action": expect.any(String),
-      "Salary Ask": expect.any(String),
-      "Top Match": expect.any(String),
-      "Main Risk": expect.any(String),
-      Resume: expect.stringMatching(/SWE|SIE|EARLY_CAREER/),
-      "Status / Outcome": expect.any(String),
-      Shortlist: expect.any(Boolean),
-      Notes: expect.any(String),
-      "Created At": expect.any(String),
-      "Updated At": expect.any(String),
-    });
+    expect(Object.keys(row)).toEqual([
+      "Rank",
+      "Discussed",
+      "Company",
+      "Role",
+      "Latest Score",
+      "Original / Alt Score",
+      "Priority",
+      "Recommended Action",
+      "Status / Outcome",
+      "Salary Ask",
+      "JD Input",
+      "Top Match",
+      "Main Risk",
+      "Notes",
+      "Resume",
+    ]);
+    expect(row.Company).toEqual(expect.any(String));
+    expect(row["Latest Score"]).toEqual(expect.any(String));
+    expect(row.Resume).toMatch(/SWE|SIE|EARLY_CAREER/);
   });
 
   it("GET /api/jobs/export?format=csv returns CSV", async () => {
@@ -136,7 +141,10 @@ describe("tracker routes", () => {
     const res = await request(app).get("/api/jobs/export").query({ format: "csv" });
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toContain("text/csv");
-    expect(String(res.text).split("\n")[0]).toContain("Company,Role,Latest Score");
+    const header = String(res.text).split("\n")[0];
+    expect(header).toBe(
+      "Rank,Discussed,Company,Role,Latest Score,Original / Alt Score,Priority,Recommended Action,Status / Outcome,Salary Ask,JD Input,Top Match,Main Risk,Notes,Resume",
+    );
   });
 
   it("status/notes updates preserve generated assets and score history", async () => {

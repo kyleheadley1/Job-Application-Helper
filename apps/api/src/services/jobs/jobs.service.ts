@@ -1,4 +1,5 @@
-import type { JobExportRow, JobListFilters, JobRecord, JobStatus } from "../../types/job.js";
+import type { JobListFilters, JobRecord, JobStatus } from "../../types/job.js";
+import type { JobExportRow } from "../../tracker/canonicalSpreadsheet.js";
 import { triageJob } from "../../agents/jobAgent/orchestrator.js";
 import {
   AssetGenerationSkippedError,

@@ -1,9 +1,85 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import type { JobRecord } from "../types/job";
+import type { JobRecord, TrackerSpreadsheetFields } from "../types/job";
 import { ScoreBadge } from "../components/ScoreBadge";
 import { FilterBar } from "../components/FilterBar";
+
+/** Canonical tracker column labels (same order as spreadsheet export). */
+const TRACKER_HEADERS = [
+  "Rank",
+  "Discussed",
+  "Company",
+  "Role",
+  "Latest Score",
+  "Original / Alt Score",
+  "Priority",
+  "Recommended Action",
+  "Status / Outcome",
+  "Salary Ask",
+  "JD Input",
+  "Top Match",
+  "Main Risk",
+  "Notes",
+  "Resume",
+] as const;
+
+const salaryAskDisplay = (job: JobRecord): string => {
+  const s = job.salaryAsk;
+  if (typeof s.number === "number") return String(s.number);
+  if (typeof s.rangeMin === "number" || typeof s.rangeMax === "number") {
+    const min = typeof s.rangeMin === "number" ? String(s.rangeMin) : "";
+    const max = typeof s.rangeMax === "number" ? String(s.rangeMax) : "";
+    return [min, max].filter(Boolean).join(" - ");
+  }
+  return "";
+};
+
+const jdDisplay = (job: JobRecord): string =>
+  job.extracted.rawText?.trim() ||
+  (job.extracted.url ? `URL: ${job.extracted.url}` : "") ||
+  "";
+
+function trackerCell(job: JobRecord, header: (typeof TRACKER_HEADERS)[number]): string {
+  const ts = job.trackerSpreadsheet ?? {};
+  const pick = (key: keyof TrackerSpreadsheetFields, fallback: string): string =>
+    ts[key] !== undefined ? String(ts[key]) : fallback;
+
+  switch (header) {
+    case "Rank":
+      return pick("rank", "");
+    case "Discussed":
+      return pick("discussed", "");
+    case "Company":
+      return pick("company", job.extracted.company);
+    case "Role":
+      return pick("role", job.extracted.title);
+    case "Latest Score":
+      return pick("latestScore", String(job.score.total));
+    case "Original / Alt Score":
+      return pick("originalAltScore", "");
+    case "Priority":
+      return pick("priority", job.tracker.priority ?? "");
+    case "Recommended Action":
+      return pick("recommendedAction", job.tracker.recommendedAction ?? "");
+    case "Status / Outcome":
+      return pick("statusOutcome", job.tracker.statusOutcome ?? job.status);
+    case "Salary Ask":
+      return pick("salaryAsk", salaryAskDisplay(job));
+    case "JD Input":
+      return pick("jdInput", jdDisplay(job));
+    case "Top Match":
+      return pick("topMatch", job.topMatch);
+    case "Main Risk":
+      return pick("mainRisk", job.mainRisk);
+    case "Notes":
+      return pick("notes", job.tracker.notes ?? "");
+    case "Resume":
+      return pick("resume", job.recommendedResume);
+    default:
+      return "";
+  }
+}
 
 const queryString = (params: Record<string, string | boolean | undefined>): string => {
   const q = new URLSearchParams();
@@ -90,44 +166,44 @@ export const TrackerPage = () => {
         shortlistOnly={shortlistOnly}
         onShortlistChange={setShortlistOnly}
       />
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Company</th>
-            <th>Role</th>
-            <th>Score</th>
-            <th>Recommendation</th>
-            <th>Resume</th>
-            <th>Top Match</th>
-            <th>Main Risk</th>
-            <th>Salary Ask</th>
-            <th>Status</th>
-            <th>Shortlist</th>
-            <th>Updated</th>
-          </tr>
-        </thead>
-        <tbody>
-          {jobs.map((job) => (
-            <tr key={job.id}>
-              <td>
-                <Link to={`/jobs/${job.id}`}>{job.extracted.company}</Link>
-              </td>
-              <td>{job.extracted.title}</td>
-              <td>
-                <ScoreBadge score={job.score.total} />
-              </td>
-              <td>{job.recommendation}</td>
-              <td>{job.recommendedResume}</td>
-              <td>{job.topMatch}</td>
-              <td>{job.mainRisk}</td>
-              <td>{job.salaryAsk.number ?? "N/A"}</td>
-              <td>{job.status}</td>
-              <td>{job.tracker.shortlist ? "yes" : "no"}</td>
-              <td>{new Date(job.updatedAt).toLocaleString()}</td>
+      <div style={{ overflowX: "auto" }}>
+        <table className="table">
+          <thead>
+            <tr>
+              {TRACKER_HEADERS.map((h) => (
+                <th key={h}>{h}</th>
+              ))}
+              <th>Shortlist</th>
+              <th>Updated</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {jobs.map((job) => (
+              <tr key={job.id}>
+                {TRACKER_HEADERS.map((h) => (
+                  <td key={h}>
+                    {h === "Company" ? (
+                      <Link to={`/jobs/${job.id}`}>{trackerCell(job, h)}</Link>
+                    ) : h === "Latest Score" ? (
+                      <ScoreBadge
+                        score={(() => {
+                          const t = trackerCell(job, h).trim();
+                          const n = Number(t);
+                          return Number.isFinite(n) ? n : job.score.total;
+                        })()}
+                      />
+                    ) : (
+                      trackerCell(job, h)
+                    )}
+                  </td>
+                ))}
+                <td>{job.tracker.shortlist ? "yes" : "no"}</td>
+                <td>{new Date(job.updatedAt).toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 };

@@ -5,6 +5,7 @@ import {
   shouldShortlist,
 } from '../../config/scoringPolicy.js';
 import type { JobRecord } from '../../types/job.js';
+import { buildTrackerSpreadsheetFromJob } from '../../tracker/canonicalSpreadsheet.js';
 import { evaluateRules } from './rules.js';
 import { scoreJob } from './scoring.js';
 import { computeSalaryAsk } from './salaryAsk.js';
@@ -127,5 +128,8 @@ export const triageJob = async (input: {
       },
     ],
   };
-  return initialRecord;
+  return {
+    ...initialRecord,
+    trackerSpreadsheet: buildTrackerSpreadsheetFromJob(initialRecord),
+  };
 };

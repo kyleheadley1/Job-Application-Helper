@@ -15,6 +15,7 @@ import {
   UpdateJobStatusBodySchema,
 } from "../agents/jobAgent/schemas.js";
 import { JobNotFoundError, jobsService } from "../services/jobs/jobs.service.js";
+import { TRACKER_EXPORT_HEADERS } from "../tracker/canonicalSpreadsheet.js";
 
 export const jobsRouter = Router();
 
@@ -26,9 +27,9 @@ const toCsvCell = (value: string | number | boolean): string => {
   return text;
 };
 
-const toCsv = (rows: Array<Record<string, string | number | boolean>>): string => {
+const toCsv = (rows: Array<Record<string, string>>): string => {
   if (rows.length === 0) return "";
-  const headers = Object.keys(rows[0]);
+  const headers = [...TRACKER_EXPORT_HEADERS];
   const headerLine = headers.map((h) => toCsvCell(h)).join(",");
   const lines = rows.map((row) => headers.map((h) => toCsvCell(row[h] ?? "")).join(","));
   return [headerLine, ...lines].join("\n");
@@ -80,7 +81,7 @@ jobsRouter.get("/export", async (req, res, next) => {
     const result = await jobsService.exportRows(filters);
     const rows = result.rows.map((row) => JobExportRowSchema.parse(row));
     if (format === "csv") {
-      const csv = toCsv(rows as Array<Record<string, string | number | boolean>>);
+      const csv = toCsv(rows as Array<Record<string, string>>);
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader("Content-Disposition", "attachment; filename=\"jobs-export.csv\"");
       res.send(csv);
