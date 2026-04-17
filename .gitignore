@@ -3,4 +3,16 @@
 .env.*.local
 node_modules/
 dist/
+coverage/
 .DS_Store
+
+# Local resume context (never commit personal resumes)
+apps/api/data/resumes/
+!apps/api/data/resumes/
+apps/api/data/resumes/*
+!apps/api/data/resumes/.gitkeep
+!apps/api/data/resumes/README.md
+apps/data/resumes/
+
+# Local tracker / personal artifacts
+data/job_role_scores_current.xlsx
