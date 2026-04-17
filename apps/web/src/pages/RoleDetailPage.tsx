@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { JobRecord, JobStatus } from "../types/job";
 import { JsonPanel } from "../components/JsonPanel";
+import { jdSourceText } from "../lib/jobDisplay";
 
 const statuses: JobStatus[] = [
   "to_review",
@@ -44,9 +45,14 @@ export const RoleDetailPage = () => {
     setJob({ ...job, ...updated });
   };
 
+  const jdText = jdSourceText(job);
+
   return (
     <section className="stack">
       <h2>Role Detail</h2>
+      <p className="row">
+        <Link to={`/jobs/${job.id}`}>← Scoring & generated assets</Link>
+      </p>
       <div className="card">
         <h3>
           {job.extracted.company} - {job.extracted.title}
@@ -78,6 +84,38 @@ export const RoleDetailPage = () => {
             <button onClick={saveNotes}>Save notes</button>
           </div>
         </div>
+        {jdText ? (
+          <details className="jd-source-block">
+            <summary>JD source / input</summary>
+            <pre className="jd-source-pre">{jdText}</pre>
+          </details>
+        ) : (
+          <p className="muted">No JD text stored (add via triage or spreadsheet import).</p>
+        )}
+        {(job.rationale?.length ?? 0) > 0 || (job.risks?.length ?? 0) > 0 ? (
+          <div className="stack rationale-block">
+            {job.rationale && job.rationale.length > 0 ? (
+              <div>
+                <h4 className="rationale-heading">Rationale</h4>
+                <ul className="rationale-list">
+                  {job.rationale.map((line, i) => (
+                    <li key={`r-${i}`}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {job.risks && job.risks.length > 0 ? (
+              <div>
+                <h4 className="rationale-heading">Risks</h4>
+                <ul className="rationale-list">
+                  {job.risks.map((line, i) => (
+                    <li key={`k-${i}`}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
       <div className="grid cols2">
         <article className="card">

@@ -75,9 +75,12 @@ export class JobsRepository {
             query["score.total"] = { $gte: filters.minScore };
         if (filters.company)
             query["extracted.company"] = { $regex: filters.company, $options: "i" };
-        const docs = await col.find(query).sort({ updatedAt: -1 }).toArray();
+        const [docs, totalAll] = await Promise.all([
+            col.find(query).sort({ updatedAt: -1 }).toArray(),
+            col.countDocuments({}),
+        ]);
         const items = docs.map((d) => this.fromDoc(d));
-        return { items, total: items.length };
+        return { items, total: items.length, totalAll };
     }
     async clearForTests() {
         const col = await this.collection();

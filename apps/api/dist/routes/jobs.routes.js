@@ -51,6 +51,7 @@ jobsRouter.get("/", async (req, res, next) => {
         res.json({
             items: result.items.map((item) => JobRecordSchema.parse(item)),
             total: result.total,
+            totalAll: result.totalAll,
             filtersApplied: query,
         });
     }

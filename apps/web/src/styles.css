@@ -151,3 +151,392 @@ button {
 .error {
   color: #ffa198;
 }
+
+/* ——— Tracker page (workflow UI; export remains canonical 15-col) ——— */
+.tracker-page {
+  gap: 1.25rem;
+}
+
+.tracker-page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.tracker-title {
+  margin: 0 0 0.35rem;
+}
+
+.tracker-app-hint {
+  font-size: 0.88rem;
+  margin: 0;
+  max-width: 36rem;
+}
+
+.tracker-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.btn-secondary {
+  background: #21262d;
+  border: 1px solid #30363d;
+  color: #f0f6fc;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.btn-secondary:hover {
+  background: #30363d;
+}
+
+.tracker-filters-card {
+  padding: 1rem 1.1rem;
+}
+
+.tracker-filters-heading {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #8b949e;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.tracker-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.65rem 1rem;
+  align-items: end;
+}
+
+.tracker-filter-shortlist {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 0.25rem;
+}
+
+.tracker-extras-toggle {
+  margin-top: 0.85rem;
+}
+
+.tracker-table-section {
+  padding: 0;
+  overflow: hidden;
+}
+
+.tracker-meta-summary {
+  margin: 0;
+  padding: 0.65rem 1rem;
+  font-size: 0.84rem;
+  border-bottom: 1px solid #21262d;
+}
+
+.tracker-empty {
+  padding: 2rem 1.25rem;
+  text-align: center;
+}
+
+.tracker-empty-title {
+  margin: 0 0 0.35rem;
+  font-weight: 600;
+}
+
+.tracker-table-scroll {
+  max-height: min(70vh, 720px);
+  overflow: auto;
+}
+
+.tracker-app-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 880px;
+}
+
+.tracker-app-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #1c2128;
+  border-bottom: 2px solid #30363d;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8b949e;
+  padding: 0.55rem 0.45rem;
+  vertical-align: bottom;
+}
+
+.tracker-app-table tbody td {
+  padding: 0.45rem;
+  vertical-align: middle;
+  font-size: 0.88rem;
+  border-bottom: 1px solid #21262d;
+}
+
+.tracker-sort-btn {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  text-align: left;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+}
+
+.tracker-sort-btn:hover {
+  color: #7ee787;
+}
+
+.tracker-sort-ind {
+  font-size: 0.85rem;
+  color: #7ee787;
+  font-weight: 700;
+}
+
+.tracker-sticky-left {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  box-shadow: 6px 0 10px -6px rgba(0, 0, 0, 0.65);
+}
+
+thead .tracker-sticky-left {
+  z-index: 4;
+  background: #1c2128;
+}
+
+tbody .tracker-sticky-left {
+  background: #0d1117;
+}
+
+.tracker-row:hover td {
+  background: #1c2128;
+}
+
+.tracker-row:hover td.tracker-sticky-left {
+  background: #1c2128;
+}
+
+.tracker-row {
+  cursor: pointer;
+}
+
+.tracker-link {
+  font-weight: 600;
+  color: #7ee787;
+}
+
+.tracker-company-cell {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.tracker-jd-dot {
+  color: #58a6ff;
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
+.tracker-assets-inline {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: #21262d;
+  border: 1px solid #30363d;
+  color: #c9d1d9;
+  text-decoration: none;
+}
+
+.tracker-assets-inline:hover {
+  color: #f0f6fc;
+  border-color: #58a6ff;
+}
+
+.cell-lines-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+  line-height: 1.35;
+}
+
+.cell-lines-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+  line-height: 1.35;
+  font-size: 0.86rem;
+}
+
+.cell-lines-action {
+  font-size: 0.82rem;
+}
+
+.cell-lines-main-risk {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+  line-height: 1.3;
+  font-size: 0.8rem;
+}
+
+.tracker-notes-preview {
+  color: #8b949e;
+  font-size: 0.78rem;
+}
+
+.tracker-salary-cell {
+  font-size: 0.84rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tracker-status-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+}
+
+.tracker-status-text {
+  font-size: 0.8rem;
+  max-width: 11rem;
+}
+
+.tracker-resume {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.tracker-updated {
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.score-badge-compact {
+  min-width: 2rem;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.tracker-col-company {
+  width: 17%;
+  min-width: 9rem;
+}
+
+.tracker-col-role {
+  width: 15%;
+}
+
+.tracker-col-score {
+  width: 3.35rem;
+}
+
+.tracker-col-recommendedAction {
+  width: 11%;
+}
+
+.tracker-col-status {
+  width: 9%;
+}
+
+.tracker-col-resume {
+  width: 3.75rem;
+}
+
+.tracker-col-topMatch {
+  width: 9%;
+}
+
+.tracker-col-mainRisk {
+  width: 9%;
+}
+
+.tracker-col-salary {
+  width: 6.5rem;
+  min-width: 5.5rem;
+}
+
+.tracker-col-notes {
+  width: 8%;
+  max-width: 7.5rem;
+}
+
+.tracker-col-updatedAt {
+  width: 6.75rem;
+  min-width: 6.25rem;
+}
+
+.tracker-col-rank,
+.tracker-col-discussed,
+.tracker-col-originalAlt,
+.tracker-col-priority {
+  width: 4.75rem;
+  font-size: 0.82rem;
+}
+
+.rationale-block {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #30363d;
+}
+
+.rationale-heading {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  color: #8b949e;
+}
+
+.rationale-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.jd-source-block {
+  margin-top: 1rem;
+  border-top: 1px solid #30363d;
+  padding-top: 0.75rem;
+}
+
+.jd-source-block summary {
+  cursor: pointer;
+  color: #8b949e;
+  font-size: 0.9rem;
+}
+
+.jd-source-pre {
+  margin: 0.75rem 0 0;
+  padding: 0.75rem;
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.82rem;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+}
