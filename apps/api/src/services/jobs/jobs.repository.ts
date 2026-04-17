@@ -182,7 +182,7 @@ export class JobsRepository {
     return { rows, total: rows.length };
   }
 
-  /** Upsert by `importKey` (XLSX seed). Preserves `id` / `createdAt` when the key already exists. */
+  /** Upsert by content-derived `importKey` (XLSX seed only; not live sync). Preserves `id` / `createdAt` when the key already exists. */
   async upsertByImportKey(record: JobRecord): Promise<JobRecord> {
     if (!record.importKey) {
       throw new Error("importKey is required for upsertByImportKey");

@@ -40,42 +40,49 @@ const jdDisplay = (job: JobRecord): string =>
   (job.extracted.url ? `URL: ${job.extracted.url}` : "") ||
   "";
 
+/**
+ * In-app tracker columns: prefer rich internal state for anything that drives logic;
+ * use `trackerSpreadsheet` only where the sheet is the natural source (rank/discussed/original score)
+ * or to fill gaps when internal JD text is empty.
+ */
 function trackerCell(job: JobRecord, header: (typeof TRACKER_HEADERS)[number]): string {
   const ts = job.trackerSpreadsheet ?? {};
-  const pick = (key: keyof TrackerSpreadsheetFields, fallback: string): string =>
-    ts[key] !== undefined ? String(ts[key]) : fallback;
+  const tsOnly = (key: keyof TrackerSpreadsheetFields): string =>
+    ts[key] !== undefined ? String(ts[key]) : "";
 
   switch (header) {
     case "Rank":
-      return pick("rank", "");
+      return tsOnly("rank");
     case "Discussed":
-      return pick("discussed", "");
-    case "Company":
-      return pick("company", job.extracted.company);
-    case "Role":
-      return pick("role", job.extracted.title);
-    case "Latest Score":
-      return pick("latestScore", String(job.score.total));
+      return tsOnly("discussed");
     case "Original / Alt Score":
-      return pick("originalAltScore", "");
+      return tsOnly("originalAltScore");
+    case "Company":
+      return job.extracted.company || tsOnly("company");
+    case "Role":
+      return job.extracted.title || tsOnly("role");
+    case "Latest Score":
+      return String(job.score.total);
     case "Priority":
-      return pick("priority", job.tracker.priority ?? "");
+      return job.tracker.priority ?? "";
     case "Recommended Action":
-      return pick("recommendedAction", job.tracker.recommendedAction ?? "");
+      return job.tracker.recommendedAction ?? "";
     case "Status / Outcome":
-      return pick("statusOutcome", job.tracker.statusOutcome ?? job.status);
+      return job.tracker.statusOutcome ?? job.status;
     case "Salary Ask":
-      return pick("salaryAsk", salaryAskDisplay(job));
-    case "JD Input":
-      return pick("jdInput", jdDisplay(job));
+      return salaryAskDisplay(job);
+    case "JD Input": {
+      const internal = jdDisplay(job);
+      return internal || tsOnly("jdInput");
+    }
     case "Top Match":
-      return pick("topMatch", job.topMatch);
+      return job.topMatch;
     case "Main Risk":
-      return pick("mainRisk", job.mainRisk);
+      return job.mainRisk;
     case "Notes":
-      return pick("notes", job.tracker.notes ?? "");
+      return job.tracker.notes ?? "";
     case "Resume":
-      return pick("resume", job.recommendedResume);
+      return job.recommendedResume;
     default:
       return "";
   }
@@ -185,13 +192,7 @@ export const TrackerPage = () => {
                     {h === "Company" ? (
                       <Link to={`/jobs/${job.id}`}>{trackerCell(job, h)}</Link>
                     ) : h === "Latest Score" ? (
-                      <ScoreBadge
-                        score={(() => {
-                          const t = trackerCell(job, h).trim();
-                          const n = Number(t);
-                          return Number.isFinite(n) ? n : job.score.total;
-                        })()}
-                      />
+                      <ScoreBadge score={job.score.total} />
                     ) : (
                       trackerCell(job, h)
                     )}

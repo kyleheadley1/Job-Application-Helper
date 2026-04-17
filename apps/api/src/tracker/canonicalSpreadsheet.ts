@@ -44,7 +44,11 @@ function formatSalaryAskDisplay(job: JobRecord): string {
   return '';
 }
 
-function pickCell(
+/**
+ * Export-only merge: prefer persisted spreadsheet cells when present so JSON/CSV
+ * match the workbook. App logic (filters, PATCH, scoring) must use `JobRecord` fields, not this.
+ */
+function pickCellForExport(
   ts: Partial<TrackerSpreadsheetFields> | undefined,
   key: keyof TrackerSpreadsheetFields,
   fallback: string,
@@ -79,26 +83,26 @@ export function buildTrackerSpreadsheetFromJob(job: JobRecord): TrackerSpreadshe
   };
 }
 
-/** JSON/CSV export: canonical columns; spreadsheet subobject overrides when a field is present. */
+/** JSON/CSV export: canonical labels/order; spreadsheet cells win for parity (seed-only path). */
 export function buildJobExportRow(job: JobRecord): JobExportRow {
   const base = buildTrackerSpreadsheetFromJob(job);
   const ts = job.trackerSpreadsheet;
   return {
-    Rank: pickCell(ts, 'rank', base.rank),
-    Discussed: pickCell(ts, 'discussed', base.discussed),
-    Company: pickCell(ts, 'company', base.company),
-    Role: pickCell(ts, 'role', base.role),
-    'Latest Score': pickCell(ts, 'latestScore', base.latestScore),
-    'Original / Alt Score': pickCell(ts, 'originalAltScore', base.originalAltScore),
-    Priority: pickCell(ts, 'priority', base.priority),
-    'Recommended Action': pickCell(ts, 'recommendedAction', base.recommendedAction),
-    'Status / Outcome': pickCell(ts, 'statusOutcome', base.statusOutcome),
-    'Salary Ask': pickCell(ts, 'salaryAsk', base.salaryAsk),
-    'JD Input': pickCell(ts, 'jdInput', base.jdInput),
-    'Top Match': pickCell(ts, 'topMatch', base.topMatch),
-    'Main Risk': pickCell(ts, 'mainRisk', base.mainRisk),
-    Notes: pickCell(ts, 'notes', base.notes),
-    Resume: pickCell(ts, 'resume', base.resume),
+    Rank: pickCellForExport(ts, 'rank', base.rank),
+    Discussed: pickCellForExport(ts, 'discussed', base.discussed),
+    Company: pickCellForExport(ts, 'company', base.company),
+    Role: pickCellForExport(ts, 'role', base.role),
+    'Latest Score': pickCellForExport(ts, 'latestScore', base.latestScore),
+    'Original / Alt Score': pickCellForExport(ts, 'originalAltScore', base.originalAltScore),
+    Priority: pickCellForExport(ts, 'priority', base.priority),
+    'Recommended Action': pickCellForExport(ts, 'recommendedAction', base.recommendedAction),
+    'Status / Outcome': pickCellForExport(ts, 'statusOutcome', base.statusOutcome),
+    'Salary Ask': pickCellForExport(ts, 'salaryAsk', base.salaryAsk),
+    'JD Input': pickCellForExport(ts, 'jdInput', base.jdInput),
+    'Top Match': pickCellForExport(ts, 'topMatch', base.topMatch),
+    'Main Risk': pickCellForExport(ts, 'mainRisk', base.mainRisk),
+    Notes: pickCellForExport(ts, 'notes', base.notes),
+    Resume: pickCellForExport(ts, 'resume', base.resume),
   };
 }
 
