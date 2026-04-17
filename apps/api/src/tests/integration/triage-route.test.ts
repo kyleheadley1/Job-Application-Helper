@@ -52,4 +52,25 @@ describe('POST /api/jobs/triage', () => {
     const response = await request(app).post('/api/jobs/triage').send({});
     expect(response.status).toBe(400);
   });
+
+  it("does not add scored jobs to tracker list until confirm-applied", async () => {
+    const triage = await request(app).post("/api/jobs/triage").send({
+      rawText:
+        "Software Engineer. Build TypeScript and Node.js APIs with React frontend. 2+ years experience. Remote in NYC.",
+      companyHint: "AppFlow",
+      fullPrep: false,
+    });
+    expect(triage.status).toBe(200);
+    const id = triage.body.id as string;
+    const listBefore = await request(app).get("/api/jobs");
+    expect(listBefore.status).toBe(200);
+    expect(listBefore.body.items.some((i: { id: string }) => i.id === id)).toBe(false);
+
+    const confirm = await request(app).post(`/api/jobs/${id}/confirm-applied`).send({});
+    expect(confirm.status).toBe(200);
+
+    const listAfter = await request(app).get("/api/jobs");
+    expect(listAfter.status).toBe(200);
+    expect(listAfter.body.items.some((i: { id: string }) => i.id === id)).toBe(true);
+  });
 });

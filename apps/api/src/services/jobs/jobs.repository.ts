@@ -70,11 +70,12 @@ export class JobsRepository {
     const now = new Date().toISOString();
     const col = await this.collection();
     const next: JobRecord = { ...record, updatedAt: now };
+    const { createdAt, ...setFields } = next;
     await col.updateOne(
       { _id: record.id },
       {
-        $set: { ...next, _id: next.id },
-        $setOnInsert: { createdAt: record.createdAt || now },
+        $set: { ...setFields, _id: next.id },
+        $setOnInsert: { createdAt: createdAt || now },
       },
       { upsert: true },
     );

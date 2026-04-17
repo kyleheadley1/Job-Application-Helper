@@ -237,11 +237,20 @@ button {
   overflow: hidden;
 }
 
+.tracker-applied-counters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  padding: 0.5rem 1rem 0.35rem;
+  font-size: 0.8rem;
+  color: #9fb0c0;
+  border-bottom: 1px solid #21262d;
+}
+
 .tracker-meta-summary {
   margin: 0;
-  padding: 0.65rem 1rem;
+  padding: 0.45rem 1rem 0.6rem;
   font-size: 0.84rem;
-  border-bottom: 1px solid #21262d;
 }
 
 .tracker-empty {
@@ -353,6 +362,30 @@ tbody .tracker-sticky-left {
   gap: 0.35rem;
 }
 
+.tracker-row-dot {
+  width: 0.52rem;
+  height: 0.52rem;
+  border-radius: 999px;
+  display: inline-block;
+  box-shadow: 0 0 0 1px #0d1117, 0 0 8px rgba(255, 255, 255, 0.12);
+}
+
+.tracker-row-dot-green {
+  background: #3fb950;
+}
+
+.tracker-row-dot-yellow {
+  background: #d29922;
+}
+
+.tracker-row-dot-red {
+  background: #f85149;
+}
+
+.tracker-row-dot-blue {
+  background: #58a6ff;
+}
+
 .tracker-jd-dot {
   color: #58a6ff;
   font-size: 0.65rem;
@@ -369,6 +402,7 @@ tbody .tracker-sticky-left {
   color: #8b949e;
   text-decoration: none;
   opacity: 0.9;
+  margin-left: 0.45rem;
 }
 
 .tracker-assets-inline:hover {

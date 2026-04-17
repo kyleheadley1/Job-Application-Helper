@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { JobListFilters, JobRecord, JobStatus } from "../../types/job.js";
 import type { JobExportRow } from "../../tracker/canonicalSpreadsheet.js";
 import { triageJob } from "../../agents/jobAgent/orchestrator.js";
@@ -6,6 +7,7 @@ import {
   generateJobAssets,
 } from "../../agents/jobAgent/assetGeneration.js";
 import { userProfile } from "../../config/userProfile.js";
+import { getTrackerColor, shouldShortlist } from "../../config/scoringPolicy.js";
 import { jobsRepository } from "./jobs.repository.js";
 
 export class JobNotFoundError extends Error {
@@ -16,7 +18,18 @@ export class JobNotFoundError extends Error {
   }
 }
 
+export class JobConfirmNotAllowedError extends Error {
+  readonly code = "JOB_CONFIRM_NOT_ALLOWED" as const;
+  constructor() {
+    super("This scored role is not eligible for confirm-applied.");
+    this.name = "JobConfirmNotAllowedError";
+  }
+}
+
 export class JobsService {
+  /** Ephemeral scored jobs until user confirms they actually applied. */
+  private readonly draftJobs = new Map<string, JobRecord>();
+
   async runTriage(input: {
     url?: string;
     rawText?: string;
@@ -24,7 +37,15 @@ export class JobsService {
     fullPrep?: boolean;
   }): Promise<JobRecord> {
     const result = await triageJob(input);
-    return jobsRepository.saveTriage(result);
+    this.draftJobs.set(result.id, result);
+    return result;
+  }
+
+  async getByIdIncludingDraft(id: string): Promise<{ job: JobRecord | null; tracked: boolean }> {
+    const tracked = await jobsRepository.getById(id);
+    if (tracked) return { job: tracked, tracked: true };
+    const draft = this.draftJobs.get(id) ?? null;
+    return { job: draft, tracked: false };
   }
 
   async getById(id: string): Promise<JobRecord | null> {
@@ -40,19 +61,33 @@ export class JobsService {
   }
 
   async generateAssetsForJobId(jobId: string, input?: { force?: boolean }): Promise<JobRecord> {
-    const job = await jobsRepository.getById(jobId);
+    const tracked = await jobsRepository.getById(jobId);
+    const draft = tracked ? null : this.draftJobs.get(jobId);
+    const job = tracked ?? draft;
     if (!job) throw new JobNotFoundError();
     const result = await generateJobAssets({ job, userProfile, force: input?.force });
     if (result.skipped) {
       throw new AssetGenerationSkippedError(result.skipReason ?? "Asset generation skipped.");
     }
-    const updated = await jobsRepository.mergeGeneratedAssets(
-      jobId,
-      result.generated,
-      result.debugAssetGeneration,
-    );
-    if (!updated) throw new JobNotFoundError();
-    return updated;
+    if (tracked) {
+      const updated = await jobsRepository.mergeGeneratedAssets(
+        jobId,
+        result.generated,
+        result.debugAssetGeneration,
+      );
+      if (!updated) throw new JobNotFoundError();
+      return updated;
+    }
+    const merged: JobRecord = {
+      ...job,
+      generated: result.generated,
+      ...(result.debugAssetGeneration !== undefined
+        ? { debugAssetGeneration: result.debugAssetGeneration }
+        : {}),
+      updatedAt: new Date().toISOString(),
+    };
+    this.draftJobs.set(jobId, merged);
+    return merged;
   }
 
   async generateAssetsFromJobBody(body: {
@@ -89,6 +124,44 @@ export class JobsService {
     const updated = await jobsRepository.updateNotes(id, notes);
     if (!updated) throw new JobNotFoundError();
     return updated;
+  }
+
+  async confirmApplied(id: string): Promise<JobRecord> {
+    const existing = await jobsRepository.getById(id);
+    if (existing) return existing;
+    const draft = this.draftJobs.get(id);
+    if (!draft) throw new JobNotFoundError();
+    if (draft.recommendation === "no") {
+      throw new JobConfirmNotAllowedError();
+    }
+
+    const now = new Date().toISOString();
+    const toPersist: JobRecord = {
+      ...draft,
+      status: "applied",
+      updatedAt: now,
+      tracker: {
+        ...draft.tracker,
+        statusOutcome: "applied",
+        shortlist: shouldShortlist(draft.score.total, "applied"),
+        color: getTrackerColor("applied", draft.score.total),
+      },
+      statusHistory: [
+        ...(draft.statusHistory ?? []),
+        {
+          id: randomUUID(),
+          jobId: draft.id,
+          fromStatus: draft.status,
+          toStatus: "applied",
+          note: "Confirmed I applied",
+          createdAt: now,
+        },
+      ],
+    };
+
+    const saved = await jobsRepository.upsertJob(toPersist);
+    this.draftJobs.delete(id);
+    return saved;
   }
 }
 

@@ -6,8 +6,10 @@ import type { JobRecord, JobStatus } from "../types/job";
 import { ScoreBadge } from "../components/ScoreBadge";
 import { StatusBadge } from "../components/StatusBadge";
 import { FilterBar } from "../components/FilterBar";
+import { etDateKey, etRangeKeys, isDateKeyInRange } from "../lib/dateEt";
 import {
   hasJdSource,
+  isAppliedPipelineStatus,
   salaryAskCompact,
   salaryAskLabel,
   trackerDisplayDate,
@@ -88,6 +90,20 @@ function statusSecondaryText(job: JobRecord): string {
 function trackerDateMs(job: JobRecord): number {
   const t = new Date(trackerDisplayDate(job).sortIso).getTime();
   return Number.isFinite(t) ? t : 0;
+}
+
+function trackerDateKey(job: JobRecord): string {
+  const ms = trackerDateMs(job);
+  if (!ms) return "";
+  return etDateKey(new Date(ms));
+}
+
+function rowDotTone(job: JobRecord): "green" | "yellow" | "red" | "blue" {
+  if (job.tracker.color) return job.tracker.color;
+  if (job.status === "offer") return "green";
+  if (job.status === "skip" || job.status === "rejected" || job.status === "closed") return "red";
+  if (job.status === "interviewing" || job.status === "assessment") return "blue";
+  return "yellow";
 }
 
 function salarySortValue(job: JobRecord): number {
@@ -196,7 +212,10 @@ export const TrackerPage = () => {
   const [resume, setResume] = useState("");
   const [recommendation, setRecommendation] = useState("");
   const [minScore, setMinScore] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [shortlistOnly, setShortlistOnly] = useState(false);
+  const [nowTick, setNowTick] = useState(() => Date.now());
   const [showExtras, setShowExtras] = useState(
     () => typeof localStorage !== "undefined" && localStorage.getItem(LS_SHOW_EXTRAS) === "1",
   );
@@ -219,6 +238,11 @@ export const TrackerPage = () => {
     localStorage.setItem(LS_SORT_DIR, sortDir);
   }, [sortKey, sortDir]);
 
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const query = useMemo(
     () =>
       queryString({
@@ -239,16 +263,37 @@ export const TrackerPage = () => {
     });
   }, [query]);
 
+  const dateFilteredJobs = useMemo(() => {
+    if (!fromDate && !toDate) return jobs;
+    return jobs.filter((j) => isDateKeyInRange(trackerDateKey(j), fromDate || undefined, toDate || undefined));
+  }, [jobs, fromDate, toDate]);
+
   const sortedJobs = useMemo(() => {
-    const copy = [...jobs];
+    const copy = [...dateFilteredJobs];
     copy.sort((a, b) => compareJobs(a, b, sortKey, sortDir));
     return copy;
-  }, [jobs, sortKey, sortDir]);
+  }, [dateFilteredJobs, sortKey, sortDir]);
 
   const shortlistInView = useMemo(
-    () => jobs.filter((j) => j.tracker.shortlist).length,
-    [jobs],
+    () => sortedJobs.filter((j) => j.tracker.shortlist).length,
+    [sortedJobs],
   );
+
+  const appliedCounters = useMemo(() => {
+    const { todayKey, weekStartKey, monthStartKey } = etRangeKeys(new Date(nowTick));
+    let today = 0;
+    let week = 0;
+    let month = 0;
+    for (const j of sortedJobs) {
+      if (!isAppliedPipelineStatus(j.status)) continue;
+      const k = trackerDateKey(j);
+      if (!k) continue;
+      if (k === todayKey) today++;
+      if (k >= weekStartKey && k <= todayKey) week++;
+      if (k >= monthStartKey && k <= todayKey) month++;
+    }
+    return { today, week, month };
+  }, [sortedJobs, nowTick]);
 
   const exportFilename = (ext: string) => {
     const d = new Date().toISOString().slice(0, 10);
@@ -306,6 +351,11 @@ export const TrackerPage = () => {
             >
               {companyCell(job)}
             </Link>
+            <span
+              className={`tracker-row-dot tracker-row-dot-${rowDotTone(job)}`}
+              title={`Tracker color: ${rowDotTone(job)}`}
+              aria-hidden="true"
+            />
             {hasJdSource(job) ? (
               <span className="tracker-jd-dot" title="JD on role detail">
                 ●
@@ -510,6 +560,10 @@ export const TrackerPage = () => {
           onRecommendationChange={setRecommendation}
           minScore={minScore}
           onMinScoreChange={setMinScore}
+          fromDate={fromDate}
+          onFromDateChange={setFromDate}
+          toDate={toDate}
+          onToDateChange={setToDate}
           shortlistOnly={shortlistOnly}
           onShortlistChange={setShortlistOnly}
         />
@@ -526,6 +580,11 @@ export const TrackerPage = () => {
       </div>
 
       <div className="tracker-table-section card">
+        <div className="tracker-applied-counters">
+          <span>Applied today: {appliedCounters.today}</span>
+          <span>Applied this week: {appliedCounters.week}</span>
+          <span>Applied this month: {appliedCounters.month}</span>
+        </div>
         <p className="tracker-meta-summary muted">{metaLine()}</p>
         {sortedJobs.length === 0 ? (
           <div className="tracker-empty">

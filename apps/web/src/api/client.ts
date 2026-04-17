@@ -23,10 +23,17 @@ const fetchCsv = async (path: string): Promise<string> => {
 
 export const api = {
   triage: (payload: { url?: string; rawText?: string; companyHint?: string; fullPrep?: boolean }) =>
-    request<JobRecord>("/jobs/triage", { method: "POST", body: JSON.stringify(payload) }),
+    request<JobRecord & { tracked?: boolean; canConfirmApplied?: boolean }>("/jobs/triage", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   listJobs: (query = "") =>
     request<{ items: JobRecord[]; total: number; totalAll?: number }>(`/jobs${query}`),
-  getJob: (id: string) => request<JobRecord & { statusHistory?: unknown[] }>(`/jobs/${id}`),
+  getJob: (id: string) =>
+    request<JobRecord & { statusHistory?: unknown[]; tracked?: boolean; canConfirmApplied?: boolean }>(
+      `/jobs/${id}`,
+    ),
+  confirmApplied: (id: string) => request<JobRecord>(`/jobs/${id}/confirm-applied`, { method: "POST" }),
   updateStatus: (id: string, status: JobStatus, note?: string) =>
     request<JobRecord>(`/jobs/${id}/status`, { method: "PATCH", body: JSON.stringify({ status, note }) }),
   updateNotes: (id: string, notes: string) =>
@@ -51,6 +58,6 @@ export const api = {
       total: number;
     }>(`/jobs/export${query}`),
   exportJobsCsv: (query = "") => fetchCsv(`/jobs/export${query}${query ? "&" : "?"}format=csv`),
-  regenerateAssets: (id: string, force = true) =>
+  regenerateAssets: (id: string, force = false) =>
     request<JobRecord>(`/jobs/${id}/generate-assets`, { method: "POST", body: JSON.stringify({ force }) }),
 };

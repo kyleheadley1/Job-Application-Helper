@@ -71,6 +71,10 @@ const APPLICATION_STATUSES = new Set<JobRecord["status"]>([
   "rejected",
 ]);
 
+export function isAppliedPipelineStatus(status: JobRecord["status"]): boolean {
+  return APPLICATION_STATUSES.has(status);
+}
+
 function earliestValidIso(values: Array<string | undefined>): string {
   const times = values
     .map((iso) => {
@@ -84,7 +88,7 @@ function earliestValidIso(values: Array<string | undefined>): string {
 }
 
 function appliedAtIso(job: JobRecord): string {
-  if (!APPLICATION_STATUSES.has(job.status)) return "";
+  if (!isAppliedPipelineStatus(job.status)) return "";
   return earliestValidIso(
     (job.statusHistory ?? [])
       .filter((h) => APPLICATION_STATUSES.has(h.toStatus))
@@ -95,6 +99,15 @@ function appliedAtIso(job: JobRecord): string {
 function parseDiscussedDate(raw: string): Date | null {
   const text = raw.trim();
   if (!text) return null;
+
+  const weekOf = text.match(/^week of\s+([A-Za-z]+)\s+(\d{1,2})(?:,?\s+(\d{2}|\d{4}))?$/i);
+  if (weekOf) {
+    const now = new Date();
+    const year =
+      weekOf[3] === undefined ? now.getFullYear() : weekOf[3].length === 2 ? 2000 + Number(weekOf[3]) : Number(weekOf[3]);
+    const t = new Date(`${weekOf[1]} ${weekOf[2]}, ${year}`);
+    if (!Number.isNaN(t.getTime())) return t;
+  }
 
   // Excel serial dates are commonly imported as numeric strings.
   const asNum = Number(text);
