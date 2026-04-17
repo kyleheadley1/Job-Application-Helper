@@ -2,6 +2,7 @@ import { Router } from "express";
 import { AssetGenerationSkippedError, } from "../agents/jobAgent/assetGeneration.js";
 import { GenerateAssetsForIdBodySchema, GenerateAssetsFromJobBodySchema, JobExportQuerySchema, JobExportRowSchema, JobListQuerySchema, JobRecordSchema, TriageRequestSchema, TriageResponseSchema, UpdateJobNotesBodySchema, UpdateJobStatusBodySchema, } from "../agents/jobAgent/schemas.js";
 import { JobNotFoundError, jobsService } from "../services/jobs/jobs.service.js";
+import { JobConfirmNotAllowedError } from "../services/jobs/jobs.service.js";
 import { TRACKER_EXPORT_HEADERS } from "../tracker/canonicalSpreadsheet.js";
 export const jobsRouter = Router();
 const toCsvCell = (value) => {
@@ -24,7 +25,11 @@ jobsRouter.post("/triage", async (req, res, next) => {
         const payload = TriageRequestSchema.parse(req.body);
         const result = await jobsService.runTriage(payload);
         const validated = TriageResponseSchema.parse(result);
-        res.json(validated);
+        res.json({
+            ...validated,
+            tracked: false,
+            canConfirmApplied: validated.recommendation !== "no",
+        });
     }
     catch (error) {
         next(error);
@@ -84,14 +89,36 @@ jobsRouter.get("/export", async (req, res, next) => {
 });
 jobsRouter.get("/:id", async (req, res, next) => {
     try {
-        const job = await jobsService.getById(req.params.id);
+        const { job, tracked } = await jobsService.getByIdIncludingDraft(req.params.id);
         if (!job) {
             res.status(404).json({ error: "JOB_NOT_FOUND", message: "Job not found" });
             return;
         }
-        res.json(JobRecordSchema.parse(job));
+        const validated = JobRecordSchema.parse(job);
+        res.json({
+            ...validated,
+            tracked,
+            canConfirmApplied: !tracked && validated.recommendation !== "no",
+        });
     }
     catch (error) {
+        next(error);
+    }
+});
+jobsRouter.post("/:id/confirm-applied", async (req, res, next) => {
+    try {
+        const job = await jobsService.confirmApplied(req.params.id);
+        res.json({ ...JobRecordSchema.parse(job), tracked: true, canConfirmApplied: false });
+    }
+    catch (error) {
+        if (error instanceof JobConfirmNotAllowedError) {
+            res.status(400).json({ error: error.code, message: error.message });
+            return;
+        }
+        if (error instanceof JobNotFoundError) {
+            res.status(404).json({ error: error.code, message: error.message });
+            return;
+        }
         next(error);
     }
 });

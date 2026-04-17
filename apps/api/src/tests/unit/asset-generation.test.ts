@@ -95,7 +95,7 @@ describe("asset generation orchestrator", () => {
     const blob = JSON.stringify(g).toLowerCase();
     expect(blob).not.toMatch(/\b1\d\+ years\b/);
     expect(blob).not.toContain("google");
-    expect(g.tailoredBulletCandidates?.some((b) => /typescript|node|react/i.test(b))).toBe(true);
+    expect(g.tailoredBulletCandidates?.some((b) => /api|product|integration|full-stack/i.test(b))).toBe(true);
   });
 
   it("whyCompany references actual company and posting thread", () => {
@@ -135,5 +135,113 @@ describe("asset generation orchestrator", () => {
     const g = buildDeterministicGeneratedAssets(makeJob({ recommendedResume: "EARLY_CAREER" }), userProfile);
     const tp = (g.talkingPoints ?? []).join(" ").toLowerCase();
     expect(tp).not.toMatch(/\bstaff engineer\b|\b10\+ years\b/);
+  });
+
+  it("deterministic cover letter stays textbox-sized by default", () => {
+    const g = buildDeterministicGeneratedAssets(makeJob({ recommendation: "yes" }), userProfile);
+    const words = (g.coverLetter ?? "").trim().split(/\s+/).filter(Boolean).length;
+    expect(words).toBeLessThanOrEqual(220);
+    expect(words).toBeGreaterThanOrEqual(120);
+  });
+
+  it("cover letters differ across role shapes and do not always reuse same angle", () => {
+    const product = buildDeterministicGeneratedAssets(
+      makeJob({
+        extracted: {
+          company: "ProductCo",
+          title: "Full-Stack Engineer",
+          stack: ["TypeScript", "React"],
+          requiredSkills: ["Node.js", "APIs"],
+          preferredSkills: [],
+          domainTags: [],
+          responsibilities: ["Ship full-stack product features and internal tooling"],
+          requirements: ["Product collaboration", "Iterative delivery"],
+          rawText: "Product role with internal tooling and full-stack shipping",
+        },
+        recommendedResume: "SWE",
+      }),
+      userProfile,
+    );
+    const impl = buildDeterministicGeneratedAssets(
+      makeJob({
+        extracted: {
+          company: "DeployCo",
+          title: "Solutions Engineer",
+          stack: ["APIs"],
+          requiredSkills: ["Integrations"],
+          preferredSkills: [],
+          domainTags: [],
+          responsibilities: ["Lead customer integrations and implementation delivery"],
+          requirements: ["Stakeholder communication"],
+          rawText: "Implementation role focused on customer integrations",
+        },
+        recommendedResume: "SIE",
+      }),
+      userProfile,
+    );
+    expect(product.coverLetter).not.toEqual(impl.coverLetter);
+    expect((impl.coverLetter ?? "").toLowerCase()).toMatch(/integration|implementation|delivery/);
+  });
+
+  it("recommendation bands produce more restrained forced-no cover letter", () => {
+    const yes = buildDeterministicGeneratedAssets(makeJob({ recommendation: "yes" }), userProfile);
+    const no = buildDeterministicGeneratedAssets(makeJob({ recommendation: "no" }), userProfile);
+    expect((no.coverLetter ?? "").toLowerCase()).toMatch(/stretch|may be a stretch|ramping/);
+    expect((yes.coverLetter ?? "").toLowerCase()).not.toMatch(/may be a stretch/);
+  });
+
+  it("cover letters keep caveat language bounded by recommendation band", () => {
+    const caveatHits = (s: string) =>
+      (s.match(/\bdon['’]t have\b/gi)?.length ?? 0) +
+      (s.match(/\black\b/gi)?.length ?? 0) +
+      (s.match(/\bmissing\b/gi)?.length ?? 0) +
+      (s.match(/\bno bachelor'?s\b/gi)?.length ?? 0);
+    const yes = buildDeterministicGeneratedAssets(makeJob({ recommendation: "yes" }), userProfile);
+    const selective = buildDeterministicGeneratedAssets(
+      makeJob({ recommendation: "selective_yes" }),
+      userProfile,
+    );
+    const forcedNo = buildDeterministicGeneratedAssets(makeJob({ recommendation: "no" }), userProfile);
+    expect(caveatHits(yes.coverLetter ?? "")).toBeLessThanOrEqual(1);
+    expect(caveatHits(selective.coverLetter ?? "")).toBeLessThanOrEqual(2);
+    expect((forcedNo.coverLetter ?? "").toLowerCase()).not.toMatch(/i should not apply|i am not qualified|reject me/);
+  });
+
+  it("whyCompany stays specific and avoids generic praise filler", () => {
+    const g = buildDeterministicGeneratedAssets(
+      makeJob({
+        extracted: {
+          company: "SignalOps",
+          title: "Product Engineer",
+          stack: ["TypeScript", "Node.js"],
+          requiredSkills: ["APIs", "internal tools"],
+          preferredSkills: [],
+          domainTags: [],
+          responsibilities: ["Ship product-facing internal tooling for operations workflows"],
+          requirements: ["Collaborate with cross-functional stakeholders"],
+          rawText: "Internal operations tooling with API-heavy product work",
+        },
+      }),
+      userProfile,
+    );
+    const why = (g.whyCompany ?? "").toLowerCase();
+    expect(why).toContain("signalops");
+    expect(why).toMatch(/role|priorit|fit|overlap|background/);
+    expect(why).not.toMatch(/innovative|fast-paced|mission-driven/);
+  });
+
+  it("bullet candidates differ materially by resume type", () => {
+    const swe = buildDeterministicGeneratedAssets(makeJob({ recommendedResume: "SWE" }), userProfile);
+    const sie = buildDeterministicGeneratedAssets(makeJob({ recommendedResume: "SIE" }), userProfile);
+    const early = buildDeterministicGeneratedAssets(
+      makeJob({ recommendedResume: "EARLY_CAREER" }),
+      userProfile,
+    );
+    const sweBlob = (swe.tailoredBulletCandidates ?? []).join(" ").toLowerCase();
+    const sieBlob = (sie.tailoredBulletCandidates ?? []).join(" ").toLowerCase();
+    const earlyBlob = (early.tailoredBulletCandidates ?? []).join(" ").toLowerCase();
+    expect(sweBlob).toMatch(/api|product|internal tooling/);
+    expect(sieBlob).toMatch(/integration|implementation|stakeholder/);
+    expect(earlyBlob).toMatch(/fundamental|ramping|full-stack/);
   });
 });

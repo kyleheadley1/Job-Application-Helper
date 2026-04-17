@@ -9,6 +9,10 @@ type Props = {
   onRecommendationChange: (value: string) => void;
   minScore: string;
   onMinScoreChange: (value: string) => void;
+  fromDate: string;
+  onFromDateChange: (value: string) => void;
+  toDate: string;
+  onToDateChange: (value: string) => void;
   shortlistOnly: boolean;
   onShortlistChange: (value: boolean) => void;
 };
@@ -24,6 +28,10 @@ export const FilterBar = ({
   onRecommendationChange,
   minScore,
   onMinScoreChange,
+  fromDate,
+  onFromDateChange,
+  toDate,
+  onToDateChange,
   shortlistOnly,
   onShortlistChange,
 }: Props) => (
@@ -76,6 +84,14 @@ export const FilterBar = ({
       />
     </label>
     <label>
+      From date
+      <input type="date" value={fromDate} onChange={(e) => onFromDateChange(e.target.value)} />
+    </label>
+    <label>
+      To date
+      <input type="date" value={toDate} onChange={(e) => onToDateChange(e.target.value)} />
+    </label>
+    <label>
       Reset
       <button
         type="button"
@@ -85,6 +101,8 @@ export const FilterBar = ({
           onResumeChange("");
           onRecommendationChange("");
           onMinScoreChange("");
+          onFromDateChange("");
+          onToDateChange("");
           onShortlistChange(false);
         }}
       >

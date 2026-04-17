@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   ASSET_EVIDENCE_DIVERSITY,
+  buildCoverLetterGuidance,
   buildCoverLetterAssetUserPrompt,
+  buildTalkingPointsAssetUserPrompt,
+  buildTailoredBulletsAssetUserPrompt,
   buildScoringPrompt,
   buildWhyCompanyAssetUserPrompt,
+  talkingPointsAssetSystemPrompt,
+  tailoredBulletsAssetSystemPrompt,
+  whyCompanyAssetSystemPrompt,
 } from "../../agents/jobAgent/prompts.js";
 import type { JobRecord } from "../../types/job.js";
 import { userProfile } from "../../config/userProfile.js";
@@ -100,6 +106,55 @@ describe("Phase 2.2 prompts", () => {
       job: minimalJob({ recommendation: "no" }),
       userProfile,
     });
-    expect(p.toLowerCase()).toMatch(/stretch|poor fit/);
+    expect(p).toContain("Tone band: no");
+  });
+
+  it("cover-letter guidance selects different archetypes by resume type", () => {
+    const sie = buildCoverLetterGuidance(minimalJob({ recommendedResume: "SIE" }), userProfile);
+    const swe = buildCoverLetterGuidance(
+      minimalJob({
+        recommendedResume: "SWE",
+        extracted: {
+          company: "ProductCo",
+          title: "Full-Stack Engineer",
+          stack: ["TypeScript", "Node.js"],
+          requiredSkills: ["API design"],
+          preferredSkills: [],
+          domainTags: [],
+          responsibilities: ["Ship product features and internal tools"],
+          requirements: ["Cross-functional collaboration"],
+        },
+      }),
+      userProfile,
+    );
+    expect(sie.archetype).toBe("implementation");
+    expect(swe.archetype).toBe("product");
+  });
+
+  it("cover letter prompt includes explicit textbox length contract", () => {
+    const p = buildCoverLetterAssetUserPrompt({
+      job: minimalJob({ recommendedResume: "SWE" }),
+      userProfile,
+    });
+    expect(p).toContain("Cover-letter guidance:");
+    expect(p).toContain('"priorities"');
+  });
+
+  it("whyCompany contract emphasizes specificity and rejects generic praise", () => {
+    expect(whyCompanyAssetSystemPrompt).toContain("specific role/company hook");
+    expect(whyCompanyAssetSystemPrompt).toContain("Do not use generic praise");
+  });
+
+  it("talking points prompt requires conversation-usable and one why-me point", () => {
+    expect(talkingPointsAssetSystemPrompt).toContain("actually say out loud");
+    expect(talkingPointsAssetSystemPrompt).toContain('"why me for this role"');
+    const p = buildTalkingPointsAssetUserPrompt({ job: minimalJob({}), userProfile });
+    expect(p).toContain("Shared generation guidance:");
+  });
+
+  it("tailored bullets prompt enforces resume-type-aware differences", () => {
+    expect(tailoredBulletsAssetSystemPrompt).toContain("Resume-type-aware");
+    const p = buildTailoredBulletsAssetUserPrompt({ job: minimalJob({ recommendedResume: "SIE" }), userProfile });
+    expect(p).toContain("Shared generation guidance:");
   });
 });

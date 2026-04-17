@@ -142,6 +142,113 @@ Emphasize: strong fundamentals, learning velocity, practical shipping from proje
 Avoid: sounding artificially senior, claiming staff-level scope, or implying long industry tenure.
 `.trim();
 };
+const tokenize = (text) => text
+    .toLowerCase()
+    .replace(/[^a-z0-9+\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+const ARCHETYPE_KEYWORDS = {
+    implementation: ["integration", "onboarding", "stakeholder", "customer", "delivery", "implementation"],
+    product: ["product", "feature", "shipping", "internal", "tool", "api", "full-stack"],
+    early: ["junior", "entry", "early", "growth", "mentor", "learn"],
+};
+const hashText = (text) => {
+    let h = 0;
+    for (let i = 0; i < text.length; i++)
+        h = (h * 31 + text.charCodeAt(i)) >>> 0;
+    return h;
+};
+function deriveArchetype(job) {
+    if (job.recommendedResume === "SIE")
+        return "implementation";
+    if (job.recommendedResume === "EARLY_CAREER")
+        return "early";
+    const blob = `${job.extracted.title} ${job.extracted.responsibilities.join(" ")} ${job.extracted.requirements.join(" ")}`.toLowerCase();
+    if (/(integration|implementation|customer|onboarding|deployment)/.test(blob))
+        return "implementation";
+    if (/(junior|entry|new grad|early career)/.test(blob))
+        return "early";
+    return "product";
+}
+function deriveTopPriorities(job, archetype) {
+    const candidates = [
+        ...job.extracted.responsibilities,
+        ...job.extracted.requirements,
+        ...job.extracted.requiredSkills.map((s) => `Needs ${s}`),
+    ]
+        .map((s) => s.trim())
+        .filter(Boolean);
+    const picked = [];
+    const targetKeywords = ARCHETYPE_KEYWORDS[archetype];
+    for (const line of candidates) {
+        const words = tokenize(line);
+        if (picked.length < 2 && words.some((w) => targetKeywords.includes(w))) {
+            picked.push(line);
+        }
+        if (picked.length >= 3)
+            break;
+    }
+    for (const line of candidates) {
+        if (picked.length >= 3)
+            break;
+        if (!picked.includes(line))
+            picked.push(line);
+    }
+    if (!picked.length) {
+        if (archetype === "implementation")
+            return ["Delivery-focused implementation with integrations and stakeholder communication."];
+        if (archetype === "early")
+            return ["Early-career shipping role with growth potential and practical collaboration."];
+        return ["Product-minded full-stack shipping with practical API and internal tooling overlap."];
+    }
+    return picked.slice(0, 3).map((p) => (p.length > 120 ? `${p.slice(0, 117)}...` : p));
+}
+function selectProjectEvidence(job, profile, archetype) {
+    const roleWords = new Set(tokenize([
+        job.extracted.title,
+        ...job.extracted.stack,
+        ...job.extracted.requiredSkills,
+        ...job.extracted.responsibilities,
+        ...job.extracted.requirements,
+    ].join(" ")));
+    const archetypeWords = ARCHETYPE_KEYWORDS[archetype];
+    const tieSeed = hashText(`${job.extracted.company}|${job.extracted.title}`);
+    const scored = profile.flagshipProjects.map((p, idx) => {
+        const projectWords = tokenize([p.name, p.summary, ...p.tech, ...p.outcomes].join(" "));
+        const overlap = projectWords.filter((w) => roleWords.has(w)).length;
+        const archetypeBoost = projectWords.filter((w) => archetypeWords.includes(w)).length;
+        const tieBreaker = ((tieSeed + idx * 17) % 1000) / 1000;
+        return { p, score: overlap * 3 + archetypeBoost * 2 + tieBreaker };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    const top = scored.slice(0, 2).map((s) => s.p);
+    return {
+        names: top.map((p) => p.name),
+        summaries: top.map((p) => p.summary),
+    };
+}
+function recommendationBandInstruction(band) {
+    if (band === "yes") {
+        return "Tone band: yes. Be confident and direct; strongest overlap first; no defensive caveat paragraph.";
+    }
+    if (band === "selective_yes") {
+        return "Tone band: selective_yes. Positive but measured; emphasize concrete overlap and keep one brief caveat subordinate if needed.";
+    }
+    return "Tone band: no (forced generation). Keep restrained and candid. Do not sound like a strong-fit pitch.";
+}
+export function buildCoverLetterGuidance(job, userProfile) {
+    const archetype = deriveArchetype(job);
+    const priorities = deriveTopPriorities(job, archetype);
+    const selected = selectProjectEvidence(job, userProfile, archetype);
+    return {
+        archetype,
+        priorities,
+        selectedProjectNames: selected.names,
+        selectedProjectSummaries: selected.summaries,
+        bandInstruction: recommendationBandInstruction(job.recommendation),
+    };
+}
+export const buildAssetGuidanceJson = (job, userProfile) => JSON.stringify(buildCoverLetterGuidance(job, userProfile), null, 2);
 export const buildAssetJobContextJson = (job) => JSON.stringify({
     extracted: job.extracted,
     rules: job.rules,
@@ -161,12 +268,22 @@ ${ASSET_GROUNDING_RULES}
 Formatting:
 - Start with a normal greeting ("Hello {company} team", "Dear hiring team", etc.).
 - Never begin with a raw job-description header line (e.g. "{company} — {title}" copied from the posting).
-Output valid JSON only with a single key "coverLetter" (string, under ~220 words unless the posting demands slightly more).
+Default output contract:
+- 140–220 words.
+- 3 short paragraphs.
+- Paragraph 1: direct role interest + why this company/role fit based on real JD priorities.
+- Paragraph 2: 1–2 strongest relevant examples only (no laundry list).
+- Paragraph 3: concise close tied to role value/growth.
+- Keep caveats brief and subordinate; never make them the center of the letter.
+Output valid JSON only with a single key "coverLetter".
 `.trim();
 export const buildCoverLetterAssetUserPrompt = (params) => `
 ${buildResumeAngleBlock(params.job.recommendedResume)}
 
 ${ASSET_EVIDENCE_DIVERSITY}
+
+Cover-letter guidance:
+${JSON.stringify(buildCoverLetterGuidance(params.job, params.userProfile), null, 2)}
 
 User profile:
 ${JSON.stringify(params.userProfile, null, 2)}
@@ -175,21 +292,26 @@ Job + evaluation context:
 ${buildAssetJobContextJson(params.job)}
 
 Write the cover letter. Reference the company and role concretely. Do not restate the entire job description.
-${params.job.recommendation === 'no'
-    ? '\nTone: candid about fit risks the evaluation already flagged, still respectful — this is likely a stretch application.\n'
-    : ''}
+Use the guidance priorities and selected project evidence. Avoid generic profile summary mode.
 `.trim();
 export const whyCompanyAssetSystemPrompt = `
 You write a concise "Why this company?" answer for an application form.
 ${ASSET_GROUNDING_RULES}
 Ground the answer in the company name, role title, and specific problems/responsibilities/stack mentioned in the posting — not generic startup enthusiasm.
 Output valid JSON only: { "whyCompany": string }.
-Length: 2–5 short sentences. Prefer line breaks (actual newline characters inside the JSON string) between sentences so the answer is scannable — especially for customer-facing / solutions / integration roles.
+Contract:
+- 3–5 concise sentences (or two short paragraphs with line breaks), textbox-friendly.
+- Include: (1) specific role/company hook, (2) strongest overlap evidence, (3) believable close tied to trajectory.
+- Do not use generic praise ("innovative", "fast-paced", "mission-driven") unless directly grounded in provided JD context.
+- Tone by recommendation band: yes=confident, selective_yes=measured positive, no/forced=restrained and candid.
 `.trim();
 export const buildWhyCompanyAssetUserPrompt = (params) => `
 ${buildResumeAngleBlock(params.job.recommendedResume)}
 
 ${ASSET_EVIDENCE_DIVERSITY}
+
+Shared generation guidance:
+${buildAssetGuidanceJson(params.job, params.userProfile)}
 
 User profile:
 ${JSON.stringify(params.userProfile, null, 2)}
@@ -203,13 +325,22 @@ ${params.job.recommendedResume === 'SIE'
 export const talkingPointsAssetSystemPrompt = `
 You produce 3–5 practical talking points the candidate could use in a screen or recruiter call.
 ${ASSET_GROUNDING_RULES}
-Each point: one sentence, concrete, tied to profile evidence and (lightly) to this role's needs where overlap exists.
+Contract:
+- 3–5 points; mostly one sentence each (max two short sentences when needed).
+- These must sound like things the candidate can actually say out loud in recruiter/interview conversation.
+- Include at least one direct "why me for this role" point.
+- Include at most one caveat-aware point, and only if the role risk justifies it.
+- Do not output resume bullets in disguise.
+- Tone by recommendation band: yes=confident, selective_yes=measured, no/forced=restrained but still useful.
 Output valid JSON: { "talkingPoints": string[] } with length 3–5.
 `.trim();
 export const buildTalkingPointsAssetUserPrompt = (params) => `
 ${buildResumeAngleBlock(params.job.recommendedResume)}
 
 ${ASSET_EVIDENCE_DIVERSITY}
+
+Shared generation guidance:
+${buildAssetGuidanceJson(params.job, params.userProfile)}
 
 User profile:
 ${JSON.stringify(params.userProfile, null, 2)}
@@ -220,13 +351,25 @@ ${buildAssetJobContextJson(params.job)}
 export const tailoredBulletsAssetSystemPrompt = `
 You produce 3–5 resume bullet CANDIDATES (not final resume lines) adapted from the user's real projects and strengths.
 ${ASSET_GROUNDING_RULES}
-Bullets should be past-tense, outcome-leaning where the profile already mentions outcomes — otherwise stay capability-focused without inventing metrics.
+Contract:
+- 3–5 concise resume-style bullet candidates, not interview talking points.
+- Resume-type-aware:
+  - SWE: APIs, full-stack product features, internal tools, pragmatic technical tradeoffs.
+  - SIE: integrations, implementation delivery, stakeholder translation, onboarding/support.
+  - EARLY_CAREER: hands-on shipped work, fundamentals, growth readiness without senior claims.
+- Tailor to JD priorities and selected evidence angles.
+- Vary lead-ins; do not start every bullet with the same phrasing pattern.
+- Keep honesty constraints; no invented scale/years/scope.
+- Tone by recommendation band: yes strongest overlap, selective_yes measured, no/forced restrained.
 Output valid JSON: { "tailoredBulletCandidates": string[] } with length 3–5.
 `.trim();
 export const buildTailoredBulletsAssetUserPrompt = (params) => `
 ${buildResumeAngleBlock(params.job.recommendedResume)}
 
 ${ASSET_EVIDENCE_DIVERSITY}
+
+Shared generation guidance:
+${buildAssetGuidanceJson(params.job, params.userProfile)}
 
 User profile:
 ${JSON.stringify(params.userProfile, null, 2)}

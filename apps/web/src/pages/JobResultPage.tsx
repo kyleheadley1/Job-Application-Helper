@@ -7,15 +7,76 @@ import { StatusBadge } from "../components/StatusBadge";
 import { JsonPanel } from "../components/JsonPanel";
 import { salaryAskLabel } from "../lib/jobDisplay";
 
+type AssetTab = "cover" | "why" | "points" | "bullets" | "raw";
+
+function tabHasContent(job: JobRecord, tab: AssetTab): boolean {
+  if (tab === "raw") return true;
+  if (tab === "cover") return Boolean(job.generated.coverLetter?.trim());
+  if (tab === "why") return Boolean(job.generated.whyCompany?.trim());
+  if (tab === "points") return (job.generated.talkingPoints?.length ?? 0) > 0;
+  if (tab === "bullets") return (job.generated.tailoredBulletCandidates?.length ?? 0) > 0;
+  return false;
+}
+
 export const JobResultPage = () => {
   const { id = "" } = useParams();
   const [job, setJob] = useState<JobRecord | null>(null);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState("cover");
+  const [tab, setTab] = useState<AssetTab>("cover");
+  const [tracked, setTracked] = useState(false);
+  const [canConfirmApplied, setCanConfirmApplied] = useState(false);
+  const [busyConfirm, setBusyConfirm] = useState(false);
+  const [confirmMsg, setConfirmMsg] = useState("");
+  const [assetBusy, setAssetBusy] = useState(false);
+  const [assetMsg, setAssetMsg] = useState("");
 
   useEffect(() => {
-    api.getJob(id).then(setJob).catch((err) => setError(err.message));
+    api
+      .getJob(id)
+      .then((data) => {
+        setJob(data);
+        setTracked(Boolean(data.tracked));
+        setCanConfirmApplied(Boolean(data.canConfirmApplied));
+      })
+      .catch((err) => setError(err.message));
   }, [id]);
+
+  const ensureAssets = async (nextTab: AssetTab) => {
+    if (!job || nextTab === "raw" || tabHasContent(job, nextTab) || assetBusy) return;
+    setAssetBusy(true);
+    setAssetMsg("Generating assets...");
+    try {
+      const updated = await api.regenerateAssets(job.id, false);
+      setJob(updated);
+      setAssetMsg("Assets generated.");
+    } catch (err) {
+      setAssetMsg(err instanceof Error ? err.message : "Asset generation failed.");
+    } finally {
+      setAssetBusy(false);
+    }
+  };
+
+  const openTab = async (nextTab: AssetTab) => {
+    setTab(nextTab);
+    await ensureAssets(nextTab);
+  };
+
+  const confirmApplied = async () => {
+    if (!job) return;
+    setBusyConfirm(true);
+    setConfirmMsg("");
+    try {
+      const saved = await api.confirmApplied(job.id);
+      setJob(saved);
+      setTracked(true);
+      setCanConfirmApplied(false);
+      setConfirmMsg("Confirmed and added to tracker.");
+    } catch (err) {
+      setConfirmMsg(err instanceof Error ? err.message : "Could not confirm applied.");
+    } finally {
+      setBusyConfirm(false);
+    }
+  };
 
   if (error) return <p className="error">{error}</p>;
   if (!job) return <p>Loading...</p>;
@@ -39,6 +100,17 @@ export const JobResultPage = () => {
         <article className="card">
           <h3>Decision</h3>
           <p>Apply: {job.recommendation}</p>
+          {!tracked ? (
+            <p className="muted">Not added to tracker yet. It is saved only after you confirm you applied.</p>
+          ) : (
+            <p className="muted">In tracker.</p>
+          )}
+          {!tracked && canConfirmApplied ? (
+            <button onClick={confirmApplied} disabled={busyConfirm}>
+              {busyConfirm ? "Confirming..." : "Confirm I applied"}
+            </button>
+          ) : null}
+          {confirmMsg ? <p className="muted">{confirmMsg}</p> : null}
           <p>Salary ask: {salaryAskLabel(job) || "N/A"}</p>
           <p>Recommended resume: {job.recommendedResume}</p>
           <p>Main risk: {job.mainRisk}</p>
@@ -61,12 +133,13 @@ export const JobResultPage = () => {
       </div>
 
       <div className="tabs">
-        <button onClick={() => setTab("cover")}>Cover Letter</button>
-        <button onClick={() => setTab("why")}>Why Company</button>
-        <button onClick={() => setTab("points")}>Talking Points</button>
-        <button onClick={() => setTab("bullets")}>Bullet Candidates</button>
-        <button onClick={() => setTab("raw")}>Raw Extraction</button>
+        <button onClick={() => void openTab("cover")}>Cover Letter</button>
+        <button onClick={() => void openTab("why")}>Why Company</button>
+        <button onClick={() => void openTab("points")}>Talking Points</button>
+        <button onClick={() => void openTab("bullets")}>Bullet Candidates</button>
+        <button onClick={() => void openTab("raw")}>Raw Extraction</button>
       </div>
+      {assetMsg ? <p className="muted">{assetMsg}</p> : null}
       <article className="card">
         {tab === "cover" ? <p>{job.generated.coverLetter ?? "Not generated"}</p> : null}
         {tab === "why" ? <p>{job.generated.whyCompany ?? "Not generated"}</p> : null}

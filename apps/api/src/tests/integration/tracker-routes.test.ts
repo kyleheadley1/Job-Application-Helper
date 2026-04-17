@@ -13,18 +13,19 @@ Salary: 130000 USD - 160000 USD
 `.trim();
 
 const BAD_FIT_RAW = `
-Heritage Bank — Associate Software Engineer (New Graduate Program)
-Location: Onsite, Dallas, TX (not commutable from NYC)
-Bachelor's required
-US citizenship required
-No visa sponsorship
-Enterprise Java 5+ years preferred
+Heritage Payments — Software Engineer
+Location: Hybrid, New York, NY
+Build backend services in Java and TypeScript for transaction analytics.
+1-3 years experience preferred.
+Salary: 95000 USD - 125000 USD
 `.trim();
 
 const triage = async (rawText: string, companyHint: string) => {
   const res = await request(app).post("/api/jobs/triage").send({ rawText, companyHint, fullPrep: false });
   expect(res.status).toBe(200);
-  return res.body as { id: string };
+  const confirm = await request(app).post(`/api/jobs/${res.body.id}/confirm-applied`).send({});
+  expect(confirm.status).toBe(200);
+  return confirm.body as { id: string };
 };
 
 describe("tracker routes", () => {
@@ -53,10 +54,10 @@ describe("tracker routes", () => {
     expect(s1.body.status).toBe("interviewing");
     expect(s1.body.tracker.color).toBe("blue");
     expect(typeof s1.body.tracker.shortlist).toBe("boolean");
-    expect(s1.body.statusHistory?.length).toBe(1);
-    expect(s1.body.statusHistory?.[0]?.fromStatus).toBe("to_review");
-    expect(s1.body.statusHistory?.[0]?.toStatus).toBe("interviewing");
-    expect(s1.body.statusHistory?.[0]?.note).toBe("Recruiter screen passed");
+    expect(s1.body.statusHistory?.length).toBe(2);
+    expect(s1.body.statusHistory?.[1]?.fromStatus).toBe("applied");
+    expect(s1.body.statusHistory?.[1]?.toStatus).toBe("interviewing");
+    expect(s1.body.statusHistory?.[1]?.note).toBe("Recruiter screen passed");
 
     const s2 = await request(app).patch(`/api/jobs/${created.id}/status`).send({
       status: "closed",
@@ -66,7 +67,7 @@ describe("tracker routes", () => {
     expect(s2.body.status).toBe("closed");
     expect(s2.body.tracker.color).toBe("red");
     expect(s2.body.tracker.shortlist).toBe(false);
-    expect(s2.body.statusHistory?.length).toBe(2);
+    expect(s2.body.statusHistory?.length).toBe(3);
   });
 
   it("PATCH /:id/notes persists notes", async () => {
