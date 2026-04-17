@@ -1,15 +1,20 @@
-import type { ResumeType } from "./resume.js";
-import type { Recommendation, RuleEvaluation, SalaryAsk, ScoreBreakdown } from "./scoring.js";
+import type { ResumeType } from './resume.js';
+import type {
+  Recommendation,
+  RuleEvaluation,
+  SalaryAsk,
+  ScoreBreakdown,
+} from './scoring.js';
 
 export type JobStatus =
-  | "to_review"
-  | "applied"
-  | "skip"
-  | "rejected"
-  | "interviewing"
-  | "assessment"
-  | "closed"
-  | "offer";
+  | 'to_review'
+  | 'applied'
+  | 'skip'
+  | 'rejected'
+  | 'interviewing'
+  | 'assessment'
+  | 'closed'
+  | 'offer';
 
 export type ExtractedJobData = {
   company: string;
@@ -17,7 +22,7 @@ export type ExtractedJobData = {
   url?: string;
   rawText?: string;
   location?: string;
-  remoteType?: "remote" | "hybrid" | "onsite" | "unknown";
+  remoteType?: 'remote' | 'hybrid' | 'onsite' | 'unknown';
   locationIsCommutable?: boolean;
   salary?: {
     min?: number;
@@ -36,7 +41,12 @@ export type ExtractedJobData = {
   domainTags: string[];
   degreeRequirement?: {
     raw?: string;
-    level?: "none" | "preferred" | "required" | "equivalent_allowed" | "unknown";
+    level?:
+      | 'none'
+      | 'preferred'
+      | 'required'
+      | 'equivalent_allowed'
+      | 'unknown';
   };
   visaRequirement?: string;
   citizenshipRequirement?: string;
@@ -113,7 +123,7 @@ export type JobRecord = {
     priority?: string;
     recommendedAction?: string;
     statusOutcome?: string;
-    color?: "green" | "yellow" | "red" | "blue";
+    color?: 'green' | 'yellow' | 'red' | 'blue';
     shortlist?: boolean;
     notes?: string;
   };
@@ -149,15 +159,15 @@ export type JobListFilters = {
 export type JobExportRow = {
   Company: string;
   Role: string;
-  "Latest Score": number;
-  "Recommended Action": string;
-  "Salary Ask": string;
-  "Top Match": string;
-  "Main Risk": string;
+  'Latest Score': number;
+  'Recommended Action': string;
+  'Salary Ask': string;
+  'Top Match': string;
+  'Main Risk': string;
   Resume: ResumeType;
-  "Status / Outcome": string;
+  'Status / Outcome': string;
   Shortlist: boolean;
   Notes: string;
-  "Created At": string;
-  "Updated At": string;
+  'Created At': string;
+  'Updated At': string;
 };

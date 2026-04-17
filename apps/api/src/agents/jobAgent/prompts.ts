@@ -1,7 +1,7 @@
-import type { ExtractedJobData, JobRecord } from "../../types/job.js";
-import type { ResumeType } from "../../types/resume.js";
-import type { RuleEvaluation, ScoreBreakdown } from "../../types/scoring.js";
-import type { UserProfile } from "../../types/userProfile.js";
+import type { ExtractedJobData, JobRecord } from '../../types/job.js';
+import type { ResumeType } from '../../types/resume.js';
+import type { RuleEvaluation, ScoreBreakdown } from '../../types/scoring.js';
+import type { UserProfile } from '../../types/userProfile.js';
 
 export const extractionSystemPrompt = `
 You extract job posting details into ONE flat JSON object (no wrapper keys like "job" or "data").
@@ -25,13 +25,17 @@ Required shape (field names must match exactly):
 - stack, requiredSkills, preferredSkills, domainTags, responsibilities, requirements: arrays of strings (empty arrays allowed).
 `.trim();
 
-export const buildExtractionPrompt = (input: { url?: string; rawText?: string; companyHint?: string }): string => `
+export const buildExtractionPrompt = (input: {
+  url?: string;
+  rawText?: string;
+  companyHint?: string;
+}): string => `
 Extract a job posting into the required schema.
-Company hint: ${input.companyHint ?? "none"}
-URL: ${input.url ?? "none"}
+Company hint: ${input.companyHint ?? 'none'}
+URL: ${input.url ?? 'none'}
 
 Job text:
-${input.rawText ?? "No raw text provided."}
+${input.rawText ?? 'No raw text provided.'}
 `;
 
 export const scoringSystemPrompt = `
@@ -49,7 +53,8 @@ export const buildScoringPrompt = (params: {
   rules: RuleEvaluation;
   userProfile: UserProfile;
   scoringPolicy: unknown;
-}): string => `
+}): string =>
+  `
 Evaluate this role with conservative realism.
 
 Return EXACTLY these keys (and no others):
@@ -146,14 +151,14 @@ Grounding and honesty (non-negotiable):
 `.trim();
 
 export const buildResumeAngleBlock = (resume: ResumeType): string => {
-  if (resume === "SWE") {
+  if (resume === 'SWE') {
     return `
 Resume angle: SWE (product engineering).
 Emphasize: backend-leaning full-stack product work, APIs, internal tools, TypeScript/Node/React where profile supports it, shipping product features, pragmatic product tradeoffs.
 Avoid: sounding like pure SRE/infra ownership or design-first craft unless the profile supports it.
 `.trim();
   }
-  if (resume === "SIE") {
+  if (resume === 'SIE') {
     return `
 Resume angle: SIE / implementation-adjacent.
 Emphasize: hands-on implementation, integrations, delivery timelines, cross-functional collaboration, technical onboarding with stakeholders, translating requirements to workable technical plans, bridging technical and business needs.
@@ -195,7 +200,11 @@ Formatting:
 Output valid JSON only with a single key "coverLetter" (string, under ~220 words unless the posting demands slightly more).
 `.trim();
 
-export const buildCoverLetterAssetUserPrompt = (params: { job: JobRecord; userProfile: UserProfile }): string => `
+export const buildCoverLetterAssetUserPrompt = (params: {
+  job: JobRecord;
+  userProfile: UserProfile;
+}): string =>
+  `
 ${buildResumeAngleBlock(params.job.recommendedResume)}
 
 ${ASSET_EVIDENCE_DIVERSITY}
@@ -208,9 +217,9 @@ ${buildAssetJobContextJson(params.job)}
 
 Write the cover letter. Reference the company and role concretely. Do not restate the entire job description.
 ${
-  params.job.recommendation === "no"
-    ? "\nTone: candid about fit risks the evaluation already flagged, still respectful — this is likely a stretch application.\n"
-    : ""
+  params.job.recommendation === 'no'
+    ? '\nTone: candid about fit risks the evaluation already flagged, still respectful — this is likely a stretch application.\n'
+    : ''
 }
 `.trim();
 
@@ -222,7 +231,11 @@ Output valid JSON only: { "whyCompany": string }.
 Length: 2–5 short sentences. Prefer line breaks (actual newline characters inside the JSON string) between sentences so the answer is scannable — especially for customer-facing / solutions / integration roles.
 `.trim();
 
-export const buildWhyCompanyAssetUserPrompt = (params: { job: JobRecord; userProfile: UserProfile }): string => `
+export const buildWhyCompanyAssetUserPrompt = (params: {
+  job: JobRecord;
+  userProfile: UserProfile;
+}): string =>
+  `
 ${buildResumeAngleBlock(params.job.recommendedResume)}
 
 ${ASSET_EVIDENCE_DIVERSITY}
@@ -233,9 +246,9 @@ ${JSON.stringify(params.userProfile, null, 2)}
 Job + evaluation context:
 ${buildAssetJobContextJson(params.job)}
 ${
-  params.job.recommendedResume === "SIE"
+  params.job.recommendedResume === 'SIE'
     ? `\nFor this SIE / implementation-forward angle: keep each sentence short; separate sentences with newline characters inside the JSON string (not one dense block paragraph).\n`
-    : ""
+    : ''
 }
 `.trim();
 
@@ -246,7 +259,11 @@ Each point: one sentence, concrete, tied to profile evidence and (lightly) to th
 Output valid JSON: { "talkingPoints": string[] } with length 3–5.
 `.trim();
 
-export const buildTalkingPointsAssetUserPrompt = (params: { job: JobRecord; userProfile: UserProfile }): string => `
+export const buildTalkingPointsAssetUserPrompt = (params: {
+  job: JobRecord;
+  userProfile: UserProfile;
+}): string =>
+  `
 ${buildResumeAngleBlock(params.job.recommendedResume)}
 
 ${ASSET_EVIDENCE_DIVERSITY}
@@ -265,7 +282,11 @@ Bullets should be past-tense, outcome-leaning where the profile already mentions
 Output valid JSON: { "tailoredBulletCandidates": string[] } with length 3–5.
 `.trim();
 
-export const buildTailoredBulletsAssetUserPrompt = (params: { job: JobRecord; userProfile: UserProfile }): string => `
+export const buildTailoredBulletsAssetUserPrompt = (params: {
+  job: JobRecord;
+  userProfile: UserProfile;
+}): string =>
+  `
 ${buildResumeAngleBlock(params.job.recommendedResume)}
 
 ${ASSET_EVIDENCE_DIVERSITY}
@@ -290,7 +311,11 @@ Output valid JSON:
 Use 3–6 items in each array when risks warrant it; fewer if the role is clean. recruiterReplyDraft: one or two short sentences max, practical tone.
 `.trim();
 
-export const buildApplicationStrategyAssetUserPrompt = (params: { job: JobRecord; userProfile: UserProfile }): string => `
+export const buildApplicationStrategyAssetUserPrompt = (params: {
+  job: JobRecord;
+  userProfile: UserProfile;
+}): string =>
+  `
 ${buildResumeAngleBlock(params.job.recommendedResume)}
 
 ${ASSET_EVIDENCE_DIVERSITY}
@@ -301,4 +326,3 @@ ${JSON.stringify(params.userProfile, null, 2)}
 Job + evaluation context:
 ${buildAssetJobContextJson(params.job)}
 `.trim();
-
