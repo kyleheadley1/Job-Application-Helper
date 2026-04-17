@@ -24,7 +24,8 @@ const fetchCsv = async (path: string): Promise<string> => {
 export const api = {
   triage: (payload: { url?: string; rawText?: string; companyHint?: string; fullPrep?: boolean }) =>
     request<JobRecord>("/jobs/triage", { method: "POST", body: JSON.stringify(payload) }),
-  listJobs: (query = "") => request<{ items: JobRecord[]; total: number }>(`/jobs${query}`),
+  listJobs: (query = "") =>
+    request<{ items: JobRecord[]; total: number; totalAll?: number }>(`/jobs${query}`),
   getJob: (id: string) => request<JobRecord & { statusHistory?: unknown[] }>(`/jobs/${id}`),
   updateStatus: (id: string, status: JobStatus, note?: string) =>
     request<JobRecord>(`/jobs/${id}/status`, { method: "PATCH", body: JSON.stringify({ status, note }) }),

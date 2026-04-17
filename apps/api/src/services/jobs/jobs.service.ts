@@ -31,7 +31,7 @@ export class JobsService {
     return jobsRepository.getById(id);
   }
 
-  async list(filters: JobListFilters): Promise<{ items: JobRecord[]; total: number }> {
+  async list(filters: JobListFilters): Promise<{ items: JobRecord[]; total: number; totalAll: number }> {
     return jobsRepository.list(filters);
   }
 

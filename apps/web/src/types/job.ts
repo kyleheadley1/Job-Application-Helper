@@ -14,6 +14,7 @@ export type ExtractedJobData = {
   company: string;
   title: string;
   url?: string;
+  rawText?: string;
   location?: string;
   remoteType?: "remote" | "hybrid" | "onsite" | "unknown";
   stack: string[];

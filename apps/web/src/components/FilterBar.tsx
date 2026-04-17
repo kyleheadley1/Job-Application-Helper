@@ -27,7 +27,7 @@ export const FilterBar = ({
   shortlistOnly,
   onShortlistChange,
 }: Props) => (
-  <div className="grid filters">
+  <div className="tracker-filter-grid">
     <label>
       Status
       <select value={status} onChange={(e) => onStatusChange(e.target.value)}>
@@ -91,13 +91,7 @@ export const FilterBar = ({
         Clear
       </button>
     </label>
-    <label style={{ visibility: "hidden" }}>
-      spacer
-      <select>
-        <option />
-      </select>
-    </label>
-    <label className="checkboxRow">
+    <label className="checkboxRow tracker-filter-shortlist">
       <input type="checkbox" checked={shortlistOnly} onChange={(e) => onShortlistChange(e.target.checked)} />
       Shortlisted only
     </label>

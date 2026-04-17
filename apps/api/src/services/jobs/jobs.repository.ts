@@ -89,7 +89,9 @@ export class JobsRepository {
     return docs.map((d) => this.fromDoc(d));
   }
 
-  async list(filters: JobListFilters = {}): Promise<{ items: JobRecord[]; total: number }> {
+  async list(
+    filters: JobListFilters = {},
+  ): Promise<{ items: JobRecord[]; total: number; totalAll: number }> {
     const col = await this.collection();
     const query: Filter<JobRecord & { _id: string }> = {};
     if (filters.status) query.status = filters.status;
@@ -98,9 +100,12 @@ export class JobsRepository {
     if (filters.recommendation) query.recommendation = filters.recommendation;
     if (filters.minScore !== undefined) query["score.total"] = { $gte: filters.minScore };
     if (filters.company) query["extracted.company"] = { $regex: filters.company, $options: "i" };
-    const docs = await col.find(query).sort({ updatedAt: -1 }).toArray();
+    const [docs, totalAll] = await Promise.all([
+      col.find(query).sort({ updatedAt: -1 }).toArray(),
+      col.countDocuments({}),
+    ]);
     const items = docs.map((d) => this.fromDoc(d));
-    return { items, total: items.length };
+    return { items, total: items.length, totalAll };
   }
 
   async clearForTests(): Promise<void> {
