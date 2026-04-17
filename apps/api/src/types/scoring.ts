@@ -1,4 +1,4 @@
-export type Recommendation = "yes" | "selective_yes" | "no";
+export type Recommendation = 'yes' | 'selective_yes' | 'no';
 
 export type ScoreBreakdown = {
   stackFit: number;

@@ -1,11 +1,11 @@
-import request from "supertest";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { app } from "../../app.js";
-import { jobsRepository } from "../../services/jobs/jobs.repository.js";
-import { createMongoTestHarness } from "../support/mongo-test-db.js";
+import request from 'supertest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { app } from '../../app.js';
+import { jobsRepository } from '../../services/jobs/jobs.repository.js';
+import { createMongoTestHarness } from '../support/mongo-test-db.js';
 
-describe("POST /api/jobs/triage", () => {
-  const mongo = createMongoTestHarness("triage_routes");
+describe('POST /api/jobs/triage', () => {
+  const mongo = createMongoTestHarness('triage_routes');
 
   beforeAll(async () => {
     await mongo.start();
@@ -19,11 +19,11 @@ describe("POST /api/jobs/triage", () => {
     await jobsRepository.clearForTests();
   });
 
-  it("returns a structured, auditable triage result", async () => {
-    const response = await request(app).post("/api/jobs/triage").send({
+  it('returns a structured, auditable triage result', async () => {
+    const response = await request(app).post('/api/jobs/triage').send({
       rawText:
-        "Software Engineer. Build TypeScript and Node.js APIs with React frontend. 2+ years experience. Remote in NYC.",
-      companyHint: "AppFlow",
+        'Software Engineer. Build TypeScript and Node.js APIs with React frontend. 2+ years experience. Remote in NYC.',
+      companyHint: 'AppFlow',
       fullPrep: false,
     });
 
@@ -48,8 +48,8 @@ describe("POST /api/jobs/triage", () => {
     expect(response.body.debugExtraction?.scoring?.success).toBeDefined();
   });
 
-  it("validates triage input", async () => {
-    const response = await request(app).post("/api/jobs/triage").send({});
+  it('validates triage input', async () => {
+    const response = await request(app).post('/api/jobs/triage').send({});
     expect(response.status).toBe(400);
   });
 });

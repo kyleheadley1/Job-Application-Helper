@@ -1,17 +1,17 @@
-import { z } from "zod";
-import { preprocessExtractionInput } from "../../tools/triageStructuredNormalize.js";
+import { z } from 'zod';
+import { preprocessExtractionInput } from '../../tools/triageStructuredNormalize.js';
 
-export const ResumeTypeSchema = z.enum(["SWE", "SIE", "EARLY_CAREER"]);
-export const RecommendationSchema = z.enum(["yes", "selective_yes", "no"]);
+export const ResumeTypeSchema = z.enum(['SWE', 'SIE', 'EARLY_CAREER']);
+export const RecommendationSchema = z.enum(['yes', 'selective_yes', 'no']);
 export const JobStatusSchema = z.enum([
-  "to_review",
-  "applied",
-  "skip",
-  "rejected",
-  "interviewing",
-  "assessment",
-  "closed",
-  "offer",
+  'to_review',
+  'applied',
+  'skip',
+  'rejected',
+  'interviewing',
+  'assessment',
+  'closed',
+  'offer',
 ]);
 
 export const ExtractedJobDataSchema = z.object({
@@ -20,7 +20,7 @@ export const ExtractedJobDataSchema = z.object({
   url: z.string().url().optional(),
   rawText: z.string().optional(),
   location: z.string().optional(),
-  remoteType: z.enum(["remote", "hybrid", "onsite", "unknown"]).optional(),
+  remoteType: z.enum(['remote', 'hybrid', 'onsite', 'unknown']).optional(),
   locationIsCommutable: z.boolean().optional(),
   salary: z
     .object({
@@ -44,7 +44,15 @@ export const ExtractedJobDataSchema = z.object({
   degreeRequirement: z
     .object({
       raw: z.string().optional(),
-      level: z.enum(["none", "preferred", "required", "equivalent_allowed", "unknown"]).optional(),
+      level: z
+        .enum([
+          'none',
+          'preferred',
+          'required',
+          'equivalent_allowed',
+          'unknown',
+        ])
+        .optional(),
     })
     .optional(),
   visaRequirement: z.string().optional(),
@@ -56,7 +64,10 @@ export const ExtractedJobDataSchema = z.object({
 });
 
 /** Live extraction JSON normalized then validated (safer URL/location/array coercion). */
-export const ExtractedJobFromModelSchema = z.preprocess(preprocessExtractionInput, ExtractedJobDataSchema);
+export const ExtractedJobFromModelSchema = z.preprocess(
+  preprocessExtractionInput,
+  ExtractedJobDataSchema,
+);
 
 export const RuleEvaluationSchema = z.object({
   explicitDegreeRisk: z.boolean(),
@@ -100,7 +111,7 @@ export const ScoreBreakdownSchema = z
     if (Math.abs(computed - v.total) > 2) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Score total should match category sum within tolerance.",
+        message: 'Score total should match category sum within tolerance.',
       });
     }
   });
@@ -186,7 +197,7 @@ export const JobRecordSchema = z.object({
       priority: z.string().optional(),
       recommendedAction: z.string().optional(),
       statusOutcome: z.string().optional(),
-      color: z.enum(["green", "yellow", "red", "blue"]).optional(),
+      color: z.enum(['green', 'yellow', 'red', 'blue']).optional(),
       shortlist: z.boolean().optional(),
       notes: z.string().optional(),
     })
@@ -214,8 +225,8 @@ export const TriageRequestSchema = z
     fullPrep: z.boolean().optional().default(false),
   })
   .refine((v) => Boolean(v.url || v.rawText), {
-    message: "Provide either url or rawText.",
-    path: ["url"],
+    message: 'Provide either url or rawText.',
+    path: ['url'],
   });
 
 export const GenerateAssetsForIdBodySchema = z.object({
@@ -242,10 +253,10 @@ const parseBooleanQuery = z.union([
   z
     .string()
     .trim()
-    .refine((t) => ["true", "false", "1", "0"].includes(t.toLowerCase()), {
-      message: "Expected boolean-like query value.",
+    .refine((t) => ['true', 'false', '1', '0'].includes(t.toLowerCase()), {
+      message: 'Expected boolean-like query value.',
     })
-    .transform((t) => t.toLowerCase() === "true" || t === "1"),
+    .transform((t) => t.toLowerCase() === 'true' || t === '1'),
 ]);
 
 export const JobListQuerySchema = z.object({
@@ -257,7 +268,7 @@ export const JobListQuerySchema = z.object({
   company: z.string().trim().min(1).optional(),
 });
 
-export const ExportFormatSchema = z.enum(["json", "csv"]).default("json");
+export const ExportFormatSchema = z.enum(['json', 'csv']).default('json');
 
 export const JobExportQuerySchema = JobListQuerySchema.extend({
   format: ExportFormatSchema.optional(),
@@ -266,21 +277,23 @@ export const JobExportQuerySchema = JobListQuerySchema.extend({
 export const JobExportRowSchema = z.object({
   Company: z.string(),
   Role: z.string(),
-  "Latest Score": z.number(),
-  "Recommended Action": z.string(),
-  "Salary Ask": z.string(),
-  "Top Match": z.string(),
-  "Main Risk": z.string(),
+  'Latest Score': z.number(),
+  'Recommended Action': z.string(),
+  'Salary Ask': z.string(),
+  'Top Match': z.string(),
+  'Main Risk': z.string(),
   Resume: ResumeTypeSchema,
-  "Status / Outcome": z.string(),
+  'Status / Outcome': z.string(),
   Shortlist: z.boolean(),
   Notes: z.string(),
-  "Created At": z.string(),
-  "Updated At": z.string(),
+  'Created At': z.string(),
+  'Updated At': z.string(),
 });
 
 export const TriageResponseSchema = JobRecordSchema;
 
 export type TriageRequest = z.infer<typeof TriageRequestSchema>;
 export type TriageResponse = z.infer<typeof TriageResponseSchema>;
-export type GenerateAssetsFromJobBody = z.infer<typeof GenerateAssetsFromJobBodySchema>;
+export type GenerateAssetsFromJobBody = z.infer<
+  typeof GenerateAssetsFromJobBodySchema
+>;
