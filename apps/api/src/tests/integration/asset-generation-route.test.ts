@@ -1,8 +1,9 @@
 import request from "supertest";
-import { describe, expect, it, beforeEach } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { app } from "../../app.js";
 import { jobsRepository } from "../../services/jobs/jobs.repository.js";
 import { GeneratedAssetsSchema } from "../../agents/jobAgent/schemas.js";
+import { createMongoTestHarness } from "../support/mongo-test-db.js";
 
 const STARTUP_RAW = `
 Nimbus Labs — Software Engineer — Product (Seed-stage startup)
@@ -29,8 +30,18 @@ Salary: $140k–$200k
 `.trim();
 
 describe("asset generation routes", () => {
-  beforeEach(() => {
-    jobsRepository.clearForTests();
+  const mongo = createMongoTestHarness("asset_generation_routes");
+
+  beforeAll(async () => {
+    await mongo.start();
+  });
+
+  afterAll(async () => {
+    await mongo.stop();
+  });
+
+  beforeEach(async () => {
+    await jobsRepository.clearForTests();
   });
 
   it("integration: triage → GET by id → POST generate-assets → validates schema", async () => {

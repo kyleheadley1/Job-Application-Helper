@@ -20,19 +20,9 @@ export const TrackerPage = () => {
   const [status, setStatus] = useState("");
   const [company, setCompany] = useState("");
   const [resume, setResume] = useState("");
-  const [scoreBand, setScoreBand] = useState("");
+  const [recommendation, setRecommendation] = useState("");
+  const [minScore, setMinScore] = useState("");
   const [shortlistOnly, setShortlistOnly] = useState(false);
-
-  const scoreBounds =
-    scoreBand === "80"
-      ? { minScore: "80" }
-      : scoreBand === "70"
-        ? { minScore: "70", maxScore: "79" }
-        : scoreBand === "65"
-          ? { minScore: "65", maxScore: "69" }
-          : scoreBand === "0"
-            ? { maxScore: "64" }
-            : {};
 
   const query = useMemo(
     () =>
@@ -40,10 +30,11 @@ export const TrackerPage = () => {
         status,
         company,
         resume,
+        recommendation,
+        minScore,
         shortlist: shortlistOnly ? true : undefined,
-        ...scoreBounds,
       }),
-    [status, company, resume, shortlistOnly, scoreBand],
+    [status, company, resume, recommendation, minScore, shortlistOnly],
   );
 
   useEffect(() => {
@@ -53,6 +44,38 @@ export const TrackerPage = () => {
   return (
     <section className="stack">
       <h2>Tracker</h2>
+      <div className="row">
+        <button
+          type="button"
+          onClick={async () => {
+            const out = await api.exportJobs(query);
+            const blob = new Blob([JSON.stringify(out.rows, null, 2)], { type: "application/json" });
+            const href = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = href;
+            a.download = "jobs-export.json";
+            a.click();
+            URL.revokeObjectURL(href);
+          }}
+        >
+          Export JSON
+        </button>
+        <button
+          type="button"
+          onClick={async () => {
+            const csv = await api.exportJobsCsv(query);
+            const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+            const href = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = href;
+            a.download = "jobs-export.csv";
+            a.click();
+            URL.revokeObjectURL(href);
+          }}
+        >
+          Export CSV
+        </button>
+      </div>
       <FilterBar
         status={status}
         onStatusChange={setStatus}
@@ -60,8 +83,10 @@ export const TrackerPage = () => {
         onCompanyChange={setCompany}
         resume={resume}
         onResumeChange={setResume}
-        scoreBand={scoreBand}
-        onScoreBandChange={setScoreBand}
+        recommendation={recommendation}
+        onRecommendationChange={setRecommendation}
+        minScore={minScore}
+        onMinScoreChange={setMinScore}
         shortlistOnly={shortlistOnly}
         onShortlistChange={setShortlistOnly}
       />

@@ -5,8 +5,10 @@ type Props = {
   onCompanyChange: (value: string) => void;
   resume: string;
   onResumeChange: (value: string) => void;
-  scoreBand: string;
-  onScoreBandChange: (value: string) => void;
+  recommendation: string;
+  onRecommendationChange: (value: string) => void;
+  minScore: string;
+  onMinScoreChange: (value: string) => void;
   shortlistOnly: boolean;
   onShortlistChange: (value: boolean) => void;
 };
@@ -18,8 +20,10 @@ export const FilterBar = ({
   onCompanyChange,
   resume,
   onResumeChange,
-  scoreBand,
-  onScoreBandChange,
+  recommendation,
+  onRecommendationChange,
+  minScore,
+  onMinScoreChange,
   shortlistOnly,
   onShortlistChange,
 }: Props) => (
@@ -52,13 +56,45 @@ export const FilterBar = ({
       </select>
     </label>
     <label>
-      Score band
-      <select value={scoreBand} onChange={(e) => onScoreBandChange(e.target.value)}>
+      Recommendation
+      <select value={recommendation} onChange={(e) => onRecommendationChange(e.target.value)}>
         <option value="">All</option>
-        <option value="80">80+</option>
-        <option value="70">70-79</option>
-        <option value="65">65-69</option>
-        <option value="0">Below 65</option>
+        <option value="yes">yes</option>
+        <option value="selective_yes">selective_yes</option>
+        <option value="no">no</option>
+      </select>
+    </label>
+    <label>
+      Min score
+      <input
+        type="number"
+        min={0}
+        max={100}
+        value={minScore}
+        onChange={(e) => onMinScoreChange(e.target.value)}
+        placeholder="e.g. 78"
+      />
+    </label>
+    <label>
+      Reset
+      <button
+        type="button"
+        onClick={() => {
+          onStatusChange("");
+          onCompanyChange("");
+          onResumeChange("");
+          onRecommendationChange("");
+          onMinScoreChange("");
+          onShortlistChange(false);
+        }}
+      >
+        Clear
+      </button>
+    </label>
+    <label style={{ visibility: "hidden" }}>
+      spacer
+      <select>
+        <option />
       </select>
     </label>
     <label className="checkboxRow">

@@ -6,7 +6,9 @@ import type { UserProfile } from "../../types/userProfile.js";
 import { normalizeText } from "../../lib/text.js";
 import { logger } from "../../lib/logger.js";
 import { buildScoringPrompt, scoringSystemPrompt } from "./prompts.js";
+import { preprocessScoringInput } from "../../tools/triageStructuredNormalize.js";
 import { responsesClient } from "../../services/llm/responsesClient.js";
+import type { StructuredCallDiagnostics } from "../../services/llm/responsesClient.js";
 
 const ScoringOutputSchema = z.object({
   score: z.object({
@@ -27,6 +29,9 @@ const ScoringOutputSchema = z.object({
 });
 
 type ScoringResult = z.infer<typeof ScoringOutputSchema>;
+
+/** Exported for regression tests (live-output normalization). */
+export const ScoringFromModelSchema = z.preprocess(preprocessScoringInput, ScoringOutputSchema);
 
 export const mapRecommendationFromScore = (total: number): Recommendation =>
   scoringPolicy.recommendationMapping.find((entry) => total >= entry.min && total <= entry.max)?.recommendation ?? "no";
@@ -104,9 +109,13 @@ export const scoreJob = async (params: {
   extracted: ExtractedJobData;
   rules: RuleEvaluation;
   userProfile: UserProfile;
-}): Promise<ScoringResult> => {
+}): Promise<{
+  scoring: ScoringResult;
+  scoringDiagnostics: StructuredCallDiagnostics;
+  scoringLlmSucceeded: boolean;
+}> => {
   const fallback = () => deterministicFallback(params.extracted, params.rules);
-  const scored = await responsesClient.runStructured({
+  const scoredRun = await responsesClient.runStructured({
     systemPrompt: scoringSystemPrompt,
     userPrompt: buildScoringPrompt({
       extracted: params.extracted,
@@ -114,19 +123,20 @@ export const scoreJob = async (params: {
       userProfile: params.userProfile,
       scoringPolicy,
     }),
-    schema: ScoringOutputSchema,
+    schema: ScoringFromModelSchema,
     fallback,
   });
-  if (!scored.success) {
+  if (!scoredRun.success) {
     logger.warn("Job scoring used deterministic fallback", {
-      fallbackUsed: scored.diagnostics.fallbackUsed,
-      httpStatus: scored.diagnostics.httpStatus,
-      errorCode: scored.diagnostics.errorCode,
-      parseStage: scored.diagnostics.parseStage,
-      reason: scored.diagnostics.reason,
+      fallbackUsed: scoredRun.diagnostics.fallbackUsed,
+      httpStatus: scoredRun.diagnostics.httpStatus,
+      errorCode: scoredRun.diagnostics.errorCode,
+      parseStage: scoredRun.diagnostics.parseStage,
+      reason: scoredRun.diagnostics.reason,
+      errorMessage: scoredRun.diagnostics.errorMessage,
     });
   }
-  const llmResult = scored.data;
+  const llmResult = scoredRun.data;
 
   const categoryTotal =
     llmResult.score.stackFit +
@@ -140,9 +150,13 @@ export const scoreJob = async (params: {
   const recommendation = mapRecommendationFromScore(boundedTotal);
 
   return {
-    ...llmResult,
-    score: { ...llmResult.score, total: boundedTotal },
-    recommendation,
+    scoring: {
+      ...llmResult,
+      score: { ...llmResult.score, total: boundedTotal },
+      recommendation,
+    },
+    scoringDiagnostics: scoredRun.diagnostics,
+    scoringLlmSucceeded: scoredRun.success,
   };
 };
 

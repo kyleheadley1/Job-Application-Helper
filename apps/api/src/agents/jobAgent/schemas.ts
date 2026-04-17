@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { preprocessExtractionInput } from "../../tools/triageStructuredNormalize.js";
 
 export const ResumeTypeSchema = z.enum(["SWE", "SIE", "EARLY_CAREER"]);
 export const RecommendationSchema = z.enum(["yes", "selective_yes", "no"]);
@@ -53,6 +54,9 @@ export const ExtractedJobDataSchema = z.object({
   responsibilities: z.array(z.string()).default([]),
   requirements: z.array(z.string()).default([]),
 });
+
+/** Live extraction JSON normalized then validated (safer URL/location/array coercion). */
+export const ExtractedJobFromModelSchema = z.preprocess(preprocessExtractionInput, ExtractedJobDataSchema);
 
 export const RuleEvaluationSchema = z.object({
   explicitDegreeRisk: z.boolean(),
@@ -111,8 +115,22 @@ export const GeneratedAssetsSchema = z.object({
   recruiterReplyDraft: z.string().optional(),
 });
 
-export const TriageDebugExtractionSchema = z.object({
+export const TriageStageDebugSchema = z.object({
+  success: z.boolean(),
   fallbackUsed: z.boolean(),
+  httpStatus: z.number().optional(),
+  errorCode: z.string().optional(),
+  errorType: z.string().optional(),
+  errorMessage: z.string().optional(),
+  parseStage: z.string().optional(),
+  reason: z.string().optional(),
+});
+
+export const TriageDebugExtractionSchema = z.object({
+  /** True when live extraction did not validate (legacy aggregate). */
+  fallbackUsed: z.boolean(),
+  extraction: TriageStageDebugSchema,
+  scoring: TriageStageDebugSchema,
   extractedFromRawText: z.array(z.string()),
   missingCriticalFields: z.array(z.string()),
 });
@@ -130,6 +148,15 @@ export const AssetGenerationSliceDebugSchema = z.object({
 
 export const DebugAssetGenerationSchema = z.object({
   slices: z.record(z.string(), AssetGenerationSliceDebugSchema),
+});
+
+export const StatusHistoryRecordSchema = z.object({
+  id: z.string(),
+  jobId: z.string(),
+  fromStatus: JobStatusSchema.optional(),
+  toStatus: JobStatusSchema,
+  note: z.string().optional(),
+  createdAt: z.string(),
 });
 
 export const JobRecordSchema = z.object({
@@ -176,6 +203,7 @@ export const JobRecordSchema = z.object({
       }),
     )
     .optional(),
+  statusHistory: z.array(StatusHistoryRecordSchema).optional(),
 });
 
 export const TriageRequestSchema = z
@@ -198,6 +226,57 @@ export const GenerateAssetsFromJobBodySchema = z.object({
   job: JobRecordSchema,
   persist: z.boolean().optional(),
   force: z.boolean().optional(),
+});
+
+export const UpdateJobStatusBodySchema = z.object({
+  status: JobStatusSchema,
+  note: z.string().trim().min(1).max(4000).optional(),
+});
+
+export const UpdateJobNotesBodySchema = z.object({
+  notes: z.string().trim().max(10000),
+});
+
+const parseBooleanQuery = z.union([
+  z.boolean(),
+  z
+    .string()
+    .trim()
+    .refine((t) => ["true", "false", "1", "0"].includes(t.toLowerCase()), {
+      message: "Expected boolean-like query value.",
+    })
+    .transform((t) => t.toLowerCase() === "true" || t === "1"),
+]);
+
+export const JobListQuerySchema = z.object({
+  status: JobStatusSchema.optional(),
+  shortlist: parseBooleanQuery.optional(),
+  resume: ResumeTypeSchema.optional(),
+  recommendation: RecommendationSchema.optional(),
+  minScore: z.coerce.number().min(0).max(100).optional(),
+  company: z.string().trim().min(1).optional(),
+});
+
+export const ExportFormatSchema = z.enum(["json", "csv"]).default("json");
+
+export const JobExportQuerySchema = JobListQuerySchema.extend({
+  format: ExportFormatSchema.optional(),
+});
+
+export const JobExportRowSchema = z.object({
+  Company: z.string(),
+  Role: z.string(),
+  "Latest Score": z.number(),
+  "Recommended Action": z.string(),
+  "Salary Ask": z.string(),
+  "Top Match": z.string(),
+  "Main Risk": z.string(),
+  Resume: ResumeTypeSchema,
+  "Status / Outcome": z.string(),
+  Shortlist: z.boolean(),
+  Notes: z.string(),
+  "Created At": z.string(),
+  "Updated At": z.string(),
 });
 
 export const TriageResponseSchema = JobRecordSchema;

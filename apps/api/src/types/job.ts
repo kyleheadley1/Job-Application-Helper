@@ -56,8 +56,23 @@ export type GeneratedAssets = {
   recruiterReplyDraft?: string;
 };
 
-export type TriageDebugExtraction = {
+/** Per-stage LLM outcome for triage (extraction vs scoring), aligned with asset slice debug. */
+export type TriageStageDebug = {
+  success: boolean;
   fallbackUsed: boolean;
+  httpStatus?: number;
+  errorCode?: string;
+  errorType?: string;
+  errorMessage?: string;
+  parseStage?: string;
+  reason?: string;
+};
+
+export type TriageDebugExtraction = {
+  /** True when live extraction JSON did not validate (same signal as pre–Phase 2.2 `fallbackUsed`). */
+  fallbackUsed: boolean;
+  extraction: TriageStageDebug;
+  scoring: TriageStageDebug;
   extractedFromRawText: string[];
   missingCriticalFields: string[];
 };
@@ -110,6 +125,7 @@ export type JobRecord = {
     score: ScoreBreakdown;
     recommendation: Recommendation;
   }>;
+  statusHistory?: StatusHistoryRecord[];
 };
 
 export type StatusHistoryRecord = {
@@ -119,4 +135,29 @@ export type StatusHistoryRecord = {
   toStatus: JobStatus;
   note?: string;
   createdAt: string;
+};
+
+export type JobListFilters = {
+  status?: JobStatus;
+  shortlist?: boolean;
+  resume?: ResumeType;
+  recommendation?: Recommendation;
+  minScore?: number;
+  company?: string;
+};
+
+export type JobExportRow = {
+  Company: string;
+  Role: string;
+  "Latest Score": number;
+  "Recommended Action": string;
+  "Salary Ask": string;
+  "Top Match": string;
+  "Main Risk": string;
+  Resume: ResumeType;
+  "Status / Outcome": string;
+  Shortlist: boolean;
+  Notes: string;
+  "Created At": string;
+  "Updated At": string;
 };

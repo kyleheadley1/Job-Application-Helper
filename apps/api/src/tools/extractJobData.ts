@@ -1,7 +1,8 @@
 import { extractionSystemPrompt, buildExtractionPrompt } from "../agents/jobAgent/prompts.js";
-import { ExtractedJobDataSchema } from "../agents/jobAgent/schemas.js";
+import { ExtractedJobFromModelSchema } from "../agents/jobAgent/schemas.js";
 import type { ExtractedJobData } from "../types/job.js";
 import { responsesClient } from "../services/llm/responsesClient.js";
+import type { StructuredCallDiagnostics } from "../services/llm/responsesClient.js";
 import { logger } from "../lib/logger.js";
 import { parseJobText } from "./parseJobText.js";
 import {
@@ -26,6 +27,7 @@ const fallbackExtraction = (input: { url?: string; rawText?: string; companyHint
 export type ExtractJobDataResult = {
   extracted: ExtractedJobData;
   llmExtractionSucceeded: boolean;
+  extractionDiagnostics: StructuredCallDiagnostics;
   heuristicInferredFields: string[];
 };
 
@@ -38,7 +40,7 @@ export const extractJobData = async (input: {
   const extractedRun = await responsesClient.runStructured({
     systemPrompt: extractionSystemPrompt,
     userPrompt: buildExtractionPrompt(input),
-    schema: ExtractedJobDataSchema,
+    schema: ExtractedJobFromModelSchema,
     fallback,
   });
   const llmExtractionSucceeded = extractedRun.success;
@@ -49,6 +51,7 @@ export const extractJobData = async (input: {
       errorCode: extractedRun.diagnostics.errorCode,
       parseStage: extractedRun.diagnostics.parseStage,
       reason: extractedRun.diagnostics.reason,
+      errorMessage: extractedRun.diagnostics.errorMessage,
     });
   }
   let extracted = extractedRun.data;
@@ -62,5 +65,5 @@ export const extractJobData = async (input: {
     extracted.rawText = extracted.rawText ?? input.rawText;
   }
 
-  return { extracted, llmExtractionSucceeded, heuristicInferredFields };
+  return { extracted, llmExtractionSucceeded, extractionDiagnostics: extractedRun.diagnostics, heuristicInferredFields };
 };

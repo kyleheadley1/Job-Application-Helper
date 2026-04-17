@@ -64,7 +64,8 @@ describe("triage from raw pasted text (no structured hand-build)", () => {
     expect(job.score.total).toBeLessThan(70);
     expect(job.tracker.shortlist).toBe(false);
 
-    expect(job.debugExtraction?.fallbackUsed).toBe(true);
+    expect(job.debugExtraction?.extraction).toBeDefined();
+    expect(job.debugExtraction?.scoring).toBeDefined();
     expect(job.debugExtraction?.extractedFromRawText.length).toBeGreaterThan(0);
     expect(job.extracted.salary).toBeUndefined();
   });

@@ -5,13 +5,34 @@ import {
 import {
   GenerateAssetsForIdBodySchema,
   GenerateAssetsFromJobBodySchema,
+  JobExportQuerySchema,
+  JobExportRowSchema,
+  JobListQuerySchema,
   JobRecordSchema,
   TriageRequestSchema,
   TriageResponseSchema,
+  UpdateJobNotesBodySchema,
+  UpdateJobStatusBodySchema,
 } from "../agents/jobAgent/schemas.js";
 import { JobNotFoundError, jobsService } from "../services/jobs/jobs.service.js";
 
 export const jobsRouter = Router();
+
+const toCsvCell = (value: string | number | boolean): string => {
+  const text = String(value ?? "");
+  if (/[",\n]/.test(text)) {
+    return `"${text.replace(/"/g, "\"\"")}"`;
+  }
+  return text;
+};
+
+const toCsv = (rows: Array<Record<string, string | number | boolean>>): string => {
+  if (rows.length === 0) return "";
+  const headers = Object.keys(rows[0]);
+  const headerLine = headers.map((h) => toCsvCell(h)).join(",");
+  const lines = rows.map((row) => headers.map((h) => toCsvCell(row[h] ?? "")).join(","));
+  return [headerLine, ...lines].join("\n");
+};
 
 jobsRouter.post("/triage", async (req, res, next) => {
   try {
@@ -38,6 +59,43 @@ jobsRouter.post("/generate-assets", async (req, res, next) => {
   }
 });
 
+jobsRouter.get("/", async (req, res, next) => {
+  try {
+    const query = JobListQuerySchema.parse(req.query);
+    const result = await jobsService.list(query);
+    res.json({
+      items: result.items.map((item) => JobRecordSchema.parse(item)),
+      total: result.total,
+      filtersApplied: query,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+jobsRouter.get("/export", async (req, res, next) => {
+  try {
+    const query = JobExportQuerySchema.parse(req.query);
+    const { format = "json", ...filters } = query;
+    const result = await jobsService.exportRows(filters);
+    const rows = result.rows.map((row) => JobExportRowSchema.parse(row));
+    if (format === "csv") {
+      const csv = toCsv(rows as Array<Record<string, string | number | boolean>>);
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", "attachment; filename=\"jobs-export.csv\"");
+      res.send(csv);
+      return;
+    }
+    res.json({
+      rows,
+      total: result.total,
+      filtersApplied: filters,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 jobsRouter.get("/:id", async (req, res, next) => {
   try {
     const job = await jobsService.getById(req.params.id);
@@ -47,6 +105,34 @@ jobsRouter.get("/:id", async (req, res, next) => {
     }
     res.json(JobRecordSchema.parse(job));
   } catch (error) {
+    next(error);
+  }
+});
+
+jobsRouter.patch("/:id/status", async (req, res, next) => {
+  try {
+    const body = UpdateJobStatusBodySchema.parse(req.body ?? {});
+    const job = await jobsService.updateStatus(req.params.id, body.status, body.note);
+    res.json(JobRecordSchema.parse(job));
+  } catch (error) {
+    if (error instanceof JobNotFoundError) {
+      res.status(404).json({ error: error.code, message: error.message });
+      return;
+    }
+    next(error);
+  }
+});
+
+jobsRouter.patch("/:id/notes", async (req, res, next) => {
+  try {
+    const body = UpdateJobNotesBodySchema.parse(req.body ?? {});
+    const job = await jobsService.updateNotes(req.params.id, body.notes);
+    res.json(JobRecordSchema.parse(job));
+  } catch (error) {
+    if (error instanceof JobNotFoundError) {
+      res.status(404).json({ error: error.code, message: error.message });
+      return;
+    }
     next(error);
   }
 });

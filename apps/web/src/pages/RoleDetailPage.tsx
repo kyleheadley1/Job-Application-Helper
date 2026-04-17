@@ -20,11 +20,13 @@ export const RoleDetailPage = () => {
   const [job, setJob] = useState<(JobRecord & { statusHistory?: unknown[] }) | null>(null);
   const [status, setStatus] = useState<JobStatus>("to_review");
   const [note, setNote] = useState("");
+  const [notes, setNotes] = useState("");
 
   useEffect(() => {
     api.getJob(id).then((data) => {
       setJob(data);
       setStatus(data.status);
+      setNotes(data.tracker.notes ?? "");
     });
   }, [id]);
 
@@ -33,7 +35,13 @@ export const RoleDetailPage = () => {
   const saveStatus = async () => {
     const updated = await api.updateStatus(job.id, status, note);
     setJob({ ...job, ...updated });
+    setNotes(updated.tracker.notes ?? notes);
     setNote("");
+  };
+
+  const saveNotes = async () => {
+    const updated = await api.updateNotes(job.id, notes);
+    setJob({ ...job, ...updated });
   };
 
   return (
@@ -43,6 +51,15 @@ export const RoleDetailPage = () => {
         <h3>
           {job.extracted.company} - {job.extracted.title}
         </h3>
+        <p>
+          Score: <strong>{job.score.total}</strong> | Recommendation: <strong>{job.recommendation}</strong> | Resume:{" "}
+          <strong>{job.recommendedResume}</strong>
+        </p>
+        <p>
+          Top match: {job.topMatch}
+          <br />
+          Main risk: {job.mainRisk}
+        </p>
         <div className="row">
           <select value={status} onChange={(e) => setStatus(e.target.value as JobStatus)}>
             {statuses.map((item) => (
@@ -53,6 +70,13 @@ export const RoleDetailPage = () => {
           </select>
           <input placeholder="Status note" value={note} onChange={(e) => setNote(e.target.value)} />
           <button onClick={saveStatus}>Update status</button>
+        </div>
+        <div className="stack">
+          <label htmlFor="notes">Tracker notes</label>
+          <textarea id="notes" rows={5} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <div>
+            <button onClick={saveNotes}>Save notes</button>
+          </div>
         </div>
       </div>
       <div className="grid cols2">
@@ -68,6 +92,10 @@ export const RoleDetailPage = () => {
       <article className="card">
         <h4>Generated Assets</h4>
         <JsonPanel value={job.generated} />
+      </article>
+      <article className="card">
+        <h4>Score History</h4>
+        <JsonPanel value={job.scoreHistory ?? []} />
       </article>
       <article className="card">
         <h4>Status History</h4>
