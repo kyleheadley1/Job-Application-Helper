@@ -62,6 +62,22 @@ export type TriageDebugExtraction = {
   missingCriticalFields: string[];
 };
 
+/** Per-slice LLM outcome for asset generation (MVP audit trail). */
+export type AssetGenerationSliceDebug = {
+  success: boolean;
+  fallbackUsed: boolean;
+  httpStatus?: number;
+  errorCode?: string;
+  errorType?: string;
+  errorMessage?: string;
+  parseStage?: string;
+  reason?: string;
+};
+
+export type DebugAssetGeneration = {
+  slices: Record<string, AssetGenerationSliceDebug>;
+};
+
 export type JobRecord = {
   id: string;
   extracted: ExtractedJobData;
@@ -77,6 +93,7 @@ export type JobRecord = {
   risks: string[];
   generated: GeneratedAssets;
   debugExtraction?: TriageDebugExtraction;
+  debugAssetGeneration?: DebugAssetGeneration;
   tracker: {
     priority?: string;
     recommendedAction?: string;

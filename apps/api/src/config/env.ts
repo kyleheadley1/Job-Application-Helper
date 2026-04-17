@@ -7,8 +7,12 @@ import { logger } from "../lib/logger.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/** Monorepo root: `apps/api/src/config` → three levels up. */
-export const repoRootDir = path.resolve(__dirname, "..", "..", "..");
+/**
+ * Monorepo (repository) root from this file’s directory:
+ * `config` → `src` → `api` → `apps` → repo root = four `..` segments.
+ * (Three levels only reached `apps/`, which wrongly pointed at `apps/.env`.)
+ */
+export const repoRootDir = path.resolve(__dirname, "..", "..", "..", "..");
 
 /** Single intended secrets file for the whole monorepo (do not rely on `cwd`). */
 export const rootEnvPath = path.join(repoRootDir, ".env");

@@ -37,7 +37,11 @@ export class JobsService {
     if (result.skipped) {
       throw new AssetGenerationSkippedError(result.skipReason ?? "Asset generation skipped.");
     }
-    const updated = await jobsRepository.mergeGeneratedAssets(jobId, result.generated);
+    const updated = await jobsRepository.mergeGeneratedAssets(
+      jobId,
+      result.generated,
+      result.debugAssetGeneration,
+    );
     if (!updated) throw new JobNotFoundError();
     return updated;
   }
@@ -55,6 +59,9 @@ export class JobsService {
     const merged: JobRecord = {
       ...job,
       generated: result.generated,
+      ...(result.debugAssetGeneration !== undefined
+        ? { debugAssetGeneration: result.debugAssetGeneration }
+        : {}),
       updatedAt: new Date().toISOString(),
     };
     if (persist) {

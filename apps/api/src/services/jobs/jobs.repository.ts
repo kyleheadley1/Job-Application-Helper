@@ -1,4 +1,4 @@
-import type { GeneratedAssets, JobRecord } from "../../types/job.js";
+import type { DebugAssetGeneration, GeneratedAssets, JobRecord } from "../../types/job.js";
 
 export class JobsRepository {
   private readonly records: JobRecord[] = [];
@@ -11,12 +11,21 @@ export class JobsRepository {
     return record;
   }
 
-  async mergeGeneratedAssets(id: string, generated: GeneratedAssets): Promise<JobRecord | null> {
+  async mergeGeneratedAssets(
+    id: string,
+    generated: GeneratedAssets,
+    debugAssetGeneration?: DebugAssetGeneration,
+  ): Promise<JobRecord | null> {
     const idx = this.records.findIndex((item) => item.id === id);
     if (idx === -1) return null;
     const prev = this.records[idx];
     const now = new Date().toISOString();
-    const next: JobRecord = { ...prev, generated, updatedAt: now };
+    const next: JobRecord = {
+      ...prev,
+      generated,
+      ...(debugAssetGeneration !== undefined ? { debugAssetGeneration } : {}),
+      updatedAt: now,
+    };
     this.records[idx] = next;
     return next;
   }

@@ -1,6 +1,7 @@
 import { z } from "zod";
-import type { GeneratedAssets, JobRecord } from "../../types/job.js";
+import type { AssetGenerationSliceDebug, DebugAssetGeneration, GeneratedAssets, JobRecord } from "../../types/job.js";
 import type { UserProfile } from "../../types/userProfile.js";
+import type { StructuredCallResult } from "../../services/llm/responsesClient.js";
 import { responsesClient } from "../../services/llm/responsesClient.js";
 import {
   applicationStrategyAssetSystemPrompt,
@@ -27,6 +28,17 @@ const StrategyOut = z.object({
   emphasize: z.array(z.string()).min(1),
   avoidClaiming: z.array(z.string()).min(1),
   recruiterReplyDraft: z.string().optional(),
+});
+
+const toSliceDebug = <T,>(r: StructuredCallResult<T>): AssetGenerationSliceDebug => ({
+  success: r.success,
+  fallbackUsed: r.diagnostics.fallbackUsed,
+  httpStatus: r.diagnostics.httpStatus,
+  errorCode: r.diagnostics.errorCode,
+  errorType: r.diagnostics.errorType,
+  errorMessage: r.diagnostics.errorMessage,
+  parseStage: r.diagnostics.parseStage,
+  reason: r.diagnostics.reason,
 });
 
 export class AssetGenerationSkippedError extends Error {
@@ -171,6 +183,7 @@ export type GenerateJobAssetsParams = {
 
 export type GenerateJobAssetsResult = {
   generated: GeneratedAssets;
+  debugAssetGeneration?: DebugAssetGeneration;
   skipped?: boolean;
   skipReason?: string;
 };
@@ -243,5 +256,15 @@ export const generateJobAssets = async (params: GenerateJobAssetsParams): Promis
     ),
   };
 
-  return { generated };
+  const debugAssetGeneration: DebugAssetGeneration = {
+    slices: {
+      coverLetter: toSliceDebug(cl),
+      whyCompany: toSliceDebug(why),
+      talkingPoints: toSliceDebug(talk),
+      tailoredBulletCandidates: toSliceDebug(bullets),
+      applicationStrategy: toSliceDebug(strat),
+    },
+  };
+
+  return { generated, debugAssetGeneration };
 };
