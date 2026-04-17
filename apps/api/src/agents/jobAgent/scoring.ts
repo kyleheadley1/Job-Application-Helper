@@ -4,6 +4,7 @@ import type { ExtractedJobData } from "../../types/job.js";
 import type { Recommendation, RuleEvaluation, ScoreBreakdown } from "../../types/scoring.js";
 import type { UserProfile } from "../../types/userProfile.js";
 import { normalizeText } from "../../lib/text.js";
+import { logger } from "../../lib/logger.js";
 import { buildScoringPrompt, scoringSystemPrompt } from "./prompts.js";
 import { responsesClient } from "../../services/llm/responsesClient.js";
 
@@ -105,7 +106,7 @@ export const scoreJob = async (params: {
   userProfile: UserProfile;
 }): Promise<ScoringResult> => {
   const fallback = () => deterministicFallback(params.extracted, params.rules);
-  const { data: llmResult } = await responsesClient.runStructured({
+  const scored = await responsesClient.runStructured({
     systemPrompt: scoringSystemPrompt,
     userPrompt: buildScoringPrompt({
       extracted: params.extracted,
@@ -116,6 +117,16 @@ export const scoreJob = async (params: {
     schema: ScoringOutputSchema,
     fallback,
   });
+  if (!scored.success) {
+    logger.warn("Job scoring used deterministic fallback", {
+      fallbackUsed: scored.diagnostics.fallbackUsed,
+      httpStatus: scored.diagnostics.httpStatus,
+      errorCode: scored.diagnostics.errorCode,
+      parseStage: scored.diagnostics.parseStage,
+      reason: scored.diagnostics.reason,
+    });
+  }
+  const llmResult = scored.data;
 
   const categoryTotal =
     llmResult.score.stackFit +

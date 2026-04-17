@@ -2,6 +2,7 @@ import { extractionSystemPrompt, buildExtractionPrompt } from "../agents/jobAgen
 import { ExtractedJobDataSchema } from "../agents/jobAgent/schemas.js";
 import type { ExtractedJobData } from "../types/job.js";
 import { responsesClient } from "../services/llm/responsesClient.js";
+import { logger } from "../lib/logger.js";
 import { parseJobText } from "./parseJobText.js";
 import {
   extractFromRawText,
@@ -34,14 +35,23 @@ export const extractJobData = async (input: {
   companyHint?: string;
 }): Promise<ExtractJobDataResult> => {
   const fallback = () => fallbackExtraction(input);
-  const { success: llmExtractionSucceeded, data: baseExtracted } = await responsesClient.runStructured({
+  const extractedRun = await responsesClient.runStructured({
     systemPrompt: extractionSystemPrompt,
     userPrompt: buildExtractionPrompt(input),
     schema: ExtractedJobDataSchema,
     fallback,
   });
-
-  let extracted = baseExtracted;
+  const llmExtractionSucceeded = extractedRun.success;
+  if (!llmExtractionSucceeded) {
+    logger.warn("Job extraction used deterministic fallback", {
+      fallbackUsed: extractedRun.diagnostics.fallbackUsed,
+      httpStatus: extractedRun.diagnostics.httpStatus,
+      errorCode: extractedRun.diagnostics.errorCode,
+      parseStage: extractedRun.diagnostics.parseStage,
+      reason: extractedRun.diagnostics.reason,
+    });
+  }
+  let extracted = extractedRun.data;
   let heuristicInferredFields: string[] = [];
 
   if (input.rawText?.trim()) {

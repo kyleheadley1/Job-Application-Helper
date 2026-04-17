@@ -117,6 +117,21 @@ export const TriageDebugExtractionSchema = z.object({
   missingCriticalFields: z.array(z.string()),
 });
 
+export const AssetGenerationSliceDebugSchema = z.object({
+  success: z.boolean(),
+  fallbackUsed: z.boolean(),
+  httpStatus: z.number().optional(),
+  errorCode: z.string().optional(),
+  errorType: z.string().optional(),
+  errorMessage: z.string().optional(),
+  parseStage: z.string().optional(),
+  reason: z.string().optional(),
+});
+
+export const DebugAssetGenerationSchema = z.object({
+  slices: z.record(z.string(), AssetGenerationSliceDebugSchema),
+});
+
 export const JobRecordSchema = z.object({
   id: z.string(),
   extracted: ExtractedJobDataSchema,
@@ -138,6 +153,7 @@ export const JobRecordSchema = z.object({
   risks: z.array(z.string()).default([]),
   generated: GeneratedAssetsSchema.default({}),
   debugExtraction: TriageDebugExtractionSchema.optional(),
+  debugAssetGeneration: DebugAssetGenerationSchema.optional(),
   tracker: z
     .object({
       priority: z.string().optional(),

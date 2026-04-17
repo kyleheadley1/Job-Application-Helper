@@ -63,6 +63,21 @@ export type GeneratedAssets = {
   recruiterReplyDraft?: string;
 };
 
+export type AssetGenerationSliceDebug = {
+  success: boolean;
+  fallbackUsed: boolean;
+  httpStatus?: number;
+  errorCode?: string;
+  errorType?: string;
+  errorMessage?: string;
+  parseStage?: string;
+  reason?: string;
+};
+
+export type DebugAssetGeneration = {
+  slices: Record<string, AssetGenerationSliceDebug>;
+};
+
 export type JobRecord = {
   id: string;
   extracted: ExtractedJobData;
@@ -77,6 +92,7 @@ export type JobRecord = {
   rationale: string[];
   risks: string[];
   generated: GeneratedAssets;
+  debugAssetGeneration?: DebugAssetGeneration;
   tracker: {
     color?: "green" | "yellow" | "red" | "blue";
     shortlist?: boolean;

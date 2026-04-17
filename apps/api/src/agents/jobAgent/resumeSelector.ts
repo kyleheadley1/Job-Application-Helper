@@ -8,6 +8,7 @@ import type { UserProfile } from "../../types/userProfile.js";
 import { responsesClient } from "../../services/llm/responsesClient.js";
 import { buildResumeSelectionPrompt, resumeSelectionSystemPrompt } from "./prompts.js";
 import { normalizeText } from "../../lib/text.js";
+import { logger } from "../../lib/logger.js";
 
 const ResumeSelectionSchema = z.object({
   recommendedResume: z.enum(["SWE", "SIE", "EARLY_CAREER"]),
@@ -84,11 +85,20 @@ export const selectResume = async (params: {
     confidence: deterministic.confidence,
     rationale: deterministic.rationale,
   });
-  const { data } = await responsesClient.runStructured({
+  const selected = await responsesClient.runStructured({
     systemPrompt: resumeSelectionSystemPrompt,
     userPrompt: buildResumeSelectionPrompt(params),
     schema: ResumeSelectionSchema,
     fallback,
   });
-  return data;
+  if (!selected.success) {
+    logger.warn("Resume selection used deterministic fallback", {
+      fallbackUsed: selected.diagnostics.fallbackUsed,
+      httpStatus: selected.diagnostics.httpStatus,
+      errorCode: selected.diagnostics.errorCode,
+      parseStage: selected.diagnostics.parseStage,
+      reason: selected.diagnostics.reason,
+    });
+  }
+  return selected.data;
 };

@@ -67,6 +67,14 @@ describe("asset generation routes", () => {
       .join(" ")
       .toLowerCase();
     expect(sweBlob).toMatch(/api|typescript|internal|product|full-stack/);
+
+    expect(gen.body.debugAssetGeneration?.slices).toBeDefined();
+    const slices = gen.body.debugAssetGeneration.slices as Record<string, { success: boolean; fallbackUsed: boolean }>;
+    for (const key of ["coverLetter", "whyCompany", "talkingPoints", "tailoredBulletCandidates", "applicationStrategy"]) {
+      expect(slices[key]).toBeDefined();
+      expect(typeof slices[key].success).toBe("boolean");
+      expect(typeof slices[key].fallbackUsed).toBe("boolean");
+    }
   });
 
   it("POST /generate-assets from full job body (no prior save) returns assets", async () => {
