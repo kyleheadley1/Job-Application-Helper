@@ -14,21 +14,34 @@ import {
   scoreBreakdownFromTotal,
 } from './canonicalSpreadsheet.js';
 
+/** Normalize for stable hashing only (not for display). */
+function normForIdentity(s: string): string {
+  return s.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/**
+ * Stable upsert identity from row *content* + import fingerprint.
+ * Row order is intentionally excluded so rows can move in the sheet without creating duplicates.
+ */
 export function buildImportKey(input: {
-  sheetName: string;
-  rowNumber: number;
   fileFingerprint: string;
   company: string;
   role: string;
+  jdInput: string;
+  salaryAskRaw: string;
+  latestScoreRaw: string;
+  originalAltScoreRaw: string;
 }): string {
-  const raw = [
-    input.sheetName,
-    String(input.rowNumber),
+  const parts = [
     input.fileFingerprint,
-    input.company.trim().toLowerCase(),
-    input.role.trim().toLowerCase(),
-  ].join('|');
-  return createHash('sha256').update(raw, 'utf8').digest('hex');
+    normForIdentity(input.company),
+    normForIdentity(input.role),
+    normForIdentity(input.jdInput).slice(0, 8000),
+    normForIdentity(input.salaryAskRaw).slice(0, 2000),
+    normForIdentity(input.latestScoreRaw).slice(0, 64),
+    normForIdentity(input.originalAltScoreRaw).slice(0, 500),
+  ];
+  return createHash('sha256').update(parts.join('\u0001'), 'utf8').digest('hex');
 }
 
 export function rowArrayToPartialTrackerSpreadsheet(
@@ -97,7 +110,11 @@ export function jobRecordFromImportedSheetRow(input: {
     (ts.recommendedAction ?? '').trim() ||
     defaultRecommendedAction(recommendation);
 
+  /** Exact cell strings from the sheet (no trimming) for export parity. */
   const trackerSpreadsheet: Partial<TrackerSpreadsheetFields> = { ...ts };
+
+  const notesFromSheet =
+    ts.notes !== undefined && ts.notes !== null ? String(ts.notes) : undefined;
 
   const job: JobRecord = {
     id: randomUUID(),
@@ -119,7 +136,7 @@ export function jobRecordFromImportedSheetRow(input: {
       statusOutcome: status,
       shortlist: shouldShortlist(score.total, status),
       color: getTrackerColor(status, score.total),
-      notes: (ts.notes ?? '').trim() || undefined,
+      notes: notesFromSheet === '' ? undefined : notesFromSheet,
     },
     trackerSpreadsheet,
     importKey,
