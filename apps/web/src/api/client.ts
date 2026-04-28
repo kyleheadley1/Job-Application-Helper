@@ -38,6 +38,12 @@ export const api = {
     request<JobRecord>(`/jobs/${id}/status`, { method: "PATCH", body: JSON.stringify({ status, note }) }),
   updateNotes: (id: string, notes: string) =>
     request<JobRecord>(`/jobs/${id}/notes`, { method: "PATCH", body: JSON.stringify({ notes }) }),
+  deleteJob: async (id: string) => {
+    const response = await fetch(`${API_BASE}/jobs/${id}`, { method: "DELETE" });
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+  },
   exportJobs: (query = "") =>
     request<{
       rows: Array<{

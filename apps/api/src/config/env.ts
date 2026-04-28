@@ -37,6 +37,14 @@ if (loadResult.error) {
   });
 }
 
+const parseBooleanEnv = (value: string | undefined, fallback: boolean): boolean => {
+  if (value === undefined) return fallback;
+  const v = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(v)) return true;
+  if (["0", "false", "no", "off"].includes(v)) return false;
+  return fallback;
+};
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? "development",
   port: Number(process.env.PORT ?? 4000),
@@ -45,6 +53,20 @@ export const env = {
   openAiApiKey: process.env.OPENAI_API_KEY,
   openAiModel: process.env.OPENAI_MODEL ?? "gpt-5-mini",
   resumeContextDir: process.env.RESUME_CONTEXT_DIR,
+  autoImportTrackerOnStart: parseBooleanEnv(
+    process.env.AUTO_IMPORT_TRACKER_ON_START,
+    true,
+  ),
+  trackerSeedWorkbookPath: process.env.TRACKER_SEED_WORKBOOK_PATH,
+  triageFastMode: parseBooleanEnv(process.env.TRIAGE_FAST_MODE, false),
+  triageSkipLlmResumeSelectionInFastMode: parseBooleanEnv(
+    process.env.TRIAGE_SKIP_LLM_RESUME_SELECTION_IN_FAST_MODE,
+    true,
+  ),
+  preloadResumeContextOnStart: parseBooleanEnv(
+    process.env.PRELOAD_RESUME_CONTEXT_ON_START,
+    true,
+  ),
   /** Resolved path used for dotenv (audit / support). */
   rootEnvPath,
   rootEnvFileExists: fs.existsSync(rootEnvPath),

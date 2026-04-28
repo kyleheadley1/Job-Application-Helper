@@ -152,6 +152,33 @@ describe("asset generation orchestrator", () => {
     expect((g.coverLetter ?? "").toLowerCase()).not.toMatch(/in a recent project i|two relevant examples from my background are/);
   });
 
+  it("selective_yes caveat language remains subordinate in final paragraph flow", () => {
+    const g = buildDeterministicGeneratedAssets(
+      makeJob({
+        recommendation: "selective_yes",
+        extracted: {
+          company: "ScaleCo",
+          title: "Junior Software Engineer",
+          stack: ["TypeScript", "Node.js"],
+          requiredSkills: ["full-stack ownership", "AI tooling"],
+          preferredSkills: ["Go"],
+          domainTags: [],
+          responsibilities: ["Build full-stack product features and iterate with cross-functional teams"],
+          requirements: ["Entry-level role with internet-scale systems exposure"],
+          rawText:
+            "Entry-level builder role with AI tooling and full-stack ownership. Go is preferred while scaling internet-scale systems.",
+        },
+      }),
+      userProfile,
+    );
+    const paras = (g.coverLetter ?? "").split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+    expect(paras.length).toBeGreaterThanOrEqual(2);
+    expect(paras.length).toBeLessThanOrEqual(3);
+    const blob = (g.coverLetter ?? "").toLowerCase();
+    const caveatHits = (blob.match(/\b(don['’]t|do not|lack|missing|without|no\b)\b/g) ?? []).length;
+    expect(caveatHits).toBeLessThanOrEqual(1);
+  });
+
   it("cover letters differ across role shapes and do not always reuse same angle", () => {
     const product = buildDeterministicGeneratedAssets(
       makeJob({

@@ -92,6 +92,11 @@ export class JobsRepository {
         const found = await col.findOne({ _id: id });
         return found ? this.fromDoc(found) : null;
     }
+    async deleteById(id) {
+        const col = await this.collection();
+        const result = await col.deleteOne({ _id: id });
+        return result.deletedCount > 0;
+    }
     async updateStatus(id, status, note) {
         const col = await this.collection();
         const prev = await col.findOne({ _id: id });

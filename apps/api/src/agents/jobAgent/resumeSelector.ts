@@ -121,7 +121,11 @@ export const selectResume = async (params: {
   resumeContexts?: ResumeContextSet;
 }): Promise<ResumeSelection> => {
   const deterministic = deterministicResumeSelection(params.extracted, params.resumeContexts);
-  if (!deterministic.ambiguous || !env.openAiApiKey) {
+  if (
+    !deterministic.ambiguous ||
+    !env.openAiApiKey ||
+    (env.triageFastMode && env.triageSkipLlmResumeSelectionInFastMode)
+  ) {
     return {
       recommendedResume: deterministic.recommendedResume,
       confidence: deterministic.confidence,

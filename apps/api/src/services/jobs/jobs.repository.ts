@@ -120,6 +120,12 @@ export class JobsRepository {
     return found ? this.fromDoc(found) : null;
   }
 
+  async deleteById(id: string): Promise<boolean> {
+    const col = await this.collection();
+    const result = await col.deleteOne({ _id: id });
+    return result.deletedCount > 0;
+  }
+
   async updateStatus(id: string, status: JobStatus, note?: string): Promise<JobRecord | null> {
     const col = await this.collection();
     const prev = await col.findOne({ _id: id });

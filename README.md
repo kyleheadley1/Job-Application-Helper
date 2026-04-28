@@ -59,6 +59,11 @@ Required keys (see `.env.example`):
 Optional:
 
 - `RESUME_CONTEXT_DIR` (override local resume folder path)
+- `AUTO_IMPORT_TRACKER_ON_START` (default `true`; re-import tracker workbook on API boot)
+- `TRACKER_SEED_WORKBOOK_PATH` (optional workbook path override)
+- `TRIAGE_FAST_MODE` (default `false`; enables faster triage behavior)
+- `TRIAGE_SKIP_LLM_RESUME_SELECTION_IN_FAST_MODE` (default `true`; avoids LLM tie-break for resume selection)
+- `PRELOAD_RESUME_CONTEXT_ON_START` (default `true`; warms resume cache on API startup)
 - `VITE_API_BASE_URL` (web -> API base URL)
 
 ## F. Running API + Web
@@ -104,6 +109,19 @@ From `apps/api`:
   - `npm run import:tracker --workspace api`
 - Verify tracker reseed behavior:
   - `npm run verify:tracker --workspace api`
+
+Startup behavior:
+
+- By default, API boot auto-imports `data/job_role_scores_current.xlsx` if present.
+- This keeps historical tracker rows persisted after DB resets/switches while safely merging via idempotent upsert.
+- You can disable this by setting `AUTO_IMPORT_TRACKER_ON_START=false`.
+- You can override the workbook path with `TRACKER_SEED_WORKBOOK_PATH`.
+- API startup also preloads local resume context by default (`PRELOAD_RESUME_CONTEXT_ON_START=true`) to reduce first-triage latency.
+
+Triage speed notes:
+
+- `TRIAGE_FAST_MODE=true` keeps extraction/scoring quality but speeds triage by skipping the LLM resume-selection tie-break when deterministic selection is ambiguous.
+- Keep `TRIAGE_FAST_MODE=false` when you prefer maximum selection nuance over speed.
 
 Root-level helper scripts:
 

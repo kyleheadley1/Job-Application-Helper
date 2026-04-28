@@ -6,7 +6,7 @@ import { ScoreBadge } from "../components/ScoreBadge";
 import { StatusBadge } from "../components/StatusBadge";
 import { JsonPanel } from "../components/JsonPanel";
 import { salaryAskLabel } from "../lib/jobDisplay";
-import { decisionSummaryLine, selectDistinctRisks, selectTopFits } from "../lib/resultSummary";
+import { decisionSummaryLine, displayRoleTitle, selectDistinctRisks, selectTopFits } from "../lib/resultSummary";
 
 type AssetTab = "cover" | "why" | "points" | "bullets" | "raw";
 
@@ -17,6 +17,15 @@ function tabHasContent(job: JobRecord, tab: AssetTab): boolean {
   if (tab === "points") return (job.generated.talkingPoints?.length ?? 0) > 0;
   if (tab === "bullets") return (job.generated.tailoredBulletCandidates?.length ?? 0) > 0;
   return false;
+}
+
+function renderTextParagraphs(text: string, fallback = "Not generated") {
+  const parts = text
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (!parts.length) return <p>{fallback}</p>;
+  return parts.map((p) => <p key={p}>{p}</p>);
 }
 
 export const JobResultPage = () => {
@@ -84,13 +93,14 @@ export const JobResultPage = () => {
   const topFits = selectTopFits(job, 2);
   const topRisks = selectDistinctRisks(job, 2);
   const summaryLine = decisionSummaryLine(job);
+  const displayTitle = displayRoleTitle(job.extracted.title);
 
   return (
     <section className="stack">
       <header className="rowBetween">
         <div>
           <h2>
-            {job.extracted.company} - {job.extracted.title}
+            {job.extracted.company} - {displayTitle}
           </h2>
           <p className="muted">{summaryLine}</p>
         </div>
@@ -147,8 +157,8 @@ export const JobResultPage = () => {
       </div>
       {assetMsg ? <p className="muted">{assetMsg}</p> : null}
       <article className="card">
-        {tab === "cover" ? <p>{job.generated.coverLetter ?? "Not generated"}</p> : null}
-        {tab === "why" ? <p>{job.generated.whyCompany ?? "Not generated"}</p> : null}
+        {tab === "cover" ? renderTextParagraphs(job.generated.coverLetter ?? "", "Not generated") : null}
+        {tab === "why" ? renderTextParagraphs(job.generated.whyCompany ?? "", "Not generated") : null}
         {tab === "points" ? (
           <ul>{(job.generated.talkingPoints ?? []).map((item) => <li key={item}>{item}</li>)}</ul>
         ) : null}

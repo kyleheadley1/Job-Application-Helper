@@ -150,6 +150,19 @@ jobsRouter.patch("/:id/notes", async (req, res, next) => {
         next(error);
     }
 });
+jobsRouter.delete("/:id", async (req, res, next) => {
+    try {
+        await jobsService.removeFromTracker(req.params.id);
+        res.status(204).send();
+    }
+    catch (error) {
+        if (error instanceof JobNotFoundError) {
+            res.status(404).json({ error: error.code, message: error.message });
+            return;
+        }
+        next(error);
+    }
+});
 jobsRouter.post("/:id/generate-assets", async (req, res, next) => {
     try {
         const body = GenerateAssetsForIdBodySchema.parse(req.body ?? {});

@@ -61,6 +61,7 @@ const polishCoverLetterTextbox = (text, recommendation) => {
     const allSentences = splitSentences(cleaned);
     const keptSentences = [];
     let keptCaveat = false;
+    let caveatSentence = "";
     for (const sentence of allSentences) {
         if (!caveatRe.test(sentence)) {
             keptSentences.push(sentence);
@@ -70,17 +71,19 @@ const polishCoverLetterTextbox = (text, recommendation) => {
             continue;
         if (recommendation === "selective_yes") {
             if (!keptCaveat && caveatHelpfulRe.test(sentence)) {
-                keptSentences.push(sentence);
+                caveatSentence = sentence;
                 keptCaveat = true;
             }
             continue;
         }
         if (!keptCaveat) {
-            keptSentences.push(sentence);
+            caveatSentence = sentence;
             keptCaveat = true;
         }
     }
-    const sourceSentences = keptSentences.length ? keptSentences : allSentences;
+    const sourceSentences = (keptSentences.length ? keptSentences : allSentences).slice();
+    if (caveatSentence)
+        sourceSentences.push(caveatSentence);
     if (!sourceSentences.length)
         return cleaned;
     const paraCount = sourceSentences.length >= 5 ? 3 : 2;

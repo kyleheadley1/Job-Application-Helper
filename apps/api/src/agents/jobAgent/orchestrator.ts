@@ -15,6 +15,7 @@ import { parseJobText } from '../../tools/parseJobText.js';
 import { extractJobData } from '../../tools/extractJobData.js';
 import { listMissingCriticalFields } from '../../tools/deterministicRawTextExtract.js';
 import { resumeContextService } from '../../services/resume/resumeContext.js';
+import { logger } from '../../lib/logger.js';
 
 export const triageJob = async (input: {
   url?: string;
@@ -22,6 +23,17 @@ export const triageJob = async (input: {
   companyHint?: string;
   fullPrep?: boolean;
 }): Promise<JobRecord> => {
+  const t0 = Date.now();
+  const stageMs = {
+    fetchAndParse: 0,
+    extraction: 0,
+    rules: 0,
+    resumeContext: 0,
+    scoring: 0,
+    salary: 0,
+    resumeSelection: 0,
+  };
+  const fetchStart = Date.now();
   const fetchedText = input.url
     ? await fetchJobPosting(input.url).catch(() => undefined)
     : undefined;
@@ -29,7 +41,9 @@ export const triageJob = async (input: {
   const parsedText = mergedText
     ? parseJobText(mergedText).normalized
     : undefined;
+  stageMs.fetchAndParse = Date.now() - fetchStart;
 
+  const extractionStart = Date.now();
   const {
     extracted,
     llmExtractionSucceeded,
@@ -40,20 +54,30 @@ export const triageJob = async (input: {
     rawText: parsedText,
     companyHint: input.companyHint,
   });
+  stageMs.extraction = Date.now() - extractionStart;
 
+  const rulesStart = Date.now();
   const rules = evaluateRules(extracted, userProfile);
+  stageMs.rules = Date.now() - rulesStart;
+  const resumeCtxStart = Date.now();
   const resumeContexts = await resumeContextService.getAvailableContexts();
+  stageMs.resumeContext = Date.now() - resumeCtxStart;
+  const scoringStart = Date.now();
   const {
     scoring: scored,
     scoringDiagnostics,
     scoringLlmSucceeded,
   } = await scoreJob({ extracted, rules, userProfile, resumeContexts });
+  stageMs.scoring = Date.now() - scoringStart;
+  const salaryStart = Date.now();
   const salaryAsk = computeSalaryAsk({
     extracted,
     score: scored.score,
     recommendation: scored.recommendation,
     rules,
   });
+  stageMs.salary = Date.now() - salaryStart;
+  const resumeSelStart = Date.now();
   const resumeSelection = await selectResume({
     extracted,
     score: scored.score,
@@ -62,6 +86,7 @@ export const triageJob = async (input: {
     userProfile,
     resumeContexts,
   });
+  stageMs.resumeSelection = Date.now() - resumeSelStart;
 
   const now = new Date().toISOString();
   const initialRecord: JobRecord = {
@@ -131,6 +156,14 @@ export const triageJob = async (input: {
       },
     ],
   };
+  logger.info('triage timing', {
+    totalMs: Date.now() - t0,
+    ...stageMs,
+    hasUrlInput: Boolean(input.url),
+    hasRawTextInput: Boolean(input.rawText?.trim()),
+    extractionLlmSucceeded: llmExtractionSucceeded,
+    scoringLlmSucceeded,
+  });
   return {
     ...initialRecord,
     trackerSpreadsheet: buildTrackerSpreadsheetFromJob(initialRecord),

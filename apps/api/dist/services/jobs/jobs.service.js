@@ -103,6 +103,12 @@ export class JobsService {
             throw new JobNotFoundError();
         return updated;
     }
+    async removeFromTracker(id) {
+        const deletedTracked = await jobsRepository.deleteById(id);
+        const deletedDraft = this.draftJobs.delete(id);
+        if (!deletedTracked && !deletedDraft)
+            throw new JobNotFoundError();
+    }
     async confirmApplied(id) {
         const existing = await jobsRepository.getById(id);
         if (existing)
