@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { JobRecord, JobStatus } from "../types/job";
 import { JsonPanel } from "../components/JsonPanel";
@@ -18,10 +19,12 @@ const statuses: JobStatus[] = [
 
 export const RoleDetailPage = () => {
   const { id = "" } = useParams();
+  const navigate = useNavigate();
   const [job, setJob] = useState<(JobRecord & { statusHistory?: unknown[] }) | null>(null);
   const [status, setStatus] = useState<JobStatus>("to_review");
   const [note, setNote] = useState("");
   const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     api.getJob(id).then((data) => {
@@ -34,15 +37,38 @@ export const RoleDetailPage = () => {
   if (!job) return <p>Loading...</p>;
 
   const saveStatus = async () => {
+    setBusy(true);
     const updated = await api.updateStatus(job.id, status, note);
     setJob({ ...job, ...updated });
     setNotes(updated.tracker.notes ?? notes);
     setNote("");
+    setBusy(false);
   };
 
   const saveNotes = async () => {
+    setBusy(true);
     const updated = await api.updateNotes(job.id, notes);
     setJob({ ...job, ...updated });
+    setBusy(false);
+  };
+
+  const markRejected = async () => {
+    setBusy(true);
+    const updated = await api.updateStatus(job.id, "rejected", "Manually marked rejected");
+    setJob({ ...job, ...updated });
+    setStatus("rejected");
+    setBusy(false);
+  };
+
+  const removeFromTracker = async () => {
+    const ok = window.confirm(
+      "Remove this job from the tracker? This cannot be undone and will update applied counts.",
+    );
+    if (!ok) return;
+    setBusy(true);
+    await api.deleteJob(job.id);
+    setBusy(false);
+    navigate("/tracker");
   };
 
   const jdText = jdSourceText(job);
@@ -75,13 +101,15 @@ export const RoleDetailPage = () => {
             ))}
           </select>
           <input placeholder="Status note" value={note} onChange={(e) => setNote(e.target.value)} />
-          <button onClick={saveStatus}>Update status</button>
+          <button onClick={saveStatus} disabled={busy}>Update status</button>
+          <button onClick={markRejected} disabled={busy}>Mark rejected</button>
+          <button onClick={removeFromTracker} disabled={busy}>Remove from tracker</button>
         </div>
         <div className="stack">
           <label htmlFor="notes">Tracker notes</label>
           <textarea id="notes" rows={5} value={notes} onChange={(e) => setNotes(e.target.value)} />
           <div>
-            <button onClick={saveNotes}>Save notes</button>
+            <button onClick={saveNotes} disabled={busy}>Save notes</button>
           </div>
         </div>
         {jdText ? (

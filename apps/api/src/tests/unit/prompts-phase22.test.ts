@@ -143,6 +143,7 @@ describe("Phase 2.2 prompts", () => {
     expect(coverLetterAssetSystemPrompt).toContain("2–3 short paragraphs");
     expect(coverLetterAssetSystemPrompt).toContain("Avoid heavy project-dump framing");
     expect(coverLetterAssetSystemPrompt).toContain("selective_yes");
+    expect(coverLetterAssetSystemPrompt).toContain("Do not make a single missing language/framework");
   });
 
   it("whyCompany contract emphasizes specificity and rejects generic praise", () => {

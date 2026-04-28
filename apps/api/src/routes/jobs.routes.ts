@@ -14,7 +14,7 @@ import {
   UpdateJobNotesBodySchema,
   UpdateJobStatusBodySchema,
 } from "../agents/jobAgent/schemas.js";
-import { JobNotFoundError, jobsService } from "../services/jobs/jobs.service.js";
+import { canConfirmApplied, JobNotFoundError, jobsService } from "../services/jobs/jobs.service.js";
 import { JobConfirmNotAllowedError } from "../services/jobs/jobs.service.js";
 import { TRACKER_EXPORT_HEADERS } from "../tracker/canonicalSpreadsheet.js";
 
@@ -44,7 +44,7 @@ jobsRouter.post("/triage", async (req, res, next) => {
     res.json({
       ...validated,
       tracked: false,
-      canConfirmApplied: validated.recommendation !== "no",
+      canConfirmApplied: canConfirmApplied(validated),
     });
   } catch (error) {
     next(error);
@@ -114,7 +114,7 @@ jobsRouter.get("/:id", async (req, res, next) => {
     res.json({
       ...validated,
       tracked,
-      canConfirmApplied: !tracked && validated.recommendation !== "no",
+      canConfirmApplied: !tracked && canConfirmApplied(validated),
     });
   } catch (error) {
     next(error);
@@ -157,6 +157,19 @@ jobsRouter.patch("/:id/notes", async (req, res, next) => {
     const body = UpdateJobNotesBodySchema.parse(req.body ?? {});
     const job = await jobsService.updateNotes(req.params.id, body.notes);
     res.json(JobRecordSchema.parse(job));
+  } catch (error) {
+    if (error instanceof JobNotFoundError) {
+      res.status(404).json({ error: error.code, message: error.message });
+      return;
+    }
+    next(error);
+  }
+});
+
+jobsRouter.delete("/:id", async (req, res, next) => {
+  try {
+    await jobsService.removeFromTracker(req.params.id);
+    res.status(204).send();
   } catch (error) {
     if (error instanceof JobNotFoundError) {
       res.status(404).json({ error: error.code, message: error.message });

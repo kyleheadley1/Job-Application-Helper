@@ -411,6 +411,33 @@ tbody .tracker-sticky-left {
   opacity: 1;
 }
 
+.tracker-inline-action {
+  font-size: 0.68rem;
+  font-weight: 500;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid #30363d66;
+  color: #8b949e;
+  opacity: 0.9;
+}
+
+.tracker-inline-action:hover:not(:disabled) {
+  color: #c9d1d9;
+  border-color: #8b949e;
+  opacity: 1;
+}
+
+.tracker-inline-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tracker-inline-action-danger:hover:not(:disabled) {
+  color: #ffa198;
+  border-color: #f85149;
+}
+
 .cell-lines-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;

@@ -356,6 +356,7 @@ Default output contract:
 - Keep caveats brief and subordinate; never make them the center of the letter.
 - For selective_yes: keep tone positive but measured; do not foreground stack-gap disclaimers unless they are central blockers.
 - For selective_yes: include at most one brief caveat sentence and keep it in the close when needed.
+- Do not make a single missing language/framework (for example Go) a dominant beat unless the JD clearly makes it a strict blocker.
 Output valid JSON only with a single key "coverLetter".
 `.trim();
 

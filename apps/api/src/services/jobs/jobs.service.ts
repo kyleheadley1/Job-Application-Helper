@@ -27,6 +27,11 @@ export class JobConfirmNotAllowedError extends Error {
   }
 }
 
+export function canConfirmApplied(job: Pick<JobRecord, "recommendation" | "score">): boolean {
+  if (job.recommendation !== "no") return true;
+  return Number(job.score?.total ?? 0) > 50;
+}
+
 export class JobsService {
   /** Ephemeral scored jobs until user confirms they actually applied. */
   private readonly draftJobs = new Map<string, JobRecord>();
@@ -129,12 +134,18 @@ export class JobsService {
     return updated;
   }
 
+  async removeFromTracker(id: string): Promise<void> {
+    const deletedTracked = await jobsRepository.deleteById(id);
+    const deletedDraft = this.draftJobs.delete(id);
+    if (!deletedTracked && !deletedDraft) throw new JobNotFoundError();
+  }
+
   async confirmApplied(id: string): Promise<JobRecord> {
     const existing = await jobsRepository.getById(id);
     if (existing) return existing;
     const draft = this.draftJobs.get(id);
     if (!draft) throw new JobNotFoundError();
-    if (draft.recommendation === "no") {
+    if (!canConfirmApplied(draft)) {
       throw new JobConfirmNotAllowedError();
     }
 

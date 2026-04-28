@@ -170,5 +170,22 @@ describe("tracker routes", () => {
     expect(after.body.generated.whyCompany).toBe("because");
     expect(after.body.scoreHistory).toEqual(scoreHistoryBefore);
   });
+
+  it("DELETE /:id removes job from tracker list", async () => {
+    const created = await triage(STARTUP_RAW, "Nimbus Labs");
+    const before = await request(app).get("/api/jobs");
+    expect(before.status).toBe(200);
+    expect(before.body.items.some((i: { id: string }) => i.id === created.id)).toBe(true);
+
+    const deleted = await request(app).delete(`/api/jobs/${created.id}`);
+    expect(deleted.status).toBe(204);
+
+    const after = await request(app).get("/api/jobs");
+    expect(after.status).toBe(200);
+    expect(after.body.items.some((i: { id: string }) => i.id === created.id)).toBe(false);
+
+    const missing = await request(app).delete(`/api/jobs/${created.id}`);
+    expect(missing.status).toBe(404);
+  });
 });
 

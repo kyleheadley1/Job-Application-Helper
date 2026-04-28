@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import type { MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
@@ -8,6 +8,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { FilterBar } from "../components/FilterBar";
 import { etDateKey, etRangeKeys, isDateKeyInRange } from "../lib/dateEt";
 import {
+  appliedAtIso,
   hasJdSource,
   isAppliedPipelineStatus,
   salaryAskCompact,
@@ -216,6 +217,7 @@ export const TrackerPage = () => {
   const [toDate, setToDate] = useState("");
   const [shortlistOnly, setShortlistOnly] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const [busyJobId, setBusyJobId] = useState<string>("");
   const [showExtras, setShowExtras] = useState(
     () => typeof localStorage !== "undefined" && localStorage.getItem(LS_SHOW_EXTRAS) === "1",
   );
@@ -256,12 +258,39 @@ export const TrackerPage = () => {
     [status, company, resume, recommendation, minScore, shortlistOnly],
   );
 
-  useEffect(() => {
-    api.listJobs(query).then((res) => {
-      setJobs(res.items);
-      setTotalAll(typeof res.totalAll === "number" ? res.totalAll : res.total);
-    });
+  const loadJobs = useCallback(async () => {
+    const res = await api.listJobs(query);
+    setJobs(res.items);
+    setTotalAll(typeof res.totalAll === "number" ? res.totalAll : res.total);
   }, [query]);
+
+  useEffect(() => {
+    void loadJobs();
+  }, [loadJobs]);
+
+  const markRejectedFromRow = async (jobId: string) => {
+    if (busyJobId) return;
+    setBusyJobId(jobId);
+    try {
+      await api.updateStatus(jobId, "rejected", "Manually marked rejected from tracker");
+      await loadJobs();
+    } finally {
+      setBusyJobId("");
+    }
+  };
+
+  const removeFromTrackerRow = async (jobId: string) => {
+    if (busyJobId) return;
+    const ok = window.confirm("Remove this job from tracker? This cannot be undone.");
+    if (!ok) return;
+    setBusyJobId(jobId);
+    try {
+      await api.deleteJob(jobId);
+      await loadJobs();
+    } finally {
+      setBusyJobId("");
+    }
+  };
 
   const dateFilteredJobs = useMemo(() => {
     if (!fromDate && !toDate) return jobs;
@@ -286,7 +315,9 @@ export const TrackerPage = () => {
     let month = 0;
     for (const j of sortedJobs) {
       if (!isAppliedPipelineStatus(j.status)) continue;
-      const k = trackerDateKey(j);
+      const appliedIso = appliedAtIso(j);
+      if (!appliedIso) continue;
+      const k = etDateKey(new Date(appliedIso));
       if (!k) continue;
       if (k === todayKey) today++;
       if (k >= weekStartKey && k <= todayKey) week++;
@@ -369,6 +400,30 @@ export const TrackerPage = () => {
             >
               Assets
             </Link>
+            <button
+              type="button"
+              className="tracker-inline-action"
+              title="Marks this role as rejected"
+              disabled={busyJobId === job.id || job.status === "rejected"}
+              onClick={(e) => {
+                e.stopPropagation();
+                void markRejectedFromRow(job.id);
+              }}
+            >
+              Reject
+            </button>
+            <button
+              type="button"
+              className="tracker-inline-action tracker-inline-action-danger"
+              title="Permanently removes this role from tracker"
+              disabled={busyJobId === job.id}
+              onClick={(e) => {
+                e.stopPropagation();
+                void removeFromTrackerRow(job.id);
+              }}
+            >
+              Remove
+            </button>
           </div>
         );
       case "role":

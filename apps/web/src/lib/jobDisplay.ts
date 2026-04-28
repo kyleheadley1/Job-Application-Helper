@@ -87,11 +87,13 @@ function earliestValidIso(values: Array<string | undefined>): string {
   return new Date(Math.min(...times)).toISOString();
 }
 
-function appliedAtIso(job: JobRecord): string {
+export function appliedAtIso(job: JobRecord): string {
   if (!isAppliedPipelineStatus(job.status)) return "";
+  // Applied counters should only key off an explicit "applied" transition,
+  // not later status transitions like "rejected" made on a different date.
   return earliestValidIso(
     (job.statusHistory ?? [])
-      .filter((h) => APPLICATION_STATUSES.has(h.toStatus))
+      .filter((h) => h.toStatus === "applied")
       .map((h) => h.createdAt),
   );
 }
