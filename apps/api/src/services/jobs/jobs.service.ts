@@ -28,8 +28,7 @@ export class JobConfirmNotAllowedError extends Error {
 }
 
 export function canConfirmApplied(job: Pick<JobRecord, "recommendation" | "score">): boolean {
-  if (job.recommendation !== "no") return true;
-  return Number(job.score?.total ?? 0) > 50;
+  return true;
 }
 
 export class JobsService {

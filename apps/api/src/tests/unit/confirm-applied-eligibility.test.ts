@@ -9,12 +9,9 @@ describe("canConfirmApplied", () => {
     ).toBe(true);
   });
 
-  it("allows override for recommendation no when score is above 50", () => {
+  it("allows confirm for recommendation no at low and high scores", () => {
     expect(canConfirmApplied({ recommendation: "no", score: { total: 51 } as { total: number } })).toBe(true);
-  });
-
-  it("blocks recommendation no when score is 50 or lower", () => {
-    expect(canConfirmApplied({ recommendation: "no", score: { total: 50 } as { total: number } })).toBe(false);
-    expect(canConfirmApplied({ recommendation: "no", score: { total: 32 } as { total: number } })).toBe(false);
+    expect(canConfirmApplied({ recommendation: "no", score: { total: 50 } as { total: number } })).toBe(true);
+    expect(canConfirmApplied({ recommendation: "no", score: { total: 32 } as { total: number } })).toBe(true);
   });
 });
