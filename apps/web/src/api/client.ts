@@ -7,10 +7,21 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
     headers: { "Content-Type": "application/json" },
     ...init,
   });
+  const text = await response.text();
   if (!response.ok) {
-    throw new Error(`API error: ${response.status}`);
+    let suffix = "";
+    try {
+      const body = JSON.parse(text) as { message?: string; detail?: string; issues?: unknown };
+      if (body.message) suffix = `: ${body.message}`;
+      if (body.detail) suffix += ` — ${body.detail}`;
+      if (body.issues) suffix += ` ${JSON.stringify(body.issues)}`;
+    } catch {
+      if (text.trim()) suffix = `: ${text.slice(0, 500)}`;
+    }
+    throw new Error(`API error: ${response.status}${suffix}`);
   }
-  return (await response.json()) as T;
+  if (!text.trim()) return {} as T;
+  return JSON.parse(text) as T;
 };
 
 const fetchCsv = async (path: string): Promise<string> => {

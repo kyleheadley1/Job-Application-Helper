@@ -12,8 +12,8 @@ export const computeSalaryAsk = (params: {
   const postedMax = job.salary?.max;
 
   if (postedMin && postedMax) {
-    const midpoint = Math.round((postedMin + postedMax) / 2);
-    const conservativeAdjustment =
+    const band = postedMax - postedMin;
+    let conservativeAdjustment: number =
       recommendation === "yes"
         ? 0.55
         : recommendation === "selective_yes"
@@ -21,7 +21,22 @@ export const computeSalaryAsk = (params: {
           : score.total >= 70
             ? 0.48
             : 0.42;
-    const ask = Math.round(postedMin + (postedMax - postedMin) * conservativeAdjustment);
+    /** Imperfect level or core stack → upper-mid band (~35–38% of span), not near-top. */
+    const levelImperfect = score.levelFit < 10;
+    const coreStackWeak = score.stackFit < 18;
+    if (levelImperfect || coreStackWeak) {
+      conservativeAdjustment = Math.min(conservativeAdjustment, 0.38);
+    }
+    let ask = Math.round(postedMin + band * conservativeAdjustment);
+    /** 200k+ only when fit is elite: high total, strong level/stack, no hard stack mismatch. */
+    const eliteForTopSalary =
+      score.total >= 82 &&
+      score.levelFit >= 10 &&
+      score.stackFit >= 20 &&
+      !rules.stackMismatch;
+    if (ask >= 200_000 && !eliteForTopSalary) {
+      ask = Math.min(ask, 190_000);
+    }
     return { number: ask, rangeMin: postedMin, rangeMax: postedMax };
   }
 

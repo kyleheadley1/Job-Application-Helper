@@ -14,6 +14,7 @@ import { buildScoringPrompt, scoringSystemPrompt } from './prompts.js';
 import { preprocessScoringInput } from '../../tools/triageStructuredNormalize.js';
 import { responsesClient } from '../../services/llm/responsesClient.js';
 import type { StructuredCallDiagnostics } from '../../services/llm/responsesClient.js';
+import { polishScoringNarrative } from '../../lib/scoringOutputPolish.js';
 
 const ScoringOutputSchema = z.object({
   score: z.object({
@@ -83,8 +84,8 @@ const deterministicFallback = (
     stackFit = Math.min(25, stackFit + 1);
 
   const levelFit = rules.seniorityOverreach ? 5 : 11;
-  const domainFit = rules.domainMismatch ? 4 : 7;
-  const resumeStoryClarity = rules.stackMismatch ? 6 : 11;
+  let domainFit = rules.domainMismatch ? 4 : 7;
+  let resumeStoryClarity = rules.stackMismatch ? 6 : 11;
   let functionalOverlap = rules.stackMismatch ? 4 : 7;
   if (/\binternal\s+tools\b/i.test(fitBlob))
     functionalOverlap = Math.min(10, functionalOverlap + 1);
@@ -135,8 +136,18 @@ const deterministicFallback = (
     resumeStoryClarity = Math.min(15, resumeStoryClarity + 1);
     careerValue = Math.min(10, careerValue + 1);
   }
-  if (appliedAiStrong && /\bpython\b/i.test(fitBlob)) {
+  // Python-primary caveat: one venue only — do not subtract when JD also signals TS/Node/API AI work.
+  if (
+    appliedAiStrong &&
+    /\bpython\b/i.test(fitBlob) &&
+    !/\btypescript|javascript|node\.?js\b/i.test(fitBlob)
+  ) {
     stackFit = Math.max(0, stackFit - 1);
+  }
+  if (appliedAiStrong && !rules.domainMismatch) {
+    domainFit = Math.max(domainFit, 7);
+    if (domainFit === 7 && /\b(agent|agents|evaluation|evals)\b/i.test(fitBlob)) domainFit = 8;
+    domainFit = Math.min(10, domainFit);
   }
   if (
     /\b(nyc|new york|manhattan|brooklyn|hybrid\s+.{0,40}new\s+york)\b/i.test(fitBlob) &&
@@ -321,11 +332,28 @@ export const scoreJob = async (params: {
     resumeContexts: params.resumeContexts,
   });
 
+  const polished = polishScoringNarrative({
+    narrative: {
+      topMatch: llmResult.topMatch,
+      mainRisk: llmResult.mainRisk,
+      risks: llmResult.risks,
+      rationale: llmResult.rationale,
+    },
+    score: adjustedScore,
+    extracted: params.extracted,
+    userProfile: params.userProfile,
+    rules: params.rules,
+  });
+
   return {
     scoring: {
       ...llmResult,
-      score: adjustedScore,
-      recommendation: mapRecommendationFromScore(adjustedScore.total),
+      score: polished.score,
+      topMatch: polished.topMatch,
+      mainRisk: polished.mainRisk,
+      risks: polished.risks,
+      rationale: polished.rationale,
+      recommendation: mapRecommendationFromScore(polished.score.total),
     },
     scoringDiagnostics: scoredRun.diagnostics,
     scoringLlmSucceeded: scoredRun.success,

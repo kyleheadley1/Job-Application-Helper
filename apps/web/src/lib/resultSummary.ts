@@ -1,11 +1,12 @@
 import type { JobRecord } from "../types/job";
 
 const RISK_CONCEPTS: Array<{ concept: string; re: RegExp }> = [
-  { concept: "stack_gap", re: /\b(go|language|stack|framework|tooling|tech gap|experience with)\b/i },
+  { concept: "stack_gap", re: /\b(go|language|stack|framework|tooling|tech gap|experience with|python)\b/i },
   { concept: "scale_infra", re: /\b(scale|internet[-\s]?scale|infra|infrastructure|performance|production systems)\b/i },
   { concept: "domain_business", re: /\b(domain|ecommerce|revenue|business impact|data science|ml|market)\b/i },
   { concept: "screen_process", re: /\b(screen|process|degree|bachelor|assessment|pipeline|sponsorship|citizenship|clearance)\b/i },
-  { concept: "location_logistics", re: /\b(location|hybrid|onsite|commute|timezone|office)\b/i },
+  { concept: "travel_lifestyle", re: /\b(travel|25\s*%|30\s*%|40\s*%|50\s*%)\b/i },
+  { concept: "location_logistics", re: /\b(location|hybrid|onsite|commute|timezone|office|days?\s+per\s+week)\b/i },
 ];
 
 const MATCH_PRIORITIES: Array<{ label: string; re: RegExp }> = [
@@ -81,6 +82,8 @@ const riskStrength = (risk: string): number => {
       ? 30
       : concept === "scale_infra"
         ? 28
+        : concept === "travel_lifestyle"
+          ? 26
         : concept === "domain_business"
           ? 20
           : concept === "location_logistics"
@@ -94,21 +97,36 @@ const riskStrength = (risk: string): number => {
   return score;
 };
 
+const PROOF_BULLET_HINT =
+  /\b(shipped|built|implemented|delivered|owned|project|production|internship|codesmith|flagship|experience|tooling)\b/i;
+const CAPABILITY_BULLET_HINT =
+  /\b(overlap|align|match|fit|llm|rag|api|typescript|node|react|full[-\s]?stack|workflow|systems|stack|role)\b/i;
+
 export function selectTopFits(job: JobRecord, n = 2): string[] {
   const items = [job.topMatch, ...job.rationale].map((s) => s.trim()).filter(Boolean);
-  const out: string[] = [];
+  const positives: string[] = [];
   const seen = new Set<string>();
   for (const item of items) {
     const split = splitMixedReason(item);
     const candidate = split.positive ?? item;
     if (classifyReason(candidate) === "negative") continue;
-    const key = normalizeText(candidate);
+    const cleaned = candidate.replace(/\s*(but|however|though|while)\b.*$/i, "").trim();
+    const key = normalizeText(cleaned);
     if (!key || seen.has(key)) continue;
     seen.add(key);
-    out.push(candidate.replace(/\s*(but|however|though|while)\b.*$/i, "").trim());
+    positives.push(cleaned);
+  }
+  const capability = positives.find((p) => CAPABILITY_BULLET_HINT.test(p));
+  const proof = positives.find((p) => PROOF_BULLET_HINT.test(p) && p !== capability);
+  const out: string[] = [];
+  if (capability) out.push(capability);
+  if (proof) out.push(proof);
+  for (const p of positives) {
+    if (out.includes(p)) continue;
+    out.push(p);
     if (out.length >= n) break;
   }
-  return out;
+  return out.slice(0, n);
 }
 
 export function selectDistinctRisks(job: JobRecord, n = 2): string[] {
@@ -123,6 +141,7 @@ export function selectDistinctRisks(job: JobRecord, n = 2): string[] {
     [job.extracted.title, ...(job.extracted.requirements ?? []), ...(job.extracted.responsibilities ?? []), job.extracted.rawText ?? ""].join(" "),
   );
   const strictDegreeSignal = /\b(bachelor|degree)\b.*\b(required|must)\b|\brequired\b.*\b(bachelor|degree)\b/.test(jdText);
+  const jdDeepDomain = /\b(deep\s+domain|subject\s+matter|industry\s+expert|10\+\s*years\s+in)\b/.test(jdText);
   const deduped: Array<{ text: string; concept: string; strength: number }> = [];
   for (const item of items) {
     const concept = conceptForRisk(item);
@@ -130,6 +149,7 @@ export function selectDistinctRisks(job: JobRecord, n = 2): string[] {
     const t = normalizeText(item);
     if (!strictDegreeSignal && /\b(degree|bachelor)\b/.test(t)) strength -= 9;
     if (strictDegreeSignal && /\b(degree|bachelor)\b/.test(t)) strength += 9;
+    if (!jdDeepDomain && concept === "domain_business" && /\b(enterprise|domain expertise|industry)\b/.test(t)) strength -= 12;
     const matchIdx = deduped.findIndex(
       (d) => d.concept === concept && (similarRisk(d.text, item) || normalizeText(d.text) === normalizeText(item)),
     );

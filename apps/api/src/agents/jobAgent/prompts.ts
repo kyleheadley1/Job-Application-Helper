@@ -47,10 +47,15 @@ Rules:
 - Do not infer experience or accomplishments not present.
 - Degree requirements can be major filters in traditional/new-grad contexts.
 - For junior/early-career roles, do not over-credit aspirational language (internet-scale, broad business-impact, data-science exposure) unless evidence in profile/rules supports it.
-- Applied AI / AI Engineer roles: when the JD emphasizes LLMs, retrieval/RAG, agents, evaluation, AI workflows, REST APIs, integrations, or customer-facing AI systems, give meaningful credit to a TypeScript/Node/React + AI-tooling profile. Python as a primary language is a real stack caveat but not an automatic near-skip when LLM/RAG/API/system-building overlap is strong.
+- Applied AI / AI Engineer roles: when the JD emphasizes LLMs, retrieval/RAG, agents, evaluation, AI workflows, REST APIs, integrations, or customer-facing AI systems, give meaningful credit to a TypeScript/Node/React + AI-tooling profile. Python as a primary language is a meaningful stack caveat but not a reason to collapse stackFit when LLM/RAG/vector/embeddings/API/integration overlap is strong — in those cases stackFit is usually about 16–17/25, not low teens. Do not “double-penalize” Python by also crushing functionalOverlap and domainFit unless the JD is overwhelmingly Python-centric with little compensating AI/API signal.
+- functionalOverlap for these roles: when the JD stresses end-to-end AI workflows, retrieval, agents, evaluations, API/customer integrations, iterating on system behavior, and production-minded product work, and the profile shows DevAI-style RAG + ingestion + API + product engineering, functionalOverlap should be 8–9/10, not 7/10, unless a hard rule flag contradicts.
 - Treat "production AI ownership" as a caveat unless the JD clearly requires staff/senior-level ownership or many years of enterprise production ML/AI.
 - Trust rules.financePenalty and rules.traditionalCompanyPenalty booleans from rule evaluation — do not invent finance/banking or traditional-employer screening from generic "enterprise customers" language.
 - NYC / hybrid-in-NYC (when rules show no location mismatch) should boost recruiterFriendliness vs forcing false relocation risk.
+- domainFit: When the JD centers on LLMs, RAG, agents, AI workflows, or customer-facing applied AI systems AND the user profile shows real LLM/RAG/AI-enabled shipping (projects or strengths), domainFit should be 7–8/10 unless rules.domainMismatch is true — do not assign a low domain score for that situation.
+- risks: Return at most 3 items total (including mainRisk as the single highest-priority line in your head — put the top risk in mainRisk, next in risks[]). Only real landability risks. Prioritize: (1) core language/stack mismatch (e.g. Python-primary vs profile), (2) level/ownership gap vs JD, (3) lifestyle: travel percentage (call out if 25%+), onsite/office-day burden. Omit vague "lack of enterprise/domain expertise" unless the JD explicitly requires deep industry specialization or SME depth.
+- rationale: At most 3 bullets, each adding new information — one should emphasize capability/JD overlap, one concrete proof from profile/projects where possible; no near-duplicate bullets. Each bullet must be a complete sentence (no trailing comma, no clipped fragment); expand thin applied-AI lines with concrete nouns (e.g. API integration, end-to-end workflow) instead of stopping mid-thought.
+- topMatch: same quality bar as rationale — one complete sentence, no trailing comma.
 - Output ONE flat JSON object with ONLY the keys listed in the user message — no extra keys, no nested wrapper, no markdown.
 `.trim();
 
@@ -85,8 +90,8 @@ Return EXACTLY these keys (and no others):
 Notes:
 - "score.total" must equal the sum of the seven category scores (integer math).
 - "topMatch" and "mainRisk" must be human-readable strings, not booleans or numbers.
-- Keep rationale decision-useful: first two rationale bullets should be strongest fit reasons; first two risk bullets should be main realistic risks.
-- "risks" must contain distinct angles (no duplicate phrasing of the same gap). Prefer one combined risk when two bullets would repeat (e.g. merge Python-primary vs TS strength into one sentence).
+- Keep rationale decision-useful: strongest fit first; max 3 rationale strings, non-redundant.
+- "risks" array: max 2 entries (mainRisk carries the top risk) — distinct angles only; prioritize stack/language, level/ownership, travel (25%+), onsite intensity; skip low-signal domain hand-waving unless JD demands deep specialization.
 - Strong applied-AI overlap + viable NYC location + high career value should usually land total score in the 70s even with Python-primary and ownership caveats — reserve recommendation "no" for true hard mismatches (see rule flags), not stacked soft risks.
 - For junior-builder roles, collaboration and growth-potential language are positive but should not be treated as proof of proven internet-scale/data/business-impact ownership.
 - "topMatch" should be a role-specific one-line decision summary tied to concrete JD priorities; avoid generic profile-only phrasing.
