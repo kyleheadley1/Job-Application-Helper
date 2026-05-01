@@ -14,7 +14,11 @@ import { buildScoringPrompt, scoringSystemPrompt } from './prompts.js';
 import { preprocessScoringInput } from '../../tools/triageStructuredNormalize.js';
 import { responsesClient } from '../../services/llm/responsesClient.js';
 import type { StructuredCallDiagnostics } from '../../services/llm/responsesClient.js';
-import { polishScoringNarrative } from '../../lib/scoringOutputPolish.js';
+import {
+  polishScoringNarrative,
+  jdHasAppliedAiSystemsOverlap,
+  profileHasAiToolingEvidence,
+} from '../../lib/scoringOutputPolish.js';
 
 const ScoringOutputSchema = z.object({
   score: z.object({
@@ -210,6 +214,45 @@ const hardBlockersDominate = (rules: RuleEvaluation): boolean =>
       rules.domainMismatch,
   );
 
+const sumScoreBreakdown = (s: ScoreBreakdown): number =>
+  s.stackFit +
+  s.levelFit +
+  s.domainFit +
+  s.resumeStoryClarity +
+  s.functionalOverlap +
+  s.recruiterFriendliness +
+  s.careerValue;
+
+/**
+ * When the JD is applied-AI shaped, the profile shows AI tooling, resume context overlap is strong,
+ * and there is no hard mismatch, resume narrative deserves a full 15/15 — do not hold story down for conservative tone alone.
+ */
+export const applyAlignedResumeStoryClarity = (params: {
+  score: ScoreBreakdown;
+  extracted: ExtractedJobData;
+  rules: RuleEvaluation;
+  resumeContexts?: ResumeContextSet;
+  userProfile: UserProfile;
+}): ScoreBreakdown => {
+  const { score, extracted, rules, resumeContexts, userProfile } = params;
+  if (rules.domainMismatch || rules.stackMismatch) return score;
+  if (rules.seniorityOverreach || rules.explicitDegreeRisk) return score;
+  const blob = normalizeText(
+    [
+      extracted.title,
+      extracted.rawText ?? "",
+      ...(extracted.responsibilities ?? []),
+      ...(extracted.requirements ?? []),
+    ].join("\n"),
+  );
+  if (!jdHasAppliedAiSystemsOverlap(blob) || !profileHasAiToolingEvidence(userProfile)) return score;
+  const signal = supportingResumeSignals(extracted, resumeContexts);
+  if (signal < 10) return score;
+  if (score.resumeStoryClarity >= 15) return score;
+  const next = { ...score, resumeStoryClarity: 15 };
+  return { ...next, total: sumScoreBreakdown(next) };
+};
+
 const supportingResumeSignals = (extracted: ExtractedJobData, resumeContexts?: ResumeContextSet): number => {
   if (!resumeContexts) return 0;
   const text = normalizeText(
@@ -345,15 +388,23 @@ export const scoreJob = async (params: {
     rules: params.rules,
   });
 
+  const scoreAfterStory = applyAlignedResumeStoryClarity({
+    score: polished.score,
+    extracted: params.extracted,
+    rules: params.rules,
+    resumeContexts: params.resumeContexts,
+    userProfile: params.userProfile,
+  });
+
   return {
     scoring: {
       ...llmResult,
-      score: polished.score,
+      score: scoreAfterStory,
       topMatch: polished.topMatch,
       mainRisk: polished.mainRisk,
       risks: polished.risks,
       rationale: polished.rationale,
-      recommendation: mapRecommendationFromScore(polished.score.total),
+      recommendation: mapRecommendationFromScore(scoreAfterStory.total),
     },
     scoringDiagnostics: scoredRun.diagnostics,
     scoringLlmSucceeded: scoredRun.success,

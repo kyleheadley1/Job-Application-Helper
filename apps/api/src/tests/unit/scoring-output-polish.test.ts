@@ -42,7 +42,7 @@ describe("scoringOutputPolish", () => {
   it("always surfaces JD travel ranges (including under 25%) as a practical risk line", () => {
     const jd = "Role requires travel 10–20% for quarterly onsite reviews.";
     expect(extractMaxTravelPercent(jd)).toBe(20);
-    expect(travelRiskLine(jd)).toMatch(/Travel requirement \(10[-–]20%\)/);
+    expect(travelRiskLine(jd)).toMatch(/Travel requirement \(10[-–]20%\).*may be a constraint/i);
   });
 
   it("raises domain floor when JD and profile show applied AI overlap", () => {
@@ -188,7 +188,7 @@ describe("scoringOutputPolish", () => {
     });
     const all = [mainRisk, ...risks];
     expect(all).toHaveLength(3);
-    expect(all.some((r) => /customer-facing production ai/i.test(r))).toBe(true);
+    expect(all.some((r) => /production ai ownership|potential mismatch/i.test(r))).toBe(true);
     expect(all.some((r) => /travel/i.test(r))).toBe(true);
   });
 
