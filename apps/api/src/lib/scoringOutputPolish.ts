@@ -100,9 +100,9 @@ export const travelRiskLine = (blob: string): string | undefined => {
   const rangeLabel = extractTravelRangeLabel(blob);
   const label = rangeLabel ?? `~${pct}%`;
   if (pct >= 25) {
-    return `Significant travel (${label}); confirm it fits your lifestyle vs hybrid/office cadence.`;
+    return `Significant travel (${label}) may be a constraint versus low-travel or office-heavy preferences.`;
   }
-  return `Travel requirement (${label}); confirm it fits your schedule and hybrid/office expectations.`;
+  return `Travel requirement (${label}) may be a constraint if you need minimal travel or fixed hybrid cadence.`;
 };
 
 const tokenSet = (s: string): Set<string> =>
@@ -139,8 +139,8 @@ const riskPriority = (risk: string, jdBlob: string): number => {
   const t = normalizeText(risk);
   /** Third-priority stretch risk: after Python/stack and travel/hybrid. */
   if (
-    /customer[-\s]?facing production ai systems/i.test(t) &&
-    /slightly above current experience/i.test(t)
+    /customer[-\s]?facing production ai|production ai ownership/.test(t) &&
+    /potential mismatch|depth of ownership|above.*experience/.test(t)
   ) {
     return 84;
   }
@@ -200,7 +200,7 @@ const uniqueRisks = (items: string[]): string[] => {
 };
 
 const PRODUCTION_AI_OWNERSHIP_RISK =
-  "Role expects ownership of customer-facing production AI systems, which may be slightly above current experience level.";
+  "Customer-facing production AI ownership is a potential mismatch with the depth of ownership shown in this profile.";
 
 export function polishRisksAndMain(params: {
   mainRisk: string;
@@ -226,7 +226,7 @@ export function polishRisksAndMain(params: {
   const sorted = [...filtered].sort((a, b) => riskPriority(b, jdBlob) - riskPriority(a, jdBlob));
   const top = pickBalancedRiskOrder(sorted, max);
   const fallbackMain =
-    params.mainRisk.trim() || "Recruiter-screen realism; confirm fit in conversation.";
+    params.mainRisk.trim() || "Standard recruiter-screen gaps may still apply for unverified claims.";
   return {
     mainRisk: top[0] ?? fallbackMain,
     risks: top.length > 1 ? top.slice(1) : [],
@@ -235,9 +235,25 @@ export function polishRisksAndMain(params: {
 
 const PROOF_HINT =
   /\b(shipped|built|implemented|delivered|owned|codesmith|project|production|internship|experience|profile|flagship|led|scaled)\b/i;
-/** Capability / fit angle (avoid treating proof verbs as the primary "why" line). */
+/** Second bullet must tie to engineering artifacts, not generic praise (embeddings, pipelines, DevAI-style delivery). */
+export const CONCRETE_ENGINEERING_PROOF =
+  /\b(embedding|embeddings|vector\s*(search|database|db)?|ingestion|pipeline|pipelines|rag\b|retrieval|semantic|chunk|evals?|evaluations?|agents?|devai|openapi|kubernetes|lambda|typescript|node\.?js|rest\s*api)\b/i;
+const VAGUE_FIT_RE =
+  /\b(solid\s+match|strategic\s+capability|strategic\s+readiness|generic\s+fit|generic\s+overlap)\b/gi;
+
+const hasVagueFitPhrase = (s: string): boolean =>
+  /\b(solid\s+match|strategic\s+capability|strategic\s+readiness|generic\s+fit|generic\s+overlap)\b/i.test(s);
+
+/** Remove reusable vague praise from Why consider lines. */
+export function stripVagueWhyConsiderPhrases(text: string): string {
+  let t = text.replace(VAGUE_FIT_RE, "").replace(/\s{2,}/g, " ").replace(/\s*,\s*,/g, ",").trim();
+  t = t.replace(/^[,;]\s*/, "").replace(/\s*[,;]\s*$/g, "").trim();
+  return t;
+}
+
+/** Capability / fit angle for bullet 1 — not concrete proof. */
 const CAPABILITY_HINT =
-  /\b(overlap|align|match|fit|role|scope|stack|workflow|systems|shape|readiness|strength)\b/i;
+  /\b(overlap|align|match|fit|role|scope|stack|workflow|systems|shape)\b/i;
 
 const appliedAiTriple =
   /\b(llm|rag|vector\s+(search|embedding)|rest\s*api|api\s+integration|applied[-\s]?ai)\b/gi;
@@ -259,7 +275,7 @@ export function dampDuplicateAppliedAiPhrasing(first: string, second: string): s
 
 /** Trim trailing commas, fix clipped applied-AI summary lines, avoid sentence fragments. */
 export function sanitizeNarrativeSentence(text: string, minLen = 55): string {
-  let t = text.trim().replace(/,\s*$/, "").replace(/\s+$/, "");
+  let t = stripVagueWhyConsiderPhrases(text.trim()).replace(/,\s*$/, "").replace(/\s+$/, "");
   t = t.replace(/\s*\b(and|or)\s*$/i, "").trim();
   if (t.length < minLen && /(llm|rag|applied[-\s]?ai|ai workflow)/i.test(t)) {
     if (!/\b(integration|end[-\s]to[-\s]end|workflow experience)\b/i.test(t)) {
@@ -267,6 +283,17 @@ export function sanitizeNarrativeSentence(text: string, minLen = 55): string {
     }
   }
   return t.replace(/,\s*$/, "").trim();
+}
+
+function pickConcreteProofLine(
+  candidates: string[],
+  avoid: string | undefined,
+): string | undefined {
+  const avoidNorm = avoid ? normalizeText(avoid) : "";
+  const scored = candidates.filter((r) => r && !similarSentence(r, avoid ?? ""));
+  const concrete = scored.find((r) => CONCRETE_ENGINEERING_PROOF.test(r) && PROOF_HINT.test(r));
+  if (concrete) return concrete;
+  return scored.find((r) => CONCRETE_ENGINEERING_PROOF.test(r)) ?? scored.find((r) => PROOF_HINT.test(r));
 }
 
 export function polishRationaleBullets(rationale: string[], max = 2): string[] {
@@ -278,18 +305,21 @@ export function polishRationaleBullets(rationale: string[], max = 2): string[] {
   }
   const proofLines = deduped.filter((r) => PROOF_HINT.test(r));
   const nonProof = deduped.filter((r) => !PROOF_HINT.test(r));
-  const capability =
-    nonProof.find((r) => CAPABILITY_HINT.test(r)) ??
+  let capability =
+    nonProof.find((r) => CAPABILITY_HINT.test(r) && !hasVagueFitPhrase(r)) ??
+    nonProof.find((r) => !hasVagueFitPhrase(r)) ??
     nonProof[0] ??
     deduped.find((r) => CAPABILITY_HINT.test(r)) ??
     deduped[0];
-  const proof =
-    proofLines.find((p) => p !== capability && !similarSentence(p, capability)) ??
-    deduped.find((r) => r !== capability);
+  if (capability) capability = stripVagueWhyConsiderPhrases(capability);
+
+  let proof = pickConcreteProofLine(deduped, capability);
+  if (proof === capability) proof = pickConcreteProofLine([...proofLines, ...deduped], capability);
+  if (!proof || proof === capability) proof = deduped.find((r) => r !== capability);
 
   const out: string[] = [];
   if (capability) out.push(capability);
-  if (proof && proof !== capability) out.push(dampDuplicateAppliedAiPhrasing(capability, proof));
+  if (proof && proof !== capability) out.push(dampDuplicateAppliedAiPhrasing(capability ?? "", proof));
   for (const r of deduped) {
     if (out.length >= max) break;
     const adj = out.length === 1 && out[0] ? dampDuplicateAppliedAiPhrasing(out[0], r) : r;
@@ -299,6 +329,12 @@ export function polishRationaleBullets(rationale: string[], max = 2): string[] {
   const sliced = out.slice(0, max).map((s) => sanitizeNarrativeSentence(s));
   if (sliced.length === 2) {
     sliced[1] = sanitizeNarrativeSentence(dampDuplicateAppliedAiPhrasing(sliced[0], sliced[1]));
+    if (!CONCRETE_ENGINEERING_PROOF.test(sliced[1]) && !/\b(shipped|built|implemented|delivered|owned|production)\b/i.test(sliced[1])) {
+      const alt = pickConcreteProofLine(deduped, sliced[0]);
+      if (alt && !similarSentence(sliced[0], alt)) {
+        sliced[1] = sanitizeNarrativeSentence(dampDuplicateAppliedAiPhrasing(sliced[0], alt));
+      }
+    }
   }
   return sliced;
 }

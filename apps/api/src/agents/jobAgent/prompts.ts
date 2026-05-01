@@ -54,8 +54,10 @@ Rules:
 - NYC / hybrid-in-NYC (when rules show no location mismatch) should boost recruiterFriendliness vs forcing false relocation risk.
 - domainFit: When the JD centers on LLMs, RAG, agents, AI workflows, or customer-facing applied AI systems AND the user profile shows real LLM/RAG/AI-enabled shipping (projects or strengths), domainFit should be 7–8/10 unless rules.domainMismatch is true — do not assign a low domain score for that situation.
 - risks: Think like a hiring manager: what could realistically block a hire? Put the strongest blocker in mainRisk and exactly one distinct angle in risks[] (two lines total: technical/stack/level/ownership vs practical travel/hybrid/onsite when both apply). Priority order: (1) core language/stack mismatch, (2) level/ownership gap vs JD, (3) lifestyle — always mirror stated travel percentages from the JD when present (especially 25%+). Omit vague "lack of enterprise/domain expertise" unless the JD explicitly requires deep industry specialization or SME depth.
-- rationale: Exactly 2 bullets max — bullet 1 = strategic capability/JD fit (what matches); bullet 2 = concrete proof from profile/projects (what you shipped). Do not repeat the same LLM/RAG/API phrasing in both bullets.
-- topMatch: same quality bar as rationale — one complete sentence, no trailing comma.
+- rationale: Exactly 2 bullets — bullet 1 = role-shaped fit vs this JD (specific verbs from the posting); bullet 2 = concrete engineering proof from the profile (embeddings, vector search, ingestion pipelines, eval hooks, DevAI-style shipping — not generic praise). Ban vague reusable phrases ("solid match", "strategic capability").
+- resumeStoryClarity: Use 15/15 when the candidate narrative clearly matches the role arc (e.g. AI tooling / product engineering → applied AI engineer) with no serious ambiguity; only score below 15 when the story is fragmented, off-topic vs the JD, or rules flag a real mismatch (stack/domain/seniority).
+- risks: Use decisive wording ("may be a constraint", "is a potential mismatch"); avoid soft hedges like "confirm it fits".
+- topMatch: One role-specific sentence grounded in this posting — same anti-generic rules as rationale.
 - Output ONE flat JSON object with ONLY the keys listed in the user message — no extra keys, no nested wrapper, no markdown.
 `.trim();
 
@@ -90,7 +92,7 @@ Return EXACTLY these keys (and no others):
 Notes:
 - "score.total" must equal the sum of the seven category scores (integer math).
 - "topMatch" and "mainRisk" must be human-readable strings, not booleans or numbers.
-- Keep rationale decision-useful: strongest strategic fit first; exactly 2 rationale strings — capability fit then proof; non-redundant wording.
+- Keep rationale decision-useful: exactly 2 strings — JD-shaped fit, then concrete shipped proof (technical nouns). No "solid match" / "strategic capability" filler.
 - "risks" array: max 1 entry after mainRisk (two distinct risks total). Separate technical/blocker angles from practical (travel, onsite, hybrid) when the JD lists both.
 - Strong applied-AI overlap + viable NYC location + high career value should usually land total score in the 70s even with Python-primary and ownership caveats — reserve recommendation "no" for true hard mismatches (see rule flags), not stacked soft risks.
 - For junior-builder roles, collaboration and growth-potential language are positive but should not be treated as proof of proven internet-scale/data/business-impact ownership.

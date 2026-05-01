@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { applyResumeSupportAdjustments } from "../../agents/jobAgent/scoring.js";
+import {
+  applyAlignedResumeStoryClarity,
+  applyResumeSupportAdjustments,
+} from "../../agents/jobAgent/scoring.js";
+import { userProfile } from "../../config/userProfile.js";
 import type { ResumeContextSet } from "../../types/resumeContext.js";
 import type { RuleEvaluation, ScoreBreakdown } from "../../types/scoring.js";
 import type { ExtractedJobData } from "../../types/job.js";
@@ -84,5 +88,58 @@ describe("resume support scoring adjustments", () => {
       resumeContexts,
     });
     expect(adjusted).toEqual(baseScore);
+  });
+
+  it("raises resumeStoryClarity to 15 for aligned applied-AI narrative when resume overlap is strong", () => {
+    const resumeStrong: ResumeContextSet = {
+      SWE: {
+        ...resumeContexts.SWE!,
+        metadata: {
+          ...resumeContexts.SWE!.metadata,
+          keywords: [
+            ...resumeContexts.SWE!.metadata.keywords,
+            "llm",
+            "rag",
+            "retrieval",
+            "embeddings",
+            "generative",
+            "typescript",
+            "node",
+            "api",
+          ],
+        },
+      },
+    };
+    const extractedAi: ExtractedJobData = {
+      ...extracted,
+      title: "Applied AI Engineer",
+      responsibilities: ["LLM systems", "RAG pipelines"],
+      rawText: "Build retrieval-augmented generation features with embeddings.",
+    };
+    const out = applyAlignedResumeStoryClarity({
+      score: { ...baseScore, resumeStoryClarity: 12, total: baseScore.total },
+      extracted: extractedAi,
+      rules: cleanRules,
+      resumeContexts: resumeStrong,
+      userProfile,
+    });
+    expect(out.resumeStoryClarity).toBe(15);
+  });
+
+  it("does not raise resumeStoryClarity when stack mismatch is flagged", () => {
+    const extractedAi: ExtractedJobData = {
+      ...extracted,
+      title: "AI Engineer",
+      responsibilities: ["LLM and RAG"],
+      rawText: "Retrieval-augmented generation.",
+    };
+    const out = applyAlignedResumeStoryClarity({
+      score: { ...baseScore, resumeStoryClarity: 11, total: baseScore.total },
+      extracted: extractedAi,
+      rules: { ...cleanRules, stackMismatch: true },
+      resumeContexts,
+      userProfile,
+    });
+    expect(out.resumeStoryClarity).toBe(11);
   });
 });
