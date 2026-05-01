@@ -41,6 +41,27 @@ describe("rule engine", () => {
     expect(rules.traditionalCompanyPenalty).toBe(true);
   });
 
+  it("does not infer finance/traditional/location penalties for enterprise applied-AI + NYC hybrid", () => {
+    const rules = evaluateRules(
+      makeJob({
+        company: "Distyl AI",
+        title: "AI Engineer",
+        remoteType: "hybrid",
+        location: "Hybrid — New York, NY",
+        locationIsCommutable: false,
+        rawText: `
+Distyl builds customer AI systems for enterprises including Fortune 500 customers and insurance operations teams.
+Stack: Python, LLMs, RAG, vector search, REST APIs, evaluations. Hybrid in New York, NY. 25-50% travel.
+Series B startup. Not a bank.
+        `.trim(),
+      }),
+      userProfile,
+    );
+    expect(rules.financePenalty).toBe(false);
+    expect(rules.traditionalCompanyPenalty).toBe(false);
+    expect(rules.locationMismatch).toBe(false);
+  });
+
   it("flags onsite non-commutable mismatch", () => {
     const rules = evaluateRules(
       makeJob({ remoteType: "onsite", location: "Dallas, TX", locationIsCommutable: false }),

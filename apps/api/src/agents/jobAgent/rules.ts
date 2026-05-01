@@ -3,6 +3,11 @@ import type { ExtractedJobData } from '../../types/job.js';
 import type { RuleEvaluation } from '../../types/scoring.js';
 import type { UserProfile } from '../../types/userProfile.js';
 import { normalizeText } from '../../lib/text.js';
+import {
+  detectStrictFinanceEmployerContext,
+  detectTraditionalEmployerContextStrict,
+  textImpliesNycMetroOrCommutableNj,
+} from '../../lib/employerLocationSignals.js';
 
 const includesAny = (haystack: string, needles: string[]): boolean =>
   needles.some((needle) => haystack.includes(needle));
@@ -60,38 +65,8 @@ export const evaluateRules = (
     [companyNorm, structuredParts, raw].filter(Boolean).join(' '),
   );
 
-  const financeNeedles = [
-    'finance',
-    'trading',
-    'capital markets',
-    'banking',
-    'bank',
-    'insurance',
-    'wealth management',
-    'investment bank',
-    'hedge fund',
-    'financial services',
-    'financial institution',
-  ];
-
-  const traditionalNeedles = [
-    'fortune 500',
-    'regulated industry',
-    'institution',
-    'government',
-    'federal',
-    'bank',
-    'financial',
-    'insurance',
-    'capital markets',
-  ];
-
-  const isFinance =
-    includesAny(combinedText, financeNeedles) ||
-    includesAny(companyNorm, ['bank', 'capital', 'financial', 'insurance']);
-  const isTraditionalCompany =
-    includesAny(combinedText, traditionalNeedles) ||
-    includesAny(companyNorm, ['bank', 'insurance', 'government']);
+  const isFinance = detectStrictFinanceEmployerContext(combinedText, companyNorm);
+  const isTraditionalCompany = detectTraditionalEmployerContextStrict(combinedText, companyNorm);
 
   const harshEmployerContext = isTraditionalCompany || isFinance;
 
@@ -128,9 +103,16 @@ export const evaluateRules = (
     includesAny(combinedText, ['senior', 'staff', 'principal']) ||
     (job.yearsExperience?.min ?? 0) >= 4;
 
+  const primaryNonNycMetroInLocationLine =
+    /\b(location|based|office)\s*:\s*[^.\n]{0,100}\b(dallas|austin|seattle|san francisco|sf\b|los angeles|chicago|denver|atlanta|boston|miami|philadelphia|phoenix|detroit|houston|portland)\b/i.test(
+      combinedText,
+    );
+  const nycOrNjViableInText =
+    textImpliesNycMetroOrCommutableNj(combinedText) && !primaryNonNycMetroInLocationLine;
   const locationMismatch =
     (job.remoteType === 'onsite' || job.remoteType === 'hybrid') &&
-    job.locationIsCommutable === false;
+    job.locationIsCommutable === false &&
+    !nycOrNjViableInText;
 
   const visaMismatch =
     includesAny(normalizeText(job.visaRequirement ?? ''), [
@@ -264,10 +246,9 @@ export const evaluateRules = (
   };
 };
 
-export const isLikelyTraditionalEmployer = (job: ExtractedJobData): boolean =>
-  includesAny(
-    normalizeText(
-      `${job.company} ${job.title} ${(job.domainTags ?? []).join(' ')} ${job.rawText ?? ''}`,
-    ),
-    ['bank', 'financial', 'insurance', 'institution', 'government'],
+export const isLikelyTraditionalEmployer = (job: ExtractedJobData): boolean => {
+  const blob = normalizeText(
+    `${job.company} ${job.title} ${(job.domainTags ?? []).join(' ')} ${job.rawText ?? ''}`,
   );
+  return detectTraditionalEmployerContextStrict(blob, normalizeText(job.company ?? ''));
+};

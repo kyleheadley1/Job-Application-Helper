@@ -3,7 +3,11 @@
  * Goal: surface obvious signals for rules + scoring when LLM extraction is unavailable.
  */
 import type { ExtractedJobData } from "../types/job.js";
-import { dedupeStrings } from "../lib/text.js";
+import { dedupeStrings, normalizeText } from "../lib/text.js";
+import {
+  detectStrictFinanceEmployerContext,
+  textImpliesNycMetroOrCommutableNj,
+} from "../lib/employerLocationSignals.js";
 
 export type DeterministicExtractResult = {
   partial: Partial<ExtractedJobData>;
@@ -14,9 +18,6 @@ const NYCISH = /\b(nyc|new york|manhattan|brooklyn|queens|bronx|staten island|nj
 const US_REMOTE = /\b(remote|work from anywhere|wfh|distributed)\b/i;
 const ONSITE = /\b(onsite|on-site|in office|in-office)\b/i;
 const HYBRID = /\bhybrid\b/i;
-
-const FINANCE_OR_TRAD =
-  /\b(bank|banking|capital markets|financial services|financial|capital|insurance|wealth management|investment bank|hedge fund|government|federal agency|institution|enterprise compliance)\b/i;
 
 const DEGREE_REQUIRED =
   /\b(bachelor'?s?\s+degree|bachelors\s+degree|bs\s+in|b\.s\.|ba\s+in|undergraduate\s+degree|four[\s-]year\s+degree)\b[^.\n]{0,160}\brequired\b|\b(required|mandatory)\b[^.\n]{0,120}\b(bachelor'?s?|bs\s+in|b\.s\.)\b|\bdegree\s+in\s+(computer science|cs|engineering)\s+required\b/i;
@@ -180,13 +181,15 @@ const inferRemoteType = (text: string): ExtractedJobData["remoteType"] => {
 
 const inferLocationCommutable = (text: string, remoteType: ExtractedJobData["remoteType"]): boolean | undefined => {
   if (remoteType === "remote") return true;
-  const n = text.toLowerCase();
+  const n = text
+    .toLowerCase()
+    .replace(/\([^)]*not\s+commutable\s+from\s+(nyc|new\s+york(\s+city)?)[^)]*\)/gi, " ");
   if (remoteType === "onsite" || remoteType === "hybrid") {
-    // If the role is anchored to a non-NYC metro, treat as non-commutable for NYC-first search.
+    // NYC / commutable NJ beats other metros mentioned (e.g. multi-office listings).
+    if (NYCISH.test(n)) return true;
     if (/\b(dallas|austin|seattle|sf|san francisco|los angeles|chicago|denver|atlanta|boston|miami|philadelphia|phoenix|detroit)\b/i.test(n)) {
       return false;
     }
-    if (NYCISH.test(n)) return true;
   }
   return undefined;
 };
@@ -356,8 +359,9 @@ export const extractFromRawText = (normalizedText: string, companyHint?: string)
   }
 
   const domainTags: string[] = [];
-  if (FINANCE_OR_TRAD.test(text)) domainTags.push("finance");
-  if (/\b(fintech|payments|trading)\b/i.test(text)) domainTags.push("fintech");
+  const coForDomain = normalizeText(partial.company ?? companyHint ?? "");
+  if (detectStrictFinanceEmployerContext(normalizeText(text), coForDomain)) domainTags.push("finance");
+  if (/\b(fintech|payments|trading firm|hedge fund)\b/i.test(text)) domainTags.push("fintech");
   if (domainTags.length) {
     partial.domainTags = dedupeStrings(domainTags);
     inferredFields.push("domainTags");
@@ -389,6 +393,17 @@ export const mergeExtractedWithHeuristics = (
   heur: DeterministicExtractResult,
 ): ExtractedJobData => {
   const h = heur.partial;
+  const locationBlob = normalizeText(
+    [base.rawText ?? "", base.location ?? "", h.location ?? "", base.title ?? ""].join("\n"),
+  );
+  const primaryNonNycInLoc =
+    /\b(location|based|office)\s*:\s*[^.\n]{0,100}\b(dallas|austin|seattle|san francisco|sf\b|los angeles|chicago|denver|atlanta|boston|miami|philadelphia|phoenix|detroit|houston|portland)\b/i.test(
+      locationBlob,
+    );
+  const mergedCommutable =
+    textImpliesNycMetroOrCommutableNj(locationBlob) && !primaryNonNycInLoc
+      ? true
+      : (h.locationIsCommutable ?? base.locationIsCommutable);
   const merged: ExtractedJobData = {
     ...base,
     company: h.company && (base.company === "Unknown Company" || !base.company) ? h.company : base.company || h.company || "Unknown Company",
@@ -398,7 +413,7 @@ export const mergeExtractedWithHeuristics = (
       h.remoteType && (base.remoteType === "unknown" || base.remoteType === undefined)
         ? h.remoteType
         : (base.remoteType ?? h.remoteType ?? "unknown"),
-    locationIsCommutable: h.locationIsCommutable ?? base.locationIsCommutable,
+    locationIsCommutable: mergedCommutable,
     salary: h.salary?.min && h.salary?.max ? h.salary : base.salary,
     seniority: h.seniority ?? base.seniority,
     yearsExperience: h.yearsExperience ?? base.yearsExperience,

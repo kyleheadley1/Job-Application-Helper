@@ -32,6 +32,7 @@ const deterministicResumeSelection = (
   const sieSignals = [
     "forward deployed",
     "solutions engineer",
+    "sales engineer",
     "customer-facing implementation",
     "implementation",
     "integrations",
@@ -47,22 +48,39 @@ const deterministicResumeSelection = (
     "workflow implementation",
     "technical implementation",
   ];
-  const earlySignals = ["new grad", "entry level", "early career", "rotational", "associate"];
-  const sweSignals = ["software engineer", "full-stack", "backend", "api", "product engineer", "builder"];
+  const explicitEarlyPipeline =
+    /\b(new grad|new graduate|entry[-\s]?level|early[-\s]?career|\bjunior\b|software engineer i\b|swe i\b|intern\b|apprentice|rotational program|rotation program|0\s*[-–]\s*2\s+years|university graduate program)\b/i.test(
+      text,
+    );
+  const earlySignals = ["new grad", "new graduate", "entry level", "early career", "rotational program", "rotation program", "software engineer i", "swe i", "intern", "apprentice", "0-2 years", "0–2 years"];
+  const sweSignals = [
+    "software engineer",
+    "full-stack",
+    "backend",
+    "api",
+    "product engineer",
+    "builder",
+    "ai engineer",
+    "machine learning engineer",
+    "applied ai",
+  ];
   const juniorBuilderSignals = [
     "junior",
     "entry-level",
     "entry level",
     "early-career",
     "early career",
-    "associate",
+    "associate software",
+    "associate engineer",
     "product engineer",
     "full-stack",
     "internal tools",
   ];
 
   const sieHits = sieSignals.filter((needle) => text.includes(needle)).length;
-  const earlyHits = earlySignals.filter((needle) => text.includes(needle)).length;
+  const earlyHits = explicitEarlyPipeline
+    ? earlySignals.filter((needle) => text.includes(needle)).length + 2
+    : earlySignals.filter((needle) => text.includes(needle)).length;
   const sweHits = sweSignals.filter((needle) => text.includes(needle)).length;
   const juniorBuilderHits = juniorBuilderSignals.filter((needle) => text.includes(needle)).length;
 
@@ -88,12 +106,26 @@ const deterministicResumeSelection = (
     EARLY_CAREER: metaScoreByType.EARLY_CAREER * 2 + earlyHits,
   };
 
-  // Calibration: junior builder/product roles should default to EARLY_CAREER or SWE,
-  // unless clear SIE implementation/onboarding/customer-delivery signals are present.
-  if (juniorBuilderHits > 0 && sieHits < 2) {
+  // SWE-first for general product / AI engineering; only boost EARLY_CAREER when explicit pipeline language matches.
+  if (
+    /\b(ai engineer|machine learning engineer|software engineer|full[- ]stack|backend engineer)\b/i.test(text) &&
+    !explicitEarlyPipeline
+  ) {
+    combinedByType.SWE += 3;
+  }
+  if (
+    /\b(rotational program|rotation program|campus hire|campus recruiting|early career program)\b/i.test(text) &&
+    explicitEarlyPipeline
+  ) {
+    combinedByType.EARLY_CAREER += 5;
+  }
+  if (juniorBuilderHits > 0 && sieHits < 2 && explicitEarlyPipeline) {
     combinedByType.SWE += 2;
     combinedByType.EARLY_CAREER += 2;
     combinedByType.SIE -= 2;
+  } else if (juniorBuilderHits > 0 && sieHits < 2 && !explicitEarlyPipeline) {
+    combinedByType.SWE += 2;
+    combinedByType.EARLY_CAREER = Math.min(combinedByType.EARLY_CAREER, 1);
   }
 
   if (sieHits >= 2 && /customer[-\s]?facing|onboarding|implementation|integration/.test(text)) {
