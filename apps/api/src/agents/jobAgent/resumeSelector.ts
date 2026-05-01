@@ -87,7 +87,13 @@ const deterministicResumeSelection = (
   const metaScoreByType: Record<ResumeType, number> = { SWE: 0, SIE: 0, EARLY_CAREER: 0 };
   if (resumeContexts) {
     const stackAndNeeds = normalizeText(
-      [...job.stack, ...job.requiredSkills, ...job.preferredSkills, ...job.responsibilities, ...job.requirements].join(" "),
+      [
+        ...(job.stack ?? []),
+        ...(job.requiredSkills ?? []),
+        ...(job.preferredSkills ?? []),
+        ...(job.responsibilities ?? []),
+        ...(job.requirements ?? []),
+      ].join(" "),
     );
     const words = new Set(stackAndNeeds.split(/\s+/).filter(Boolean));
     const types: ResumeType[] = ["SWE", "SIE", "EARLY_CAREER"];
