@@ -70,8 +70,9 @@ export const scoringPolicy: ScoringPolicy = {
     startupFounderMismatch: 8,
   },
   recommendationMapping: [
-    { min: 80, max: 100, recommendation: "yes", note: "strong apply" },
-    { min: 70, max: 79, recommendation: "selective_yes", note: "viable apply" },
+    { min: 82, max: 100, recommendation: "yes", note: "strong apply" },
+    { min: 74, max: 81, recommendation: "yes", note: "apply" },
+    { min: 70, max: 73, recommendation: "selective_yes", note: "viable apply" },
     { min: 65, max: 69, recommendation: "selective_yes", note: "only if special reason" },
     { min: 0, max: 64, recommendation: "no", note: "skip" },
   ],

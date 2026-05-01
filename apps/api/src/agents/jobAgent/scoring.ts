@@ -125,6 +125,26 @@ const deterministicFallback = (
     functionalOverlap = Math.max(0, functionalOverlap - 1);
   }
 
+  const appliedAiStrong =
+    /\b(llm|rag\b|vector\s+(search|database|db)|embedding|generative ai|ai engineer|agentic|evals?\b|retrieval[-\s]?augmented)\b/i.test(
+      fitBlob,
+    );
+  if (appliedAiStrong) {
+    stackFit = Math.min(25, stackFit + 2);
+    functionalOverlap = Math.min(10, functionalOverlap + 2);
+    resumeStoryClarity = Math.min(15, resumeStoryClarity + 1);
+    careerValue = Math.min(10, careerValue + 1);
+  }
+  if (appliedAiStrong && /\bpython\b/i.test(fitBlob)) {
+    stackFit = Math.max(0, stackFit - 1);
+  }
+  if (
+    /\b(nyc|new york|manhattan|brooklyn|hybrid\s+.{0,40}new\s+york)\b/i.test(fitBlob) &&
+    (job.remoteType === "hybrid" || job.remoteType === "onsite" || job.remoteType === "remote")
+  ) {
+    recruiterFriendliness = Math.min(15, recruiterFriendliness + 1);
+  }
+
   const subtotal =
     stackFit +
     levelFit +

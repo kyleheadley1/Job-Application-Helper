@@ -13,7 +13,14 @@ export const computeSalaryAsk = (params: {
 
   if (postedMin && postedMax) {
     const midpoint = Math.round((postedMin + postedMax) / 2);
-    const conservativeAdjustment = recommendation === "yes" ? 0.52 : recommendation === "selective_yes" ? 0.47 : 0.42;
+    const conservativeAdjustment =
+      recommendation === "yes"
+        ? 0.55
+        : recommendation === "selective_yes"
+          ? 0.51
+          : score.total >= 70
+            ? 0.48
+            : 0.42;
     const ask = Math.round(postedMin + (postedMax - postedMin) * conservativeAdjustment);
     return { number: ask, rangeMin: postedMin, rangeMax: postedMax };
   }

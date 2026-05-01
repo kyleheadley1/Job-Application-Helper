@@ -57,6 +57,29 @@ describe("resume selection", () => {
     expect(result.recommendedResume).toBe("EARLY_CAREER");
   });
 
+  it("prefers SWE for applied AI engineering roles without junior pipeline language", async () => {
+    const extracted: ExtractedJobData = {
+      company: "Distyl AI",
+      title: "AI Engineer",
+      stack: ["Python", "REST APIs"],
+      requiredSkills: ["LLMs", "RAG", "vector search"],
+      preferredSkills: [],
+      domainTags: [],
+      responsibilities: ["Build customer-facing production AI systems", "Evaluations and retrieval workflows"],
+      requirements: ["Experience with agents and API integrations"],
+      rawText:
+        "AI Engineer role. Python, LLMs, RAG, embeddings, REST APIs. Hybrid in New York, NY. Serves enterprise customers.",
+    };
+    const result = await selectResume({
+      extracted,
+      score,
+      topMatch: "LLM/RAG overlap",
+      mainRisk: "Python-primary vs TypeScript strength",
+      userProfile,
+    });
+    expect(result.recommendedResume).toBe("SWE");
+  });
+
   it("does not misclassify junior product builder roles as SIE", async () => {
     const extracted: ExtractedJobData = {
       company: "Rokt",

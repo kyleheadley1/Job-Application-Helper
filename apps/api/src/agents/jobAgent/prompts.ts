@@ -19,7 +19,7 @@ Required shape (field names must match exactly):
 - url: OPTIONAL. Omit this key entirely unless you have a valid absolute http(s) URL from the input. Never use null, "", "none", or placeholders.
 - location: OPTIONAL string only. If you include it, it must be a single human-readable line (e.g. "Remote (US)", "Hybrid — New York, NY"). Never return an object or array for location.
 - remoteType: optional enum string: "remote" | "hybrid" | "onsite" | "unknown"
-- locationIsCommutable: optional boolean
+- locationIsCommutable: optional boolean. Set true when the role lists New York, NY / NYC / hybrid or onsite in the NYC metro, or clearly commutable North Jersey, as a work location option. Set false only when the role requires a non-NYC metro with no NYC/NJ option. Do not mark non-commutable for hybrid in NYC.
 - salary, seniority, visaRequirement, etc.: only when clearly supported; use numbers for salary min/max.
 - yearsExperience: if present, MUST be an object like { "raw": "2+", "min": 2, "max": 4 } — never a bare number or bare string at the top level.
 - degreeRequirement: if present, MUST be an object like { "raw": "Bachelor's required", "level": "required" } — never a bare string.
@@ -47,6 +47,10 @@ Rules:
 - Do not infer experience or accomplishments not present.
 - Degree requirements can be major filters in traditional/new-grad contexts.
 - For junior/early-career roles, do not over-credit aspirational language (internet-scale, broad business-impact, data-science exposure) unless evidence in profile/rules supports it.
+- Applied AI / AI Engineer roles: when the JD emphasizes LLMs, retrieval/RAG, agents, evaluation, AI workflows, REST APIs, integrations, or customer-facing AI systems, give meaningful credit to a TypeScript/Node/React + AI-tooling profile. Python as a primary language is a real stack caveat but not an automatic near-skip when LLM/RAG/API/system-building overlap is strong.
+- Treat "production AI ownership" as a caveat unless the JD clearly requires staff/senior-level ownership or many years of enterprise production ML/AI.
+- Trust rules.financePenalty and rules.traditionalCompanyPenalty booleans from rule evaluation — do not invent finance/banking or traditional-employer screening from generic "enterprise customers" language.
+- NYC / hybrid-in-NYC (when rules show no location mismatch) should boost recruiterFriendliness vs forcing false relocation risk.
 - Output ONE flat JSON object with ONLY the keys listed in the user message — no extra keys, no nested wrapper, no markdown.
 `.trim();
 
@@ -82,6 +86,8 @@ Notes:
 - "score.total" must equal the sum of the seven category scores (integer math).
 - "topMatch" and "mainRisk" must be human-readable strings, not booleans or numbers.
 - Keep rationale decision-useful: first two rationale bullets should be strongest fit reasons; first two risk bullets should be main realistic risks.
+- "risks" must contain distinct angles (no duplicate phrasing of the same gap). Prefer one combined risk when two bullets would repeat (e.g. merge Python-primary vs TS strength into one sentence).
+- Strong applied-AI overlap + viable NYC location + high career value should usually land total score in the 70s even with Python-primary and ownership caveats — reserve recommendation "no" for true hard mismatches (see rule flags), not stacked soft risks.
 - For junior-builder roles, collaboration and growth-potential language are positive but should not be treated as proof of proven internet-scale/data/business-impact ownership.
 - "topMatch" should be a role-specific one-line decision summary tied to concrete JD priorities; avoid generic profile-only phrasing.
 
@@ -101,11 +107,10 @@ ${JSON.stringify(params.scoringPolicy, null, 2)}
 export const resumeSelectionSystemPrompt = `
 Choose one resume type: SWE, SIE, or EARLY_CAREER.
 Rules:
-- Use role shape and expected recruiter screen.
-- Do not choose based only on title.
-- EARLY_CAREER is for explicit junior pipeline pitch, not low score fallback.
-- Junior builder/product/full-stack roles should generally favor EARLY_CAREER or SWE.
-- Reserve SIE for implementation/onboarding/customer-facing integration-heavy role shapes.
+- Default to SWE for normal software engineering and AI / ML engineering roles unless the posting is explicitly early-career.
+- EARLY_CAREER only when the JD is clearly junior/new-grad/entry-level/apprenticeship/rotational/emerging-talent (not merely "AI Engineer" without those signals).
+- Reserve SIE for forward-deployed, solutions engineering, sales engineering, or customer technical consulting / implementation-heavy delivery roles — not for standard product AI engineering.
+- Use role shape and expected recruiter screen; do not choose from title alone.
 - Output valid JSON only.
 `;
 
