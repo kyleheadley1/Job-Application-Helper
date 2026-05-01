@@ -98,9 +98,22 @@ const riskStrength = (risk: string): number => {
 };
 
 const PROOF_BULLET_HINT =
-  /\b(shipped|built|implemented|delivered|owned|project|production|internship|codesmith|flagship|experience|tooling)\b/i;
+  /\b(shipped|built|implemented|delivered|owned|project|production|internship|codesmith|flagship|experience|tooling|led|scaled)\b/i;
+/** Line 1 = strategic fit; avoid treating duplicate LLM/RAG tokens as two independent positives. */
 const CAPABILITY_BULLET_HINT =
-  /\b(overlap|align|match|fit|llm|rag|api|typescript|node|react|full[-\s]?stack|workflow|systems|stack|role)\b/i;
+  /\b(overlap|align|match|fit|role|scope|workflow|systems|stack|readiness|shape|strength)\b/i;
+
+const appliedAiOverlapRe =
+  /\b(llm|rag|vector\s+(search|embedding)|rest\s*api|applied[-\s]?ai)\b/gi;
+
+function dampWhyConsiderSecond(first: string, second: string): string {
+  const f = (first.match(appliedAiOverlapRe) ?? []).length;
+  const s = (second.match(appliedAiOverlapRe) ?? []).length;
+  if (f < 2 || s < 2) return second;
+  let t = second.replace(/^\s*(strong\s+|clear\s+)?(applied[-\s]?ai\s+)?(product\s+)?/i, "");
+  t = t.replace(/\s+/g, " ").trim();
+  return t.length >= 28 ? t : second;
+}
 
 export function selectTopFits(job: JobRecord, n = 2): string[] {
   const items = [job.topMatch, ...job.rationale].map((s) => s.trim()).filter(Boolean);
@@ -116,17 +129,25 @@ export function selectTopFits(job: JobRecord, n = 2): string[] {
     seen.add(key);
     positives.push(cleaned);
   }
-  const capability = positives.find((p) => CAPABILITY_BULLET_HINT.test(p));
-  const proof = positives.find((p) => PROOF_BULLET_HINT.test(p) && p !== capability);
+  const proofCandidates = positives.filter((p) => PROOF_BULLET_HINT.test(p));
+  const nonProof = positives.filter((p) => !PROOF_BULLET_HINT.test(p));
+  const capability =
+    nonProof.find((p) => CAPABILITY_BULLET_HINT.test(p)) ??
+    nonProof[0] ??
+    positives.find((p) => CAPABILITY_BULLET_HINT.test(p));
+  const proof =
+    proofCandidates.find((p) => p !== capability) ?? positives.find((p) => p !== capability);
   const out: string[] = [];
   if (capability) out.push(capability);
-  if (proof) out.push(proof);
+  if (proof && proof !== capability) out.push(dampWhyConsiderSecond(capability ?? "", proof));
   for (const p of positives) {
     if (out.includes(p)) continue;
-    out.push(p);
+    out.push(out.length === 1 ? dampWhyConsiderSecond(out[0], p) : p);
     if (out.length >= n) break;
   }
-  return out.slice(0, n);
+  const slice = out.slice(0, n);
+  if (slice.length === 2) slice[1] = dampWhyConsiderSecond(slice[0], slice[1]);
+  return slice;
 }
 
 export function selectDistinctRisks(job: JobRecord, n = 2): string[] {

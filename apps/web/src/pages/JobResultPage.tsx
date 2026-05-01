@@ -91,7 +91,7 @@ export const JobResultPage = () => {
   if (error) return <p className="error">{error}</p>;
   if (!job) return <p>Loading...</p>;
   const topFits = selectTopFits(job, 2);
-  const topRisks = selectDistinctRisks(job, 3);
+  const topRisks = selectDistinctRisks(job, 2);
   const summaryLine = decisionSummaryLine(job);
   const displayTitle = displayRoleTitle(job.extracted.title);
 

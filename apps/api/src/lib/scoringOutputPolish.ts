@@ -58,6 +58,10 @@ export const profileHasAiToolingEvidence = (profile: UserProfile): boolean => {
 export const extractMaxTravelPercent = (blob: string): number | undefined => {
   let max = 0;
   const patterns: RegExp[] = [
+    /travel\s*[:.]?\s*(\d+)\s*[%％]\s*[-–]\s*(\d+)\s*[%％]/gi,
+    /travel\s+(\d+)\s*[-–]\s*(\d+)\s*[%％]/gi,
+    /(\d+)\s*[%％]\s*[-–]\s*(\d+)\s*[%％]\s*(?:for\s+)?travel/gi,
+    /(\d+)\s*[%％]\s*[-–]\s*(\d+)\s*[%％]\s*annually/gi,
     /travel\s*[:.]?\s*(\d+)\s*[%％]\s*(?:-\s*(\d+)\s*[%％])?/gi,
     /(\d+)\s*[%％]\s*travel/gi,
     /up to\s*(\d+)\s*[%％]\s*travel/gi,
@@ -75,12 +79,30 @@ export const extractMaxTravelPercent = (blob: string): number | undefined => {
   return max > 0 ? max : undefined;
 };
 
+/** Human label when JD states a travel range (e.g. "travel 10–20%"). */
+export const extractTravelRangeLabel = (blob: string): string | undefined => {
+  const r1 = blob.match(/travel\s*[:.]?\s*(\d+)\s*[%％]\s*[-–]\s*(\d+)\s*[%％]/i);
+  if (r1) return `${r1[1]}–${r1[2]}%`;
+  const r1b = blob.match(/travel\s+(\d+)\s*[-–]\s*(\d+)\s*[%％]/i);
+  if (r1b) return `${r1b[1]}–${r1b[2]}%`;
+  const r2 = blob.match(/(\d+)\s*[%％]\s*[-–]\s*(\d+)\s*[%％]\s*(?:for\s+)?travel/i);
+  if (r2) return `${r2[1]}–${r2[2]}%`;
+  return undefined;
+};
+
+/**
+ * Always surface travel % from the JD as a practical risk when detectable.
+ * 25%+ uses stronger wording (high-signal lifestyle blocker).
+ */
 export const travelRiskLine = (blob: string): string | undefined => {
   const pct = extractMaxTravelPercent(blob);
-  if (pct === undefined || pct < 25) return undefined;
-  const range = blob.match(/travel\s*[:.]?\s*(\d+)\s*[%％]\s*[-–]\s*(\d+)\s*[%％]/i);
-  const label = range ? `${range[1]}–${range[2]}%` : `~${pct}%`;
-  return `Significant travel (${label}); confirm it fits your lifestyle vs hybrid/office cadence.`;
+  if (pct === undefined) return undefined;
+  const rangeLabel = extractTravelRangeLabel(blob);
+  const label = rangeLabel ?? `~${pct}%`;
+  if (pct >= 25) {
+    return `Significant travel (${label}); confirm it fits your lifestyle vs hybrid/office cadence.`;
+  }
+  return `Travel requirement (${label}); confirm it fits your schedule and hybrid/office expectations.`;
 };
 
 const tokenSet = (s: string): Set<string> =>
@@ -123,16 +145,48 @@ const riskPriority = (risk: string, jdBlob: string): number => {
     return 84;
   }
   let p = 50;
+  // Decision-blocker order: language/stack → level/ownership → travel (25%+) → travel (lower) → onsite/hybrid
   if (/\bpython\b/.test(t) && /\b(type ?script|javascript|node|primary|first)\b/.test(t)) p = 100;
-  else if (/\b(stack|language|framework|go\b|ruby|java(?!script))\b/.test(t)) p = 95;
-  if (/\b(senior|staff|principal|ownership|years of|leadership scope|enterprise production ai)\b/.test(t)) p = Math.max(p, 92);
-  if (/\btravel\b/.test(t)) p = Math.max(p, 88);
-  if (/\b(onsite|in[-\s]?office|days?\s+per\s+week|relocation|commute)\b/.test(t)) p = Math.max(p, 82);
+  else if (/\b(stack|language|framework|go\b|ruby|java(?!script))\b/.test(t)) p = 96;
+  if (/\b(senior|staff|principal|ownership|years of|leadership scope|enterprise production ai)\b/.test(t))
+    p = Math.max(p, 94);
+  if (/\btravel\b/.test(t)) {
+    const maxT = extractMaxTravelPercent(jdBlob);
+    p = Math.max(p, maxT !== undefined && maxT >= 25 ? 90 : 86);
+  }
+  if (/\b(onsite|in[-\s]?office|days?\s+per\s+week|relocation|commute|hybrid)\b/.test(t)) p = Math.max(p, 83);
   if (/\b(degree|bachelor|clearance|citizenship|sponsorship)\b/.test(t)) p = Math.max(p, 78);
   if (isLowSignalEnterpriseDomainRisk(risk, jdBlob)) p = Math.min(p, 15);
   if (/\b(required|must|hard)\b/.test(t)) p += 5;
   return p;
 };
+
+/** Practical = lifestyle/logistics; technical = stack, level, ownership, gates. */
+export const riskBucket = (risk: string): "technical" | "practical" =>
+  /\b(travel|onsite|hybrid|in[-\s]?office|commute|relocation|timezone|days?\s+per\s+week|office\s+days|lifestyle)\b/i.test(
+    risk,
+  )
+    ? "practical"
+    : "technical";
+
+/** Prefer top priority first, then one from the other bucket when possible (hiring-manager scan). */
+export function pickBalancedRiskOrder(sorted: string[], max: number): string[] {
+  if (sorted.length === 0) return [];
+  if (max <= 1) return [sorted[0]];
+  const main = sorted[0];
+  const wantOther = riskBucket(main) === "technical" ? "practical" : "technical";
+  const second =
+    sorted.slice(1).find((r) => riskBucket(r) === wantOther && !similarSentence(r, main)) ??
+    sorted.slice(1).find((r) => !similarSentence(r, main));
+  const out: string[] = [main];
+  if (second) out.push(second);
+  for (const r of sorted) {
+    if (out.length >= max) break;
+    if (out.some((x) => similarSentence(x, r))) continue;
+    out.push(r);
+  }
+  return out.slice(0, max);
+}
 
 const uniqueRisks = (items: string[]): string[] => {
   const out: string[] = [];
@@ -170,17 +224,38 @@ export function polishRisksAndMain(params: {
   );
   const filtered = merged.filter((r) => !isLowSignalEnterpriseDomainRisk(r, jdBlob));
   const sorted = [...filtered].sort((a, b) => riskPriority(b, jdBlob) - riskPriority(a, jdBlob));
-  const top = sorted.slice(0, max);
+  const top = pickBalancedRiskOrder(sorted, max);
   const fallbackMain =
     params.mainRisk.trim() || "Recruiter-screen realism; confirm fit in conversation.";
   return {
     mainRisk: top[0] ?? fallbackMain,
-    risks: top.length ? top.slice(1) : [],
+    risks: top.length > 1 ? top.slice(1) : [],
   };
 }
 
-const PROOF_HINT = /\b(shipped|built|implemented|delivered|owned|codesmith|project|production|internship|experience|profile|flagship)\b/i;
-const CAPABILITY_HINT = /\b(overlap|align|match|fit|stack|llm|rag|api|typescript|node|react|full[-\s]?stack|workflow|systems)\b/i;
+const PROOF_HINT =
+  /\b(shipped|built|implemented|delivered|owned|codesmith|project|production|internship|experience|profile|flagship|led|scaled)\b/i;
+/** Capability / fit angle (avoid treating proof verbs as the primary "why" line). */
+const CAPABILITY_HINT =
+  /\b(overlap|align|match|fit|role|scope|stack|workflow|systems|shape|readiness|strength)\b/i;
+
+const appliedAiTriple =
+  /\b(llm|rag|vector\s+(search|embedding)|rest\s*api|api\s+integration|applied[-\s]?ai)\b/gi;
+
+/** Reduce repeated LLM/RAG/API clusters across the two "why consider" lines. */
+export function dampDuplicateAppliedAiPhrasing(first: string, second: string): string {
+  let b = second.trim();
+  const hitsFirst = (first.match(appliedAiTriple) ?? []).length;
+  const hitsSecond = (b.match(appliedAiTriple) ?? []).length;
+  if (hitsFirst < 2 || hitsSecond < 2) return b;
+  b = b.replace(/^\s*(strong\s+|clear\s+)?(applied[-\s]?ai\s+)?(product\s+)?/i, "");
+  b = b.replace(/\b(via|from|including)\s+[^,.]+(?:llm|rag|api)[^.]*\.?/i, (m) =>
+    /\b(shipped|built|owned|delivered)\b/i.test(m) ? m : "",
+  );
+  b = b.replace(/\s*\.?\s*$/, "");
+  if (b.length < 28) return second.trim();
+  return b.replace(/^,\s*/, "").trim();
+}
 
 /** Trim trailing commas, fix clipped applied-AI summary lines, avoid sentence fragments. */
 export function sanitizeNarrativeSentence(text: string, minLen = 55): string {
@@ -194,24 +269,38 @@ export function sanitizeNarrativeSentence(text: string, minLen = 55): string {
   return t.replace(/,\s*$/, "").trim();
 }
 
-export function polishRationaleBullets(rationale: string[], max = 3): string[] {
+export function polishRationaleBullets(rationale: string[], max = 2): string[] {
   const items = rationale.map((s) => sanitizeNarrativeSentence(s.trim())).filter(Boolean);
   const deduped: string[] = [];
   for (const item of items) {
     if (deduped.some((d) => similarSentence(d, item))) continue;
     deduped.push(item);
   }
-  const proof = deduped.find((r) => PROOF_HINT.test(r));
-  const capability = deduped.find((r) => CAPABILITY_HINT.test(r) && r !== proof);
+  const proofLines = deduped.filter((r) => PROOF_HINT.test(r));
+  const nonProof = deduped.filter((r) => !PROOF_HINT.test(r));
+  const capability =
+    nonProof.find((r) => CAPABILITY_HINT.test(r)) ??
+    nonProof[0] ??
+    deduped.find((r) => CAPABILITY_HINT.test(r)) ??
+    deduped[0];
+  const proof =
+    proofLines.find((p) => p !== capability && !similarSentence(p, capability)) ??
+    deduped.find((r) => r !== capability);
+
   const out: string[] = [];
   if (capability) out.push(capability);
-  if (proof && proof !== capability) out.push(proof);
+  if (proof && proof !== capability) out.push(dampDuplicateAppliedAiPhrasing(capability, proof));
   for (const r of deduped) {
-    if (out.includes(r)) continue;
-    out.push(r);
     if (out.length >= max) break;
+    const adj = out.length === 1 && out[0] ? dampDuplicateAppliedAiPhrasing(out[0], r) : r;
+    if (out.some((x) => x === r || similarSentence(x, adj))) continue;
+    out.push(adj);
   }
-  return out.slice(0, max).map((s) => sanitizeNarrativeSentence(s));
+  const sliced = out.slice(0, max).map((s) => sanitizeNarrativeSentence(s));
+  if (sliced.length === 2) {
+    sliced[1] = sanitizeNarrativeSentence(dampDuplicateAppliedAiPhrasing(sliced[0], sliced[1]));
+  }
+  return sliced;
 }
 
 /** Raise domain fit when JD + profile show direct applied-AI overlap (unless hard domain mismatch). */
@@ -304,9 +393,9 @@ export function polishScoringNarrative(params: {
     risks: params.narrative.risks,
     extracted: params.extracted,
     travelLine,
-    max: 3,
+    max: 2,
   });
-  const rationale = polishRationaleBullets(params.narrative.rationale, 3);
+  const rationale = polishRationaleBullets(params.narrative.rationale, 2);
   const rawTop = params.narrative.topMatch?.trim() ?? "";
   const topMatch = rawTop ? sanitizeNarrativeSentence(rawTop, 50) : rawTop;
   let score = applyAppliedAiDomainFloor({
