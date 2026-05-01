@@ -39,6 +39,12 @@ describe("scoringOutputPolish", () => {
     expect(travelRiskLine("occasional travel under 20%")).toBeUndefined();
   });
 
+  it("always surfaces JD travel ranges (including under 25%) as a practical risk line", () => {
+    const jd = "Role requires travel 10–20% for quarterly onsite reviews.";
+    expect(extractMaxTravelPercent(jd)).toBe(20);
+    expect(travelRiskLine(jd)).toMatch(/Travel requirement \(10[-–]20%\)/);
+  });
+
   it("raises domain floor when JD and profile show applied AI overlap", () => {
     const extracted: ExtractedJobData = {
       company: "Co",
@@ -115,7 +121,7 @@ describe("scoringOutputPolish", () => {
       risks: ["Python is the primary language while profile leads with TypeScript.", "Role expects staff-level ownership of ML platform."],
       extracted,
       travelLine: travelRiskLine("python primary 25-40% travel to clients"),
-      max: 3,
+      max: 2,
     });
     expect(mainRisk.toLowerCase()).not.toContain("enterprise domain");
     expect([mainRisk, ...risks].some((r) => /python|typescript|travel/i.test(r))).toBe(true);
