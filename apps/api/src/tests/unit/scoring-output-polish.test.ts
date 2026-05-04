@@ -3,8 +3,10 @@ import {
   applyAppliedAiStackFunctionalCalibration,
   applyAppliedAiDomainFloor,
   applyFdeBuilderScoreCalibration,
+  applyVagueEarlyStageAiCalibration,
   extractMaxTravelPercent,
   jdHasAppliedAiSystemsOverlap,
+  jdIsStructurallyVague,
   polishRisksAndMain,
   profileHasAiToolingEvidence,
   sanitizeNarrativeSentence,
@@ -30,6 +32,8 @@ const baseRules = (): RuleEvaluation => ({
   domainMismatch: false,
   startupFounderMismatch: false,
   fdeBuilderSoftwarePrimary: false,
+  vagueEarlyStageAiCalibration: false,
+  hardRuleNotes: [],
   notes: [],
   penaltyVector: {},
 });
@@ -197,6 +201,51 @@ describe("scoringOutputPolish", () => {
       rules: { ...baseRules(), fdeBuilderSoftwarePrimary: true },
     });
     expect(next).toEqual(score);
+  });
+
+  it("detects structurally vague applied-AI JDs", () => {
+    const extracted: ExtractedJobData = {
+      company: "StealthCo",
+      title: "AI Engineer Intern",
+      stack: ["Python"],
+      requiredSkills: [],
+      preferredSkills: [],
+      domainTags: [],
+      responsibilities: ["Support AI initiatives.", "Ship small features."],
+      requirements: [],
+      rawText: "Remote US seed startup. Generative AI. Fast learners.",
+    };
+    expect(jdHasAppliedAiSystemsOverlap(extracted.rawText ?? "")).toBe(true);
+    expect(jdIsStructurallyVague(extracted)).toBe(true);
+  });
+
+  it("applyVagueEarlyStageAiCalibration trims inflated scores", () => {
+    const inflated = {
+      stackFit: 22,
+      levelFit: 12,
+      domainFit: 9,
+      resumeStoryClarity: 14,
+      functionalOverlap: 9,
+      recruiterFriendliness: 13,
+      careerValue: 9,
+      total: 88,
+    };
+    const next = applyVagueEarlyStageAiCalibration({
+      score: inflated,
+      extracted: {
+        company: "X",
+        title: "AI",
+        stack: [],
+        requiredSkills: [],
+        preferredSkills: [],
+        domainTags: [],
+        responsibilities: [],
+        requirements: [],
+      },
+      rules: { ...baseRules(), vagueEarlyStageAiCalibration: true, stackMismatch: true },
+    });
+    expect(next.total).toBeLessThanOrEqual(84);
+    expect(next.recruiterFriendliness).toBeLessThanOrEqual(10);
   });
 
   it("applyFdeBuilderScoreCalibration caps inflated totals around the mid-80s", () => {

@@ -14,6 +14,10 @@ import {
   isMatureStructuredEmployer,
 } from '../../lib/coreLanguageRequirements.js';
 import { isFdeBuilderSoftwarePrimaryShape } from '../../lib/fdeBuilderRole.js';
+import {
+  jdHasAppliedAiSystemsOverlap,
+  jdIsStructurallyVague,
+} from '../../lib/scoringOutputPolish.js';
 
 const includesAny = (haystack: string, needles: string[]): boolean =>
   needles.some((needle) => haystack.includes(needle));
@@ -169,9 +173,6 @@ export const evaluateRules = (
       isTraditionalCompany || strictNewGradPipeline
         ? scoringPolicy.hardPenalties.degreeRequiredTraditional
         : scoringPolicy.hardPenalties.degreeRequiredGeneral;
-    notes.push(
-      'Explicit degree requirement may be a first-pass recruiter filter.',
-    );
   }
   if (isTraditionalCompany) {
     penaltyVector.traditional = 4;
@@ -201,7 +202,6 @@ export const evaluateRules = (
   }
   if (locationMismatch) {
     penaltyVector.location = scoringPolicy.hardPenalties.locationMismatch;
-    notes.push('Onsite/hybrid requirement appears non-commutable.');
   }
   if (visaMismatch) {
     penaltyVector.visa = scoringPolicy.hardPenalties.sponsorshipMismatch;
@@ -246,8 +246,41 @@ export const evaluateRules = (
     matureStructuredEmployer &&
     coreLang.explicitHardRequirement &&
     !coreLang.candidateHasProductionLanguage;
+  const knownStrongEmployer =
+    /\b(google|alphabet|meta|facebook|amazon|aws|microsoft|apple|netflix|uber|spotify|salesforce|oracle|ibm|stripe|airbnb|databricks|palantir|openai|anthropic|goldman|jpmorgan|jp\s*morgan|bloomberg)\b/i.test(
+      companyNorm,
+    );
+  const startupOrWeakEmployerShape =
+    /\b(seed|series\s+[ab]|pre-seed|stealth|early-stage|early stage|startup|founding team|y\s*combinator|yc\s*backed)\b/i.test(
+      combinedText,
+    );
+  const unknownWeakEmployer =
+    !knownStrongEmployer && (startupOrWeakEmployerShape || companyNorm.length < 36);
+  const entryLevelAiSignals =
+    earlyCareerFriendlyRole ||
+    (job.yearsExperience?.min ?? 99) <= 2 ||
+    /\b(intern|internship|associate\s+engineer|junior|entry[-\s]?level)\b/i.test(combinedText);
+  const vagueEarlyStageAiCalibration =
+    !harshEmployerContext &&
+    jdHasAppliedAiSystemsOverlap(combinedText) &&
+    jdIsStructurallyVague(job) &&
+    unknownWeakEmployer &&
+    entryLevelAiSignals;
+  if (vagueEarlyStageAiCalibration) {
+    notes.push(
+      'Vague or thin JD for an entry-level AI posting at a non-name employer — scores calibrated down for generic-posting inflation.',
+    );
+  }
+
+  const hardRuleNotes: string[] = [];
+  if (locationMismatch) {
+    hardRuleNotes.push('Onsite/hybrid requirement appears non-commutable.');
+  }
+  if (explicitDegreeRisk) {
+    hardRuleNotes.push('Explicit degree requirement may be a first-pass recruiter filter.');
+  }
   if (explicitCoreLanguageMismatch && coreLang.language) {
-    notes.push(explicitCoreLanguageRiskSummary(coreLang.language));
+    hardRuleNotes.push(explicitCoreLanguageRiskSummary(coreLang.language));
   }
 
   return {
@@ -269,6 +302,8 @@ export const evaluateRules = (
     explicitCoreLanguageMismatch,
     explicitCoreLanguage: explicitCoreLanguageMismatch ? coreLang.language : null,
     fdeBuilderSoftwarePrimary,
+    vagueEarlyStageAiCalibration,
+    hardRuleNotes,
     notes: [...new Set(notes)],
     penaltyVector,
   };

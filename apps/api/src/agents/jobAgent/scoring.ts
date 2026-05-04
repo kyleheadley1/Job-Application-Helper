@@ -187,12 +187,13 @@ const deterministicFallback = (
     },
     recommendation,
     topMatch: 'Backend-leaning product engineering and API overlap.',
-    mainRisk: rules.notes[0] ?? 'Recruiter screen realism risk.',
+    mainRisk:
+      rules.hardRuleNotes?.[0] ?? rules.notes[0] ?? 'Recruiter screen realism risk.',
     rationale: [
       'Score uses conservative fit plus recruiter-screen realism.',
       'Deterministic penalties are applied when hard gates are present.',
     ],
-    risks: rules.notes,
+    risks: [...(rules.hardRuleNotes ?? []), ...rules.notes],
   };
 };
 

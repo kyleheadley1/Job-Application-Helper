@@ -44,6 +44,8 @@ export type RuleEvaluation = {
   explicitCoreLanguageMismatch?: boolean;
   explicitCoreLanguage?: string | null;
   fdeBuilderSoftwarePrimary?: boolean;
+  vagueEarlyStageAiCalibration?: boolean;
+  hardRuleNotes?: string[];
   notes: string[];
 };
 

@@ -1,5 +1,7 @@
 import type { ExtractedJobData } from "../../types/job.js";
 import type { Recommendation, RuleEvaluation, SalaryAsk, ScoreBreakdown } from "../../types/scoring.js";
+import { normalizeText } from "../../lib/text.js";
+import { jdHasAppliedAiSystemsOverlap } from "../../lib/scoringOutputPolish.js";
 
 export const computeSalaryAsk = (params: {
   extracted: ExtractedJobData;
@@ -49,9 +51,53 @@ export const computeSalaryAsk = (params: {
     return { number: ask, rangeMin: postedMin, rangeMax: postedMax };
   }
 
+  const impliedBlob = normalizeText(
+    [
+      job.title,
+      job.rawText ?? "",
+      job.seniority ?? "",
+      job.location ?? "",
+      ...(job.stack ?? []),
+      ...(job.requirements ?? []),
+      ...(job.responsibilities ?? []),
+    ].join(" "),
+  );
+
+  const entryLevelAiShape =
+    rules.earlyCareerFriendlyRole ||
+    (job.yearsExperience?.min ?? 99) <= 2 ||
+    /\b(intern|junior|entry[-\s]?level|associate\s+engineer)\b/i.test(impliedBlob);
+
+  const remoteUsShape =
+    /\b(remote|anywhere(\s+in)?\s+the\s+us|work\s+from\s+home|wfh)\b/i.test(impliedBlob) &&
+    /\b(us|u\.s\.|united states|usa)\b/i.test(impliedBlob);
+
+  const explicitlyLowPayingPosted =
+    typeof postedMax === "number" && postedMax > 0 && postedMax < 115_000;
+
+  if (
+    entryLevelAiShape &&
+    jdHasAppliedAiSystemsOverlap(impliedBlob) &&
+    remoteUsShape &&
+    !rules.financePenalty &&
+    !rules.traditionalCompanyPenalty &&
+    !explicitlyLowPayingPosted
+  ) {
+    const mid = 127_500;
+    return { number: mid, rangeMin: 120_000, rangeMax: 135_000 };
+  }
+
   let base = 120000;
   if ((job.yearsExperience?.min ?? 0) <= 2 || (job.seniority ?? "").toLowerCase().includes("junior")) {
-    base = 105000;
+    if (
+      jdHasAppliedAiSystemsOverlap(impliedBlob) &&
+      !rules.financePenalty &&
+      !rules.traditionalCompanyPenalty
+    ) {
+      base = 120000;
+    } else {
+      base = 105000;
+    }
   }
   if (rules.financePenalty || rules.traditionalCompanyPenalty) base -= 5000;
   if (recommendation === "no") base -= 10000;

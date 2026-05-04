@@ -150,6 +150,21 @@ export function selectTopFits(job: JobRecord, n = 2): string[] {
   return slice;
 }
 
+/** Merge LLM-scored risks with soft rule notes (hard gates use `rules.hardRuleNotes` separately). */
+export function buildKeyRisks(job: JobRecord, max = 5): string[] {
+  const fromLlm = selectDistinctRisks(job, 2);
+  const out = [...fromLlm];
+  const seen = new Set(out.map((s) => normalizeText(s)));
+  for (const n of job.rules.notes) {
+    const k = normalizeText(n);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(n);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 export function selectDistinctRisks(job: JobRecord, n = 2): string[] {
   const baseItems = [job.mainRisk, ...job.risks].map((s) => s.trim()).filter(Boolean);
   const items: string[] = [];

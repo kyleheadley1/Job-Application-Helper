@@ -59,6 +59,43 @@ export const profileHasAiToolingEvidence = (profile: UserProfile): boolean => {
   );
 };
 
+/** JD names concrete RAG/LLM/vector/agent systems AND profile backs that lane (not generic "AI" only). */
+export const jdExplicitProfileAiDomainOverlap = (blob: string, profile: UserProfile): boolean => {
+  if (!jdHasAppliedAiSystemsOverlap(blob)) return false;
+  const jdSpecific = /\b(rag\b|retrieval|llm|vector\s+(search|db|database)|embedding|agentic|evals?\b|ai workflow)\b/i.test(
+    blob,
+  );
+  return jdSpecific && profileHasAiToolingEvidence(profile);
+};
+
+/**
+ * Applied-AI-shaped JD that is thin on concrete stack, responsibilities, and system surface area.
+ * Used to damp "generic AI startup" score inflation.
+ */
+export const jdIsStructurallyVague = (extracted: ExtractedJobData): boolean => {
+  const blob = jobTextBlob(extracted);
+  if (!jdHasAppliedAiSystemsOverlap(blob)) return false;
+  const stacks = [...(extracted.stack ?? []), ...(extracted.requiredSkills ?? [])].join(" ").toLowerCase();
+  const stackTokenHits =
+    (stacks.match(
+      /\b(python|typescript|javascript|java|go|rust|react|vue|angular|node\.?js|kubernetes|docker|postgres|graphql|grpc|fastapi|django|flask)\b/gi,
+    ) ?? []).length;
+  const hasConcreteStack =
+    (extracted.stack?.length ?? 0) + (extracted.requiredSkills?.length ?? 0) >= 2 || stackTokenHits >= 2;
+  const bullets = extracted.responsibilities ?? [];
+  const substantive = bullets.filter((b) => b.trim().length > 38).length;
+  const hasSpecificResponsibilities = substantive >= 2 || bullets.length >= 4;
+  const hasSystemTypes =
+    /\b(rest\s*api|graphql|grpc|microservice|kubernetes|k8s|infra|database|postgres|mysql|inference|training|pipeline|rag\b|llm|embedding|vector|retrieval|agents?|evals?|distributed|observability|backend\s+service)\b/i.test(
+      blob,
+    );
+  const thinDetail = blob.length < 720;
+  const fewBullets = bullets.length <= 2;
+  const fewStack = (extracted.stack?.length ?? 0) + (extracted.requiredSkills?.length ?? 0) <= 1;
+  if (thinDetail && fewBullets && fewStack && !hasSystemTypes) return true;
+  return thinDetail && (!hasConcreteStack || !hasSpecificResponsibilities || !hasSystemTypes);
+};
+
 /** Max travel % mentioned in JD; used for lifestyle risk. */
 export const extractMaxTravelPercent = (blob: string): number | undefined => {
   let max = 0;
@@ -370,6 +407,14 @@ export function applyAppliedAiDomainFloor(params: {
   if (rules.domainMismatch) return score;
   const blob = jobTextBlob(extracted);
   if (!jdHasAppliedAiSystemsOverlap(blob) || !profileHasAiToolingEvidence(userProfile)) return score;
+  if (rules.vagueEarlyStageAiCalibration) {
+    const explicit = jdExplicitProfileAiDomainOverlap(blob, userProfile);
+    let domainFit = Math.min(score.domainFit, explicit ? 8 : 7);
+    domainFit = Math.max(0, domainFit);
+    if (domainFit === score.domainFit) return score;
+    const next = { ...score, domainFit };
+    return { ...next, total: sumScoreParts(next) };
+  }
   let domainFit = score.domainFit;
   if (domainFit < 7) domainFit = 7;
   else if (domainFit === 7 && /\b(agent|agents|evaluation|evals)\b/i.test(blob)) domainFit = 8;
@@ -395,6 +440,8 @@ export function applyAppliedAiStackFunctionalCalibration(params: {
   if (rules.explicitCoreLanguageMismatch) return score;
   /** Builder-first FDE / growth roles: post-process caps scores; skip stack inflation here. */
   if (rules.fdeBuilderSoftwarePrimary) return score;
+  /** Generic thin AI startup JDs: do not inflate stack/functional from broad AI overlap alone. */
+  if (rules.vagueEarlyStageAiCalibration) return score;
   const blob = jobTextBlob(extracted);
   if (!jdHasAppliedAiSystemsOverlap(blob) || !profileHasAiToolingEvidence(userProfile)) return score;
 
@@ -532,6 +579,69 @@ export function applyFdeBuilderScoreCalibration(params: {
   return { ...next, total };
 }
 
+const KNOWN_STRONG_EMPLOYER_RE =
+  /\b(google|alphabet|meta|facebook|amazon|aws|microsoft|apple|netflix|uber|spotify|salesforce|oracle|ibm|stripe|airbnb|databricks|palantir|openai|anthropic|goldman|jpmorgan|jp\s*morgan|bloomberg)\b/i;
+
+/**
+ * Vague entry-level applied-AI startup posting: small total trim, recruiter cap, domain already handled in domain pass.
+ */
+export function applyVagueEarlyStageAiCalibration(params: {
+  score: ScoreBreakdown;
+  extracted: ExtractedJobData;
+  rules: RuleEvaluation;
+}): ScoreBreakdown {
+  if (!params.rules.vagueEarlyStageAiCalibration) return params.score;
+  const blob = jobTextBlob(params.extracted);
+  const strongCompany = KNOWN_STRONG_EMPLOYER_RE.test(normalizeText(params.extracted.company ?? ""));
+  const stackStrong = !params.rules.stackMismatch && params.score.stackFit >= 19;
+  const referralSignal = /\b(referral|employee referral|internal referral)\b/i.test(blob);
+  const escapeRecruiterCap = strongCompany || stackStrong || referralSignal;
+
+  let next = { ...params.score };
+  if (!escapeRecruiterCap) {
+    next.recruiterFriendliness = Math.min(next.recruiterFriendliness, 10);
+  }
+  type Dim = keyof Omit<ScoreBreakdown, "total">;
+  const order: Dim[] = [
+    "stackFit",
+    "functionalOverlap",
+    "careerValue",
+    "levelFit",
+    "resumeStoryClarity",
+    "recruiterFriendliness",
+    "domainFit",
+  ];
+  const mins: Partial<Record<Dim, number>> = {
+    stackFit: 12,
+    functionalOverlap: 5,
+    careerValue: 5,
+    levelFit: 6,
+    resumeStoryClarity: 10,
+    recruiterFriendliness: 7,
+    domainFit: 5,
+  };
+
+  let total = sumScoreParts(next);
+  let targetDrop = 4;
+  let guard = 0;
+  while (total > 0 && targetDrop > 0 && guard < 40) {
+    guard += 1;
+    let progressed = false;
+    for (const key of order) {
+      const minV = mins[key] ?? 0;
+      if (next[key] > minV) {
+        next = { ...next, [key]: (next[key] as number) - 1 } as ScoreBreakdown;
+        total = sumScoreParts(next);
+        targetDrop -= 1;
+        progressed = true;
+        break;
+      }
+    }
+    if (!progressed) break;
+  }
+  return { ...next, total };
+}
+
 export function appendMatureLanguageShotGuidance(topMatch: string, rules: RuleEvaluation): string {
   if (!rules.explicitCoreLanguageMismatch || !rules.matureStructuredEmployer) return topMatch;
   const lab =
@@ -580,6 +690,11 @@ export function polishScoringNarrative(params: {
   });
   score = applyMatureExplicitLanguageCalibration({ score, rules: params.rules });
   score = applyFdeBuilderScoreCalibration({ score, rules: params.rules });
+  score = applyVagueEarlyStageAiCalibration({
+    score,
+    extracted: params.extracted,
+    rules: params.rules,
+  });
   const rawTop = params.narrative.topMatch?.trim() ?? "";
   const topMatch = appendMatureLanguageShotGuidance(
     rawTop ? sanitizeNarrativeSentence(rawTop, 50) : rawTop,

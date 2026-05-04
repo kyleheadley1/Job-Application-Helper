@@ -6,7 +6,7 @@ import { ScoreBadge } from "../components/ScoreBadge";
 import { StatusBadge } from "../components/StatusBadge";
 import { JsonPanel } from "../components/JsonPanel";
 import { salaryAskLabel } from "../lib/jobDisplay";
-import { decisionSummaryLine, displayRoleTitle, selectDistinctRisks, selectTopFits } from "../lib/resultSummary";
+import { buildKeyRisks, decisionSummaryLine, displayRoleTitle, selectTopFits } from "../lib/resultSummary";
 
 type AssetTab = "cover" | "why" | "points" | "bullets" | "raw";
 
@@ -91,7 +91,8 @@ export const JobResultPage = () => {
   if (error) return <p className="error">{error}</p>;
   if (!job) return <p>Loading...</p>;
   const topFits = selectTopFits(job, 2);
-  const topRisks = selectDistinctRisks(job, 2);
+  const topRisks = buildKeyRisks(job, 5);
+  const hardRules = job.rules.hardRuleNotes ?? [];
   const summaryLine = decisionSummaryLine(job);
   const displayTitle = displayRoleTitle(job.extracted.title);
 
@@ -144,7 +145,11 @@ export const JobResultPage = () => {
             <li>Career value: {job.score.careerValue}/10</li>
           </ul>
           <h4>Hard-rule flags</h4>
-          <ul>{job.rules.notes.map((note) => <li key={note}>{note}</li>)}</ul>
+          {hardRules.length ? (
+            <ul>{hardRules.map((note) => <li key={note}>{note}</li>)}</ul>
+          ) : (
+            <p className="muted">None identified.</p>
+          )}
         </article>
       </div>
 
