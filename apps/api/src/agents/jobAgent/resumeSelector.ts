@@ -10,6 +10,12 @@ import { responsesClient } from "../../services/llm/responsesClient.js";
 import { buildResumeSelectionPrompt, resumeSelectionSystemPrompt } from "./prompts.js";
 import { normalizeText } from "../../lib/text.js";
 import { logger } from "../../lib/logger.js";
+import {
+  countStrongSieRoleDescriptorHits,
+  fdeSweAlternateSieNote,
+  hasBuilderFirstSoftwareContext,
+  isFdeBuilderSoftwarePrimaryShape,
+} from "../../lib/fdeBuilderRole.js";
 
 const ResumeSelectionSchema = z.object({
   recommendedResume: z.enum(["SWE", "SIE", "EARLY_CAREER"]),
@@ -29,25 +35,7 @@ const deterministicResumeSelection = (
       (job.responsibilities ?? []).join(" "),
     ].join(" "),
   );
-  const sieSignals = [
-    "forward deployed",
-    "solutions engineer",
-    "sales engineer",
-    "customer-facing implementation",
-    "implementation",
-    "integrations",
-    "customer deployment",
-    "technical onboarding",
-    "solution design",
-    "delivery timelines",
-    "integration timelines",
-    "partner engineering",
-    "pre-sales",
-    "post-sales",
-    "api integration",
-    "workflow implementation",
-    "technical implementation",
-  ];
+  /** Do not treat title-only "Forward Deployed" or generic "implementation" as SIE; see countStrongSieRoleDescriptorHits. */
   const explicitEarlyPipeline =
     /\b(new grad|new graduate|entry[-\s]?level|early[-\s]?career|\bjunior\b|software engineer i\b|swe i\b|intern\b|apprentice|rotational program|rotation program|0\s*[-–]\s*2\s+years|university graduate program)\b/i.test(
       text,
@@ -63,6 +51,11 @@ const deterministicResumeSelection = (
     "ai engineer",
     "machine learning engineer",
     "applied ai",
+    "internal tooling",
+    "internal tools",
+    "growth systems",
+    "automation",
+    "growth engineer",
   ];
   const juniorBuilderSignals = [
     "junior",
@@ -77,7 +70,8 @@ const deterministicResumeSelection = (
     "internal tools",
   ];
 
-  const sieHits = sieSignals.filter((needle) => text.includes(needle)).length;
+  const strongSieHits = countStrongSieRoleDescriptorHits(text);
+  const fdeBuilderPrimary = isFdeBuilderSoftwarePrimaryShape(job);
   const earlyHits = explicitEarlyPipeline
     ? earlySignals.filter((needle) => text.includes(needle)).length + 2
     : earlySignals.filter((needle) => text.includes(needle)).length;
@@ -108,7 +102,7 @@ const deterministicResumeSelection = (
 
   const combinedByType: Record<ResumeType, number> = {
     SWE: metaScoreByType.SWE * 2 + sweHits,
-    SIE: metaScoreByType.SIE * 2 + sieHits,
+    SIE: metaScoreByType.SIE * 2 + strongSieHits,
     EARLY_CAREER: metaScoreByType.EARLY_CAREER * 2 + earlyHits,
   };
 
@@ -125,16 +119,24 @@ const deterministicResumeSelection = (
   ) {
     combinedByType.EARLY_CAREER += 5;
   }
-  if (juniorBuilderHits > 0 && sieHits < 2 && explicitEarlyPipeline) {
+  if (juniorBuilderHits > 0 && strongSieHits < 2 && explicitEarlyPipeline) {
     combinedByType.SWE += 2;
     combinedByType.EARLY_CAREER += 2;
     combinedByType.SIE -= 2;
-  } else if (juniorBuilderHits > 0 && sieHits < 2 && !explicitEarlyPipeline) {
+  } else if (juniorBuilderHits > 0 && strongSieHits < 2 && !explicitEarlyPipeline) {
     combinedByType.SWE += 2;
     combinedByType.EARLY_CAREER = Math.min(combinedByType.EARLY_CAREER, 1);
   }
 
-  if (sieHits >= 2 && /customer[-\s]?facing|onboarding|implementation|integration/.test(text)) {
+  if (fdeBuilderPrimary) {
+    combinedByType.SWE += 5;
+    combinedByType.SIE -= 4;
+    if (hasBuilderFirstSoftwareContext(text)) {
+      combinedByType.SWE += 2;
+    }
+  }
+
+  if (strongSieHits >= 2 && /customer[-\s]?facing|onboarding|implementation|integration/.test(text)) {
     combinedByType.SIE += 2;
   }
   const ordered = (Object.entries(combinedByType) as Array<[ResumeType, number]>).sort((a, b) => b[1] - a[1]);
@@ -142,10 +144,15 @@ const deterministicResumeSelection = (
   const recommendedResume: ResumeType = ordered[0]?.[0] ?? "SWE";
 
   const profile = resumeProfiles.find((r) => r.type === recommendedResume);
+  const baseRationale = profile?.exampleRationale ?? ["Resume selected from stable role-shape heuristics."];
+  const rationale =
+    recommendedResume === "SWE" && fdeBuilderPrimary
+      ? [...baseRationale, fdeSweAlternateSieNote]
+      : baseRationale;
   return {
     recommendedResume,
     confidence: ambiguous ? 0.62 : 0.84,
-    rationale: profile?.exampleRationale ?? ["Resume selected from stable role-shape heuristics."],
+    rationale,
     ambiguous,
   };
 };

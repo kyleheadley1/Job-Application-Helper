@@ -12,8 +12,8 @@ export const resumeProfiles: ResumeProfile[] = [
       "API/platform applications",
     ],
     avoidFor: [
-      "Forward-deployed customer implementation",
-      "Pure solutions onboarding and delivery consulting",
+      "Misreading 'Forward Deployed Engineer' as pure solutions consulting when the JD is builder-first software",
+      "Pure external customer implementation roles where SIE is the primary screen story",
     ],
     summaryStyle: "Backend-leaning product engineer who ships practical full-stack systems.",
     emphasisKeywords: ["TypeScript", "Node.js", "React", "APIs", "product engineering", "internal tools"],
@@ -26,13 +26,13 @@ export const resumeProfiles: ResumeProfile[] = [
     type: "SIE",
     label: "Solutions & Implementation Engineering",
     bestFor: [
-      "Forward deployed roles",
-      "Solutions engineering-ish roles",
-      "Customer-facing implementation",
-      "Integrations and delivery",
-      "Technical implementation bridging business and engineering",
+      "External customer implementation and enterprise integrations",
+      "Sales engineering, solutions engineering, and technical consulting delivery",
+      "Post-sales deployment and customer onboarding owned by the implementation team",
     ],
-    avoidFor: ["Deep product feature ownership with minimal customer implementation context"],
+    avoidFor: [
+      "Builder-first forward-deployed roles that are mostly internal tooling, product engineering, or growth/automation systems",
+    ],
     summaryStyle: "Technical implementation bridge for customer-facing onboarding and integration work.",
     emphasisKeywords: [
       "Integrations",

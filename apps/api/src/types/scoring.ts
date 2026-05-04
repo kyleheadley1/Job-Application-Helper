@@ -27,6 +27,17 @@ export type RuleEvaluation = {
   stackMismatch: boolean;
   domainMismatch: boolean;
   startupFounderMismatch: boolean;
+  /** Big-tech / enterprise-style org where explicit stack gates are usually strict. */
+  matureStructuredEmployer?: boolean;
+  /** Explicit production-language requirement in JD does not match profile; only set for mature employers. */
+  explicitCoreLanguageMismatch?: boolean;
+  /** When mismatch is set: `java` | `go` | `python`. */
+  explicitCoreLanguage?: string | null;
+  /**
+   * Forward-deployed / growth-style title without strong external customer-delivery JD:
+   * builder-first software engineering; calibrate scores down from inflated 90+ bands.
+   */
+  fdeBuilderSoftwarePrimary?: boolean;
   notes: string[];
   penaltyVector?: Record<string, number>;
 };

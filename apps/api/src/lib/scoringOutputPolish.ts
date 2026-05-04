@@ -1,3 +1,8 @@
+import {
+  explicitCoreLanguageRiskSummary,
+  type CoreLanguageId,
+} from "./coreLanguageRequirements.js";
+import { fdeBuilderPrimaryRiskSummary } from "./fdeBuilderRole.js";
 import type { ExtractedJobData } from "../types/job.js";
 import type { RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
 import type { UserProfile } from "../types/userProfile.js";
@@ -129,6 +134,7 @@ const jdRequiresDeepDomainSpecialization = (jd: string): boolean =>
 /** Drop vague "enterprise/domain expertise" caveats unless JD demands deep specialization. */
 export const isLowSignalEnterpriseDomainRisk = (risk: string, jdBlob: string): boolean => {
   if (jdRequiresDeepDomainSpecialization(jdBlob)) return false;
+  if (/forward[-\s]?deployed\s+or\s+growth[-\s]?engineering/i.test(risk)) return false;
   const t = risk.toLowerCase();
   if (!/\b(enterprise|domain|industry|vertical)\b/.test(t)) return false;
   if (!/\b(lack|limited|missing|gap|no |without|insufficient|weak|light)\b/.test(t)) return false;
@@ -137,6 +143,7 @@ export const isLowSignalEnterpriseDomainRisk = (risk: string, jdBlob: string): b
 
 const riskPriority = (risk: string, jdBlob: string): number => {
   const t = normalizeText(risk);
+  if (/explicit\s+\w+\s+backend requirement vs type/i.test(t)) return 98;
   /** Third-priority stretch risk: after Python/stack and travel/hybrid. */
   if (
     /customer[-\s]?facing production ai|production ai ownership/.test(t) &&
@@ -147,6 +154,7 @@ const riskPriority = (risk: string, jdBlob: string): number => {
   let p = 50;
   // Decision-blocker order: language/stack → level/ownership → travel (25%+) → travel (lower) → onsite/hybrid
   if (/\bpython\b/.test(t) && /\b(type ?script|javascript|node|primary|first)\b/.test(t)) p = 100;
+  else if (/forward[-\s]?deployed\s+or\s+growth[-\s]?engineering/i.test(t)) p = 97;
   else if (/\b(stack|language|framework|go\b|ruby|java(?!script))\b/.test(t)) p = 96;
   if (/\b(senior|staff|principal|ownership|years of|leadership scope|enterprise production ai)\b/.test(t))
     p = Math.max(p, 94);
@@ -208,10 +216,22 @@ export function polishRisksAndMain(params: {
   extracted: ExtractedJobData;
   travelLine?: string;
   max?: number;
+  rules?: RuleEvaluation;
 }): { mainRisk: string; risks: string[] } {
   const jdBlob = jobTextBlob(params.extracted);
   const max = params.max ?? 3;
   const rawList = [params.mainRisk, ...(params.risks ?? [])].filter((x): x is string => Boolean(x?.trim()));
+  if (params.rules?.explicitCoreLanguageMismatch && params.rules.explicitCoreLanguage) {
+    const line = explicitCoreLanguageRiskSummary(params.rules.explicitCoreLanguage as CoreLanguageId);
+    if (!rawList.some((r) => /explicit.*mature employer/i.test(r))) {
+      rawList.unshift(line);
+    }
+  }
+  if (params.rules?.fdeBuilderSoftwarePrimary) {
+    if (!rawList.some((r) => similarSentence(r, fdeBuilderPrimaryRiskSummary))) {
+      rawList.unshift(fdeBuilderPrimaryRiskSummary);
+    }
+  }
   const suggestOwnershipRisk =
     max >= 3 &&
     /\b(customer[-\s]?facing|production ai)\b/i.test(jdBlob) &&
@@ -371,6 +391,10 @@ export function applyAppliedAiStackFunctionalCalibration(params: {
 }): ScoreBreakdown {
   const { score, extracted, userProfile, rules } = params;
   if (rules.domainMismatch || rules.stackMismatch) return score;
+  /** Do not inflate stack for applied-AI overlap when mature employer + explicit core-language gate applies. */
+  if (rules.explicitCoreLanguageMismatch) return score;
+  /** Builder-first FDE / growth roles: post-process caps scores; skip stack inflation here. */
+  if (rules.fdeBuilderSoftwarePrimary) return score;
   const blob = jobTextBlob(extracted);
   if (!jdHasAppliedAiSystemsOverlap(blob) || !profileHasAiToolingEvidence(userProfile)) return score;
 
@@ -416,6 +440,115 @@ export function applyAppliedAiStackFunctionalCalibration(params: {
   return { ...next, total: sumScoreParts(next) };
 }
 
+/**
+ * Mature employer + explicit core-language mismatch: pull stack/recruiter-screen realism down
+ * so strong domain/story cannot fully offset a hard language gate (target low–mid 70s total).
+ */
+export function applyMatureExplicitLanguageCalibration(params: {
+  score: ScoreBreakdown;
+  rules: RuleEvaluation;
+}): ScoreBreakdown {
+  if (!params.rules.explicitCoreLanguageMismatch) return params.score;
+  let next = { ...params.score };
+  next.stackFit = Math.min(next.stackFit, 14);
+  next.levelFit = Math.min(next.levelFit, 9);
+  next.recruiterFriendliness = Math.min(next.recruiterFriendliness, 8);
+  next.functionalOverlap = Math.min(next.functionalOverlap, 9);
+  next.careerValue = Math.min(next.careerValue, 10);
+  let total = sumScoreParts(next);
+  while (total > 74 && next.stackFit > 12) {
+    next = { ...next, stackFit: next.stackFit - 1 };
+    total = sumScoreParts(next);
+  }
+  while (total > 74 && next.recruiterFriendliness > 6) {
+    next = { ...next, recruiterFriendliness: next.recruiterFriendliness - 1 };
+    total = sumScoreParts(next);
+  }
+  while (total > 74 && next.levelFit > 7) {
+    next = { ...next, levelFit: next.levelFit - 1 };
+    total = sumScoreParts(next);
+  }
+  while (total > 74 && next.functionalOverlap > 7) {
+    next = { ...next, functionalOverlap: next.functionalOverlap - 1 };
+    total = sumScoreParts(next);
+  }
+  return { ...next, total };
+}
+
+/**
+ * Forward-deployed / growth title without external customer-implementation core:
+ * keep strong fit in the mid-80s (not 90+) — builder lane vs solutions consulting.
+ */
+export function applyFdeBuilderScoreCalibration(params: {
+  score: ScoreBreakdown;
+  rules: RuleEvaluation;
+}): ScoreBreakdown {
+  if (!params.rules.fdeBuilderSoftwarePrimary) return params.score;
+  let next = { ...params.score };
+  next.stackFit = Math.min(20, next.stackFit);
+  next.levelFit = Math.min(12, next.levelFit);
+  next.domainFit = Math.min(8, next.domainFit);
+  next.resumeStoryClarity = Math.min(15, next.resumeStoryClarity);
+  next.functionalOverlap = Math.min(9, next.functionalOverlap);
+  next.recruiterFriendliness = Math.min(12, next.recruiterFriendliness);
+  next.careerValue = Math.min(10, next.careerValue);
+
+  type Dim = keyof Omit<ScoreBreakdown, "total">;
+  const order: Dim[] = [
+    "stackFit",
+    "recruiterFriendliness",
+    "levelFit",
+    "functionalOverlap",
+    "domainFit",
+    "careerValue",
+    "resumeStoryClarity",
+  ];
+  const mins: Partial<Record<Dim, number>> = {
+    stackFit: 17,
+    recruiterFriendliness: 8,
+    levelFit: 10,
+    functionalOverlap: 7,
+    domainFit: 6,
+    careerValue: 7,
+    resumeStoryClarity: 14,
+  };
+
+  let total = sumScoreParts(next);
+  let guard = 0;
+  while (total > 86 && guard < 80) {
+    guard += 1;
+    let progressed = false;
+    for (const key of order) {
+      const minV = mins[key] ?? 0;
+      if (next[key] > minV) {
+        next = { ...next, [key]: (next[key] as number) - 1 } as ScoreBreakdown;
+        total = sumScoreParts(next);
+        progressed = true;
+        break;
+      }
+    }
+    if (!progressed) break;
+  }
+  return { ...next, total };
+}
+
+export function appendMatureLanguageShotGuidance(topMatch: string, rules: RuleEvaluation): string {
+  if (!rules.explicitCoreLanguageMismatch || !rules.matureStructuredEmployer) return topMatch;
+  const lab =
+    rules.explicitCoreLanguage === "java"
+      ? "Java"
+      : rules.explicitCoreLanguage === "go"
+        ? "Go"
+        : rules.explicitCoreLanguage === "python"
+          ? "Python"
+          : "the stated core language";
+  const tail = `Apply, but treat as a lower-probability shot because the explicit ${lab} backend requirement is a major recruiter-screen risk.`;
+  const base = topMatch.trim();
+  if (!base) return tail;
+  if (/\blower[-\s]?probability\b/i.test(base)) return base;
+  return `${base.replace(/\.\s*$/, "")}. ${tail}`;
+}
+
 export function polishScoringNarrative(params: {
   narrative: Pick<ScoringNarrative, "topMatch" | "mainRisk" | "risks" | "rationale">;
   score: ScoreBreakdown;
@@ -430,10 +563,9 @@ export function polishScoringNarrative(params: {
     extracted: params.extracted,
     travelLine,
     max: 2,
+    rules: params.rules,
   });
   const rationale = polishRationaleBullets(params.narrative.rationale, 2);
-  const rawTop = params.narrative.topMatch?.trim() ?? "";
-  const topMatch = rawTop ? sanitizeNarrativeSentence(rawTop, 50) : rawTop;
   let score = applyAppliedAiDomainFloor({
     score: params.score,
     extracted: params.extracted,
@@ -446,5 +578,12 @@ export function polishScoringNarrative(params: {
     userProfile: params.userProfile,
     rules: params.rules,
   });
+  score = applyMatureExplicitLanguageCalibration({ score, rules: params.rules });
+  score = applyFdeBuilderScoreCalibration({ score, rules: params.rules });
+  const rawTop = params.narrative.topMatch?.trim() ?? "";
+  const topMatch = appendMatureLanguageShotGuidance(
+    rawTop ? sanitizeNarrativeSentence(rawTop, 50) : rawTop,
+    params.rules,
+  );
   return { score, topMatch, mainRisk, risks, rationale };
 }

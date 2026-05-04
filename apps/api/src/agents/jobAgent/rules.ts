@@ -8,6 +8,12 @@ import {
   detectTraditionalEmployerContextStrict,
   textImpliesNycMetroOrCommutableNj,
 } from '../../lib/employerLocationSignals.js';
+import {
+  analyzeCoreLanguageRequirement,
+  explicitCoreLanguageRiskSummary,
+  isMatureStructuredEmployer,
+} from '../../lib/coreLanguageRequirements.js';
+import { isFdeBuilderSoftwarePrimaryShape } from '../../lib/fdeBuilderRole.js';
 
 const includesAny = (haystack: string, needles: string[]): boolean =>
   needles.some((needle) => haystack.includes(needle));
@@ -38,7 +44,7 @@ const hasStrongPipelineMarkers = (combinedText: string): boolean =>
 
 export const evaluateRules = (
   job: ExtractedJobData,
-  _profile: UserProfile,
+  profile: UserProfile,
 ): RuleEvaluation => {
   const notes: string[] = [];
   const penaltyVector: Record<string, number> = {};
@@ -226,6 +232,24 @@ export const evaluateRules = (
     );
   }
 
+  const fdeBuilderSoftwarePrimary = isFdeBuilderSoftwarePrimaryShape(job);
+  if (fdeBuilderSoftwarePrimary) {
+    notes.push(
+      'Forward-deployed / growth title without strong external customer-implementation JD — default builder-first SWE screen story (SIE only as secondary angle).',
+    );
+  }
+
+  const coreLang = analyzeCoreLanguageRequirement(job, profile);
+  const matureStructuredEmployer =
+    isMatureStructuredEmployer(job.company ?? '', combinedText) || harshEmployerContext;
+  const explicitCoreLanguageMismatch =
+    matureStructuredEmployer &&
+    coreLang.explicitHardRequirement &&
+    !coreLang.candidateHasProductionLanguage;
+  if (explicitCoreLanguageMismatch && coreLang.language) {
+    notes.push(explicitCoreLanguageRiskSummary(coreLang.language));
+  }
+
   return {
     explicitDegreeRisk,
     traditionalCompanyPenalty: isTraditionalCompany,
@@ -241,6 +265,10 @@ export const evaluateRules = (
     stackMismatch,
     domainMismatch,
     startupFounderMismatch,
+    matureStructuredEmployer,
+    explicitCoreLanguageMismatch,
+    explicitCoreLanguage: explicitCoreLanguageMismatch ? coreLang.language : null,
+    fdeBuilderSoftwarePrimary,
     notes: [...new Set(notes)],
     penaltyVector,
   };

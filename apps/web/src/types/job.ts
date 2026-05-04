@@ -40,6 +40,10 @@ export type RuleEvaluation = {
   stackMismatch: boolean;
   domainMismatch: boolean;
   startupFounderMismatch: boolean;
+  matureStructuredEmployer?: boolean;
+  explicitCoreLanguageMismatch?: boolean;
+  explicitCoreLanguage?: string | null;
+  fdeBuilderSoftwarePrimary?: boolean;
   notes: string[];
 };
 
