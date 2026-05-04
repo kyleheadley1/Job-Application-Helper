@@ -37,6 +37,15 @@ export const computeSalaryAsk = (params: {
     if (ask >= 200_000 && !eliteForTopSalary) {
       ask = Math.min(ask, 190_000);
     }
+    /** Mature employer + explicit core-language mismatch: keep ask in a conservative band (~165–175k on wide postings). */
+    if (
+      rules.explicitCoreLanguageMismatch === true &&
+      rules.matureStructuredEmployer === true &&
+      band >= 60_000
+    ) {
+      const conservativeCap = Math.round(postedMin + band * 0.26);
+      ask = Math.min(ask, conservativeCap, 175_000);
+    }
     return { number: ask, rangeMin: postedMin, rangeMax: postedMax };
   }
 

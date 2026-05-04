@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyAppliedAiStackFunctionalCalibration,
   applyAppliedAiDomainFloor,
+  applyFdeBuilderScoreCalibration,
   extractMaxTravelPercent,
   jdHasAppliedAiSystemsOverlap,
   polishRisksAndMain,
@@ -28,6 +29,7 @@ const baseRules = (): RuleEvaluation => ({
   stackMismatch: false,
   domainMismatch: false,
   startupFounderMismatch: false,
+  fdeBuilderSoftwarePrimary: false,
   notes: [],
   penaltyVector: {},
 });
@@ -164,6 +166,57 @@ describe("scoringOutputPolish", () => {
     expect(next.stackFit).toBeGreaterThanOrEqual(16);
     expect(next.functionalOverlap).toBeGreaterThanOrEqual(8);
     expect(next.total).toBeGreaterThanOrEqual(score.total);
+  });
+
+  it("skips applied-AI stack inflation when fdeBuilderSoftwarePrimary is set", () => {
+    const extracted: ExtractedJobData = {
+      company: "Maple AI",
+      title: "Forward Deployed Engineer",
+      stack: ["TypeScript", "Python"],
+      requiredSkills: [],
+      preferredSkills: [],
+      domainTags: [],
+      responsibilities: ["LLM and RAG workflows", "REST APIs", "internal tooling"],
+      requirements: [],
+      rawText: "Applied AI and retrieval for sales workflows.",
+    };
+    const score = {
+      stackFit: 14,
+      levelFit: 10,
+      domainFit: 8,
+      resumeStoryClarity: 11,
+      functionalOverlap: 7,
+      recruiterFriendliness: 11,
+      careerValue: 8,
+      total: 69,
+    };
+    const next = applyAppliedAiStackFunctionalCalibration({
+      score,
+      extracted,
+      userProfile,
+      rules: { ...baseRules(), fdeBuilderSoftwarePrimary: true },
+    });
+    expect(next).toEqual(score);
+  });
+
+  it("applyFdeBuilderScoreCalibration caps inflated totals around the mid-80s", () => {
+    const inflated = {
+      stackFit: 22,
+      levelFit: 14,
+      domainFit: 9,
+      resumeStoryClarity: 15,
+      functionalOverlap: 10,
+      recruiterFriendliness: 14,
+      careerValue: 10,
+      total: 94,
+    };
+    const next = applyFdeBuilderScoreCalibration({
+      score: inflated,
+      rules: { ...baseRules(), fdeBuilderSoftwarePrimary: true },
+    });
+    expect(next.total).toBeLessThanOrEqual(86);
+    expect(next.stackFit).toBeLessThanOrEqual(20);
+    expect(next.recruiterFriendliness).toBeLessThanOrEqual(12);
   });
 
   it("injects production-AI ownership stretch risk as third item when JD matches", () => {

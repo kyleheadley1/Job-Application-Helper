@@ -80,6 +80,33 @@ describe("resume selection", () => {
     expect(result.recommendedResume).toBe("SWE");
   });
 
+  it("prefers SWE for Maple-style forward deployed engineer (builder-first) and notes SIE alternate", async () => {
+    const extracted: ExtractedJobData = {
+      company: "Maple AI",
+      title: "Forward Deployed Engineer",
+      stack: ["TypeScript", "Python"],
+      requiredSkills: [],
+      preferredSkills: [],
+      domainTags: [],
+      responsibilities: [
+        "Ship internal sales tooling and AI-enabled workflows.",
+        "Partner with sales and ops to translate business needs into software.",
+        "Build full-stack features; hybrid NYC office cadence.",
+      ],
+      requirements: ["2+ years shipping software"],
+      rawText: "Founding team. LLM and RAG experience valued.",
+    };
+    const result = await selectResume({
+      extracted,
+      score,
+      topMatch: "Strong applied-AI and internal tooling overlap",
+      mainRisk: "Adjacent vs pure GTM consulting lane",
+      userProfile,
+    });
+    expect(result.recommendedResume).toBe("SWE");
+    expect(result.rationale.some((r) => /SIE can be used as an alternate/i.test(r))).toBe(true);
+  });
+
   it("does not misclassify junior product builder roles as SIE", async () => {
     const extracted: ExtractedJobData = {
       company: "Rokt",

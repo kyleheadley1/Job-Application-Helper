@@ -93,4 +93,41 @@ Series B startup. Not a bank.
     const rules = evaluateRules(makeJob({ title: "Founding Engineer", requirements: ["first engineer at startup"] }), userProfile);
     expect(rules.startupFounderMismatch).toBe(true);
   });
+
+  it("sets fdeBuilderSoftwarePrimary for forward deployed title without external customer implementation core", () => {
+    const rules = evaluateRules(
+      makeJob({
+        company: "Maple AI",
+        title: "Forward Deployed Engineer",
+        responsibilities: [
+          "Ship internal sales tooling and AI workflows with TypeScript.",
+          "Partner with sales and ops; hybrid NYC.",
+        ],
+        rawText: "Founding team. LLM and RAG valued.",
+      }),
+      userProfile,
+    );
+    expect(rules.fdeBuilderSoftwarePrimary).toBe(true);
+    expect(rules.notes.some((n) => /forward-deployed/i.test(n))).toBe(true);
+  });
+
+  it("flags explicit core Java requirement at Spotify vs TypeScript-first profile", () => {
+    const rules = evaluateRules(
+      makeJob({
+        company: "Spotify",
+        title: "Backend Engineer, Artist-First AI Music Lab",
+        stack: ["Java"],
+        responsibilities: [
+          "You have experience developing backend systems using Java.",
+          "Ship LLM-powered features for creators.",
+        ],
+        rawText: "Applied AI and RAG for music discovery.",
+      }),
+      userProfile,
+    );
+    expect(rules.matureStructuredEmployer).toBe(true);
+    expect(rules.explicitCoreLanguageMismatch).toBe(true);
+    expect(rules.explicitCoreLanguage).toBe("java");
+    expect(rules.notes.some((n) => /explicit java/i.test(n))).toBe(true);
+  });
 });

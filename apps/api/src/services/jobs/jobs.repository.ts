@@ -90,6 +90,79 @@ export class JobsRepository {
     return docs.map((d) => this.fromDoc(d));
   }
 
+  /** Full scan for maintenance scripts (e.g. controlled tracker rescoring). */
+  async findAll(): Promise<JobRecord[]> {
+    const col = await this.collection();
+    const docs = await col.find({}).sort({ updatedAt: -1 }).toArray();
+    return docs.map((d) => this.fromDoc(d));
+  }
+
+  /**
+   * Apply rescored snapshot: preserves historical Original / Alt score once set,
+   * updates Latest Score and narrative fields, appends scoreHistory, refreshes shortlist bit.
+   */
+  async applyTrackerRescore(params: {
+    id: string;
+    previousScoreTotal: number;
+    rules: JobRecord["rules"];
+    score: JobRecord["score"];
+    recommendation: JobRecord["recommendation"];
+    salaryAsk: JobRecord["salaryAsk"];
+    topMatch: JobRecord["topMatch"];
+    mainRisk: JobRecord["mainRisk"];
+    rationale: JobRecord["rationale"];
+    risks: JobRecord["risks"];
+  }): Promise<JobRecord | null> {
+    const col = await this.collection();
+    const prev = await col.findOne({ _id: params.id });
+    if (!prev) return null;
+    const prevJob = this.fromDoc(prev);
+    const now = new Date().toISOString();
+    const ts = prevJob.trackerSpreadsheet ?? {};
+    const prevOriginal =
+      typeof ts.originalAltScore === "string" && ts.originalAltScore.trim()
+        ? ts.originalAltScore.trim()
+        : "";
+    const nextSpreadsheet = {
+      ...ts,
+      latestScore: String(params.score.total),
+      originalAltScore: prevOriginal ? prevOriginal : String(params.previousScoreTotal),
+    };
+    const nextTracker = {
+      ...prevJob.tracker,
+      ...this.upsertTrackerFields(
+        { ...prevJob, score: params.score },
+        prevJob.status,
+      ),
+    };
+    const historyEntry = {
+      scoredAt: now,
+      score: params.score,
+      recommendation: params.recommendation,
+    };
+    await col.updateOne(
+      { _id: params.id },
+      {
+        $set: {
+          rules: params.rules,
+          score: params.score,
+          recommendation: params.recommendation,
+          salaryAsk: params.salaryAsk,
+          topMatch: params.topMatch,
+          mainRisk: params.mainRisk,
+          rationale: params.rationale,
+          risks: params.risks,
+          tracker: nextTracker,
+          trackerSpreadsheet: nextSpreadsheet,
+          updatedAt: now,
+        },
+        $push: { scoreHistory: historyEntry },
+      },
+    );
+    const next = await col.findOne({ _id: params.id });
+    return next ? this.fromDoc(next) : null;
+  }
+
   async list(
     filters: JobListFilters = {},
   ): Promise<{ items: JobRecord[]; total: number; totalAll: number }> {

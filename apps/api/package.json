@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "test": "vitest run src/tests",
     "import:tracker": "tsx scripts/import-tracker-xlsx.mts",
-    "verify:tracker": "tsx scripts/verify-tracker-reseed.mts"
+    "verify:tracker": "tsx scripts/verify-tracker-reseed.mts",
+    "rescore:tracker": "tsx scripts/rescore-tracker-roles.mts"
   },
   "keywords": [],
   "author": "",

@@ -30,6 +30,8 @@ const baseRules = (): RuleEvaluation => ({
   stackMismatch: false,
   domainMismatch: false,
   startupFounderMismatch: false,
+  matureStructuredEmployer: false,
+  explicitCoreLanguageMismatch: false,
   notes: [],
 });
 
@@ -85,5 +87,20 @@ describe("computeSalaryAsk", () => {
       rules: baseRules(),
     });
     expect(ask.number).toBeGreaterThanOrEqual(200_000);
+  });
+
+  it("caps salary ask for mature employer explicit core-language mismatch on wide bands", () => {
+    const ask = computeSalaryAsk({
+      extracted: baseJob(),
+      score: scoreParts({ stackFit: 13, levelFit: 9, total: 73 }),
+      recommendation: "selective_yes",
+      rules: {
+        ...baseRules(),
+        matureStructuredEmployer: true,
+        explicitCoreLanguageMismatch: true,
+      },
+    });
+    expect(ask.number).toBeLessThanOrEqual(175_000);
+    expect(ask.number).toBeGreaterThanOrEqual(150_000);
   });
 });
