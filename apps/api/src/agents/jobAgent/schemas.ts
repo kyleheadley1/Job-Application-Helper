@@ -89,6 +89,8 @@ export const RuleEvaluationSchema = z.object({
   explicitCoreLanguageMismatch: z.boolean().optional().default(false),
   explicitCoreLanguage: z.string().nullable().optional(),
   fdeBuilderSoftwarePrimary: z.boolean().optional().default(false),
+  vagueEarlyStageAiCalibration: z.boolean().optional().default(false),
+  hardRuleNotes: z.array(z.string()).optional().default([]),
   notes: z.array(z.string()).default([]),
   penaltyVector: z.record(z.string(), z.number()).optional(),
 });

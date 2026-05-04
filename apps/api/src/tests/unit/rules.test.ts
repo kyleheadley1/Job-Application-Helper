@@ -94,6 +94,25 @@ Series B startup. Not a bank.
     expect(rules.startupFounderMismatch).toBe(true);
   });
 
+  it("flags vagueEarlyStageAiCalibration for thin entry-level AI startup JD", () => {
+    const rules = evaluateRules(
+      makeJob({
+        company: "StealthCo",
+        title: "AI Engineer Intern",
+        yearsExperience: { min: 0, max: 2 },
+        stack: ["Python"],
+        responsibilities: ["Support AI initiatives.", "Ship small features."],
+        requirements: [],
+        rawText:
+          "Remote (US). Seed startup. Generative AI product for SMBs. Great culture. Fast learners welcome.",
+        location: "Remote (US)",
+      }),
+      userProfile,
+    );
+    expect(rules.vagueEarlyStageAiCalibration).toBe(true);
+    expect(rules.notes.some((n) => /generic-posting inflation/i.test(n))).toBe(true);
+  });
+
   it("sets fdeBuilderSoftwarePrimary for forward deployed title without external customer implementation core", () => {
     const rules = evaluateRules(
       makeJob({
@@ -128,6 +147,6 @@ Series B startup. Not a bank.
     expect(rules.matureStructuredEmployer).toBe(true);
     expect(rules.explicitCoreLanguageMismatch).toBe(true);
     expect(rules.explicitCoreLanguage).toBe("java");
-    expect(rules.notes.some((n) => /explicit java/i.test(n))).toBe(true);
+    expect(rules.hardRuleNotes?.some((n) => /explicit java/i.test(n))).toBe(true);
   });
 });

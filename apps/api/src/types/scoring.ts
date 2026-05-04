@@ -38,6 +38,16 @@ export type RuleEvaluation = {
    * builder-first software engineering; calibrate scores down from inflated 90+ bands.
    */
   fdeBuilderSoftwarePrimary?: boolean;
+  /**
+   * Thin / generic JD + entry-level applied-AI posting at an unknown startup:
+   * damp score inflation, cap recruiter/domain realism.
+   */
+  vagueEarlyStageAiCalibration?: boolean;
+  /**
+   * True first-pass gates only (UI "Hard-rule flags"): commutable location, degree, explicit core language.
+   * Visa/citizenship/clearance and other notes stay in `notes` / key risks.
+   */
+  hardRuleNotes?: string[];
   notes: string[];
   penaltyVector?: Record<string, number>;
 };

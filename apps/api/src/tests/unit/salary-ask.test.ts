@@ -32,6 +32,8 @@ const baseRules = (): RuleEvaluation => ({
   startupFounderMismatch: false,
   matureStructuredEmployer: false,
   explicitCoreLanguageMismatch: false,
+  vagueEarlyStageAiCalibration: false,
+  hardRuleNotes: [],
   notes: [],
 });
 
@@ -102,5 +104,29 @@ describe("computeSalaryAsk", () => {
     });
     expect(ask.number).toBeLessThanOrEqual(175_000);
     expect(ask.number).toBeGreaterThanOrEqual(150_000);
+  });
+
+  it("uses 120k–135k band for entry-level applied-AI remote US when salary is not posted", () => {
+    const ask = computeSalaryAsk({
+      extracted: {
+        company: "StealthCo",
+        title: "AI Engineering Intern",
+        stack: ["Python"],
+        requiredSkills: [],
+        preferredSkills: [],
+        domainTags: [],
+        responsibilities: ["Ship generative AI experiments."],
+        requirements: [],
+        yearsExperience: { min: 0, max: 2 },
+        location: "Remote (US)",
+        rawText: "Remote (US). Seed startup. LLM and generative AI. Entry friendly.",
+      },
+      score: scoreParts({ stackFit: 16, levelFit: 10, total: 72 }),
+      recommendation: "selective_yes",
+      rules: { ...baseRules(), earlyCareerFriendlyRole: true },
+    });
+    expect(ask.number).toBe(127_500);
+    expect(ask.rangeMin).toBe(120_000);
+    expect(ask.rangeMax).toBe(135_000);
   });
 });
