@@ -34,6 +34,8 @@ const baseRules = (): RuleEvaluation => ({
   explicitCoreLanguageMismatch: false,
   vagueEarlyStageAiCalibration: false,
   hardRuleNotes: [],
+  pythonStackFlexibleWithJsTs: false,
+  healthcareProductEngineering: false,
   notes: [],
 });
 
@@ -104,6 +106,16 @@ describe("computeSalaryAsk", () => {
     });
     expect(ask.number).toBeLessThanOrEqual(175_000);
     expect(ask.number).toBeGreaterThanOrEqual(150_000);
+  });
+
+  it("never anchors below 120k on wide 150k+ posted bands for viable fits", () => {
+    const ask = computeSalaryAsk({
+      extracted: { ...baseJob(), salary: { min: 150_000, max: 260_000 } },
+      score: scoreParts({ stackFit: 17, levelFit: 9, total: 72 }),
+      recommendation: "selective_yes",
+      rules: baseRules(),
+    });
+    expect(ask.number).toBeGreaterThanOrEqual(120_000);
   });
 
   it("uses 120k–135k band for entry-level applied-AI remote US when salary is not posted", () => {

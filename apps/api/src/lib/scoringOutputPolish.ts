@@ -178,7 +178,7 @@ export const isLowSignalEnterpriseDomainRisk = (risk: string, jdBlob: string): b
   return true;
 };
 
-const riskPriority = (risk: string, jdBlob: string): number => {
+const riskPriority = (risk: string, jdBlob: string, rules?: RuleEvaluation): number => {
   const t = normalizeText(risk);
   if (/explicit\s+\w+\s+backend requirement vs type/i.test(t)) return 98;
   /** Third-priority stretch risk: after Python/stack and travel/hybrid. */
@@ -190,7 +190,9 @@ const riskPriority = (risk: string, jdBlob: string): number => {
   }
   let p = 50;
   // Decision-blocker order: language/stack → level/ownership → travel (25%+) → travel (lower) → onsite/hybrid
-  if (/\bpython\b/.test(t) && /\b(type ?script|javascript|node|primary|first)\b/.test(t)) p = 100;
+  if (/\bpython\b/.test(t) && /\b(type ?script|javascript|node|primary|first)\b/.test(t)) {
+    p = rules?.pythonStackFlexibleWithJsTs ? 62 : 100;
+  }
   else if (/forward[-\s]?deployed\s+or\s+growth[-\s]?engineering/i.test(t)) p = 97;
   else if (/\b(stack|language|framework|go\b|ruby|java(?!script))\b/.test(t)) p = 96;
   if (/\b(senior|staff|principal|ownership|years of|leadership scope|enterprise production ai)\b/.test(t))
@@ -280,7 +282,9 @@ export function polishRisksAndMain(params: {
     [...rawList, params.travelLine].filter((x): x is string => Boolean(x?.trim())),
   );
   const filtered = merged.filter((r) => !isLowSignalEnterpriseDomainRisk(r, jdBlob));
-  const sorted = [...filtered].sort((a, b) => riskPriority(b, jdBlob) - riskPriority(a, jdBlob));
+  const sorted = [...filtered].sort(
+    (a, b) => riskPriority(b, jdBlob, params.rules) - riskPriority(a, jdBlob, params.rules),
+  );
   const top = pickBalancedRiskOrder(sorted, max);
   const fallbackMain =
     params.mainRisk.trim() || "Standard recruiter-screen gaps may still apply for unverified claims.";
@@ -452,6 +456,7 @@ export function applyAppliedAiStackFunctionalCalibration(params: {
   if (!compensatingOverlap) return score;
 
   const pythonOverwhelming =
+    !rules.pythonStackFlexibleWithJsTs &&
     /\bpython\b/i.test(blob) &&
     !/\btypescript|javascript|node\.?js\b/i.test(blob) &&
     /\b(primary\s+language|python[-\s]first|expert\s+in\s+python|strong\s+python)\b/i.test(blob);
@@ -484,6 +489,92 @@ export function applyAppliedAiStackFunctionalCalibration(params: {
 
   if (stackFit === score.stackFit && functionalOverlap === score.functionalOverlap) return score;
   const next = { ...score, stackFit, functionalOverlap };
+  return { ...next, total: sumScoreParts(next) };
+}
+
+/** Python listed flexibly with JS/TS: recover ~2 stack points vs TypeScript-primary profile (minor caveat only). */
+export function applyPythonFlexibleStackSupport(params: {
+  score: ScoreBreakdown;
+  rules: RuleEvaluation;
+}): ScoreBreakdown {
+  if (!params.rules.pythonStackFlexibleWithJsTs || params.rules.stackMismatch) return params.score;
+  const stackFit = Math.min(22, params.score.stackFit + 2);
+  if (stackFit === params.score.stackFit) return params.score;
+  const next = { ...params.score, stackFit };
+  return { ...next, total: sumScoreParts(next) };
+}
+
+/**
+ * 2–4y + ownership / roadmap influence without explicit senior JD: keep level in realistic mid-band (not <10).
+ */
+export function applyMidLevelOwnershipLevelCalibration(params: {
+  score: ScoreBreakdown;
+  extracted: ExtractedJobData;
+  rules: RuleEvaluation;
+}): ScoreBreakdown {
+  if (params.rules.seniorityOverreach) return params.score;
+  const blob = jobTextBlob(params.extracted);
+  const midOwnership =
+    /\b(2\+|3\+|at\s+least\s+2|2\s*[-–]\s*5|2\s+to\s+4|3\s+to\s+5)\s*years?\b/i.test(blob) &&
+    /\b(ownership|own\s+the|technical\s+ownership|influence\s+(the\s+)?(roadmap|priorities)|contribute\s+to\s+decisions?|shape\s+features|end[-\s]?to[-\s]?end)\b/i.test(
+      blob,
+    );
+  if (!midOwnership) return params.score;
+  const levelFit = Math.min(12, Math.max(11, params.score.levelFit));
+  if (levelFit === params.score.levelFit) return params.score;
+  const next = { ...params.score, levelFit };
+  return { ...next, total: sumScoreParts(next) };
+}
+
+/** Healthcare org + product/full-stack JD: avoid domain scores in the gutter for generic “no clinical SME” noise. */
+export function applyHealthcareProductDomainCalibration(params: {
+  score: ScoreBreakdown;
+  rules: RuleEvaluation;
+}): ScoreBreakdown {
+  if (!params.rules.healthcareProductEngineering || params.rules.domainMismatch) return params.score;
+  let domainFit = params.score.domainFit;
+  if (domainFit < 6) domainFit = 6;
+  else if (domainFit > 7) domainFit = Math.min(domainFit, 8);
+  if (domainFit === params.score.domainFit) return params.score;
+  const next = { ...params.score, domainFit };
+  return { ...next, total: sumScoreParts(next) };
+}
+
+/**
+ * Mature backend/API product roles that mention infra tooling should not collapse stack to single digits.
+ * Keep stack in a realistic 14+ band when API/backend overlap is strong and infra is not the core job.
+ */
+export function applyBackendApiInfraCalibration(params: {
+  score: ScoreBreakdown;
+  extracted: ExtractedJobData;
+  rules: RuleEvaluation;
+}): ScoreBreakdown {
+  const { score, extracted, rules } = params;
+  if (!rules.backendProductApiRole || rules.infraCoreRole) return score;
+  const blob = jobTextBlob(extracted);
+  const backendApiSignals =
+    /\b(backend|api|rest\s*api|full[-\s]?stack|product features?|debugging|testing|ownership|reliable systems?)\b/i.test(
+      blob,
+    );
+  const infraSupportingSignals =
+    /\b(kubernetes|docker|aws|postgres|sql|cloud)\b/i.test(blob);
+  if (!backendApiSignals) return score;
+
+  let next = { ...score };
+  if (infraSupportingSignals && next.stackFit < 14) next.stackFit = 14;
+  if (infraSupportingSignals && next.stackFit < 15 && !rules.stackMismatch) next.stackFit = 15;
+  if (next.functionalOverlap < 8) next.functionalOverlap = 8;
+  if (next.levelFit < 12 && !rules.seniorityOverreach) next.levelFit = 12;
+  if (next.domainFit < 6) next.domainFit = 6;
+  if (next.recruiterFriendliness > 9) next.recruiterFriendliness = 9;
+
+  const changed =
+    next.stackFit !== score.stackFit ||
+    next.functionalOverlap !== score.functionalOverlap ||
+    next.levelFit !== score.levelFit ||
+    next.domainFit !== score.domainFit ||
+    next.recruiterFriendliness !== score.recruiterFriendliness;
+  if (!changed) return score;
   return { ...next, total: sumScoreParts(next) };
 }
 
@@ -686,6 +777,18 @@ export function polishScoringNarrative(params: {
     score,
     extracted: params.extracted,
     userProfile: params.userProfile,
+    rules: params.rules,
+  });
+  score = applyPythonFlexibleStackSupport({ score, rules: params.rules });
+  score = applyMidLevelOwnershipLevelCalibration({
+    score,
+    extracted: params.extracted,
+    rules: params.rules,
+  });
+  score = applyHealthcareProductDomainCalibration({ score, rules: params.rules });
+  score = applyBackendApiInfraCalibration({
+    score,
+    extracted: params.extracted,
     rules: params.rules,
   });
   score = applyMatureExplicitLanguageCalibration({ score, rules: params.rules });

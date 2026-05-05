@@ -1,14 +1,53 @@
 import { describe, expect, it } from "vitest";
-import { mapRecommendationFromScore } from "../../agents/jobAgent/scoring.js";
+import {
+  mapRecommendationFromScore,
+  resolveRecommendation,
+  recommendationHardConstraints,
+} from "../../agents/jobAgent/scoring.js";
+import type { RuleEvaluation } from "../../types/scoring.js";
 import { getTrackerColor, shouldShortlist } from "../../config/scoringPolicy.js";
+
+const cleanRules = (): RuleEvaluation => ({
+  explicitDegreeRisk: false,
+  traditionalCompanyPenalty: false,
+  financePenalty: false,
+  strictNewGradPipeline: false,
+  earlyCareerFriendlyRole: false,
+  newGradPenalty: false,
+  seniorityOverreach: false,
+  locationMismatch: false,
+  visaMismatch: false,
+  citizenshipMismatch: false,
+  clearanceMismatch: false,
+  stackMismatch: false,
+  domainMismatch: false,
+  startupFounderMismatch: false,
+  notes: [],
+});
 
 describe("scoring policy behavior", () => {
   it("maps recommendations by score band", () => {
     expect(mapRecommendationFromScore(83)).toBe("yes");
-    expect(mapRecommendationFromScore(74)).toBe("yes");
+    expect(mapRecommendationFromScore(80)).toBe("yes");
+    expect(mapRecommendationFromScore(76)).toBe("selective_yes");
     expect(mapRecommendationFromScore(72)).toBe("selective_yes");
     expect(mapRecommendationFromScore(66)).toBe("selective_yes");
     expect(mapRecommendationFromScore(60)).toBe("no");
+  });
+
+  it("upgrades selective to yes at 80+ when no hard gates", () => {
+    expect(resolveRecommendation(80, cleanRules())).toBe("yes");
+    expect(resolveRecommendation(76, cleanRules())).toBe("selective_yes");
+  });
+
+  it("does not return no at 60+ without hard blockers", () => {
+    expect(mapRecommendationFromScore(60)).toBe("no");
+    expect(resolveRecommendation(60, cleanRules())).toBe("selective_yes");
+  });
+
+  it("downgrades yes to selective_yes at 80+ when hard constraints exist", () => {
+    expect(resolveRecommendation(83, { ...cleanRules(), locationMismatch: true })).toBe("selective_yes");
+    expect(recommendationHardConstraints({ ...cleanRules(), locationMismatch: true })).toBe(true);
   });
 
   it("shortlists only for >=78 and non-terminal status", () => {

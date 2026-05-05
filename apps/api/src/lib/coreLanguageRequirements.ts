@@ -43,6 +43,29 @@ const EXPLICIT_PYTHON = [
   /\brequired[^.]{0,60}\bpython\b[^.]{0,40}\b(production|backend)\b/i,
 ];
 
+/** JD treats Python as interchangeable with JS/TS or lists multiple acceptable languages — not a hard Python-only gate. */
+export function jdPythonFlexibleWithJsOrTs(blob: string): boolean {
+  const t = normalizeText(blob);
+  if (!/\bpython\b/.test(t)) return false;
+  if (!/\b(type\s*script|typescript|javascript|node\.?js|js)\b/.test(t)) return false;
+  if (
+    /\bpython\s+(and\s*\/\s*or|and\/or|or)\s+(java\s*script|typescript|js|node)\b/i.test(t) ||
+    /\b(java\s*script|typescript|js|node)\s+(and\s*\/\s*or|and\/or|or)\s+python\b/i.test(t) ||
+    /\b(python|typescript|javascript)\s*,\s*(python|typescript|javascript|node)\b/i.test(t) ||
+    /\b(either|any)\s+(of\s+)?(python|typescript|javascript)\b/i.test(t) ||
+    /\bpreferred[^.]{0,160}\b(python|typescript|javascript)[^.]{0,160}\b(python|typescript|javascript|node|js)\b/i.test(
+      t,
+    ) ||
+    /\b(polyglot|multi[-\s]?language|language\s+agnostic|flexible\s+(on\s+)?(the\s+)?stack)\b/i.test(t) ||
+    /\b(comfortable\s+with|proficient\s+in)\s+[^.]{0,40}\b(python|typescript|javascript)[^.]{0,80}\b(python|typescript|javascript|node)\b/i.test(
+      t,
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function blobForLanguageScan(job: ExtractedJobData): string {
   return normalizeText(
     [
@@ -109,9 +132,14 @@ export function analyzeCoreLanguageRequirement(
   } else if (matchesExplicitSet(blob, EXPLICIT_GO)) {
     language = "go";
     explicit = true;
-  } else   if (matchesExplicitSet(blob, EXPLICIT_PYTHON)) {
+  } else if (matchesExplicitSet(blob, EXPLICIT_PYTHON)) {
     language = "python";
     explicit = true;
+  }
+
+  if (language === "python" && explicit && jdPythonFlexibleWithJsOrTs(blob)) {
+    language = null;
+    explicit = false;
   }
 
   if (explicit && language) {
