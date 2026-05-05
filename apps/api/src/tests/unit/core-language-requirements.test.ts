@@ -32,6 +32,26 @@ describe("coreLanguageRequirements", () => {
     expect(a.candidateHasProductionLanguage).toBe(false);
   });
 
+  it("does not treat Python as hard when JD lists Python flexibly with TypeScript/JavaScript", () => {
+    const job: ExtractedJobData = {
+      company: "HealthCo",
+      title: "Software Engineer",
+      stack: ["Python", "TypeScript"],
+      requiredSkills: [],
+      preferredSkills: [],
+      domainTags: [],
+      responsibilities: [
+        "Must have Python production experience for backend services.",
+        "We work in Python and/or TypeScript across the stack.",
+      ],
+      requirements: [],
+      rawText: "",
+    };
+    const a = analyzeCoreLanguageRequirement(job, userProfile);
+    expect(a.explicitHardRequirement).toBe(false);
+    expect(a.language).toBeNull();
+  });
+
   it("does not treat Java as hard when only soft framing appears", () => {
     const job: ExtractedJobData = {
       ...spotifyJavaJd,

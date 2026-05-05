@@ -37,7 +37,7 @@ const deterministicResumeSelection = (
   );
   /** Do not treat title-only "Forward Deployed" or generic "implementation" as SIE; see countStrongSieRoleDescriptorHits. */
   const explicitEarlyPipeline =
-    /\b(new grad|new graduate|entry[-\s]?level|early[-\s]?career|\bjunior\b|software engineer i\b|swe i\b|intern\b|apprentice|rotational program|rotation program|0\s*[-–]\s*2\s+years|university graduate program)\b/i.test(
+    /\b(new grad|new graduate|entry[-\s]?level|early[-\s]?career|software engineer i\b|swe i\b|intern\b|apprentice|rotational program|rotation program|0\s*[-–]\s*2\s+years|university graduate program)\b/i.test(
       text,
     );
   const earlySignals = ["new grad", "new graduate", "entry level", "early career", "rotational program", "rotation program", "software engineer i", "swe i", "intern", "apprentice", "0-2 years", "0–2 years"];

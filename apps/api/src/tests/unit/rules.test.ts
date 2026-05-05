@@ -32,6 +32,20 @@ describe("rule engine", () => {
     expect(rules.seniorityOverreach).toBe(true);
   });
 
+  it("does not flag seniority overreach for 4y mid-level without senior/staff/5y-hard signals", () => {
+    const rules = evaluateRules(
+      makeJob({
+        title: "Software Engineer",
+        yearsExperience: { min: 4, max: 6, raw: "4+ years" },
+        responsibilities: ["Own features end-to-end", "Contribute to technical decisions"],
+        rawText: "Python and/or TypeScript. Remote US. Healthcare product engineering.",
+      }),
+      userProfile,
+    );
+    expect(rules.seniorityOverreach).toBe(false);
+    expect(rules.pythonStackFlexibleWithJsTs).toBe(true);
+  });
+
   it("flags finance/traditional strictness", () => {
     const rules = evaluateRules(
       makeJob({ company: "Heritage Bank", domainTags: ["finance"], requirements: ["banking systems experience"] }),
@@ -68,6 +82,26 @@ Series B startup. Not a bank.
       userProfile,
     );
     expect(rules.locationMismatch).toBe(true);
+  });
+
+  it("classifies Plaid-like backend API role as backendProductApiRole (not infraCoreRole)", () => {
+    const rules = evaluateRules(
+      makeJob({
+        company: "Plaid",
+        title: "Backend Engineer",
+        stack: ["Go", "Kubernetes", "Docker", "AWS", "Postgres"],
+        responsibilities: [
+          "Build backend systems and APIs for product features.",
+          "Collaborate with PM and design on customer problems.",
+          "Test and debug reliable production systems.",
+        ],
+        rawText: "Ownership and execution across product engineering squads.",
+      }),
+      userProfile,
+    );
+    expect(rules.backendProductApiRole).toBe(true);
+    expect(rules.infraCoreRole).toBe(false);
+    expect(rules.stackMismatch).toBe(false);
   });
 
   it("applies strong new-grad pipeline penalty only with harsh employer or degree gate", () => {

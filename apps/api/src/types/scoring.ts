@@ -38,6 +38,14 @@ export type RuleEvaluation = {
    * builder-first software engineering; calibrate scores down from inflated 90+ bands.
    */
   fdeBuilderSoftwarePrimary?: boolean;
+  /** JD lists Python alongside JS/TS as acceptable — avoid Python-only hard stack framing. */
+  pythonStackFlexibleWithJsTs?: boolean;
+  /** Healthcare / clinical org but JD is product/full-stack software — do not treat as exotic domain mismatch. */
+  healthcareProductEngineering?: boolean;
+  /** Backend/product/API role where infra tools are supporting context, not platform-core work. */
+  backendProductApiRole?: boolean;
+  /** Platform/DevOps/SRE role where infra depth is core to the job shape. */
+  infraCoreRole?: boolean;
   /**
    * Thin / generic JD + entry-level applied-AI posting at an unknown startup:
    * damp score inflation, cap recruiter/domain realism.

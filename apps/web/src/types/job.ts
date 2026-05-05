@@ -44,6 +44,10 @@ export type RuleEvaluation = {
   explicitCoreLanguageMismatch?: boolean;
   explicitCoreLanguage?: string | null;
   fdeBuilderSoftwarePrimary?: boolean;
+  pythonStackFlexibleWithJsTs?: boolean;
+  healthcareProductEngineering?: boolean;
+  backendProductApiRole?: boolean;
+  infraCoreRole?: boolean;
   vagueEarlyStageAiCalibration?: boolean;
   hardRuleNotes?: string[];
   notes: string[];

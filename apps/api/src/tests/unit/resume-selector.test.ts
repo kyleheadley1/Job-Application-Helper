@@ -133,4 +133,29 @@ describe("resume selection", () => {
     expect(result.recommendedResume).not.toBe("SIE");
     expect(["EARLY_CAREER", "SWE"]).toContain(result.recommendedResume);
   });
+
+  it("defaults to SWE (not EARLY_CAREER) for normal 1-4 year backend roles", async () => {
+    const extracted: ExtractedJobData = {
+      company: "Plaid",
+      title: "Backend Engineer",
+      stack: ["Go", "Kubernetes", "Postgres"],
+      requiredSkills: ["API development", "testing", "debugging"],
+      preferredSkills: [],
+      domainTags: ["fintech"],
+      responsibilities: [
+        "Build backend systems and product features.",
+        "Collaborate with PM/design and contribute to technical decisions.",
+      ],
+      requirements: ["2+ years experience", "ownership mindset"],
+      rawText: "Python and/or JavaScript/TypeScript acceptable.",
+    };
+    const result = await selectResume({
+      extracted,
+      score,
+      topMatch: "Backend/API overlap",
+      mainRisk: "Scale depth",
+      userProfile,
+    });
+    expect(result.recommendedResume).toBe("SWE");
+  });
 });

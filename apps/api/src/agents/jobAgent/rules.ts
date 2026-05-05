@@ -12,6 +12,7 @@ import {
   analyzeCoreLanguageRequirement,
   explicitCoreLanguageRiskSummary,
   isMatureStructuredEmployer,
+  jdPythonFlexibleWithJsOrTs,
 } from '../../lib/coreLanguageRequirements.js';
 import { isFdeBuilderSoftwarePrimaryShape } from '../../lib/fdeBuilderRole.js';
 import {
@@ -109,9 +110,25 @@ export const evaluateRules = (
 
   const earlyCareerFriendlyRole = earlyCareerShape && !strictNewGradPipeline;
 
+  const explicitSeniorStaffInJd =
+    /\b(senior|staff|principal|sr\.)\b/i.test(combinedText) ||
+    /\b(lead\s+engineer|engineering\s+manager|director\s+of\s+engineering)\b/i.test(combinedText);
+  const fivePlusYearsSoftPreferred =
+    /\b(5\+|6\+|7\+|8\+|10\+)\s*years?\b[^.\n]{0,160}\b(preferred|nice to have|a plus|bonus|plus)\b/i.test(
+      combinedText,
+    ) || /\b(preferred|nice to have)[^.\n]{0,160}\b(5\+|6\+|7\+)\s*years?\b/i.test(combinedText);
+  const yearsFivePlusHardRequired =
+    ((job.yearsExperience?.min ?? 0) >= 5 && !fivePlusYearsSoftPreferred) ||
+    /\b(5\+|6\+|7\+|8\+|10\+)\s*years?[^.\n]{0,40}\b(required|must)\b/i.test(combinedText) ||
+    /\b(at\s+least|minimum)[^.\n]{0,24}(5|6|7|8|10)\s*\+?\s*years?[^.\n]{0,30}\b(required|must)\b/i.test(
+      combinedText,
+    );
+  const leadingTeamsHard =
+    /\b(people\s+manager|manage\s+engineers|managing\s+engineers|leading\s+a\s+team\s+of\s+engineers)\b/i.test(
+      combinedText,
+    );
   const seniorityOverreach =
-    includesAny(combinedText, ['senior', 'staff', 'principal']) ||
-    (job.yearsExperience?.min ?? 0) >= 4;
+    explicitSeniorStaffInJd || yearsFivePlusHardRequired || leadingTeamsHard;
 
   const primaryNonNycMetroInLocationLine =
     /\b(location|based|office)\s*:\s*[^.\n]{0,100}\b(dallas|austin|seattle|san francisco|sf\b|los angeles|chicago|denver|atlanta|boston|miami|philadelphia|phoenix|detroit|houston|portland)\b/i.test(
@@ -138,7 +155,20 @@ export const evaluateRules = (
   const clearanceMismatch =
     Boolean(job.clearanceRequirement) || RAW_CLEARANCE.test(job.rawText ?? '');
 
+  const backendProductApiRole =
+    /\b(backend|api|full[-\s]?stack|product engineer|product engineering|customer problems?|feature development|features|reliable systems?|testing|debugging|production systems?)\b/i.test(
+      combinedText,
+    ) &&
+    !/\b(sre|site reliability|platform engineering|devops|terraform|iac|infrastructure tooling|airgapped|linux internals|container runtime|supply chain security|security hardening)\b/i.test(
+      combinedText,
+    );
+  const infraCoreRole =
+    /\b(sre|site reliability|platform engineering|devops|infrastructure tooling|kubernetes platform|container runtime|linux internals|terraform|iac|airgapped|supply chain|security hardening)\b/i.test(
+      combinedText,
+    ) &&
+    !/\b(product features?|pm|design|customer problems?|full[-\s]?stack|backend api)\b/i.test(combinedText);
   const stackMismatch =
+    !backendProductApiRole &&
     !includesAny(combinedText, [
       'typescript',
       'javascript',
@@ -155,12 +185,21 @@ export const evaluateRules = (
       'platform',
     ]);
 
-  const domainMismatch = includesAny(combinedText, [
-    'medical billing',
-    'quantitative research',
-    'actuarial',
-    'embedded firmware',
-  ]);
+  const healthcareProductEngineering =
+    /\b(healthcare|health\s+care|behavioral\s+health|clinical|patient|hospital|therapy|ehr|hipaa)\b/i.test(
+      combinedText,
+    ) &&
+    /\b(product\s+engineer|full[-\s]?stack|software\s+engineer|typescript|javascript|react|api|revenue|billing|growth|internal\s+tools|crm)\b/i.test(
+      combinedText,
+    );
+  const domainMismatch =
+    !healthcareProductEngineering &&
+    includesAny(combinedText, [
+      'medical billing',
+      'quantitative research',
+      'actuarial',
+      'embedded firmware',
+    ]);
 
   const startupFounderMismatch = includesAny(combinedText, [
     'founding engineer',
@@ -220,6 +259,18 @@ export const evaluateRules = (
   if (stackMismatch) {
     penaltyVector.stack = scoringPolicy.hardPenalties.stackMismatch;
     notes.push('Core technical story does not align with role stack shape.');
+  } else if (backendProductApiRole && !infraCoreRole) {
+    const matureFintechApi =
+      /\b(plaid|stripe|fintech|payments|banking[-\s]?api|financial infrastructure)\b/i.test(combinedText);
+    notes.push(
+      matureFintechApi
+        ? 'Plaid-like mature fintech/API infrastructure employers may screen hard for production scale, infra depth, and backend fundamentals.'
+        : 'Backend/API product role with infra tooling mentions: screen may check scale and infra fundamentals, but this is not a pure platform-infra mismatch.',
+    );
+  } else if (infraCoreRole) {
+    notes.push(
+      'Role appears platform/infra-core; deeper production infra background may be screened more strictly.',
+    );
   }
   if (domainMismatch) {
     penaltyVector.domain = scoringPolicy.hardPenalties.domainMismatch;
@@ -231,6 +282,8 @@ export const evaluateRules = (
       'Founding-style expectations do not match strongest current story.',
     );
   }
+
+  const pythonStackFlexibleWithJsTs = jdPythonFlexibleWithJsOrTs(combinedText);
 
   const fdeBuilderSoftwarePrimary = isFdeBuilderSoftwarePrimaryShape(job);
   if (fdeBuilderSoftwarePrimary) {
@@ -302,6 +355,10 @@ export const evaluateRules = (
     explicitCoreLanguageMismatch,
     explicitCoreLanguage: explicitCoreLanguageMismatch ? coreLang.language : null,
     fdeBuilderSoftwarePrimary,
+    pythonStackFlexibleWithJsTs,
+    healthcareProductEngineering,
+    backendProductApiRole,
+    infraCoreRole,
     vagueEarlyStageAiCalibration,
     hardRuleNotes,
     notes: [...new Set(notes)],

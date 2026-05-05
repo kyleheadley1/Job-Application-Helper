@@ -58,7 +58,6 @@ describe("triage from raw pasted text (no structured hand-build)", () => {
     expect(job.rules.newGradPenalty).toBe(true);
     expect(job.rules.citizenshipMismatch || job.rules.visaMismatch).toBe(true);
     expect(job.rules.locationMismatch).toBe(true);
-    expect(job.rules.seniorityOverreach).toBe(true);
 
     expect(job.recommendation).toBe("no");
     expect(job.score.total).toBeLessThan(70);

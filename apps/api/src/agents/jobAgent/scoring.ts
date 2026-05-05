@@ -51,6 +51,35 @@ export const mapRecommendationFromScore = (total: number): Recommendation =>
     (entry) => total >= entry.min && total <= entry.max,
   )?.recommendation ?? 'no';
 
+/** True when recommendation should stay conservative (selective_yes allowed). */
+export const recommendationHardConstraints = (rules: RuleEvaluation): boolean =>
+  Boolean(
+    rules.locationMismatch ||
+      rules.explicitDegreeRisk ||
+      rules.strictNewGradPipeline ||
+      rules.explicitCoreLanguageMismatch ||
+      rules.visaMismatch ||
+      rules.citizenshipMismatch ||
+      rules.clearanceMismatch ||
+      rules.stackMismatch ||
+      rules.domainMismatch ||
+      rules.seniorityOverreach,
+  );
+
+/**
+ * Strong scores default to "yes" when no gates; real gates pull high scores to selective_yes.
+ */
+export const resolveRecommendation = (total: number, rules: RuleEvaluation): Recommendation => {
+  const base = mapRecommendationFromScore(total);
+  if (recommendationHardConstraints(rules)) {
+    if (total >= 80 && base === "yes") return "selective_yes";
+    return base;
+  }
+  if (base === "no" && total >= 60) return "selective_yes";
+  if (total >= 80 && base === "selective_yes") return "yes";
+  return base;
+};
+
 const deterministicFallback = (
   job: ExtractedJobData,
   rules: RuleEvaluation,
@@ -173,7 +202,7 @@ const deterministicFallback = (
     0,
   );
   const total = Math.max(0, Math.min(100, subtotal - Math.round(penalty / 3)));
-  const recommendation = mapRecommendationFromScore(total);
+  const recommendation = resolveRecommendation(total, rules);
   return {
     score: {
       stackFit,
@@ -405,7 +434,7 @@ export const scoreJob = async (params: {
       mainRisk: polished.mainRisk,
       risks: polished.risks,
       rationale: polished.rationale,
-      recommendation: mapRecommendationFromScore(scoreAfterStory.total),
+      recommendation: resolveRecommendation(scoreAfterStory.total, params.rules),
     },
     scoringDiagnostics: scoredRun.diagnostics,
     scoringLlmSucceeded: scoredRun.success,

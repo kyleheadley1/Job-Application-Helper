@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyAppliedAiStackFunctionalCalibration,
+  applyBackendApiInfraCalibration,
   applyAppliedAiDomainFloor,
   applyFdeBuilderScoreCalibration,
   applyVagueEarlyStageAiCalibration,
@@ -34,6 +35,8 @@ const baseRules = (): RuleEvaluation => ({
   fdeBuilderSoftwarePrimary: false,
   vagueEarlyStageAiCalibration: false,
   hardRuleNotes: [],
+  pythonStackFlexibleWithJsTs: false,
+  healthcareProductEngineering: false,
   notes: [],
   penaltyVector: {},
 });
@@ -246,6 +249,43 @@ describe("scoringOutputPolish", () => {
     });
     expect(next.total).toBeLessThanOrEqual(84);
     expect(next.recruiterFriendliness).toBeLessThanOrEqual(10);
+  });
+
+  it("keeps backend/API roles with infra tooling in a non-collapsed stack band", () => {
+    const extracted: ExtractedJobData = {
+      company: "Plaid",
+      title: "Backend Engineer",
+      stack: ["Go", "Kubernetes", "Docker", "AWS", "Postgres"],
+      requiredSkills: [],
+      preferredSkills: [],
+      domainTags: ["fintech"],
+      responsibilities: [
+        "Build backend systems and APIs for product features.",
+        "Work with PM/design to solve customer problems.",
+        "Test and debug reliable production systems.",
+      ],
+      requirements: [],
+      rawText: "Ownership and collaboration across product teams.",
+    };
+    const score = {
+      stackFit: 7,
+      levelFit: 9,
+      domainFit: 5,
+      resumeStoryClarity: 12,
+      functionalOverlap: 6,
+      recruiterFriendliness: 11,
+      careerValue: 10,
+      total: 60,
+    };
+    const next = applyBackendApiInfraCalibration({
+      score,
+      extracted,
+      rules: { ...baseRules(), backendProductApiRole: true, infraCoreRole: false },
+    });
+    expect(next.stackFit).toBeGreaterThanOrEqual(14);
+    expect(next.functionalOverlap).toBeGreaterThanOrEqual(8);
+    expect(next.levelFit).toBeGreaterThanOrEqual(12);
+    expect(next.domainFit).toBeGreaterThanOrEqual(6);
   });
 
   it("applyFdeBuilderScoreCalibration caps inflated totals around the mid-80s", () => {

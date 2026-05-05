@@ -48,6 +48,28 @@ export const computeSalaryAsk = (params: {
       const conservativeCap = Math.round(postedMin + band * 0.26);
       ask = Math.min(ask, conservativeCap, 175_000);
     }
+    /** Plaid-like mature backend/API roles: viable but imperfect fits should stay near lower-mid ($190k-ish on 176–244k bands). */
+    if (
+      rules.backendProductApiRole === true &&
+      rules.infraCoreRole !== true &&
+      rules.matureStructuredEmployer === true &&
+      postedMin >= 170_000 &&
+      recommendation !== "no" &&
+      score.total < 82
+    ) {
+      const conservativeMid = Math.round(postedMin + band * 0.24);
+      ask = Math.min(ask, conservativeMid);
+      ask = Math.max(ask, 190_000);
+    }
+    /** Wide $150k+ bands: never anchor below $120k for viable fits (does not override mature-language caps above). */
+    if (
+      postedMin >= 150_000 &&
+      recommendation !== "no" &&
+      score.total >= 65 &&
+      !rules.stackMismatch
+    ) {
+      ask = Math.max(ask, 120_000);
+    }
     return { number: ask, rangeMin: postedMin, rangeMax: postedMax };
   }
 
