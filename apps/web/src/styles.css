@@ -152,6 +152,28 @@ button {
   color: #ffa198;
 }
 
+.triageTiming {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.triageProgressTrack {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: #21262d;
+  border: 1px solid #30363d;
+  overflow: hidden;
+}
+
+.triageProgressFill {
+  height: 100%;
+  width: 5%;
+  background: linear-gradient(90deg, #2f81f7, #7ee787);
+  transition: width 180ms linear;
+}
+
 /* ——— Tracker page (workflow UI; export remains canonical 15-col) ——— */
 .tracker-page {
   gap: 1.25rem;

@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
+import { computeVisualProgress, formatDuration } from "../lib/triageTiming";
 
 export const AddJobPage = () => {
   const navigate = useNavigate();
@@ -11,14 +12,31 @@ export const AddJobPage = () => {
   const [fullPrep, setFullPrep] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [elapsedMs, setElapsedMs] = useState(0);
+
+  useEffect(() => {
+    if (!busy || !startedAt) return;
+    const update = () => setElapsedMs(Date.now() - startedAt);
+    update();
+    const timer = window.setInterval(update, 200);
+    return () => window.clearInterval(timer);
+  }, [busy, startedAt]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setBusy(true);
     setError("");
+    const start = Date.now();
+    setStartedAt(start);
+    setElapsedMs(0);
     try {
       const job = await api.triage({ url: url || undefined, rawText: rawText || undefined, companyHint, fullPrep });
-      navigate(`/jobs/${job.id}`);
+      navigate(`/jobs/${job.id}`, {
+        state: {
+          triageTiming: { startedAt: start },
+        },
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to triage role");
     } finally {
@@ -47,6 +65,18 @@ export const AddJobPage = () => {
           <input type="checkbox" checked={fullPrep} onChange={(e) => setFullPrep(e.target.checked)} />
           Full apply prep
         </label>
+        {busy && startedAt ? (
+          <div className="triageTiming">
+            <p className="muted">Thinking...</p>
+            <div className="triageProgressTrack" aria-hidden>
+              <div
+                className="triageProgressFill"
+                style={{ width: `${computeVisualProgress(elapsedMs)}%` }}
+              />
+            </div>
+            <p className="muted">Elapsed: {formatDuration(elapsedMs)}</p>
+          </div>
+        ) : null}
         <button disabled={busy}>{busy ? "Scoring..." : "Run triage"}</button>
         {error ? <p className="error">{error}</p> : null}
       </form>

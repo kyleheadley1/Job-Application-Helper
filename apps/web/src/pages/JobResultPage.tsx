@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { JobRecord } from "../types/job";
 import { ScoreBadge } from "../components/ScoreBadge";
@@ -7,6 +7,13 @@ import { StatusBadge } from "../components/StatusBadge";
 import { JsonPanel } from "../components/JsonPanel";
 import { salaryAskLabel } from "../lib/jobDisplay";
 import { buildKeyRisks, decisionSummaryLine, displayRoleTitle, selectTopFits } from "../lib/resultSummary";
+import {
+  computeVisualProgress,
+  formatDuration,
+  readStoredTriageTiming,
+  writeStoredTriageTiming,
+  type TriageTimingPayload,
+} from "../lib/triageTiming";
 
 type AssetTab = "cover" | "why" | "points" | "bullets" | "raw";
 
@@ -30,6 +37,8 @@ function renderTextParagraphs(text: string, fallback = "Not generated") {
 
 export const JobResultPage = () => {
   const { id = "" } = useParams();
+  const location = useLocation();
+  const navTiming = (location.state as { triageTiming?: TriageTimingPayload } | undefined)?.triageTiming;
   const [job, setJob] = useState<JobRecord | null>(null);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<AssetTab>("cover");
@@ -39,6 +48,29 @@ export const JobResultPage = () => {
   const [confirmMsg, setConfirmMsg] = useState("");
   const [assetBusy, setAssetBusy] = useState(false);
   const [assetMsg, setAssetMsg] = useState("");
+  const [startedAt, setStartedAt] = useState<number | null>(navTiming?.startedAt ?? null);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [finishedMs, setFinishedMs] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    const stored = readStoredTriageTiming(id);
+    if (stored) {
+      setStartedAt(stored.startedAt);
+      setFinishedMs(stored.finishedMs);
+    } else if (navTiming?.startedAt) {
+      setStartedAt(navTiming.startedAt);
+      setFinishedMs(null);
+    }
+  }, [id, navTiming?.startedAt]);
+
+  useEffect(() => {
+    if (!startedAt || finishedMs !== null || !!job) return;
+    const update = () => setElapsedMs(Date.now() - startedAt);
+    update();
+    const timer = window.setInterval(update, 200);
+    return () => window.clearInterval(timer);
+  }, [startedAt, finishedMs, job]);
 
   useEffect(() => {
     api
@@ -47,9 +79,15 @@ export const JobResultPage = () => {
         setJob(data);
         setTracked(Boolean(data.tracked));
         setCanConfirmApplied(Boolean(data.canConfirmApplied));
+        if (startedAt && finishedMs === null) {
+          const done = Date.now() - startedAt;
+          setFinishedMs(done);
+          setElapsedMs(done);
+          writeStoredTriageTiming(data.id, { startedAt, finishedMs: done });
+        }
       })
       .catch((err) => setError(err.message));
-  }, [id]);
+  }, [id, startedAt, finishedMs]);
 
   const ensureAssets = async (nextTab: AssetTab) => {
     if (!job || nextTab === "raw" || tabHasContent(job, nextTab) || assetBusy) return;
@@ -89,7 +127,23 @@ export const JobResultPage = () => {
   };
 
   if (error) return <p className="error">{error}</p>;
-  if (!job) return <p>Loading...</p>;
+  if (!job) {
+    return (
+      <section className="stack">
+        {startedAt ? (
+          <article className="card triageTiming">
+            <p className="muted">Thinking...</p>
+            <div className="triageProgressTrack" aria-hidden>
+              <div className="triageProgressFill" style={{ width: `${computeVisualProgress(elapsedMs)}%` }} />
+            </div>
+            <p className="muted">Elapsed: {formatDuration(elapsedMs)}</p>
+          </article>
+        ) : (
+          <p>Loading...</p>
+        )}
+      </section>
+    );
+  }
   const topFits = selectTopFits(job, 2);
   const topRisks = buildKeyRisks(job, 5);
   const hardRules = job.rules.hardRuleNotes ?? [];
@@ -127,6 +181,7 @@ export const JobResultPage = () => {
           ) : null}
           {confirmMsg ? <p className="muted">{confirmMsg}</p> : null}
           <p>Salary ask: {salaryAskLabel(job) || "N/A"}</p>
+          {finishedMs !== null ? <p className="muted">Finished in {formatDuration(finishedMs)}</p> : null}
           <p>Recommended resume: {job.recommendedResume}</p>
           <h4>Why consider</h4>
           <ul>{topFits.map((item) => <li key={item}>{item}</li>)}</ul>
