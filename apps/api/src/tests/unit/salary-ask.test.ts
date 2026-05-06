@@ -165,4 +165,27 @@ describe("computeSalaryAsk", () => {
     });
     expect(ask.number).toBe(110_000);
   });
+
+  it("returns 150k-160k ask range for founding-engineer stretch without posted salary", () => {
+    const ask = computeSalaryAsk({
+      extracted: {
+        company: "Sailor Health",
+        title: "Founding Full-Stack Engineer",
+        stack: ["TypeScript", "Node.js", "React", "PostgreSQL"],
+        requiredSkills: [],
+        preferredSkills: [],
+        domainTags: ["healthcare"],
+        responsibilities: ["Build from scratch and own major technical decisions."],
+        requirements: ["Founding team", "4th engineer"],
+        location: "NYC or Remote",
+        rawText: "Series A startup, 11-50 employees.",
+      },
+      score: scoreParts({ stackFit: 22, levelFit: 8, total: 78 }),
+      recommendation: "yes",
+      rules: { ...baseRules(), foundingEngineerStretch: true },
+    });
+    expect(ask.number).toBe(155_000);
+    expect(ask.rangeMin).toBe(150_000);
+    expect(ask.rangeMax).toBe(160_000);
+  });
 });

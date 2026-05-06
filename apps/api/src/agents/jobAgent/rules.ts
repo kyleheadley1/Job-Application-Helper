@@ -77,7 +77,11 @@ export const evaluateRules = (
   );
 
   const isFinance = detectStrictFinanceEmployerContext(combinedText, companyNorm);
-  const isTraditionalCompany = detectTraditionalEmployerContextStrict(combinedText, companyNorm);
+  const traditionalSignal = detectTraditionalEmployerContextStrict(combinedText, companyNorm);
+  const startupSmallTeam =
+    /\b(1[-\s]?10|11[-\s]?50|51[-\s]?200)\s*(employees|employee|people|person|team)\b/i.test(combinedText) ||
+    /\b(seed|series\s+[ab]|pre-seed|founding team|startup|early[-\s]?stage)\b/i.test(combinedText);
+  const isTraditionalCompany = traditionalSignal && !startupSmallTeam;
 
   const harshEmployerContext = isTraditionalCompany || isFinance;
 
@@ -209,6 +213,16 @@ export const evaluateRules = (
     'first engineer',
     'build from scratch with no support',
   ]);
+  const foundingSignals =
+    /\b(founding engineer|founding full[-\s]?stack engineer|founding team|1st engineer|2nd engineer|3rd engineer|4th engineer)\b/i.test(
+      combinedText,
+    ) ||
+    /\b(shape engineering culture|own major technical decisions|build from scratch|limited mentorship|low mentorship)\b/i.test(
+      combinedText,
+    );
+  const healthcareOpsComplexity =
+    /\b(healthcare|clinical|patient|care operations|compliance|hipaa)\b/i.test(combinedText);
+  const foundingEngineerStretch = foundingSignals;
   const fintechPaymentsRole =
     /\b(fintech|payments?|credit card|co[-\s]?branded|issuing|cardholder|banking api|financial infrastructure|underwriting)\b/i.test(
       combinedText,
@@ -320,6 +334,18 @@ export const evaluateRules = (
       'Founding-style expectations do not match strongest current story.',
     );
   }
+  if (foundingEngineerStretch) {
+    penaltyVector.foundingStretch = Math.max(penaltyVector.foundingStretch ?? 0, 10);
+    notes.push(
+      'Founding engineer role may require more independent production ownership and architectural judgment than the profile clearly demonstrates.',
+    );
+    if (healthcareOpsComplexity) {
+      notes.push(
+        'Healthcare AI workflows may involve clinical, compliance, and operational complexity that could create a steeper ramp.',
+      );
+    }
+    notes.push('Early-stage team may offer limited mentorship or structure.');
+  }
   if (researchHeavyAiRole) {
     penaltyVector.research = 15;
     notes.push(
@@ -414,6 +440,7 @@ export const evaluateRules = (
     vagueEarlyStageAiCalibration,
     researchHeavyAiRole,
     fintechGoPrimaryStretch,
+    foundingEngineerStretch,
     hardRuleNotes,
     notes: [...new Set(notes)],
     penaltyVector,

@@ -8,10 +8,11 @@ import { JsonPanel } from "../components/JsonPanel";
 import { salaryAskLabel } from "../lib/jobDisplay";
 import { buildKeyRisks, decisionSummaryLine, displayRoleTitle, selectTopFits } from "../lib/resultSummary";
 import {
-  computeVisualProgress,
   formatDuration,
+  progressForPhase,
   readStoredTriageTiming,
   writeStoredTriageTiming,
+  type TriageProgressPhase,
   type TriageTimingPayload,
 } from "../lib/triageTiming";
 
@@ -51,6 +52,7 @@ export const JobResultPage = () => {
   const [startedAt, setStartedAt] = useState<number | null>(navTiming?.startedAt ?? null);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [finishedMs, setFinishedMs] = useState<number | null>(null);
+  const [progressPhase, setProgressPhase] = useState<TriageProgressPhase>("idle");
 
   useEffect(() => {
     if (!id) return;
@@ -58,9 +60,11 @@ export const JobResultPage = () => {
     if (stored) {
       setStartedAt(stored.startedAt);
       setFinishedMs(stored.finishedMs);
+      setProgressPhase("result_ready");
     } else if (navTiming?.startedAt) {
       setStartedAt(navTiming.startedAt);
       setFinishedMs(null);
+      setProgressPhase("result_fetch_in_flight");
     }
   }, [id, navTiming?.startedAt]);
 
@@ -73,12 +77,14 @@ export const JobResultPage = () => {
   }, [startedAt, finishedMs, job]);
 
   useEffect(() => {
+    setProgressPhase("result_fetch_in_flight");
     api
       .getJob(id)
       .then((data) => {
         setJob(data);
         setTracked(Boolean(data.tracked));
         setCanConfirmApplied(Boolean(data.canConfirmApplied));
+        setProgressPhase("result_ready");
         if (startedAt && finishedMs === null) {
           const done = Date.now() - startedAt;
           setFinishedMs(done);
@@ -134,7 +140,7 @@ export const JobResultPage = () => {
           <article className="card triageTiming">
             <p className="muted">Thinking...</p>
             <div className="triageProgressTrack" aria-hidden>
-              <div className="triageProgressFill" style={{ width: `${computeVisualProgress(elapsedMs)}%` }} />
+              <div className="triageProgressFill" style={{ width: `${progressForPhase(progressPhase)}%` }} />
             </div>
             <p className="muted">Elapsed: {formatDuration(elapsedMs)}</p>
           </article>

@@ -55,6 +55,8 @@ export type RuleEvaluation = {
   researchHeavyAiRole?: boolean;
   /** Fintech/payments backend role with Go-primary or microservices-heavy production expectations. */
   fintechGoPrimaryStretch?: boolean;
+  /** Founding/very-early startup role with high-autonomy ownership risk despite technical overlap. */
+  foundingEngineerStretch?: boolean;
   /**
    * True first-pass gates only (UI "Hard-rule flags"): commutable location, degree, explicit core language.
    * Visa/citizenship/clearance and other notes stay in `notes` / key risks.

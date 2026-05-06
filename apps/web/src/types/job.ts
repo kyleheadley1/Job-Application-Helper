@@ -51,6 +51,7 @@ export type RuleEvaluation = {
   vagueEarlyStageAiCalibration?: boolean;
   researchHeavyAiRole?: boolean;
   fintechGoPrimaryStretch?: boolean;
+  foundingEngineerStretch?: boolean;
   hardRuleNotes?: string[];
   notes: string[];
 };

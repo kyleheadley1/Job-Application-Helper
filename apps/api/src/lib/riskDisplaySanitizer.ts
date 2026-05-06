@@ -272,6 +272,20 @@ export function sanitizeVisibleRiskLine(text: string, ctx: VisibleSanitizeContex
       "Go-primary fintech/payments backend role is outside the strongest TypeScript/Node + AI/product lane.",
     );
   }
+  if (ctx.rules?.foundingEngineerStretch) {
+    t = t.replace(
+      /\bfounding-style expectations do not match strongest current story\./gi,
+      "Founding engineer role may require more independent production ownership and architectural judgment than the profile clearly demonstrates.",
+    );
+    t = t.replace(
+      /\b(role|screeners?) may still (probe|check) scale and fundamentals[^.]*\./gi,
+      "Early-stage team may offer limited mentorship or structure.",
+    );
+    t = t.replace(
+      /\btraditional employer signal suggests stricter screening behavior\./gi,
+      "Early-stage founder-level autonomy can still create stricter first-pass screening.",
+    );
+  }
   return cleanupVisibleLineFragments(t);
 }
 

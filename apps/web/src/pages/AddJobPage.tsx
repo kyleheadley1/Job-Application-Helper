@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
-import { computeVisualProgress, formatDuration } from "../lib/triageTiming";
+import { formatDuration, progressForPhase, type TriageProgressPhase } from "../lib/triageTiming";
 
 export const AddJobPage = () => {
   const navigate = useNavigate();
@@ -14,6 +14,7 @@ export const AddJobPage = () => {
   const [error, setError] = useState("");
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [progressPhase, setProgressPhase] = useState<TriageProgressPhase>("idle");
 
   useEffect(() => {
     if (!busy || !startedAt) return;
@@ -27,11 +28,14 @@ export const AddJobPage = () => {
     event.preventDefault();
     setBusy(true);
     setError("");
+    setProgressPhase("submitted");
     const start = Date.now();
     setStartedAt(start);
     setElapsedMs(0);
     try {
+      setProgressPhase("triage_request_in_flight");
       const job = await api.triage({ url: url || undefined, rawText: rawText || undefined, companyHint, fullPrep });
+      setProgressPhase("triage_response_received");
       navigate(`/jobs/${job.id}`, {
         state: {
           triageTiming: { startedAt: start },
@@ -41,6 +45,7 @@ export const AddJobPage = () => {
       setError(err instanceof Error ? err.message : "Failed to triage role");
     } finally {
       setBusy(false);
+      setProgressPhase("idle");
     }
   };
 
@@ -71,7 +76,7 @@ export const AddJobPage = () => {
             <div className="triageProgressTrack" aria-hidden>
               <div
                 className="triageProgressFill"
-                style={{ width: `${computeVisualProgress(elapsedMs)}%` }}
+                style={{ width: `${progressForPhase(progressPhase)}%` }}
               />
             </div>
             <p className="muted">Elapsed: {formatDuration(elapsedMs)}</p>
