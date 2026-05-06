@@ -70,13 +70,15 @@ export const recommendationHardConstraints = (rules: RuleEvaluation): boolean =>
  * Strong scores default to "yes" when no gates; real gates pull high scores to selective_yes.
  */
 export const resolveRecommendation = (total: number, rules: RuleEvaluation): Recommendation => {
+  if (total < 60) return "no";
+  if (rules.researchHeavyAiRole && total < 70) return "no";
   const base = mapRecommendationFromScore(total);
   if (recommendationHardConstraints(rules)) {
     if (total >= 80 && base === "yes") return "selective_yes";
     return base;
   }
   if (base === "no" && total >= 60) return "selective_yes";
-  if (total >= 80 && base === "selective_yes") return "yes";
+  if (total >= 78 && base === "selective_yes") return "yes";
   return base;
 };
 

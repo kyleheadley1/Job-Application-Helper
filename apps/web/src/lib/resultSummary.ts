@@ -1,4 +1,5 @@
 import type { JobRecord } from "../types/job";
+import { sanitizeRoleCardLine } from "./riskDisplaySanitizer";
 
 const RISK_CONCEPTS: Array<{ concept: string; re: RegExp }> = [
   { concept: "stack_gap", re: /\b(go|language|stack|framework|tooling|tech gap|experience with|python)\b/i },
@@ -147,11 +148,11 @@ export function selectTopFits(job: JobRecord, n = 2): string[] {
   }
   const slice = out.slice(0, n);
   if (slice.length === 2) slice[1] = dampWhyConsiderSecond(slice[0], slice[1]);
-  return slice;
+  return slice.map((s) => sanitizeRoleCardLine(s, job.extracted.company));
 }
 
 /** Merge LLM-scored risks with soft rule notes (hard gates use `rules.hardRuleNotes` separately). */
-export function buildKeyRisks(job: JobRecord, max = 5): string[] {
+export function buildKeyRisks(job: JobRecord, max = 3): string[] {
   const fromLlm = selectDistinctRisks(job, 2);
   const out = [...fromLlm];
   const seen = new Set(out.map((s) => normalizeText(s)));
@@ -162,7 +163,7 @@ export function buildKeyRisks(job: JobRecord, max = 5): string[] {
     out.push(n);
     if (out.length >= max) break;
   }
-  return out;
+  return out.slice(0, max).map((s) => sanitizeRoleCardLine(s, job.extracted.company));
 }
 
 export function selectDistinctRisks(job: JobRecord, n = 2): string[] {

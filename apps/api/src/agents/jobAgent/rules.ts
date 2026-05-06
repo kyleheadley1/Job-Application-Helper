@@ -127,8 +127,11 @@ export const evaluateRules = (
     /\b(people\s+manager|manage\s+engineers|managing\s+engineers|leading\s+a\s+team\s+of\s+engineers)\b/i.test(
       combinedText,
     );
-  const seniorityOverreach =
+  const contradictorySeniorSignals =
     explicitSeniorStaffInJd || yearsFivePlusHardRequired || leadingTeamsHard;
+  // Associate/entry roles should not get "overreach" unless the JD also carries explicit senior markers.
+  const seniorityOverreach =
+    contradictorySeniorSignals && !earlyCareerFriendlyRole;
 
   const primaryNonNycMetroInLocationLine =
     /\b(location|based|office)\s*:\s*[^.\n]{0,100}\b(dallas|austin|seattle|san francisco|sf\b|los angeles|chicago|denver|atlanta|boston|miami|philadelphia|phoenix|detroit|houston|portland)\b/i.test(
@@ -206,6 +209,31 @@ export const evaluateRules = (
     'first engineer',
     'build from scratch with no support',
   ]);
+  const fintechPaymentsRole =
+    /\b(fintech|payments?|credit card|co[-\s]?branded|issuing|cardholder|banking api|financial infrastructure|underwriting)\b/i.test(
+      combinedText,
+    );
+  const goPrimaryBackend =
+    /\b(go|golang)\s+is\s+our\s+primary\s+backend\s+language\b/i.test(combinedText) ||
+    /\bprimary\s+backend\s+language\b[^.\n]{0,60}\b(go|golang)\b/i.test(combinedText) ||
+    /\bstrong\s+proficiency\s+in\s+(go|golang)\b/i.test(combinedText) ||
+    /\b(go|golang)\b[^.\n]{0,60}\bprimary\b[^.\n]{0,40}\bbackend\b/i.test(combinedText);
+  const microservicesHeavy =
+    /\b(microservices?|service[-\s]?oriented|distributed systems?|on[-\s]?call|production troubleshooting|incident response)\b/i.test(
+      combinedText,
+    );
+  const fintechGoPrimaryStretch =
+    fintechPaymentsRole && backendProductApiRole && (goPrimaryBackend || microservicesHeavy);
+  const researchHeavyAiRole =
+    /\b(applied ai researcher|research scientist|ai researcher|research engineer)\b/i.test(combinedText) &&
+    /\b(research track record|publications?|meta[-\s]?learning|program synthesis|evolutionary computation|self[-\s]?constructing systems?|recursive systems?|self[-\s]?architecting|frontier research|model experiments?|data analysis)\b/i.test(
+      combinedText,
+    );
+  const associateEntryRole =
+    /\b(associate|entry[-\s]?level|early[-\s]?career|junior|new grad|new graduate)\b/i.test(combinedText);
+  const preferredPlatformStackGap =
+    /\b(preferred|nice to have|plus)\b[^.\n]{0,180}\b(go|golang|graphql|docker|kubernetes|cloud)\b/i.test(combinedText) ||
+    /\b(go|golang|graphql|docker|kubernetes|cloud)\b[^.\n]{0,120}\b(preferred|nice to have|plus)\b/i.test(combinedText);
 
   if (explicitDegreeRisk) {
     penaltyVector.degree =
@@ -219,9 +247,14 @@ export const evaluateRules = (
       'Traditional employer signal suggests stricter screening behavior.',
     );
   }
-  if (isFinance) {
+  if (isFinance && !fintechGoPrimaryStretch) {
     penaltyVector.finance = 5;
     notes.push('Finance/banking role context typically screens more strictly.');
+  } else if (fintechGoPrimaryStretch) {
+    penaltyVector.finance = 5;
+    notes.push(
+      'No prior fintech/payments or co-branded card experience may create a steeper ramp and stricter screening.',
+    );
   }
   if (strictNewGradPipeline) {
     penaltyVector.newGrad = scoringPolicy.hardPenalties.newGradPipelineMismatch;
@@ -259,13 +292,18 @@ export const evaluateRules = (
   if (stackMismatch) {
     penaltyVector.stack = scoringPolicy.hardPenalties.stackMismatch;
     notes.push('Core technical story does not align with role stack shape.');
+  } else if (associateEntryRole && preferredPlatformStackGap) {
+    notes.push(
+      "Preferred Go/GraphQL/platform stack is not the candidate's strongest lane, but baseline backend expectations appear accessible.",
+    );
   } else if (backendProductApiRole && !infraCoreRole) {
+    const companyLabel = job.company?.trim() || 'This company';
     const matureFintechApi =
       /\b(plaid|stripe|fintech|payments|banking[-\s]?api|financial infrastructure)\b/i.test(combinedText);
     notes.push(
       matureFintechApi
-        ? 'Plaid-like mature fintech/API infrastructure employers may screen hard for production scale, infra depth, and backend fundamentals.'
-        : 'Backend/API product role with infra tooling mentions: screen may check scale and infra fundamentals, but this is not a pure platform-infra mismatch.',
+        ? `${companyLabel} operates payment- or API-heavy product infrastructure; hiring rubrics often emphasize production reliability, backend fundamentals, and operational maturity.`
+        : `${companyLabel} lists backend/API product work with infra tooling context — screeners may still probe scale and fundamentals without treating this as pure platform engineering.`,
     );
   } else if (infraCoreRole) {
     notes.push(
@@ -280,6 +318,20 @@ export const evaluateRules = (
     penaltyVector.founding = scoringPolicy.hardPenalties.startupFounderMismatch;
     notes.push(
       'Founding-style expectations do not match strongest current story.',
+    );
+  }
+  if (researchHeavyAiRole) {
+    penaltyVector.research = 15;
+    notes.push(
+      'Role is research-heavy and asks for self-constructing systems, meta-learning, program synthesis, and agent architecture research not clearly demonstrated in the current profile.',
+    );
+    notes.push(
+      'Proven track record of research results is a major recruiter-screen gap.',
+    );
+  }
+  if (fintechGoPrimaryStretch && goPrimaryBackend) {
+    notes.push(
+      'Go-primary backend expectations are outside the strongest TypeScript/Node lane and are a major stack caveat.',
     );
   }
 
@@ -360,6 +412,8 @@ export const evaluateRules = (
     backendProductApiRole,
     infraCoreRole,
     vagueEarlyStageAiCalibration,
+    researchHeavyAiRole,
+    fintechGoPrimaryStretch,
     hardRuleNotes,
     notes: [...new Set(notes)],
     penaltyVector,

@@ -94,6 +94,8 @@ export const RuleEvaluationSchema = z.object({
   backendProductApiRole: z.boolean().optional().default(false),
   infraCoreRole: z.boolean().optional().default(false),
   vagueEarlyStageAiCalibration: z.boolean().optional().default(false),
+  researchHeavyAiRole: z.boolean().optional().default(false),
+  fintechGoPrimaryStretch: z.boolean().optional().default(false),
   hardRuleNotes: z.array(z.string()).optional().default([]),
   notes: z.array(z.string()).default([]),
   penaltyVector: z.record(z.string(), z.number()).optional(),

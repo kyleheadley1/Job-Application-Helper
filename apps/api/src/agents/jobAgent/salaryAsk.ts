@@ -3,6 +3,8 @@ import type { Recommendation, RuleEvaluation, SalaryAsk, ScoreBreakdown } from "
 import { normalizeText } from "../../lib/text.js";
 import { jdHasAppliedAiSystemsOverlap } from "../../lib/scoringOutputPolish.js";
 
+const roundToNearest5k = (n: number): number => Math.round(n / 5_000) * 5_000;
+
 export const computeSalaryAsk = (params: {
   extracted: ExtractedJobData;
   score: ScoreBreakdown;
@@ -70,6 +72,22 @@ export const computeSalaryAsk = (params: {
     ) {
       ask = Math.max(ask, 120_000);
     }
+    // For narrower/modest posted bands, strong fits can anchor near the top.
+    if (score.total >= 78 && band <= 150_000 && postedMax < 150_000 && recommendation !== "no") {
+      ask = postedMax;
+    } else if (score.total >= 78 && band <= 90_000 && recommendation !== "no" && postedMax < 150_000) {
+      ask = Math.max(ask, Math.round(postedMin + band * 0.88));
+    } else if (
+      score.total >= 70 &&
+      score.total <= 77 &&
+      recommendation !== "no" &&
+      postedMax < 150_000 &&
+      band <= 90_000
+    ) {
+      ask = Math.max(ask, Math.round(postedMin + band * 0.66));
+    }
+    ask = Math.min(postedMax, Math.max(postedMin, ask));
+    ask = roundToNearest5k(ask);
     return { number: ask, rangeMin: postedMin, rangeMax: postedMax };
   }
 
@@ -106,7 +124,7 @@ export const computeSalaryAsk = (params: {
     !explicitlyLowPayingPosted
   ) {
     const mid = 127_500;
-    return { number: mid, rangeMin: 120_000, rangeMax: 135_000 };
+    return { number: roundToNearest5k(mid), rangeMin: 120_000, rangeMax: 135_000 };
   }
 
   let base = 120000;
@@ -126,5 +144,5 @@ export const computeSalaryAsk = (params: {
   if (score.total >= 80 && recommendation === "yes") base += 5000;
 
   const spread = score.total >= 80 ? 12000 : 10000;
-  return { number: base, rangeMin: base - spread, rangeMax: base + spread };
+  return { number: roundToNearest5k(base), rangeMin: base - spread, rangeMax: base + spread };
 };

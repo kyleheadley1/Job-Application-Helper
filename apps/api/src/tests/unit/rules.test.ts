@@ -76,6 +76,40 @@ Series B startup. Not a bank.
     expect(rules.locationMismatch).toBe(false);
   });
 
+  it("classifies research-heavy applied AI researcher roles", () => {
+    const rules = evaluateRules(
+      makeJob({
+        company: "Distyl AI",
+        title: "Applied AI Researcher, System Self-Construction",
+        stack: ["Python"],
+        rawText:
+          "Looking for proven research track record and publications. Focus on self-constructing systems, meta-learning loops, program synthesis, evolutionary computation, model experiments, and frontier research results.",
+        requirements: ["Proven research track record", "Publication-quality results"],
+      }),
+      userProfile,
+    );
+    expect(rules.researchHeavyAiRole).toBe(true);
+    expect(rules.notes.some((n) => /research-heavy/i.test(n))).toBe(true);
+    expect(rules.notes.some((n) => /recruiter-screen gap/i.test(n))).toBe(true);
+  });
+
+  it("classifies fintech go-primary backend roles as viable stretch", () => {
+    const rules = evaluateRules(
+      makeJob({
+        company: "Imprint",
+        title: "Software Engineer",
+        stack: ["Go", "MySQL", "DynamoDB"],
+        rawText:
+          "Fintech payments platform. Go is our primary backend language. Microservices, on-call, production troubleshooting, and partner integrations.",
+        requirements: ["Build backend microservices for payments"],
+      }),
+      userProfile,
+    );
+    expect(rules.fintechGoPrimaryStretch).toBe(true);
+    expect(rules.notes.some((n) => /fintech\/payments/i.test(n))).toBe(true);
+    expect(rules.notes.some((n) => /go-primary backend expectations/i.test(n))).toBe(true);
+  });
+
   it("flags onsite non-commutable mismatch", () => {
     const rules = evaluateRules(
       makeJob({ remoteType: "onsite", location: "Dallas, TX", locationIsCommutable: false }),
@@ -182,5 +216,27 @@ Series B startup. Not a bank.
     expect(rules.explicitCoreLanguageMismatch).toBe(true);
     expect(rules.explicitCoreLanguage).toBe("java");
     expect(rules.hardRuleNotes?.some((n) => /explicit java/i.test(n))).toBe(true);
+  });
+
+  it("does not set seniority overreach for associate/entry roles with familiarity wording", () => {
+    const rules = evaluateRules(
+      makeJob({
+        company: "New York Times",
+        title: "Core Software Engineer Associate",
+        yearsExperience: { min: 0, max: 2, raw: "0-2 years" },
+        stack: ["TypeScript", "Node.js"],
+        preferredSkills: ["Go", "GraphQL", "Docker", "Kubernetes"],
+        requirements: [
+          "Familiarity with relational databases",
+          "Familiarity building backend systems",
+          "Familiarity with software development process",
+        ],
+        rawText:
+          "Associate Software Engineer. Preferred qualifications include Go, GraphQL, cloud deployments, Docker/Kubernetes.",
+      }),
+      userProfile,
+    );
+    expect(rules.seniorityOverreach).toBe(false);
+    expect(rules.notes.some((n) => /preferred go\/graphql\/platform stack/i.test(n))).toBe(true);
   });
 });
