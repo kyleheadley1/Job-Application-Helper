@@ -178,4 +178,29 @@ Series B startup. Not a bank.
         expect(rules.seniorityOverreach).toBe(false);
         expect(rules.notes.some((n) => /preferred go\/graphql\/platform stack/i.test(n))).toBe(true);
     });
+    it("classifies fintech go-primary backend roles as viable stretch", () => {
+        const rules = evaluateRules(makeJob({
+            company: "Imprint",
+            title: "Software Engineer",
+            stack: ["Go", "MySQL", "DynamoDB"],
+            rawText: "Fintech payments platform. Go is our primary backend language. Microservices, on-call, production troubleshooting, and partner integrations.",
+            requirements: ["Build backend microservices for payments"],
+        }), userProfile);
+        expect(rules.fintechGoPrimaryStretch).toBe(true);
+        expect(rules.notes.some((n) => /fintech\/payments/i.test(n))).toBe(true);
+        expect(rules.notes.some((n) => /go-primary backend expectations/i.test(n))).toBe(true);
+    });
+    it("classifies founding startup roles without traditional-employer penalty", () => {
+        const rules = evaluateRules(makeJob({
+            company: "Sailor Health",
+            title: "Founding Full-Stack Engineer",
+            stack: ["TypeScript", "React", "Node.js", "PostgreSQL"],
+            rawText: "Series A startup, 11-50 employees. 4th engineer. Shape engineering culture, own major technical decisions, and build from scratch for healthcare operations.",
+            requirements: ["Founding team role with high autonomy"],
+        }), userProfile);
+        expect(rules.foundingEngineerStretch).toBe(true);
+        expect(rules.traditionalCompanyPenalty).toBe(false);
+        expect(rules.notes.some((n) => /independent production ownership/i.test(n))).toBe(true);
+        expect(rules.notes.some((n) => /limited mentorship or structure/i.test(n))).toBe(true);
+    });
 });

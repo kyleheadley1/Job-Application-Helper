@@ -42,7 +42,10 @@ export const evaluateRules = (job, profile) => {
         .join(' ');
     const combinedText = normalizeText([companyNorm, structuredParts, raw].filter(Boolean).join(' '));
     const isFinance = detectStrictFinanceEmployerContext(combinedText, companyNorm);
-    const isTraditionalCompany = detectTraditionalEmployerContextStrict(combinedText, companyNorm);
+    const traditionalSignal = detectTraditionalEmployerContextStrict(combinedText, companyNorm);
+    const startupSmallTeam = /\b(1[-\s]?10|11[-\s]?50|51[-\s]?200)\s*(employees|employee|people|person|team)\b/i.test(combinedText) ||
+        /\b(seed|series\s+[ab]|pre-seed|founding team|startup|early[-\s]?stage)\b/i.test(combinedText);
+    const isTraditionalCompany = traditionalSignal && !startupSmallTeam;
     const harshEmployerContext = isTraditionalCompany || isFinance;
     const degreeLevel = job.degreeRequirement?.level ?? 'unknown';
     const degreeRaw = normalizeText(job.degreeRequirement?.raw ?? '');
@@ -123,6 +126,10 @@ export const evaluateRules = (job, profile) => {
         'first engineer',
         'build from scratch with no support',
     ]);
+    const foundingSignals = /\b(founding engineer|founding full[-\s]?stack engineer|founding team|1st engineer|2nd engineer|3rd engineer|4th engineer)\b/i.test(combinedText) ||
+        /\b(shape engineering culture|own major technical decisions|build from scratch|limited mentorship|low mentorship)\b/i.test(combinedText);
+    const healthcareOpsComplexity = /\b(healthcare|clinical|patient|care operations|compliance|hipaa)\b/i.test(combinedText);
+    const foundingEngineerStretch = foundingSignals;
     const fintechPaymentsRole = /\b(fintech|payments?|credit card|co[-\s]?branded|issuing|cardholder|banking api|financial infrastructure|underwriting)\b/i.test(combinedText);
     const goPrimaryBackend = /\b(go|golang)\s+is\s+our\s+primary\s+backend\s+language\b/i.test(combinedText) ||
         /\bprimary\s+backend\s+language\b[^.\n]{0,60}\b(go|golang)\b/i.test(combinedText) ||
@@ -206,6 +213,14 @@ export const evaluateRules = (job, profile) => {
         penaltyVector.founding = scoringPolicy.hardPenalties.startupFounderMismatch;
         notes.push('Founding-style expectations do not match strongest current story.');
     }
+    if (foundingEngineerStretch) {
+        penaltyVector.foundingStretch = Math.max(penaltyVector.foundingStretch ?? 0, 10);
+        notes.push('Founding engineer role may require more independent production ownership and architectural judgment than the profile clearly demonstrates.');
+        if (healthcareOpsComplexity) {
+            notes.push('Healthcare AI workflows may involve clinical, compliance, and operational complexity that could create a steeper ramp.');
+        }
+        notes.push('Early-stage team may offer limited mentorship or structure.');
+    }
     if (researchHeavyAiRole) {
         penaltyVector.research = 15;
         notes.push('Role is research-heavy and asks for self-constructing systems, meta-learning, program synthesis, and agent architecture research not clearly demonstrated in the current profile.');
@@ -274,6 +289,7 @@ export const evaluateRules = (job, profile) => {
         vagueEarlyStageAiCalibration,
         researchHeavyAiRole,
         fintechGoPrimaryStretch,
+        foundingEngineerStretch,
         hardRuleNotes,
         notes: [...new Set(notes)],
         penaltyVector,

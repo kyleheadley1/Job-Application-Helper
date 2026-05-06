@@ -96,6 +96,9 @@ export const computeSalaryAsk = (params) => {
         const mid = 127_500;
         return { number: roundToNearest5k(mid), rangeMin: 120_000, rangeMax: 135_000 };
     }
+    if (rules.foundingEngineerStretch && recommendation !== "no") {
+        return { number: 155_000, rangeMin: 150_000, rangeMax: 160_000 };
+    }
     let base = 120000;
     if ((job.yearsExperience?.min ?? 0) <= 2 || (job.seniority ?? "").toLowerCase().includes("junior")) {
         if (jdHasAppliedAiSystemsOverlap(impliedBlob) &&

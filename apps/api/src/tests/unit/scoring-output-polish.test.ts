@@ -4,6 +4,7 @@ import {
   applyAppliedAiStackFunctionalCalibration,
   applyBackendApiInfraCalibration,
   applyAppliedAiDomainFloor,
+  applyFoundingEngineerStretchCalibration,
   applyFintechGoPrimaryCalibration,
   applyFdeBuilderScoreCalibration,
   applyNytCareerValueCalibration,
@@ -468,5 +469,46 @@ describe("scoringOutputPolish", () => {
     expect(next.domainFit).toBeLessThanOrEqual(5);
     expect(next.functionalOverlap).toBeGreaterThanOrEqual(7);
     expect(next.functionalOverlap).toBeLessThanOrEqual(8);
+  });
+
+  it("calibrates founding engineer startup roles to high-alignment stretch band", () => {
+    const extracted: ExtractedJobData = {
+      company: "Sailor Health",
+      title: "Founding Engineer",
+      stack: ["TypeScript", "React", "Node.js", "PostgreSQL"],
+      requiredSkills: [],
+      preferredSkills: [],
+      domainTags: ["healthcare"],
+      responsibilities: ["Shape engineering culture and own major technical decisions."],
+      requirements: ["4th engineer", "Build from scratch with high autonomy"],
+      rawText:
+        "Series A startup, 11-50 employees. Founding team role building healthcare AI workflows with limited mentorship.",
+    };
+    const next = applyFoundingEngineerStretchCalibration({
+      score: {
+        stackFit: 23,
+        levelFit: 11,
+        domainFit: 8,
+        resumeStoryClarity: 15,
+        functionalOverlap: 10,
+        recruiterFriendliness: 10,
+        careerValue: 10,
+        total: 87,
+      },
+      extracted,
+      rules: { ...baseRules(), foundingEngineerStretch: true },
+    });
+    expect(next.total).toBeGreaterThanOrEqual(77);
+    expect(next.total).toBeLessThanOrEqual(79);
+    expect(next.stackFit).toBeGreaterThanOrEqual(21);
+    expect(next.stackFit).toBeLessThanOrEqual(23);
+    expect(next.levelFit).toBeGreaterThanOrEqual(8);
+    expect(next.levelFit).toBeLessThanOrEqual(9);
+    expect(next.resumeStoryClarity).toBeGreaterThanOrEqual(13);
+    expect(next.resumeStoryClarity).toBeLessThanOrEqual(14);
+    expect(next.functionalOverlap).toBe(9);
+    expect(next.recruiterFriendliness).toBeGreaterThanOrEqual(7);
+    expect(next.recruiterFriendliness).toBeLessThanOrEqual(8);
+    expect(next.careerValue).toBe(10);
   });
 });

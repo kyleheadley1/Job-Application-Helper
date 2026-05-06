@@ -18,10 +18,31 @@ export const formatDuration = (ms: number): string => {
   return `${minutes}m ${seconds}s`;
 };
 
-/** Smoothly approaches ~92% while waiting for server completion. */
-export const computeVisualProgress = (elapsedMs: number): number => {
-  const eased = 100 * (1 - Math.exp(-Math.max(0, elapsedMs) / 6000));
-  return Math.min(92, Math.max(5, eased));
+export type TriageProgressPhase =
+  | "idle"
+  | "submitted"
+  | "triage_request_in_flight"
+  | "triage_response_received"
+  | "result_fetch_in_flight"
+  | "result_ready";
+
+/** Milestone-based progress to avoid rushing to ~90% then stalling. */
+export const progressForPhase = (phase: TriageProgressPhase): number => {
+  switch (phase) {
+    case "submitted":
+      return 8;
+    case "triage_request_in_flight":
+      return 45;
+    case "triage_response_received":
+      return 70;
+    case "result_fetch_in_flight":
+      return 85;
+    case "result_ready":
+      return 100;
+    case "idle":
+    default:
+      return 0;
+  }
 };
 
 export const readStoredTriageTiming = (jobId: string): StoredTriageTiming | null => {

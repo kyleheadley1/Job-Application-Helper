@@ -53,6 +53,8 @@ export const resolveRecommendation = (total, rules) => {
     }
     if (base === "no" && total >= 60)
         return "selective_yes";
+    if (rules.foundingEngineerStretch && total >= 77 && base === "selective_yes")
+        return "yes";
     if (total >= 78 && base === "selective_yes")
         return "yes";
     return base;
