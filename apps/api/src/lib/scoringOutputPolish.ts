@@ -7,6 +7,11 @@ import type { ExtractedJobData } from "../types/job.js";
 import type { RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
 import type { UserProfile } from "../types/userProfile.js";
 import { normalizeText } from "./text.js";
+import {
+  sanitizeVisibleNarrativeLine,
+  sanitizeVisibleRiskLine,
+  type VisibleSanitizeContext,
+} from "./riskDisplaySanitizer.js";
 
 export type ScoringNarrative = {
   score: ScoreBreakdown;
@@ -256,6 +261,7 @@ export function polishRisksAndMain(params: {
   travelLine?: string;
   max?: number;
   rules?: RuleEvaluation;
+  userProfile?: UserProfile;
 }): { mainRisk: string; risks: string[] } {
   const jdBlob = jobTextBlob(params.extracted);
   const max = params.max ?? 3;
@@ -288,9 +294,16 @@ export function polishRisksAndMain(params: {
   const top = pickBalancedRiskOrder(sorted, max);
   const fallbackMain =
     params.mainRisk.trim() || "Standard recruiter-screen gaps may still apply for unverified claims.";
+  const ctx: VisibleSanitizeContext = {
+    extracted: params.extracted,
+    userProfile: params.userProfile,
+    rules: params.rules,
+  };
+  const mainSan = sanitizeVisibleRiskLine(top[0] ?? fallbackMain, ctx);
+  const restSan = (top.length > 1 ? top.slice(1) : []).map((r) => sanitizeVisibleRiskLine(r, ctx));
   return {
-    mainRisk: top[0] ?? fallbackMain,
-    risks: top.length > 1 ? top.slice(1) : [],
+    mainRisk: mainSan,
+    risks: restSan,
   };
 }
 
@@ -357,7 +370,11 @@ function pickConcreteProofLine(
   return scored.find((r) => CONCRETE_ENGINEERING_PROOF.test(r)) ?? scored.find((r) => PROOF_HINT.test(r));
 }
 
-export function polishRationaleBullets(rationale: string[], max = 2): string[] {
+export function polishRationaleBullets(
+  rationale: string[],
+  max = 2,
+  ctx?: VisibleSanitizeContext,
+): string[] {
   const items = rationale.map((s) => sanitizeNarrativeSentence(s.trim())).filter(Boolean);
   const deduped: string[] = [];
   for (const item of items) {
@@ -397,6 +414,9 @@ export function polishRationaleBullets(rationale: string[], max = 2): string[] {
       }
     }
   }
+  if (ctx) {
+    return sliced.map((s) => sanitizeVisibleNarrativeLine(s, ctx));
+  }
   return sliced;
 }
 
@@ -408,6 +428,7 @@ export function applyAppliedAiDomainFloor(params: {
   rules: RuleEvaluation;
 }): ScoreBreakdown {
   const { score, extracted, userProfile, rules } = params;
+  if (rules.researchHeavyAiRole) return score;
   if (rules.domainMismatch) return score;
   const blob = jobTextBlob(extracted);
   if (!jdHasAppliedAiSystemsOverlap(blob) || !profileHasAiToolingEvidence(userProfile)) return score;
@@ -439,6 +460,7 @@ export function applyAppliedAiStackFunctionalCalibration(params: {
   rules: RuleEvaluation;
 }): ScoreBreakdown {
   const { score, extracted, userProfile, rules } = params;
+  if (rules.researchHeavyAiRole) return score;
   if (rules.domainMismatch || rules.stackMismatch) return score;
   /** Do not inflate stack for applied-AI overlap when mature employer + explicit core-language gate applies. */
   if (rules.explicitCoreLanguageMismatch) return score;
@@ -524,6 +546,174 @@ export function applyMidLevelOwnershipLevelCalibration(params: {
   if (levelFit === params.score.levelFit) return params.score;
   const next = { ...params.score, levelFit };
   return { ...next, total: sumScoreParts(next) };
+}
+
+/**
+ * Associate/entry backend-platform roles with broad "familiarity with" basics should stay accessible.
+ * Preferred stack deltas (Go/GraphQL/cloud platform) are caveats, not score-killers.
+ */
+export function applyAssociateEntryBackendPlatformCalibration(params: {
+  score: ScoreBreakdown;
+  extracted: ExtractedJobData;
+  rules: RuleEvaluation;
+}): ScoreBreakdown {
+  const { score, extracted, rules } = params;
+  const blob = jobTextBlob(extracted);
+  const associateEntry =
+    /\b(associate|entry[-\s]?level|early[-\s]?career|new grad|new graduate|junior)\b/i.test(blob);
+  const backendPlatform =
+    /\b(backend|platform|core software|service|infrastructure|content platform|publishing systems?|api)\b/i.test(
+      blob,
+    );
+  if (!associateEntry || !backendPlatform) return score;
+  if (rules.seniorityOverreach || rules.explicitCoreLanguageMismatch || rules.stackMismatch) return score;
+
+  const familiarityHeavy =
+    (blob.match(/\bfamiliarity\s+with\b/gi)?.length ?? 0) >= 2 ||
+    /\bfamiliarity\s+(building|with)\s+(backend|relational databases?|development process|unit testing|integration testing)\b/i.test(
+      blob,
+    );
+  const preferredOnlyAdvanced =
+    /\bpreferred[^.\n]{0,160}\b(go|golang|graphql|docker|kubernetes|cloud)\b/i.test(blob) ||
+    /\b(go|golang|graphql|docker|kubernetes|cloud)\b[^.\n]{0,160}\b(preferred|nice to have|plus)\b/i.test(
+      blob,
+    );
+  if (!familiarityHeavy && !preferredOnlyAdvanced) return score;
+
+  let next = { ...score };
+  next.levelFit = Math.max(13, next.levelFit);
+  next.stackFit = Math.max(16, next.stackFit);
+  next.functionalOverlap = Math.max(8, next.functionalOverlap);
+  next.domainFit = Math.max(8, next.domainFit);
+  next.resumeStoryClarity = Math.max(14, next.resumeStoryClarity);
+  next.careerValue = Math.max(9, next.careerValue);
+  if (next.recruiterFriendliness < 10) next.recruiterFriendliness = 10;
+  next.total = sumScoreParts(next);
+
+  const targetLo = 79;
+  const targetHi = 82;
+  const ups: Array<keyof Omit<ScoreBreakdown, "total">> = [
+    "careerValue",
+    "recruiterFriendliness",
+    "functionalOverlap",
+    "stackFit",
+    "levelFit",
+    "domainFit",
+    "resumeStoryClarity",
+  ];
+  const upsMax: Partial<Record<keyof Omit<ScoreBreakdown, "total">, number>> = {
+    careerValue: 10,
+    recruiterFriendliness: 11,
+    functionalOverlap: 9,
+    stackFit: 17,
+    levelFit: 14,
+    domainFit: 8,
+    resumeStoryClarity: 15,
+  };
+  let upGuard = 0;
+  while (next.total < targetLo && upGuard < 30) {
+    upGuard += 1;
+    let changed = false;
+    for (const d of ups) {
+      if (next[d] < (upsMax[d] ?? 99)) {
+        next = { ...next, [d]: (next[d] as number) + 1 } as ScoreBreakdown;
+        next.total = sumScoreParts(next);
+        changed = true;
+        break;
+      }
+    }
+    if (!changed) break;
+  }
+
+  if (next.total > 82) {
+    const dims: Array<keyof Omit<ScoreBreakdown, "total">> = [
+      "stackFit",
+      "recruiterFriendliness",
+      "functionalOverlap",
+      "domainFit",
+      "levelFit",
+      "careerValue",
+      "resumeStoryClarity",
+    ];
+    const mins: Partial<Record<keyof Omit<ScoreBreakdown, "total">, number>> = {
+      stackFit: 16,
+      recruiterFriendliness: 10,
+      functionalOverlap: 8,
+      domainFit: 8,
+      levelFit: 13,
+      careerValue: 9,
+      resumeStoryClarity: 14,
+    };
+    let guard = 0;
+    while (next.total > 82 && guard < 40) {
+      guard += 1;
+      let changed = false;
+      for (const d of dims) {
+        if (next[d] > (mins[d] ?? 0)) {
+          next = { ...next, [d]: (next[d] as number) - 1 } as ScoreBreakdown;
+          next.total = sumScoreParts(next);
+          changed = true;
+          break;
+        }
+      }
+      if (!changed) break;
+    }
+  }
+  if (next.total > targetHi) {
+    let guard = 0;
+    const dims: Array<keyof Omit<ScoreBreakdown, "total">> = [
+      "stackFit",
+      "recruiterFriendliness",
+      "functionalOverlap",
+      "domainFit",
+      "levelFit",
+      "careerValue",
+      "resumeStoryClarity",
+    ];
+    const mins: Partial<Record<keyof Omit<ScoreBreakdown, "total">, number>> = {
+      stackFit: 16,
+      recruiterFriendliness: 10,
+      functionalOverlap: 8,
+      domainFit: 8,
+      levelFit: 13,
+      careerValue: 9,
+      resumeStoryClarity: 14,
+    };
+    while (next.total > targetHi && guard < 30) {
+      guard += 1;
+      let changed = false;
+      for (const d of dims) {
+        if (next[d] > (mins[d] ?? 0)) {
+          next = { ...next, [d]: (next[d] as number) - 1 } as ScoreBreakdown;
+          next.total = sumScoreParts(next);
+          changed = true;
+          break;
+        }
+      }
+      if (!changed) break;
+    }
+  }
+  return next;
+}
+
+/** NYT publishing/content engineering is high-signal career value for this profile when no hard blockers. */
+export function applyNytCareerValueCalibration(params: {
+  score: ScoreBreakdown;
+  extracted: ExtractedJobData;
+  rules: RuleEvaluation;
+}): ScoreBreakdown {
+  const { score, extracted, rules } = params;
+  if (rules.domainMismatch || rules.locationMismatch) return score;
+  const blob = jobTextBlob(extracted);
+  const nyt = /\b(new york times|nyt)\b/i.test(blob);
+  const contentPlatform =
+    /\b(publishing|content platform|newsroom|editorial systems?|media platform|content systems?)\b/i.test(blob);
+  if (!nyt || !contentPlatform) return score;
+  let next = { ...score };
+  next.careerValue = Math.max(next.careerValue, 9);
+  if (next.domainFit < 8) next.domainFit = 8;
+  next.total = sumScoreParts(next);
+  return next;
 }
 
 /** Healthcare org + product/full-stack JD: avoid domain scores in the gutter for generic “no clinical SME” noise. */
@@ -733,6 +923,244 @@ export function applyVagueEarlyStageAiCalibration(params: {
   return { ...next, total };
 }
 
+/**
+ * Research-heavy AI roles (publications/meta-learning/program synthesis/experiments)
+ * should not be inflated by product LLM overlap alone.
+ */
+export function applyResearchHeavyAiCalibration(params: {
+  score: ScoreBreakdown;
+  rules: RuleEvaluation;
+}): ScoreBreakdown {
+  if (!params.rules.researchHeavyAiRole) return params.score;
+  let next = { ...params.score };
+  next.stackFit = Math.min(next.stackFit, 11);
+  next.levelFit = Math.min(next.levelFit, 8);
+  next.domainFit = Math.min(next.domainFit, 8);
+  next.resumeStoryClarity = Math.min(next.resumeStoryClarity, 9);
+  next.functionalOverlap = Math.min(next.functionalOverlap, 6);
+  next.recruiterFriendliness = Math.min(next.recruiterFriendliness, 6);
+  next.careerValue = Math.max(next.careerValue, 9);
+  next.total = sumScoreParts(next);
+
+  const targetLo = 55;
+  const targetHi = 60;
+  type Dim = keyof Omit<ScoreBreakdown, "total">;
+  const downOrder: Dim[] = [
+    "stackFit",
+    "resumeStoryClarity",
+    "functionalOverlap",
+    "recruiterFriendliness",
+    "levelFit",
+    "domainFit",
+  ];
+  const mins: Partial<Record<Dim, number>> = {
+    stackFit: 9,
+    resumeStoryClarity: 7,
+    functionalOverlap: 5,
+    recruiterFriendliness: 4,
+    levelFit: 6,
+    domainFit: 6,
+    careerValue: 9,
+  };
+  let guard = 0;
+  while (next.total > targetHi && guard < 60) {
+    guard += 1;
+    let progressed = false;
+    for (const key of downOrder) {
+      if (next[key] > (mins[key] ?? 0)) {
+        next = { ...next, [key]: (next[key] as number) - 1 } as ScoreBreakdown;
+        next.total = sumScoreParts(next);
+        progressed = true;
+        break;
+      }
+    }
+    if (!progressed) break;
+  }
+  const upOrder: Dim[] = ["careerValue", "domainFit", "levelFit", "recruiterFriendliness"];
+  const maxs: Partial<Record<Dim, number>> = {
+    careerValue: 10,
+    domainFit: 8,
+    levelFit: 8,
+    recruiterFriendliness: 6,
+  };
+  guard = 0;
+  while (next.total < targetLo && guard < 40) {
+    guard += 1;
+    let progressed = false;
+    for (const key of upOrder) {
+      if (next[key] < (maxs[key] ?? 99)) {
+        next = { ...next, [key]: (next[key] as number) + 1 } as ScoreBreakdown;
+        next.total = sumScoreParts(next);
+        progressed = true;
+        break;
+      }
+    }
+    if (!progressed) break;
+  }
+  return next;
+}
+
+/**
+ * Fintech/payments backend roles with Go-primary or microservices-heavy expectations:
+ * viable but lower-priority stretch for TypeScript-first profile.
+ */
+export function applyFintechGoPrimaryCalibration(params: {
+  score: ScoreBreakdown;
+  extracted: ExtractedJobData;
+  rules: RuleEvaluation;
+}): ScoreBreakdown {
+  const { score, extracted, rules } = params;
+  if (!rules.fintechGoPrimaryStretch) return score;
+  const blob = jobTextBlob(extracted);
+  const goPrimary =
+    /\b(go|golang)\s+is\s+our\s+primary\s+backend\s+language\b/i.test(blob) ||
+    /\bprimary\s+backend\s+language\b[^.\n]{0,60}\b(go|golang)\b/i.test(blob) ||
+    /\bstrong\s+proficiency\s+in\s+(go|golang)\b/i.test(blob);
+  const jsPythonAcceptable =
+    /\b(java|python|javascript|typescript)\b[^.\n]{0,70}\b(acceptable|also accepted|or equivalent|or similar)\b/i.test(
+      blob,
+    ) ||
+    /\b(acceptable|equivalent|similar)\b[^.\n]{0,90}\b(java|python|javascript|typescript)\b/i.test(blob);
+
+  let next = { ...score };
+  const stackCap = goPrimary ? (jsPythonAcceptable ? 15 : 14) : 15;
+  next.stackFit = Math.min(next.stackFit, stackCap);
+  next.resumeStoryClarity = Math.min(next.resumeStoryClarity, 12);
+  next.domainFit = Math.min(next.domainFit, 5);
+  next.functionalOverlap = Math.min(next.functionalOverlap, 8);
+  if (goPrimary) next.recruiterFriendliness = Math.min(next.recruiterFriendliness, 7);
+  next.total = sumScoreParts(next);
+
+  const targetLo = 66;
+  const targetHi = 70;
+  type Dim = keyof Omit<ScoreBreakdown, "total">;
+  const downOrder: Dim[] = [
+    "stackFit",
+    "resumeStoryClarity",
+    "domainFit",
+    "functionalOverlap",
+    "recruiterFriendliness",
+    "levelFit",
+  ];
+  const mins: Partial<Record<Dim, number>> = {
+    stackFit: 14,
+    resumeStoryClarity: 11,
+    domainFit: 4,
+    functionalOverlap: 7,
+    recruiterFriendliness: 6,
+    levelFit: 9,
+    careerValue: 8,
+  };
+  let guard = 0;
+  while (next.total > targetHi && guard < 50) {
+    guard += 1;
+    let progressed = false;
+    for (const k of downOrder) {
+      if (next[k] > (mins[k] ?? 0)) {
+        next = { ...next, [k]: (next[k] as number) - 1 } as ScoreBreakdown;
+        next.total = sumScoreParts(next);
+        progressed = true;
+        break;
+      }
+    }
+    if (!progressed) break;
+  }
+  const upOrder: Dim[] = ["functionalOverlap", "resumeStoryClarity", "stackFit", "recruiterFriendliness"];
+  const maxs: Partial<Record<Dim, number>> = {
+    stackFit: 15,
+    resumeStoryClarity: 12,
+    domainFit: 5,
+    functionalOverlap: 8,
+    recruiterFriendliness: 8,
+  };
+  guard = 0;
+  while (next.total < targetLo && guard < 40) {
+    guard += 1;
+    let progressed = false;
+    for (const k of upOrder) {
+      if (next[k] < (maxs[k] ?? 99)) {
+        next = { ...next, [k]: (next[k] as number) + 1 } as ScoreBreakdown;
+        next.total = sumScoreParts(next);
+        progressed = true;
+        break;
+      }
+    }
+    if (!progressed) break;
+  }
+  return next;
+}
+
+/**
+ * Charlie Health–shaped healthcare product engineering: keep totals in a realistic high-80s band
+ * (internal calibration; visible copy must stay company-specific via risk sanitizer).
+ */
+export function applyCharlieHealthProductCalibration(params: {
+  score: ScoreBreakdown;
+  extracted: ExtractedJobData;
+  rules: RuleEvaluation;
+}): ScoreBreakdown {
+  const { score, extracted, rules } = params;
+  if (!/\bcharlie\s+health\b/i.test((extracted.company ?? "").trim())) return score;
+  if (!rules.healthcareProductEngineering || rules.domainMismatch || rules.stackMismatch) return score;
+  if (rules.explicitCoreLanguageMismatch || rules.fdeBuilderSoftwarePrimary || rules.vagueEarlyStageAiCalibration) {
+    return score;
+  }
+
+  type Dim = keyof Omit<ScoreBreakdown, "total">;
+  const bands: Record<Dim, [number, number]> = {
+    stackFit: [20, 22],
+    levelFit: [11, 12],
+    domainFit: [6, 7],
+    resumeStoryClarity: [14, 15],
+    functionalOverlap: [9, 10],
+    recruiterFriendliness: [10, 11],
+    careerValue: [8, 9],
+  };
+
+  let next: ScoreBreakdown = { ...score };
+  (Object.keys(bands) as Dim[]).forEach((k) => {
+    const [lo, hi] = bands[k];
+    next[k] = Math.min(hi, Math.max(lo, next[k])) as ScoreBreakdown[typeof k];
+  });
+  next.total = sumScoreParts(next);
+
+  const targetLo = 82;
+  const targetHi = 85;
+  let guard = 0;
+  while (next.total < targetLo && guard < 28) {
+    guard += 1;
+    let progressed = false;
+    for (const k of Object.keys(bands) as Dim[]) {
+      const [lo, hi] = bands[k];
+      const cur = next[k] as number;
+      if (cur < hi) {
+        next = { ...next, [k]: cur + 1 } as ScoreBreakdown;
+        next.total = sumScoreParts(next);
+        progressed = true;
+        break;
+      }
+    }
+    if (!progressed) break;
+  }
+  guard = 0;
+  while (next.total > targetHi && guard < 28) {
+    guard += 1;
+    let progressed = false;
+    for (const k of Object.keys(bands) as Dim[]) {
+      const [lo, hi] = bands[k];
+      const cur = next[k] as number;
+      if (cur > lo) {
+        next = { ...next, [k]: cur - 1 } as ScoreBreakdown;
+        next.total = sumScoreParts(next);
+        progressed = true;
+        break;
+      }
+    }
+    if (!progressed) break;
+  }
+  return next;
+}
+
 export function appendMatureLanguageShotGuidance(topMatch: string, rules: RuleEvaluation): string {
   if (!rules.explicitCoreLanguageMismatch || !rules.matureStructuredEmployer) return topMatch;
   const lab =
@@ -750,6 +1178,27 @@ export function appendMatureLanguageShotGuidance(topMatch: string, rules: RuleEv
   return `${base.replace(/\.\s*$/, "")}. ${tail}`;
 }
 
+export function appendLotteryTicketGuidance(topMatch: string, params: {
+  score: ScoreBreakdown;
+  rules: RuleEvaluation;
+}): string {
+  if (params.score.total >= 60) return topMatch;
+  if (!params.rules.researchHeavyAiRole && params.score.careerValue < 9) return topMatch;
+  if (/\blottery[-\s]?ticket\b/i.test(topMatch)) return topMatch;
+  const suffix = "At this fit level, treat this as a lottery-ticket only application.";
+  const base = topMatch.trim();
+  return base ? `${base.replace(/\.\s*$/, "")}. ${suffix}` : suffix;
+}
+
+export function appendFintechGoStretchGuidance(topMatch: string, params: {
+  rules: RuleEvaluation;
+}): string {
+  if (!params.rules.fintechGoPrimaryStretch) return topMatch;
+  const line =
+    "Moderate backend/API fit with useful product collaboration overlap, but Go-primary fintech infrastructure makes this a stretch.";
+  return line;
+}
+
 export function polishScoringNarrative(params: {
   narrative: Pick<ScoringNarrative, "topMatch" | "mainRisk" | "risks" | "rationale">;
   score: ScoreBreakdown;
@@ -758,6 +1207,11 @@ export function polishScoringNarrative(params: {
   rules: RuleEvaluation;
 }): ScoringNarrative {
   const travelLine = travelRiskLine(jobTextBlob(params.extracted));
+  const visibleCtx: VisibleSanitizeContext = {
+    extracted: params.extracted,
+    userProfile: params.userProfile,
+    rules: params.rules,
+  };
   const { mainRisk, risks } = polishRisksAndMain({
     mainRisk: params.narrative.mainRisk,
     risks: params.narrative.risks,
@@ -765,8 +1219,9 @@ export function polishScoringNarrative(params: {
     travelLine,
     max: 2,
     rules: params.rules,
+    userProfile: params.userProfile,
   });
-  const rationale = polishRationaleBullets(params.narrative.rationale, 2);
+  const rationale = polishRationaleBullets(params.narrative.rationale, 2, visibleCtx);
   let score = applyAppliedAiDomainFloor({
     score: params.score,
     extracted: params.extracted,
@@ -785,6 +1240,16 @@ export function polishScoringNarrative(params: {
     extracted: params.extracted,
     rules: params.rules,
   });
+  score = applyAssociateEntryBackendPlatformCalibration({
+    score,
+    extracted: params.extracted,
+    rules: params.rules,
+  });
+  score = applyNytCareerValueCalibration({
+    score,
+    extracted: params.extracted,
+    rules: params.rules,
+  });
   score = applyHealthcareProductDomainCalibration({ score, rules: params.rules });
   score = applyBackendApiInfraCalibration({
     score,
@@ -798,10 +1263,27 @@ export function polishScoringNarrative(params: {
     extracted: params.extracted,
     rules: params.rules,
   });
+  score = applyResearchHeavyAiCalibration({
+    score,
+    rules: params.rules,
+  });
+  score = applyFintechGoPrimaryCalibration({
+    score,
+    extracted: params.extracted,
+    rules: params.rules,
+  });
+  score = applyCharlieHealthProductCalibration({
+    score,
+    extracted: params.extracted,
+    rules: params.rules,
+  });
   const rawTop = params.narrative.topMatch?.trim() ?? "";
-  const topMatch = appendMatureLanguageShotGuidance(
+  let topMatch = appendMatureLanguageShotGuidance(
     rawTop ? sanitizeNarrativeSentence(rawTop, 50) : rawTop,
     params.rules,
   );
+  topMatch = appendFintechGoStretchGuidance(topMatch, { rules: params.rules });
+  topMatch = appendLotteryTicketGuidance(topMatch, { score, rules: params.rules });
+  topMatch = sanitizeVisibleNarrativeLine(topMatch, visibleCtx);
   return { score, topMatch, mainRisk, risks, rationale };
 }

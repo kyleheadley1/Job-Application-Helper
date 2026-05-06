@@ -70,7 +70,7 @@ describe("computeSalaryAsk", () => {
       recommendation: "yes",
       rules: baseRules(),
     });
-    expect(ask.number).toBe(188_000);
+    expect(ask.number).toBe(190_000);
   });
 
   it("caps at 190k when ask would cross 200k without elite fit", () => {
@@ -137,8 +137,32 @@ describe("computeSalaryAsk", () => {
       recommendation: "selective_yes",
       rules: { ...baseRules(), earlyCareerFriendlyRole: true },
     });
-    expect(ask.number).toBe(127_500);
+    expect(ask.number).toBe(130_000);
     expect(ask.rangeMin).toBe(120_000);
     expect(ask.rangeMax).toBe(135_000);
+  });
+
+  it("uses posted top-of-band for strong fit on modest narrow bands", () => {
+    const ask = computeSalaryAsk({
+      extracted: {
+        ...baseJob(),
+        company: "New York Times",
+        title: "Core Software Engineer Associate",
+        salary: { min: 96_000, max: 110_000 },
+      },
+      score: scoreParts({
+        stackFit: 16,
+        levelFit: 14,
+        domainFit: 8,
+        resumeStoryClarity: 14,
+        functionalOverlap: 8,
+        recruiterFriendliness: 10,
+        careerValue: 9,
+        total: 79,
+      }),
+      recommendation: "yes",
+      rules: baseRules(),
+    });
+    expect(ask.number).toBe(110_000);
   });
 });

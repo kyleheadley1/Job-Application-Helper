@@ -5,6 +5,7 @@ import { logger } from '../../lib/logger.js';
 import { buildScoringPrompt, scoringSystemPrompt } from './prompts.js';
 import { preprocessScoringInput } from '../../tools/triageStructuredNormalize.js';
 import { responsesClient } from '../../services/llm/responsesClient.js';
+import { polishScoringNarrative, jdHasAppliedAiSystemsOverlap, profileHasAiToolingEvidence, } from '../../lib/scoringOutputPolish.js';
 const ScoringOutputSchema = z.object({
     score: z.object({
         stackFit: z.number().min(0).max(25),
@@ -25,6 +26,37 @@ const ScoringOutputSchema = z.object({
 /** Exported for regression tests (live-output normalization). */
 export const ScoringFromModelSchema = z.preprocess(preprocessScoringInput, ScoringOutputSchema);
 export const mapRecommendationFromScore = (total) => scoringPolicy.recommendationMapping.find((entry) => total >= entry.min && total <= entry.max)?.recommendation ?? 'no';
+/** True when recommendation should stay conservative (selective_yes allowed). */
+export const recommendationHardConstraints = (rules) => Boolean(rules.locationMismatch ||
+    rules.explicitDegreeRisk ||
+    rules.strictNewGradPipeline ||
+    rules.explicitCoreLanguageMismatch ||
+    rules.visaMismatch ||
+    rules.citizenshipMismatch ||
+    rules.clearanceMismatch ||
+    rules.stackMismatch ||
+    rules.domainMismatch ||
+    rules.seniorityOverreach);
+/**
+ * Strong scores default to "yes" when no gates; real gates pull high scores to selective_yes.
+ */
+export const resolveRecommendation = (total, rules) => {
+    if (total < 60)
+        return "no";
+    if (rules.researchHeavyAiRole && total < 70)
+        return "no";
+    const base = mapRecommendationFromScore(total);
+    if (recommendationHardConstraints(rules)) {
+        if (total >= 80 && base === "yes")
+            return "selective_yes";
+        return base;
+    }
+    if (base === "no" && total >= 60)
+        return "selective_yes";
+    if (total >= 78 && base === "selective_yes")
+        return "yes";
+    return base;
+};
 const deterministicFallback = (job, rules) => {
     const stackHits = [job.stack, job.requiredSkills, job.preferredSkills]
         .flat()
@@ -56,8 +88,8 @@ const deterministicFallback = (job, rules) => {
     if (/\brest(ful)?\s+apis?\b|\brest\s+api\b/i.test(fitBlob))
         stackFit = Math.min(25, stackFit + 1);
     const levelFit = rules.seniorityOverreach ? 5 : 11;
-    const domainFit = rules.domainMismatch ? 4 : 7;
-    const resumeStoryClarity = rules.stackMismatch ? 6 : 11;
+    let domainFit = rules.domainMismatch ? 4 : 7;
+    let resumeStoryClarity = rules.stackMismatch ? 6 : 11;
     let functionalOverlap = rules.stackMismatch ? 4 : 7;
     if (/\binternal\s+tools\b/i.test(fitBlob))
         functionalOverlap = Math.min(10, functionalOverlap + 1);
@@ -84,6 +116,29 @@ const deterministicFallback = (job, rules) => {
         recruiterFriendliness = Math.max(0, recruiterFriendliness - 1);
         functionalOverlap = Math.max(0, functionalOverlap - 1);
     }
+    const appliedAiStrong = /\b(llm|rag\b|vector\s+(search|database|db)|embedding|generative ai|ai engineer|agentic|evals?\b|retrieval[-\s]?augmented)\b/i.test(fitBlob);
+    if (appliedAiStrong) {
+        stackFit = Math.min(25, stackFit + 2);
+        functionalOverlap = Math.min(10, functionalOverlap + 2);
+        resumeStoryClarity = Math.min(15, resumeStoryClarity + 1);
+        careerValue = Math.min(10, careerValue + 1);
+    }
+    // Python-primary caveat: one venue only — do not subtract when JD also signals TS/Node/API AI work.
+    if (appliedAiStrong &&
+        /\bpython\b/i.test(fitBlob) &&
+        !/\btypescript|javascript|node\.?js\b/i.test(fitBlob)) {
+        stackFit = Math.max(0, stackFit - 1);
+    }
+    if (appliedAiStrong && !rules.domainMismatch) {
+        domainFit = Math.max(domainFit, 7);
+        if (domainFit === 7 && /\b(agent|agents|evaluation|evals)\b/i.test(fitBlob))
+            domainFit = 8;
+        domainFit = Math.min(10, domainFit);
+    }
+    if (/\b(nyc|new york|manhattan|brooklyn|hybrid\s+.{0,40}new\s+york)\b/i.test(fitBlob) &&
+        (job.remoteType === "hybrid" || job.remoteType === "onsite" || job.remoteType === "remote")) {
+        recruiterFriendliness = Math.min(15, recruiterFriendliness + 1);
+    }
     const subtotal = stackFit +
         levelFit +
         domainFit +
@@ -93,7 +148,7 @@ const deterministicFallback = (job, rules) => {
         careerValue;
     const penalty = Object.values(rules.penaltyVector ?? {}).reduce((sum, value) => sum + value, 0);
     const total = Math.max(0, Math.min(100, subtotal - Math.round(penalty / 3)));
-    const recommendation = mapRecommendationFromScore(total);
+    const recommendation = resolveRecommendation(total, rules);
     return {
         score: {
             stackFit,
@@ -107,12 +162,12 @@ const deterministicFallback = (job, rules) => {
         },
         recommendation,
         topMatch: 'Backend-leaning product engineering and API overlap.',
-        mainRisk: rules.notes[0] ?? 'Recruiter screen realism risk.',
+        mainRisk: rules.hardRuleNotes?.[0] ?? rules.notes[0] ?? 'Recruiter screen realism risk.',
         rationale: [
             'Score uses conservative fit plus recruiter-screen realism.',
             'Deterministic penalties are applied when hard gates are present.',
         ],
-        risks: rules.notes,
+        risks: [...(rules.hardRuleNotes ?? []), ...rules.notes],
     };
 };
 /** Deterministic scoring path exported for calibration tests. */
@@ -124,6 +179,39 @@ const hardBlockersDominate = (rules) => Boolean(rules.explicitDegreeRisk ||
     rules.strictNewGradPipeline ||
     rules.seniorityOverreach ||
     rules.domainMismatch);
+const sumScoreBreakdown = (s) => s.stackFit +
+    s.levelFit +
+    s.domainFit +
+    s.resumeStoryClarity +
+    s.functionalOverlap +
+    s.recruiterFriendliness +
+    s.careerValue;
+/**
+ * When the JD is applied-AI shaped, the profile shows AI tooling, resume context overlap is strong,
+ * and there is no hard mismatch, resume narrative deserves a full 15/15 — do not hold story down for conservative tone alone.
+ */
+export const applyAlignedResumeStoryClarity = (params) => {
+    const { score, extracted, rules, resumeContexts, userProfile } = params;
+    if (rules.domainMismatch || rules.stackMismatch)
+        return score;
+    if (rules.seniorityOverreach || rules.explicitDegreeRisk)
+        return score;
+    const blob = normalizeText([
+        extracted.title,
+        extracted.rawText ?? "",
+        ...(extracted.responsibilities ?? []),
+        ...(extracted.requirements ?? []),
+    ].join("\n"));
+    if (!jdHasAppliedAiSystemsOverlap(blob) || !profileHasAiToolingEvidence(userProfile))
+        return score;
+    const signal = supportingResumeSignals(extracted, resumeContexts);
+    if (signal < 10)
+        return score;
+    if (score.resumeStoryClarity >= 15)
+        return score;
+    const next = { ...score, resumeStoryClarity: 15 };
+    return { ...next, total: sumScoreBreakdown(next) };
+};
 const supportingResumeSignals = (extracted, resumeContexts) => {
     if (!resumeContexts)
         return 0;
@@ -227,11 +315,34 @@ export const scoreJob = async (params) => {
         rules: params.rules,
         resumeContexts: params.resumeContexts,
     });
+    const polished = polishScoringNarrative({
+        narrative: {
+            topMatch: llmResult.topMatch,
+            mainRisk: llmResult.mainRisk,
+            risks: llmResult.risks,
+            rationale: llmResult.rationale,
+        },
+        score: adjustedScore,
+        extracted: params.extracted,
+        userProfile: params.userProfile,
+        rules: params.rules,
+    });
+    const scoreAfterStory = applyAlignedResumeStoryClarity({
+        score: polished.score,
+        extracted: params.extracted,
+        rules: params.rules,
+        resumeContexts: params.resumeContexts,
+        userProfile: params.userProfile,
+    });
     return {
         scoring: {
             ...llmResult,
-            score: adjustedScore,
-            recommendation: mapRecommendationFromScore(adjustedScore.total),
+            score: scoreAfterStory,
+            topMatch: polished.topMatch,
+            mainRisk: polished.mainRisk,
+            risks: polished.risks,
+            rationale: polished.rationale,
+            recommendation: resolveRecommendation(scoreAfterStory.total, params.rules),
         },
         scoringDiagnostics: scoredRun.diagnostics,
         scoringLlmSucceeded: scoredRun.success,

@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyAssociateEntryBackendPlatformCalibration,
   applyAppliedAiStackFunctionalCalibration,
   applyBackendApiInfraCalibration,
   applyAppliedAiDomainFloor,
+  applyFintechGoPrimaryCalibration,
   applyFdeBuilderScoreCalibration,
+  applyNytCareerValueCalibration,
+  applyResearchHeavyAiCalibration,
   applyVagueEarlyStageAiCalibration,
   extractMaxTravelPercent,
   jdHasAppliedAiSystemsOverlap,
@@ -339,5 +343,130 @@ describe("scoringOutputPolish", () => {
     const expanded = sanitizeNarrativeSentence("Strong applied-AI fit from LLM/RAG work,");
     expect(expanded.length).toBeGreaterThan(55);
     expect(expanded).toMatch(/end-to-end|workflow experience|integration/i);
+  });
+
+  it("keeps associate/entry backend-platform roles in an accessible band", () => {
+    const extracted: ExtractedJobData = {
+      company: "New York Times",
+      title: "Core Software Engineer Associate",
+      stack: ["TypeScript", "Node.js"],
+      requiredSkills: [],
+      preferredSkills: ["Go", "GraphQL", "Docker/Kubernetes", "Cloud deployments"],
+      domainTags: [],
+      responsibilities: ["Build backend services for publishing systems."],
+      requirements: ["Familiarity with relational databases and backend systems."],
+      rawText:
+        "Associate role. Basic qualifications emphasize familiarity with backend systems, relational databases, and testing. Preferred: Go, GraphQL, cloud, Docker/Kubernetes.",
+    };
+    const next = applyAssociateEntryBackendPlatformCalibration({
+      score: {
+        stackFit: 14,
+        levelFit: 11,
+        domainFit: 7,
+        resumeStoryClarity: 13,
+        functionalOverlap: 7,
+        recruiterFriendliness: 9,
+        careerValue: 8,
+        total: 69,
+      },
+      extracted,
+      rules: baseRules(),
+    });
+    expect(next.levelFit).toBeGreaterThanOrEqual(13);
+    expect(next.stackFit).toBeGreaterThanOrEqual(16);
+    expect(next.total).toBeGreaterThanOrEqual(79);
+    expect(next.total).toBeLessThanOrEqual(82);
+  });
+
+  it("boosts career/domain for NYT publishing-content roles", () => {
+    const extracted: ExtractedJobData = {
+      company: "New York Times",
+      title: "Backend Engineer",
+      stack: [],
+      requiredSkills: [],
+      preferredSkills: [],
+      domainTags: [],
+      responsibilities: ["Build publishing and content platform services."],
+      requirements: [],
+      rawText: "Editorial tooling and content platform systems in NYC.",
+    };
+    const next = applyNytCareerValueCalibration({
+      score: {
+        stackFit: 16,
+        levelFit: 13,
+        domainFit: 6,
+        resumeStoryClarity: 14,
+        functionalOverlap: 8,
+        recruiterFriendliness: 10,
+        careerValue: 7,
+        total: 74,
+      },
+      extracted,
+      rules: baseRules(),
+    });
+    expect(next.careerValue).toBeGreaterThanOrEqual(9);
+    expect(next.domainFit).toBeGreaterThanOrEqual(8);
+  });
+
+  it("pulls research-heavy AI roles into 55-60 with career value preserved", () => {
+    const next = applyResearchHeavyAiCalibration({
+      score: {
+        stackFit: 17,
+        levelFit: 11,
+        domainFit: 8,
+        resumeStoryClarity: 13,
+        functionalOverlap: 9,
+        recruiterFriendliness: 10,
+        careerValue: 9,
+        total: 77,
+      },
+      rules: { ...baseRules(), researchHeavyAiRole: true },
+    });
+    expect(next.total).toBeGreaterThanOrEqual(55);
+    expect(next.total).toBeLessThanOrEqual(60);
+    expect(next.stackFit).toBeLessThanOrEqual(11);
+    expect(next.resumeStoryClarity).toBeLessThanOrEqual(9);
+    expect(next.functionalOverlap).toBeLessThanOrEqual(6);
+    expect(next.recruiterFriendliness).toBeLessThanOrEqual(6);
+    expect(next.careerValue).toBeGreaterThanOrEqual(9);
+  });
+
+  it("calibrates fintech go-primary backend stretch into mid/upper 60s", () => {
+    const extracted: ExtractedJobData = {
+      company: "Imprint",
+      title: "Software Engineer",
+      stack: ["Go", "MySQL", "DynamoDB", "Microservices"],
+      requiredSkills: ["Go is our primary backend language", "on-call ownership"],
+      preferredSkills: [],
+      domainTags: ["fintech", "payments"],
+      responsibilities: ["Build microservices and provider integrations."],
+      requirements: [],
+      rawText:
+        "Fintech payments backend role. Go is our primary backend language. Microservices, on-call, production troubleshooting, external provider integrations.",
+    };
+    const next = applyFintechGoPrimaryCalibration({
+      score: {
+        stackFit: 18,
+        levelFit: 11,
+        domainFit: 7,
+        resumeStoryClarity: 14,
+        functionalOverlap: 9,
+        recruiterFriendliness: 10,
+        careerValue: 9,
+        total: 78,
+      },
+      extracted,
+      rules: { ...baseRules(), fintechGoPrimaryStretch: true },
+    });
+    expect(next.total).toBeGreaterThanOrEqual(66);
+    expect(next.total).toBeLessThanOrEqual(70);
+    expect(next.stackFit).toBeGreaterThanOrEqual(14);
+    expect(next.stackFit).toBeLessThanOrEqual(15);
+    expect(next.resumeStoryClarity).toBeGreaterThanOrEqual(11);
+    expect(next.resumeStoryClarity).toBeLessThanOrEqual(12);
+    expect(next.domainFit).toBeGreaterThanOrEqual(4);
+    expect(next.domainFit).toBeLessThanOrEqual(5);
+    expect(next.functionalOverlap).toBeGreaterThanOrEqual(7);
+    expect(next.functionalOverlap).toBeLessThanOrEqual(8);
   });
 });

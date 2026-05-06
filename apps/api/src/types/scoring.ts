@@ -51,6 +51,10 @@ export type RuleEvaluation = {
    * damp score inflation, cap recruiter/domain realism.
    */
   vagueEarlyStageAiCalibration?: boolean;
+  /** Research-heavy AI role shape (publications/meta-learning/program synthesis/experimental track record). */
+  researchHeavyAiRole?: boolean;
+  /** Fintech/payments backend role with Go-primary or microservices-heavy production expectations. */
+  fintechGoPrimaryStretch?: boolean;
   /**
    * True first-pass gates only (UI "Hard-rule flags"): commutable location, degree, explicit core language.
    * Visa/citizenship/clearance and other notes stay in `notes` / key risks.

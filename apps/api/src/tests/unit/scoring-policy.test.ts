@@ -35,14 +35,17 @@ describe("scoring policy behavior", () => {
     expect(mapRecommendationFromScore(60)).toBe("no");
   });
 
-  it("upgrades selective to yes at 80+ when no hard gates", () => {
+  it("upgrades selective to yes at 78+ when no hard gates", () => {
     expect(resolveRecommendation(80, cleanRules())).toBe("yes");
+    expect(resolveRecommendation(78, cleanRules())).toBe("yes");
     expect(resolveRecommendation(76, cleanRules())).toBe("selective_yes");
   });
 
-  it("does not return no at 60+ without hard blockers", () => {
+  it("keeps sub-70 viable roles as selective_yes unless research-heavy", () => {
     expect(mapRecommendationFromScore(60)).toBe("no");
     expect(resolveRecommendation(60, cleanRules())).toBe("selective_yes");
+    expect(resolveRecommendation(69, cleanRules())).toBe("selective_yes");
+    expect(resolveRecommendation(69, { ...cleanRules(), researchHeavyAiRole: true })).toBe("no");
   });
 
   it("downgrades yes to selective_yes at 80+ when hard constraints exist", () => {

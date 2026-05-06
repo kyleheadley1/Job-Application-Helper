@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { AssetGenerationSkippedError, } from "../agents/jobAgent/assetGeneration.js";
 import { GenerateAssetsForIdBodySchema, GenerateAssetsFromJobBodySchema, JobExportQuerySchema, JobExportRowSchema, JobListQuerySchema, JobRecordSchema, TriageRequestSchema, TriageResponseSchema, UpdateJobNotesBodySchema, UpdateJobStatusBodySchema, } from "../agents/jobAgent/schemas.js";
-import { JobNotFoundError, jobsService } from "../services/jobs/jobs.service.js";
+import { canConfirmApplied, JobNotFoundError, jobsService } from "../services/jobs/jobs.service.js";
 import { JobConfirmNotAllowedError } from "../services/jobs/jobs.service.js";
 import { TRACKER_EXPORT_HEADERS } from "../tracker/canonicalSpreadsheet.js";
 export const jobsRouter = Router();
@@ -28,7 +28,7 @@ jobsRouter.post("/triage", async (req, res, next) => {
         res.json({
             ...validated,
             tracked: false,
-            canConfirmApplied: validated.recommendation !== "no",
+            canConfirmApplied: canConfirmApplied(validated),
         });
     }
     catch (error) {
@@ -98,7 +98,7 @@ jobsRouter.get("/:id", async (req, res, next) => {
         res.json({
             ...validated,
             tracked,
-            canConfirmApplied: !tracked && validated.recommendation !== "no",
+            canConfirmApplied: !tracked && canConfirmApplied(validated),
         });
     }
     catch (error) {

@@ -49,6 +49,8 @@ export type RuleEvaluation = {
   backendProductApiRole?: boolean;
   infraCoreRole?: boolean;
   vagueEarlyStageAiCalibration?: boolean;
+  researchHeavyAiRole?: boolean;
+  fintechGoPrimaryStretch?: boolean;
   hardRuleNotes?: string[];
   notes: string[];
 };

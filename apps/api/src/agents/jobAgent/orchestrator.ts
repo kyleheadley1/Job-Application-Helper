@@ -16,6 +16,7 @@ import { extractJobData } from '../../tools/extractJobData.js';
 import { listMissingCriticalFields } from '../../tools/deterministicRawTextExtract.js';
 import { resumeContextService } from '../../services/resume/resumeContext.js';
 import { logger } from '../../lib/logger.js';
+import { withSanitizedRuleNotes } from '../../lib/riskDisplaySanitizer.js';
 
 export const triageJob = async (input: {
   url?: string;
@@ -57,7 +58,7 @@ export const triageJob = async (input: {
   stageMs.extraction = Date.now() - extractionStart;
 
   const rulesStart = Date.now();
-  const rules = evaluateRules(extracted, userProfile);
+  const rules = withSanitizedRuleNotes(evaluateRules(extracted, userProfile), extracted, userProfile);
   stageMs.rules = Date.now() - rulesStart;
   const resumeCtxStart = Date.now();
   const resumeContexts = await resumeContextService.getAvailableContexts();

@@ -19,6 +19,9 @@ export class JobConfirmNotAllowedError extends Error {
         this.name = "JobConfirmNotAllowedError";
     }
 }
+export function canConfirmApplied(job) {
+    return true;
+}
 export class JobsService {
     /** Ephemeral scored jobs until user confirms they actually applied. */
     draftJobs = new Map();
@@ -116,7 +119,7 @@ export class JobsService {
         const draft = this.draftJobs.get(id);
         if (!draft)
             throw new JobNotFoundError();
-        if (draft.recommendation === "no") {
+        if (!canConfirmApplied(draft)) {
             throw new JobConfirmNotAllowedError();
         }
         const now = new Date().toISOString();

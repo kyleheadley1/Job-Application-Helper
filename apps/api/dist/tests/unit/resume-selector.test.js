@@ -52,6 +52,53 @@ describe("resume selection", () => {
         });
         expect(result.recommendedResume).toBe("EARLY_CAREER");
     });
+    it("prefers SWE for applied AI engineering roles without junior pipeline language", async () => {
+        const extracted = {
+            company: "Distyl AI",
+            title: "AI Engineer",
+            stack: ["Python", "REST APIs"],
+            requiredSkills: ["LLMs", "RAG", "vector search"],
+            preferredSkills: [],
+            domainTags: [],
+            responsibilities: ["Build customer-facing production AI systems", "Evaluations and retrieval workflows"],
+            requirements: ["Experience with agents and API integrations"],
+            rawText: "AI Engineer role. Python, LLMs, RAG, embeddings, REST APIs. Hybrid in New York, NY. Serves enterprise customers.",
+        };
+        const result = await selectResume({
+            extracted,
+            score,
+            topMatch: "LLM/RAG overlap",
+            mainRisk: "Python-primary vs TypeScript strength",
+            userProfile,
+        });
+        expect(result.recommendedResume).toBe("SWE");
+    });
+    it("prefers SWE for Maple-style forward deployed engineer (builder-first) and notes SIE alternate", async () => {
+        const extracted = {
+            company: "Maple AI",
+            title: "Forward Deployed Engineer",
+            stack: ["TypeScript", "Python"],
+            requiredSkills: [],
+            preferredSkills: [],
+            domainTags: [],
+            responsibilities: [
+                "Ship internal sales tooling and AI-enabled workflows.",
+                "Partner with sales and ops to translate business needs into software.",
+                "Build full-stack features; hybrid NYC office cadence.",
+            ],
+            requirements: ["2+ years shipping software"],
+            rawText: "Founding team. LLM and RAG experience valued.",
+        };
+        const result = await selectResume({
+            extracted,
+            score,
+            topMatch: "Strong applied-AI and internal tooling overlap",
+            mainRisk: "Adjacent vs pure GTM consulting lane",
+            userProfile,
+        });
+        expect(result.recommendedResume).toBe("SWE");
+        expect(result.rationale.some((r) => /SIE can be used as an alternate/i.test(r))).toBe(true);
+    });
     it("does not misclassify junior product builder roles as SIE", async () => {
         const extracted = {
             company: "Rokt",
@@ -76,5 +123,29 @@ describe("resume selection", () => {
         });
         expect(result.recommendedResume).not.toBe("SIE");
         expect(["EARLY_CAREER", "SWE"]).toContain(result.recommendedResume);
+    });
+    it("defaults to SWE (not EARLY_CAREER) for normal 1-4 year backend roles", async () => {
+        const extracted = {
+            company: "Plaid",
+            title: "Backend Engineer",
+            stack: ["Go", "Kubernetes", "Postgres"],
+            requiredSkills: ["API development", "testing", "debugging"],
+            preferredSkills: [],
+            domainTags: ["fintech"],
+            responsibilities: [
+                "Build backend systems and product features.",
+                "Collaborate with PM/design and contribute to technical decisions.",
+            ],
+            requirements: ["2+ years experience", "ownership mindset"],
+            rawText: "Python and/or JavaScript/TypeScript acceptable.",
+        };
+        const result = await selectResume({
+            extracted,
+            score,
+            topMatch: "Backend/API overlap",
+            mainRisk: "Scale depth",
+            userProfile,
+        });
+        expect(result.recommendedResume).toBe("SWE");
     });
 });

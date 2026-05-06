@@ -5,6 +5,7 @@ import { responsesClient } from "../../services/llm/responsesClient.js";
 import { buildResumeSelectionPrompt, resumeSelectionSystemPrompt } from "./prompts.js";
 import { normalizeText } from "../../lib/text.js";
 import { logger } from "../../lib/logger.js";
+import { countStrongSieRoleDescriptorHits, fdeSweAlternateSieNote, hasBuilderFirstSoftwareContext, isFdeBuilderSoftwarePrimaryShape, } from "../../lib/fdeBuilderRole.js";
 const ResumeSelectionSchema = z.object({
     recommendedResume: z.enum(["SWE", "SIE", "EARLY_CAREER"]),
     confidence: z.number().min(0).max(1),
@@ -17,44 +18,53 @@ const deterministicResumeSelection = (job, resumeContexts) => {
         (job.requirements ?? []).join(" "),
         (job.responsibilities ?? []).join(" "),
     ].join(" "));
-    const sieSignals = [
-        "forward deployed",
-        "solutions engineer",
-        "customer-facing implementation",
-        "implementation",
-        "integrations",
-        "customer deployment",
-        "technical onboarding",
-        "solution design",
-        "delivery timelines",
-        "integration timelines",
-        "partner engineering",
-        "pre-sales",
-        "post-sales",
-        "api integration",
-        "workflow implementation",
-        "technical implementation",
+    /** Do not treat title-only "Forward Deployed" or generic "implementation" as SIE; see countStrongSieRoleDescriptorHits. */
+    const explicitEarlyPipeline = /\b(new grad|new graduate|entry[-\s]?level|early[-\s]?career|software engineer i\b|swe i\b|intern\b|apprentice|rotational program|rotation program|0\s*[-–]\s*2\s+years|university graduate program)\b/i.test(text);
+    const earlySignals = ["new grad", "new graduate", "entry level", "early career", "rotational program", "rotation program", "software engineer i", "swe i", "intern", "apprentice", "0-2 years", "0–2 years"];
+    const sweSignals = [
+        "software engineer",
+        "full-stack",
+        "backend",
+        "api",
+        "product engineer",
+        "builder",
+        "ai engineer",
+        "machine learning engineer",
+        "applied ai",
+        "internal tooling",
+        "internal tools",
+        "growth systems",
+        "automation",
+        "growth engineer",
     ];
-    const earlySignals = ["new grad", "entry level", "early career", "rotational", "associate"];
-    const sweSignals = ["software engineer", "full-stack", "backend", "api", "product engineer", "builder"];
     const juniorBuilderSignals = [
         "junior",
         "entry-level",
         "entry level",
         "early-career",
         "early career",
-        "associate",
+        "associate software",
+        "associate engineer",
         "product engineer",
         "full-stack",
         "internal tools",
     ];
-    const sieHits = sieSignals.filter((needle) => text.includes(needle)).length;
-    const earlyHits = earlySignals.filter((needle) => text.includes(needle)).length;
+    const strongSieHits = countStrongSieRoleDescriptorHits(text);
+    const fdeBuilderPrimary = isFdeBuilderSoftwarePrimaryShape(job);
+    const earlyHits = explicitEarlyPipeline
+        ? earlySignals.filter((needle) => text.includes(needle)).length + 2
+        : earlySignals.filter((needle) => text.includes(needle)).length;
     const sweHits = sweSignals.filter((needle) => text.includes(needle)).length;
     const juniorBuilderHits = juniorBuilderSignals.filter((needle) => text.includes(needle)).length;
     const metaScoreByType = { SWE: 0, SIE: 0, EARLY_CAREER: 0 };
     if (resumeContexts) {
-        const stackAndNeeds = normalizeText([...job.stack, ...job.requiredSkills, ...job.preferredSkills, ...job.responsibilities, ...job.requirements].join(" "));
+        const stackAndNeeds = normalizeText([
+            ...(job.stack ?? []),
+            ...(job.requiredSkills ?? []),
+            ...(job.preferredSkills ?? []),
+            ...(job.responsibilities ?? []),
+            ...(job.requirements ?? []),
+        ].join(" "));
         const words = new Set(stackAndNeeds.split(/\s+/).filter(Boolean));
         const types = ["SWE", "SIE", "EARLY_CAREER"];
         for (const type of types) {
@@ -68,27 +78,49 @@ const deterministicResumeSelection = (job, resumeContexts) => {
     }
     const combinedByType = {
         SWE: metaScoreByType.SWE * 2 + sweHits,
-        SIE: metaScoreByType.SIE * 2 + sieHits,
+        SIE: metaScoreByType.SIE * 2 + strongSieHits,
         EARLY_CAREER: metaScoreByType.EARLY_CAREER * 2 + earlyHits,
     };
-    // Calibration: junior builder/product roles should default to EARLY_CAREER or SWE,
-    // unless clear SIE implementation/onboarding/customer-delivery signals are present.
-    if (juniorBuilderHits > 0 && sieHits < 2) {
+    // SWE-first for general product / AI engineering; only boost EARLY_CAREER when explicit pipeline language matches.
+    if (/\b(ai engineer|machine learning engineer|software engineer|full[- ]stack|backend engineer)\b/i.test(text) &&
+        !explicitEarlyPipeline) {
+        combinedByType.SWE += 3;
+    }
+    if (/\b(rotational program|rotation program|campus hire|campus recruiting|early career program)\b/i.test(text) &&
+        explicitEarlyPipeline) {
+        combinedByType.EARLY_CAREER += 5;
+    }
+    if (juniorBuilderHits > 0 && strongSieHits < 2 && explicitEarlyPipeline) {
         combinedByType.SWE += 2;
         combinedByType.EARLY_CAREER += 2;
         combinedByType.SIE -= 2;
     }
-    if (sieHits >= 2 && /customer[-\s]?facing|onboarding|implementation|integration/.test(text)) {
+    else if (juniorBuilderHits > 0 && strongSieHits < 2 && !explicitEarlyPipeline) {
+        combinedByType.SWE += 2;
+        combinedByType.EARLY_CAREER = Math.min(combinedByType.EARLY_CAREER, 1);
+    }
+    if (fdeBuilderPrimary) {
+        combinedByType.SWE += 5;
+        combinedByType.SIE -= 4;
+        if (hasBuilderFirstSoftwareContext(text)) {
+            combinedByType.SWE += 2;
+        }
+    }
+    if (strongSieHits >= 2 && /customer[-\s]?facing|onboarding|implementation|integration/.test(text)) {
         combinedByType.SIE += 2;
     }
     const ordered = Object.entries(combinedByType).sort((a, b) => b[1] - a[1]);
     const ambiguous = Math.abs((ordered[0]?.[1] ?? 0) - (ordered[1]?.[1] ?? 0)) <= 1;
     const recommendedResume = ordered[0]?.[0] ?? "SWE";
     const profile = resumeProfiles.find((r) => r.type === recommendedResume);
+    const baseRationale = profile?.exampleRationale ?? ["Resume selected from stable role-shape heuristics."];
+    const rationale = recommendedResume === "SWE" && fdeBuilderPrimary
+        ? [...baseRationale, fdeSweAlternateSieNote]
+        : baseRationale;
     return {
         recommendedResume,
         confidence: ambiguous ? 0.62 : 0.84,
-        rationale: profile?.exampleRationale ?? ["Resume selected from stable role-shape heuristics."],
+        rationale,
         ambiguous,
     };
 };

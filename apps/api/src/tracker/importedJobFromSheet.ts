@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { evaluateRules } from '../agents/jobAgent/rules.js';
+import { withSanitizedRuleNotes } from '../lib/riskDisplaySanitizer.js';
 import { getTrackerColor, shouldShortlist } from '../config/scoringPolicy.js';
 import { userProfile } from '../config/userProfile.js';
 import type { ExtractedJobData, JobRecord, JobStatus } from '../types/job.js';
@@ -94,7 +95,7 @@ export function jobRecordFromImportedSheetRow(input: {
   const { partialTs, importSource, importKey, createdAt } = input;
   const ts: Partial<TrackerSpreadsheetFields> = { ...partialTs };
   const extracted = minimalExtracted(ts);
-  const rules = evaluateRules(extracted, userProfile);
+  const rules = withSanitizedRuleNotes(evaluateRules(extracted, userProfile), extracted, userProfile);
   const scoreTotal = parseLatestScore(ts.latestScore ?? '');
   const score = scoreBreakdownFromTotal(scoreTotal);
   const recommendation = recommendationFromScoreTotal(scoreTotal);
