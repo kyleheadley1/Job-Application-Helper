@@ -4,12 +4,18 @@ import {
   applyAppliedAiStackFunctionalCalibration,
   applyBackendApiInfraCalibration,
   applyAppliedAiDomainFloor,
+  applyCredentialHeavyFintechAlgorithmCalibration,
+  applyGoDistributedDataInfraCalibration,
   applyFoundingEngineerStretchCalibration,
   applyFintechGoPrimaryCalibration,
   applyFdeBuilderScoreCalibration,
   applyNytCareerValueCalibration,
+  applyProductionCompetitiveHiringBarCalibration,
   applyResearchHeavyAiCalibration,
   applyVagueEarlyStageAiCalibration,
+  appendCredentialedAccountingSystemsGuidance,
+  appendGoDistributedDataInfraStretchGuidance,
+  appendLotteryTicketGuidance,
   extractMaxTravelPercent,
   jdHasAppliedAiSystemsOverlap,
   jdIsStructurallyVague,
@@ -510,5 +516,88 @@ describe("scoringOutputPolish", () => {
     expect(next.recruiterFriendliness).toBeGreaterThanOrEqual(7);
     expect(next.recruiterFriendliness).toBeLessThanOrEqual(8);
     expect(next.careerValue).toBe(10);
+  });
+
+  it("calibrates credentialed accounting/fintech gate roles into a skip band and fixes headline copy", () => {
+    const rules = { ...baseRules(), credentialHeavyFintechAlgorithm: true };
+    const next = applyCredentialHeavyFintechAlgorithmCalibration({
+      score: {
+        stackFit: 20,
+        levelFit: 12,
+        domainFit: 8,
+        resumeStoryClarity: 14,
+        functionalOverlap: 9,
+        recruiterFriendliness: 12,
+        careerValue: 7,
+        total: 92,
+      },
+      rules,
+    });
+    expect(next.total).toBeGreaterThanOrEqual(35);
+    expect(next.total).toBeLessThanOrEqual(45);
+    expect(next.recruiterFriendliness).toBeLessThanOrEqual(3);
+    expect(next.levelFit).toBeLessThanOrEqual(6);
+    expect(next.careerValue).toBeGreaterThanOrEqual(9);
+    expect(appendCredentialedAccountingSystemsGuidance("generic overlap", { rules })).toMatch(
+      /credentialed fintech\/accounting systems profile/i,
+    );
+    expect(appendLotteryTicketGuidance("headline", { score: next, rules })).toBe("headline");
+  });
+
+  it("caps competitive production-bar scores at 80 when profile lacks JD gate stack match", () => {
+    const extracted: ExtractedJobData = {
+      company: "LivePerson",
+      title: "Software Engineer",
+      stack: ["Python", "PostgreSQL", "NestJS"],
+      requiredSkills: [],
+      preferredSkills: [],
+      domainTags: [],
+      responsibilities: [],
+      requirements: [],
+      rawText: "2+ years professional experience. Python and PostgreSQL in production. Ownership of services.",
+    };
+    const next = applyProductionCompetitiveHiringBarCalibration({
+      score: {
+        stackFit: 22,
+        levelFit: 12,
+        domainFit: 8,
+        resumeStoryClarity: 15,
+        functionalOverlap: 10,
+        recruiterFriendliness: 12,
+        careerValue: 9,
+        total: 88,
+      },
+      extracted,
+      userProfile,
+      rules: { ...baseRules(), productionBarCompetitivePool: true },
+    });
+    expect(next.total).toBeLessThanOrEqual(80);
+    expect(next.recruiterFriendliness).toBeLessThanOrEqual(8);
+  });
+
+  it("calibrates Go/data-infra stretch roles into a low-50s skip band", () => {
+    const rules = { ...baseRules(), goDistributedDataInfraCandidateGap: true };
+    const next = applyGoDistributedDataInfraCalibration({
+      score: {
+        stackFit: 18,
+        levelFit: 12,
+        domainFit: 7,
+        resumeStoryClarity: 14,
+        functionalOverlap: 9,
+        recruiterFriendliness: 11,
+        careerValue: 8,
+        total: 79,
+      },
+      rules,
+    });
+    expect(next.total).toBeGreaterThanOrEqual(48);
+    expect(next.total).toBeLessThanOrEqual(55);
+    expect(next.stackFit).toBeGreaterThanOrEqual(6);
+    expect(next.stackFit).toBeLessThanOrEqual(10);
+    expect(next.levelFit).toBeLessThanOrEqual(8);
+    expect(next.recruiterFriendliness).toBeLessThanOrEqual(6);
+    expect(appendGoDistributedDataInfraStretchGuidance("Strong TypeScript API fit.", { rules })).toMatch(
+      /low-fit backend\/data-infrastructure stretch/i,
+    );
   });
 });

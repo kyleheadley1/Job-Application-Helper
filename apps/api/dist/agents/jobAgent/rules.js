@@ -3,13 +3,41 @@ import { normalizeText } from '../../lib/text.js';
 import { detectStrictFinanceEmployerContext, detectTraditionalEmployerContextStrict, textImpliesNycMetroOrCommutableNj, } from '../../lib/employerLocationSignals.js';
 import { analyzeCoreLanguageRequirement, explicitCoreLanguageRiskSummary, isMatureStructuredEmployer, jdPythonFlexibleWithJsOrTs, } from '../../lib/coreLanguageRequirements.js';
 import { isFdeBuilderSoftwarePrimaryShape } from '../../lib/fdeBuilderRole.js';
-import { jdHasAppliedAiSystemsOverlap, jdIsStructurallyVague, } from '../../lib/scoringOutputPolish.js';
+import { jdHasAppliedAiSystemsOverlap, jdIsStructurallyVague, profileHasGoDataInfraProductionEvidence, } from '../../lib/scoringOutputPolish.js';
 const includesAny = (haystack, needles) => needles.some((needle) => haystack.includes(needle));
 const RAW_CITIZENSHIP = /\b(us\s+)?citizenship\s+(is\s+)?required\b|\bcitizenship\s+required\b|\bonly\s+u\.?s\.?\s+citizens\b/i;
 const RAW_VISA = /\bno\s+(visa\s+)?sponsorship\b|\bunable\s+to\s+sponsor\b|\bmust\s+be\s+authorized\s+to\s+work\s+in\s+the\s+u\.?s\.?\b|\bauthorized\s+to\s+work\s+in\s+the\s+u\.?s\.?\b/i;
 const RAW_CLEARANCE = /\b(security\s+clearance|ts\/sci|top\s+secret|clearance\s+required|dod\s+clearance)\b/i;
 const RAW_DEGREE = /\b(bachelor'?s?\s+degree|bachelors\s+degree|bs\s+in|b\.s\.|ba\s+in)[^.\n]{0,160}\brequired\b|\bdegree\s+in\s+(computer science|cs|engineering)\s+required\b/i;
 const NEW_GRAD_WORD = /\b(new\s+graduate|new\s+grad)\b/i;
+function profileHasCsDegreeCred(profile) {
+    if (!profile.degreeStatus.hasBachelors)
+        return false;
+    const blob = normalizeText([profile.degreeStatus.note, profile.training?.program ?? '', profile.headline].join(' '));
+    return /\b(computer science|comp sci|cs degree|b\.?s\.?\s*(in\s*)?cs|bachelor[^.\n]{0,60}computer science)\b/i.test(blob);
+}
+function jdDegreeEquivalenceSoftened(combinedText, degreeLevel) {
+    return (degreeLevel === 'equivalent_allowed' ||
+        /\bor equivalent experience\b/i.test(combinedText) ||
+        /\b(bachelor|degree)[^.\n]{0,120}\bor equivalent\b/i.test(combinedText) ||
+        /\bor equivalent[^.\n]{0,80}\b(bachelor|degree)\b/i.test(combinedText));
+}
+function jdExplicitCsDegreeHard(combinedText, degreeRaw, degreeLevel) {
+    if (jdDegreeEquivalenceSoftened(combinedText, degreeLevel))
+        return false;
+    const dr = normalizeText(degreeRaw);
+    const csInStructured = (dr.includes('computer science') || /\bcs degree\b/i.test(dr)) &&
+        /\b(bachelor|bs|b\.s\.|degree|ms|m\.s\.)\b/i.test(dr);
+    const csInBlob = /\b(bachelor'?s?|bs|b\.s\.|ms|m\.s\.)\b[^.\n]{0,100}\b(computer science|comp sci|cs)\b/i.test(combinedText) ||
+        /\b(computer science|comp sci)\b[^.\n]{0,80}\b(bachelor|bs|b\.s\.|degree|ms)\b/i.test(combinedText) ||
+        /\b(bs\/ms|bs|ms)\s+in\s+(computer science|cs)\b/i.test(combinedText) ||
+        csInStructured;
+    if (!csInBlob)
+        return false;
+    return (degreeLevel === 'required' ||
+        /\b(must have|required)\b[^.\n]{0,160}\b(bachelor|bs|computer science|cs degree|bs\/ms)\b/i.test(combinedText) ||
+        /\b(bachelor|bs)[^.\n]{0,100}\b(computer science|cs)\b[^.\n]{0,40}\brequired\b/i.test(combinedText));
+}
 /** Language that usually indicates a formal campus / graduate / rotation hiring track. */
 const hasStrongPipelineMarkers = (combinedText) => NEW_GRAD_WORD.test(combinedText) ||
     includesAny(combinedText, [
@@ -49,6 +77,30 @@ export const evaluateRules = (job, profile) => {
     const harshEmployerContext = isTraditionalCompany || isFinance;
     const degreeLevel = job.degreeRequirement?.level ?? 'unknown';
     const degreeRaw = normalizeText(job.degreeRequirement?.raw ?? '');
+    const jdFinanceAccountingHard = /\b(gaap|asc\s*606|asc606|generally accepted accounting|revenue recognition|accounting principles)\b/i.test(combinedText) ||
+        (/\b(financial workflow|finance workflow|accounting workflow)\b/i.test(combinedText) &&
+            /\b(build|building|software|application|engineer|saas)\b/i.test(combinedText));
+    const jdAlgorithmPublicationHard = /\bdemonstrated algorithm expertise\b/i.test(combinedText) ||
+        /\bacademic or industry publications\b/i.test(combinedText) ||
+        (/\bpublications?\b/i.test(combinedText) &&
+            /\b(algorithm|big data algorithms|distributed systems|high[-\s]?performance computing|\bhpc\b)\b/i.test(combinedText));
+    const jdJavaCppOopHard = /\b(java|c\+\+)\b[^.\n]{0,120}\b(object[-\s]oriented|oop)\b/i.test(combinedText) ||
+        /\bjava\s*\/\s*c\+\+\s*style\b/i.test(combinedText) ||
+        (/\bobject[-\s]oriented programming\b/i.test(combinedText) &&
+            /\b(java|c\+\+)\b/i.test(combinedText));
+    const jdB2bSaasExperienceHard = /\bb2b\b/i.test(combinedText) &&
+        /\bsaas\b/i.test(combinedText) &&
+        /\b(\d\+\s*years?|years?\s+of|must have|required)\b/i.test(combinedText);
+    const credentialHardSignalCount = [
+        jdFinanceAccountingHard,
+        jdAlgorithmPublicationHard,
+        jdJavaCppOopHard,
+        jdB2bSaasExperienceHard,
+    ].filter(Boolean).length;
+    const explicitCsDegreeHard = jdExplicitCsDegreeHard(combinedText, degreeRaw, degreeLevel);
+    const credentialHeavyFintechAlgorithm = explicitCsDegreeHard &&
+        !profileHasCsDegreeCred(profile) &&
+        credentialHardSignalCount >= 2;
     const explicitDegreeRisk = degreeLevel === 'required' ||
         degreeRaw.includes('bachelor') ||
         degreeRaw.includes('bs in computer science') ||
@@ -139,9 +191,52 @@ export const evaluateRules = (job, profile) => {
     const fintechGoPrimaryStretch = fintechPaymentsRole && backendProductApiRole && (goPrimaryBackend || microservicesHeavy);
     const researchHeavyAiRole = /\b(applied ai researcher|research scientist|ai researcher|research engineer)\b/i.test(combinedText) &&
         /\b(research track record|publications?|meta[-\s]?learning|program synthesis|evolutionary computation|self[-\s]?constructing systems?|recursive systems?|self[-\s]?architecting|frontier research|model experiments?|data analysis)\b/i.test(combinedText);
+    const dataInfraStreaming = /\b(kafka|kinesis|amazon\s*kinesis|amazon\s*sqs|\bsqs\b|managed streaming|event stream|stream processing|streaming pipeline)\b/i.test(combinedText);
+    const dataWarehouseAnalytics = /\b(redshift|snowflake|clickhouse|trino|apache iceberg|iceberg tables|\biceberg\b|data warehouse|analytics database|olap)\b/i.test(combinedText);
+    const specializedDataStores = /\b(elasticsearch|opensearch|scylladb|scylla|aerospike|tidb)\b/i.test(combinedText);
+    const largeDataPerf = /\b(large datasets?|big data|petabyte|terabyte|billions?\s+of rows|high throughput|low latency|memory optimization|performance optimization)\b/i.test(combinedText);
+    const dataInfraCoreContext = infraCoreRole ||
+        /\b(data infrastructure|analytics infrastructure|data platform|stats?\s*(and|&)\s*analytics|metrics platform|analytics engine)\b/i.test(combinedText);
+    const hasGoMention = /\b(go|golang)\b/i.test(combinedText);
+    const goDistributedDataInfraRole = hasGoMention &&
+        (goPrimaryBackend || dataInfraCoreContext) &&
+        (dataInfraStreaming || dataWarehouseAnalytics || specializedDataStores) &&
+        (microservicesHeavy || largeDataPerf || dataInfraStreaming || dataWarehouseAnalytics) &&
+        !researchHeavyAiRole &&
+        !credentialHeavyFintechAlgorithm;
+    const apprenticeshipDataInfraOk = /\b(apprenticeship|apprentice\s+program|new\s+grad\s+program|graduate\s+program|training\s+program|rotational\s+program|engineering\s+residency|intern\s+to\s+full)\b/i.test(combinedText);
+    const goDistributedDataInfraCandidateGap = goDistributedDataInfraRole &&
+        !profileHasGoDataInfraProductionEvidence(profile) &&
+        !apprenticeshipDataInfraOk;
     const associateEntryRole = /\b(associate|entry[-\s]?level|early[-\s]?career|junior|new grad|new graduate)\b/i.test(combinedText);
     const preferredPlatformStackGap = /\b(preferred|nice to have|plus)\b[^.\n]{0,180}\b(go|golang|graphql|docker|kubernetes|cloud)\b/i.test(combinedText) ||
         /\b(go|golang|graphql|docker|kubernetes|cloud)\b[^.\n]{0,120}\b(preferred|nice to have|plus)\b/i.test(combinedText);
+    const productionOwnershipJd = /\b(production ownership|meaningful scope|on[-\s]?call|end[-\s]?to[-\s]?end|own(s|\s+the)?\s+(the\s+)?(features?|roadmap|slice|technical|service|area|product)|technical ownership|operate in production|production systems?|ship(ped|ping)?[^.\n]{0,60}production)\b/i.test(combinedText);
+    const twoPlusProfessionalBar = (job.yearsExperience?.min ?? 0) >= 2 ||
+        (/\b(2\+|3\+|4\+|at\s+least\s+2|minimum\s+of\s+2|2\s*[-–]\s*6|2\s+to\s+6)\s*years?\b/i.test(combinedText) &&
+            /\b(professional|commercial|software engineering|engineering experience|years of experience)\b/i.test(combinedText));
+    const competitiveHiringContext = /\b(charlie\s+health|liveperson)\b/i.test(companyNorm) ||
+        /\b(liveperson|charlie\s+health)\b/i.test(combinedText) ||
+        /\b(series\s+[bcd]|unicorn|post[-\s]?ipo|public(?:ly)?\s+traded)\b/i.test(combinedText) ||
+        /\b(competitive\s+(applicant|candidate|talent|pool|salary)|high\s+bar|best[-\s]?in[-\s]?class|top\s+engineers?)\b/i.test(combinedText) ||
+        (healthcareProductEngineering &&
+            /\b(series\s+[ab]|well[-\s]?funded|growth|scaling|mature)\b/i.test(combinedText)) ||
+        isTraditionalCompany ||
+        isFinance ||
+        /\b(fortune\b|enterprise\s+saas|global\s+scale)\b/i.test(combinedText);
+    const productionBarCompetitivePool = !earlyCareerFriendlyRole &&
+        !associateEntryRole &&
+        !researchHeavyAiRole &&
+        !credentialHeavyFintechAlgorithm &&
+        !foundingEngineerStretch &&
+        !goDistributedDataInfraCandidateGap &&
+        productionOwnershipJd &&
+        twoPlusProfessionalBar &&
+        competitiveHiringContext;
+    if (credentialHeavyFintechAlgorithm) {
+        penaltyVector.credentialHeavy = 30;
+        notes.push('Explicit CS degree requirement is a major screen risk.', 'Role requires finance/accounting workflow experience, including GAAP and ASC 606, which is not demonstrated.', 'JD asks for Java/C++ style OOP and algorithm-publication evidence, which do not match the current profile.');
+    }
     if (explicitDegreeRisk) {
         penaltyVector.degree =
             isTraditionalCompany || strictNewGradPipeline
@@ -229,6 +324,16 @@ export const evaluateRules = (job, profile) => {
     if (fintechGoPrimaryStretch && goPrimaryBackend) {
         notes.push('Go-primary backend expectations are outside the strongest TypeScript/Node lane and are a major stack caveat.');
     }
+    if (productionBarCompetitivePool) {
+        notes.push('Mature production-ownership bar with competitive hiring context — keep recruiter-screen realism conservative unless the profile matches JD stack details and production depth.');
+    }
+    if (goDistributedDataInfraCandidateGap) {
+        penaltyVector.dataInfraGo = 20;
+        notes.push('Go-first distributed data infrastructure role with streaming and analytics databases outside strongest TypeScript/Node lane.', 'Requires production-scale backend/data systems experience, including Kafka/Kinesis and warehouse/analytics technologies not demonstrated.');
+        if (/\b(adtech|advertising\s+technology|programmatic|dsp|ssp|real[-\s]?time bidding|rtb|bidder)\b/i.test(combinedText)) {
+            notes.push('Adtech analytics domain and optimization-heavy technical screen may be a poor fit.');
+        }
+    }
     const pythonStackFlexibleWithJsTs = jdPythonFlexibleWithJsOrTs(combinedText);
     const fdeBuilderSoftwarePrimary = isFdeBuilderSoftwarePrimaryShape(job);
     if (fdeBuilderSoftwarePrimary) {
@@ -257,7 +362,10 @@ export const evaluateRules = (job, profile) => {
     if (locationMismatch) {
         hardRuleNotes.push('Onsite/hybrid requirement appears non-commutable.');
     }
-    if (explicitDegreeRisk) {
+    if (credentialHeavyFintechAlgorithm) {
+        hardRuleNotes.push('Credentialed fintech/accounting-systems gates (CS degree, GAAP/ASC 606, publication-style depth) are likely hard screens.');
+    }
+    else if (explicitDegreeRisk) {
         hardRuleNotes.push('Explicit degree requirement may be a first-pass recruiter filter.');
     }
     if (explicitCoreLanguageMismatch && coreLang.language) {
@@ -290,6 +398,10 @@ export const evaluateRules = (job, profile) => {
         researchHeavyAiRole,
         fintechGoPrimaryStretch,
         foundingEngineerStretch,
+        credentialHeavyFintechAlgorithm,
+        productionBarCompetitivePool,
+        goDistributedDataInfraRole,
+        goDistributedDataInfraCandidateGap,
         hardRuleNotes,
         notes: [...new Set(notes)],
         penaltyVector,

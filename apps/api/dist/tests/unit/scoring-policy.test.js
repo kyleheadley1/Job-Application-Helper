@@ -38,6 +38,12 @@ describe("scoring policy behavior", () => {
         expect(resolveRecommendation(69, cleanRules())).toBe("selective_yes");
         expect(resolveRecommendation(69, { ...cleanRules(), researchHeavyAiRole: true })).toBe("no");
     });
+    it("forces skip for credentialed fintech/accounting gate stack even at high model totals", () => {
+        expect(resolveRecommendation(88, { ...cleanRules(), credentialHeavyFintechAlgorithm: true })).toBe("no");
+    });
+    it("forces skip for Go/data-infra candidate gap even when raw total would be viable", () => {
+        expect(resolveRecommendation(72, { ...cleanRules(), goDistributedDataInfraCandidateGap: true })).toBe("no");
+    });
     it("downgrades yes to selective_yes at 80+ when hard constraints exist", () => {
         expect(resolveRecommendation(83, { ...cleanRules(), locationMismatch: true })).toBe("selective_yes");
         expect(recommendationHardConstraints({ ...cleanRules(), locationMismatch: true })).toBe(true);

@@ -42,6 +42,174 @@ const jobTextBlob = (job: ExtractedJobData): string =>
     ].join("\n"),
   );
 
+/** Profile reads as nontraditional / early-career for recruiter-realism adjustments. */
+export function isNonTraditionalEarlyCareerProfile(profile: UserProfile): boolean {
+  if (!profile.degreeStatus.hasBachelors) return true;
+  const blob = normalizeText(
+    [
+      profile.degreeStatus.note,
+      profile.headline,
+      profile.training.program,
+      ...profile.targetRoles,
+    ].join(" "),
+  );
+  return /\b(nontraditional|bootcamp|codesmith|career\s+change|early[-\s]career|self[-\s]taught|immersive)\b/i.test(
+    blob,
+  );
+}
+
+export function profileHasDirectProductionEvidence(profile: UserProfile): boolean {
+  const blob = normalizeText(
+    [
+      profile.headline,
+      ...profile.strengths,
+      ...profile.recurringStory,
+      ...profile.flagshipProjects.flatMap((p) => [p.name, p.summary, ...p.tech, ...p.outcomes]),
+    ].join(" "),
+  );
+  return /\b(production|production[-\s]grade|shipped|operating|operations|customer[-\s]facing|sla|on[-\s]call|end[-\s]to[-\s]end|owned|operational|live systems?)\b/i.test(
+    blob,
+  );
+}
+
+const JD_STACK_EVIDENCE_GATES: Array<{ jd: RegExp; profile: RegExp }> = [
+  { jd: /\bpython\b/i, profile: /\bpython\b/i },
+  { jd: /\b(postgresql|postgres)\b/i, profile: /\b(postgresql|postgres|psql)\b/i },
+  { jd: /\b(nest\.?js|nest\b)/i, profile: /\b(nest\.?js|nestjs|nest\b)/i },
+  { jd: /\bvue(\.js)?\b/i, profile: /\bvue(\.js)?\b/i },
+  { jd: /\bcouchbase\b/i, profile: /\bcouchbase\b/i },
+  { jd: /\bmongodb\b/i, profile: /\bmongodb\b/i },
+];
+
+/**
+ * True when the profile shows direct production depth and every JD-mentioned gate stack
+ * (Python/Postgres/Nest/Vue/Couchbase/Mongo, etc.) appears in strengths or project tech.
+ */
+export function profilePassesProductionBarEvidence(jdBlob: string, profile: UserProfile): boolean {
+  if (!profileHasDirectProductionEvidence(profile)) return false;
+  const prof = normalizeText(
+    [
+      profile.headline,
+      ...profile.strengths,
+      ...profile.recurringStory,
+      ...profile.flagshipProjects.flatMap((p) => [...p.tech, p.summary]),
+    ].join(" "),
+  );
+  for (const g of JD_STACK_EVIDENCE_GATES) {
+    if (g.jd.test(jdBlob) && !g.profile.test(prof)) return false;
+  }
+  return true;
+}
+
+/** Profile shows Go/streaming/warehouse/distributed data infra in a production-relevant way. */
+export function profileHasGoDataInfraProductionEvidence(profile: UserProfile): boolean {
+  const blob = normalizeText(
+    [
+      profile.headline,
+      ...profile.strengths,
+      ...profile.recurringStory,
+      ...profile.flagshipProjects.flatMap((p) => [...p.tech, p.summary, ...p.outcomes]),
+    ].join(" "),
+  );
+  if (!blob.trim()) return false;
+  const go = /\b(go|golang)\b/i.test(blob);
+  const stream = /\b(kafka|kinesis|amazon\s*sqs|\bsqs\b|pulsar|event streaming|stream processing)\b/i.test(
+    blob,
+  );
+  const warehouse = /\b(redshift|snowflake|clickhouse|trino|iceberg|bigquery|databricks|data warehouse)\b/i.test(
+    blob,
+  );
+  const specialized = /\b(elasticsearch|opensearch|scylladb|aerospike|tidb)\b/i.test(blob);
+  const distributed = /\b(distributed systems?|distributed backend|data infrastructure|analytics infrastructure)\b/i.test(
+    blob,
+  );
+  const prod = /\b(production|operating|shipped|on[-\s]call|sla|at scale)\b/i.test(blob);
+  if (go && prod) return true;
+  if (stream && prod) return true;
+  if (warehouse && prod) return true;
+  if (specialized && prod) return true;
+  if (distributed && (stream || warehouse || go)) return true;
+  return false;
+}
+
+/**
+ * 2+ yrs professional bar + production-ownership hiring context: cap product/story inflation unless
+ * the profile matches JD gate stack(s) and production depth. Tighten recruiter-screen for early-career profiles.
+ */
+export function applyProductionCompetitiveHiringBarCalibration(params: {
+  score: ScoreBreakdown;
+  extracted: ExtractedJobData;
+  userProfile: UserProfile;
+  rules: RuleEvaluation;
+}): ScoreBreakdown {
+  const { score, extracted, userProfile, rules } = params;
+  if (!rules.productionBarCompetitivePool) return score;
+  if (rules.goDistributedDataInfraCandidateGap) return score;
+  if (rules.credentialHeavyFintechAlgorithm || rules.researchHeavyAiRole) return score;
+
+  const jdBlob = jobTextBlob(extracted);
+  const strong = profilePassesProductionBarEvidence(jdBlob, userProfile);
+  const early = isNonTraditionalEarlyCareerProfile(userProfile);
+
+  let next = { ...score };
+
+  if (!strong) {
+    type Dim = keyof Omit<ScoreBreakdown, "total">;
+    const pullOrder: Dim[] = [
+      "resumeStoryClarity",
+      "functionalOverlap",
+      "stackFit",
+      "recruiterFriendliness",
+      "levelFit",
+    ];
+    const mins: Partial<Record<Dim, number>> = {
+      resumeStoryClarity: 10,
+      functionalOverlap: 7,
+      stackFit: 12,
+      recruiterFriendliness: 5,
+      levelFit: 8,
+      domainFit: 5,
+      careerValue: 7,
+    };
+    let guard = 0;
+    while (next.total > 80 && guard < 50) {
+      guard += 1;
+      let progressed = false;
+      for (const d of pullOrder) {
+        const minV = mins[d] ?? 0;
+        if (next[d] > minV) {
+          next = { ...next, [d]: (next[d] as number) - 1 } as ScoreBreakdown;
+          next.total = sumScoreParts(next);
+          progressed = true;
+          break;
+        }
+      }
+      if (!progressed) break;
+    }
+    next.resumeStoryClarity = Math.min(next.resumeStoryClarity, 14);
+    next.functionalOverlap = Math.min(next.functionalOverlap, 9);
+    next.total = sumScoreParts(next);
+  }
+
+  if (early) {
+    next.recruiterFriendliness = Math.min(next.recruiterFriendliness, strong ? 9 : 8);
+    next.total = sumScoreParts(next);
+  }
+
+  let floorGuard = 0;
+  while (next.total < 70 && floorGuard < 30) {
+    floorGuard += 1;
+    if (next.careerValue < 10) {
+      next = { ...next, careerValue: next.careerValue + 1 } as ScoreBreakdown;
+      next.total = sumScoreParts(next);
+    } else {
+      break;
+    }
+  }
+
+  return next;
+}
+
 /** JD emphasizes applied AI / LLM product work (domain alignment with AI systems). */
 export const jdHasAppliedAiSystemsOverlap = (blob: string): boolean =>
   /\b(llm|large language model|rag\b|retrieval[-\s]?augmented|agentic|ai agents?|generative ai|vector\s+(search|db|database)|embedding|ai workflow|applied ai|customer[-\s]?facing ai|production ai|evals?\b|evaluation framework)\b/i.test(
@@ -430,7 +598,14 @@ export function applyAppliedAiDomainFloor(params: {
   const { score, extracted, userProfile, rules } = params;
   if (rules.researchHeavyAiRole) return score;
   if (rules.domainMismatch) return score;
+  if (rules.goDistributedDataInfraCandidateGap) return score;
   const blob = jobTextBlob(extracted);
+  if (
+    rules.productionBarCompetitivePool &&
+    !profilePassesProductionBarEvidence(blob, userProfile)
+  ) {
+    return score;
+  }
   if (!jdHasAppliedAiSystemsOverlap(blob) || !profileHasAiToolingEvidence(userProfile)) return score;
   if (rules.vagueEarlyStageAiCalibration) {
     const explicit = jdExplicitProfileAiDomainOverlap(blob, userProfile);
@@ -461,6 +636,7 @@ export function applyAppliedAiStackFunctionalCalibration(params: {
 }): ScoreBreakdown {
   const { score, extracted, userProfile, rules } = params;
   if (rules.researchHeavyAiRole) return score;
+  if (rules.goDistributedDataInfraCandidateGap) return score;
   if (rules.domainMismatch || rules.stackMismatch) return score;
   /** Do not inflate stack for applied-AI overlap when mature employer + explicit core-language gate applies. */
   if (rules.explicitCoreLanguageMismatch) return score;
@@ -469,6 +645,12 @@ export function applyAppliedAiStackFunctionalCalibration(params: {
   /** Generic thin AI startup JDs: do not inflate stack/functional from broad AI overlap alone. */
   if (rules.vagueEarlyStageAiCalibration) return score;
   const blob = jobTextBlob(extracted);
+  if (
+    rules.productionBarCompetitivePool &&
+    !profilePassesProductionBarEvidence(blob, userProfile)
+  ) {
+    return score;
+  }
   if (!jdHasAppliedAiSystemsOverlap(blob) || !profileHasAiToolingEvidence(userProfile)) return score;
 
   const compensatingOverlap =
@@ -534,6 +716,7 @@ export function applyMidLevelOwnershipLevelCalibration(params: {
   extracted: ExtractedJobData;
   rules: RuleEvaluation;
 }): ScoreBreakdown {
+  if (params.rules.goDistributedDataInfraCandidateGap) return params.score;
   if (params.rules.seniorityOverreach) return params.score;
   const blob = jobTextBlob(params.extracted);
   const midOwnership =
@@ -740,6 +923,7 @@ export function applyBackendApiInfraCalibration(params: {
   rules: RuleEvaluation;
 }): ScoreBreakdown {
   const { score, extracted, rules } = params;
+  if (rules.goDistributedDataInfraCandidateGap) return score;
   if (!rules.backendProductApiRole || rules.infraCoreRole) return score;
   const blob = jobTextBlob(extracted);
   const backendApiSignals =
@@ -1170,6 +1354,204 @@ export function applyFoundingEngineerStretchCalibration(params: {
 }
 
 /**
+ * Credentialed fintech / accounting-systems roles (strict CS degree, GAAP/ASC 606, publication-depth):
+ * keep totals in a skip band; career value can stay high.
+ */
+export function applyCredentialHeavyFintechAlgorithmCalibration(params: {
+  score: ScoreBreakdown;
+  rules: RuleEvaluation;
+}): ScoreBreakdown {
+  if (!params.rules.credentialHeavyFintechAlgorithm) return params.score;
+  let next = { ...params.score };
+  next.stackFit = Math.min(next.stackFit, 8);
+  next.levelFit = Math.min(next.levelFit, 6);
+  next.domainFit = Math.min(next.domainFit, 4);
+  next.resumeStoryClarity = Math.min(next.resumeStoryClarity, 6);
+  next.functionalOverlap = Math.min(next.functionalOverlap, 6);
+  next.recruiterFriendliness = Math.min(next.recruiterFriendliness, 3);
+  next.careerValue = Math.max(next.careerValue, 9);
+  next.total = sumScoreParts(next);
+
+  const targetLo = 35;
+  const targetHi = 45;
+  type Dim = keyof Omit<ScoreBreakdown, "total">;
+  const downOrder: Dim[] = [
+    "stackFit",
+    "resumeStoryClarity",
+    "functionalOverlap",
+    "levelFit",
+    "domainFit",
+    "recruiterFriendliness",
+  ];
+  const mins: Partial<Record<Dim, number>> = {
+    stackFit: 6,
+    levelFit: 4,
+    domainFit: 2,
+    resumeStoryClarity: 4,
+    functionalOverlap: 4,
+    recruiterFriendliness: 1,
+    careerValue: 9,
+  };
+  let guard = 0;
+  while (next.total > targetHi && guard < 80) {
+    guard += 1;
+    let progressed = false;
+    for (const key of downOrder) {
+      if (next[key] > (mins[key] ?? 0)) {
+        next = { ...next, [key]: (next[key] as number) - 1 } as ScoreBreakdown;
+        next.total = sumScoreParts(next);
+        progressed = true;
+        break;
+      }
+    }
+    if (!progressed) break;
+  }
+  const upOrder: Dim[] = [
+    "careerValue",
+    "stackFit",
+    "resumeStoryClarity",
+    "domainFit",
+    "levelFit",
+    "functionalOverlap",
+    "recruiterFriendliness",
+  ];
+  const maxs: Partial<Record<Dim, number>> = {
+    stackFit: 8,
+    levelFit: 6,
+    domainFit: 4,
+    resumeStoryClarity: 6,
+    functionalOverlap: 6,
+    recruiterFriendliness: 3,
+    careerValue: 10,
+  };
+  guard = 0;
+  while (next.total < targetLo && guard < 80) {
+    guard += 1;
+    let progressed = false;
+    for (const key of upOrder) {
+      if (next[key] < (maxs[key] ?? 99)) {
+        next = { ...next, [key]: (next[key] as number) + 1 } as ScoreBreakdown;
+        next.total = sumScoreParts(next);
+        progressed = true;
+        break;
+      }
+    }
+    if (!progressed) break;
+  }
+  guard = 0;
+  while (next.total > targetHi && guard < 80) {
+    guard += 1;
+    let progressed = false;
+    for (const key of downOrder) {
+      if (next[key] > (mins[key] ?? 0)) {
+        next = { ...next, [key]: (next[key] as number) - 1 } as ScoreBreakdown;
+        next.total = sumScoreParts(next);
+        progressed = true;
+        break;
+      }
+    }
+    if (!progressed) break;
+  }
+  return next;
+}
+
+/**
+ * Go-first distributed data infrastructure (streaming, warehouses, specialized stores):
+ * keep totals in a skip / one-click band; do not let generic API overlap inflate stack.
+ */
+export function applyGoDistributedDataInfraCalibration(params: {
+  score: ScoreBreakdown;
+  rules: RuleEvaluation;
+}): ScoreBreakdown {
+  if (!params.rules.goDistributedDataInfraCandidateGap) return params.score;
+  if (params.rules.credentialHeavyFintechAlgorithm) return params.score;
+
+  let next = { ...params.score };
+  next.stackFit = Math.min(next.stackFit, 10);
+  next.levelFit = Math.min(next.levelFit, 8);
+  next.domainFit = Math.min(next.domainFit, 6);
+  next.resumeStoryClarity = Math.min(next.resumeStoryClarity, 9);
+  next.functionalOverlap = Math.min(next.functionalOverlap, 7);
+  next.recruiterFriendliness = Math.min(next.recruiterFriendliness, 6);
+  next.careerValue = Math.max(7, Math.min(9, next.careerValue));
+  next.total = sumScoreParts(next);
+
+  const targetLo = 48;
+  const targetHi = 55;
+  type Dim = keyof Omit<ScoreBreakdown, "total">;
+  const downOrder: Dim[] = [
+    "stackFit",
+    "resumeStoryClarity",
+    "functionalOverlap",
+    "levelFit",
+    "domainFit",
+    "recruiterFriendliness",
+  ];
+  const mins: Partial<Record<Dim, number>> = {
+    stackFit: 6,
+    levelFit: 6,
+    domainFit: 4,
+    resumeStoryClarity: 6,
+    functionalOverlap: 5,
+    recruiterFriendliness: 4,
+    careerValue: 7,
+  };
+  let guard = 0;
+  while (next.total > targetHi && guard < 80) {
+    guard += 1;
+    let progressed = false;
+    for (const key of downOrder) {
+      if (next[key] > (mins[key] ?? 0)) {
+        next = { ...next, [key]: (next[key] as number) - 1 } as ScoreBreakdown;
+        next.total = sumScoreParts(next);
+        progressed = true;
+        break;
+      }
+    }
+    if (!progressed) break;
+  }
+  const upOrder: Dim[] = ["careerValue", "stackFit", "resumeStoryClarity", "domainFit", "levelFit"];
+  const maxs: Partial<Record<Dim, number>> = {
+    stackFit: 10,
+    levelFit: 8,
+    domainFit: 6,
+    resumeStoryClarity: 9,
+    functionalOverlap: 7,
+    recruiterFriendliness: 6,
+    careerValue: 9,
+  };
+  guard = 0;
+  while (next.total < targetLo && guard < 80) {
+    guard += 1;
+    let progressed = false;
+    for (const key of upOrder) {
+      if (next[key] < (maxs[key] ?? 99)) {
+        next = { ...next, [key]: (next[key] as number) + 1 } as ScoreBreakdown;
+        next.total = sumScoreParts(next);
+        progressed = true;
+        break;
+      }
+    }
+    if (!progressed) break;
+  }
+  guard = 0;
+  while (next.total > targetHi && guard < 80) {
+    guard += 1;
+    let progressed = false;
+    for (const key of downOrder) {
+      if (next[key] > (mins[key] ?? 0)) {
+        next = { ...next, [key]: (next[key] as number) - 1 } as ScoreBreakdown;
+        next.total = sumScoreParts(next);
+        progressed = true;
+        break;
+      }
+    }
+    if (!progressed) break;
+  }
+  return next;
+}
+
+/**
  * Charlie Health–shaped healthcare product engineering: keep totals in a realistic high-80s band
  * (internal calibration; visible copy must stay company-specific via risk sanitizer).
  */
@@ -1177,24 +1559,39 @@ export function applyCharlieHealthProductCalibration(params: {
   score: ScoreBreakdown;
   extracted: ExtractedJobData;
   rules: RuleEvaluation;
+  userProfile: UserProfile;
 }): ScoreBreakdown {
-  const { score, extracted, rules } = params;
+  const { score, extracted, rules, userProfile } = params;
+  if (rules.goDistributedDataInfraCandidateGap) return score;
   if (!/\bcharlie\s+health\b/i.test((extracted.company ?? "").trim())) return score;
   if (!rules.healthcareProductEngineering || rules.domainMismatch || rules.stackMismatch) return score;
   if (rules.explicitCoreLanguageMismatch || rules.fdeBuilderSoftwarePrimary || rules.vagueEarlyStageAiCalibration) {
     return score;
   }
 
+  const conservativeBar =
+    Boolean(rules.productionBarCompetitivePool) && isNonTraditionalEarlyCareerProfile(userProfile);
+
   type Dim = keyof Omit<ScoreBreakdown, "total">;
-  const bands: Record<Dim, [number, number]> = {
-    stackFit: [20, 22],
-    levelFit: [11, 12],
-    domainFit: [6, 7],
-    resumeStoryClarity: [14, 15],
-    functionalOverlap: [9, 10],
-    recruiterFriendliness: [10, 11],
-    careerValue: [8, 9],
-  };
+  const bands: Record<Dim, [number, number]> = conservativeBar
+    ? {
+        stackFit: [18, 21],
+        levelFit: [10, 11],
+        domainFit: [6, 7],
+        resumeStoryClarity: [12, 14],
+        functionalOverlap: [8, 9],
+        recruiterFriendliness: [7, 8],
+        careerValue: [8, 9],
+      }
+    : {
+        stackFit: [20, 22],
+        levelFit: [11, 12],
+        domainFit: [6, 7],
+        resumeStoryClarity: [14, 15],
+        functionalOverlap: [9, 10],
+        recruiterFriendliness: [10, 11],
+        careerValue: [8, 9],
+      };
 
   let next: ScoreBreakdown = { ...score };
   (Object.keys(bands) as Dim[]).forEach((k) => {
@@ -1203,8 +1600,8 @@ export function applyCharlieHealthProductCalibration(params: {
   });
   next.total = sumScoreParts(next);
 
-  const targetLo = 82;
-  const targetHi = 85;
+  const targetLo = conservativeBar ? 76 : 82;
+  const targetHi = conservativeBar ? 80 : 85;
   let guard = 0;
   while (next.total < targetLo && guard < 28) {
     guard += 1;
@@ -1261,6 +1658,8 @@ export function appendLotteryTicketGuidance(topMatch: string, params: {
   score: ScoreBreakdown;
   rules: RuleEvaluation;
 }): string {
+  if (params.rules.credentialHeavyFintechAlgorithm) return topMatch;
+  if (params.rules.goDistributedDataInfraCandidateGap) return topMatch;
   if (params.score.total >= 60) return topMatch;
   if (!params.rules.researchHeavyAiRole && params.score.careerValue < 9) return topMatch;
   if (/\blottery[-\s]?ticket\b/i.test(topMatch)) return topMatch;
@@ -1285,6 +1684,20 @@ export function appendFoundingStretchGuidance(topMatch: string, params: {
   return "Strong technical fit, meaningful founding-engineer risk. This is a high-alignment stretch rather than a top-confidence screen pass.";
 }
 
+export function appendCredentialedAccountingSystemsGuidance(topMatch: string, params: {
+  rules: RuleEvaluation;
+}): string {
+  if (!params.rules.credentialHeavyFintechAlgorithm) return topMatch;
+  return "This is a credentialed fintech/accounting systems profile, not a general full-stack AI role.";
+}
+
+export function appendGoDistributedDataInfraStretchGuidance(topMatch: string, params: {
+  rules: RuleEvaluation;
+}): string {
+  if (!params.rules.goDistributedDataInfraCandidateGap) return topMatch;
+  return "Low-fit backend/data-infrastructure stretch with minor API/database overlap.";
+}
+
 export function polishScoringNarrative(params: {
   narrative: Pick<ScoringNarrative, "topMatch" | "mainRisk" | "risks" | "rationale">;
   score: ScoreBreakdown;
@@ -1303,7 +1716,10 @@ export function polishScoringNarrative(params: {
     risks: params.narrative.risks,
     extracted: params.extracted,
     travelLine,
-    max: 2,
+    max:
+      params.rules.credentialHeavyFintechAlgorithm || params.rules.goDistributedDataInfraCandidateGap
+        ? 3
+        : 2,
     rules: params.rules,
     userProfile: params.userProfile,
   });
@@ -1367,6 +1783,15 @@ export function polishScoringNarrative(params: {
     score,
     extracted: params.extracted,
     rules: params.rules,
+    userProfile: params.userProfile,
+  });
+  score = applyCredentialHeavyFintechAlgorithmCalibration({
+    score,
+    rules: params.rules,
+  });
+  score = applyGoDistributedDataInfraCalibration({
+    score,
+    rules: params.rules,
   });
   const rawTop = params.narrative.topMatch?.trim() ?? "";
   let topMatch = appendMatureLanguageShotGuidance(
@@ -1375,6 +1800,8 @@ export function polishScoringNarrative(params: {
   );
   topMatch = appendFintechGoStretchGuidance(topMatch, { rules: params.rules });
   topMatch = appendFoundingStretchGuidance(topMatch, { rules: params.rules });
+  topMatch = appendCredentialedAccountingSystemsGuidance(topMatch, { rules: params.rules });
+  topMatch = appendGoDistributedDataInfraStretchGuidance(topMatch, { rules: params.rules });
   topMatch = appendLotteryTicketGuidance(topMatch, { score, rules: params.rules });
   topMatch = sanitizeVisibleNarrativeLine(topMatch, visibleCtx);
   return { score, topMatch, mainRisk, risks, rationale };

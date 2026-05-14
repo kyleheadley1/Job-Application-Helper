@@ -5,6 +5,10 @@ export const computeSalaryAsk = (params) => {
     const { extracted: job, score, recommendation, rules } = params;
     const postedMin = job.salary?.min;
     const postedMax = job.salary?.max;
+    if ((rules.credentialHeavyFintechAlgorithm || rules.goDistributedDataInfraCandidateGap) &&
+        recommendation === "no") {
+        return {};
+    }
     if (postedMin && postedMax) {
         const band = postedMax - postedMin;
         let conservativeAdjustment = recommendation === "yes"

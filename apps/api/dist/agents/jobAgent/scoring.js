@@ -5,7 +5,7 @@ import { logger } from '../../lib/logger.js';
 import { buildScoringPrompt, scoringSystemPrompt } from './prompts.js';
 import { preprocessScoringInput } from '../../tools/triageStructuredNormalize.js';
 import { responsesClient } from '../../services/llm/responsesClient.js';
-import { polishScoringNarrative, jdHasAppliedAiSystemsOverlap, profileHasAiToolingEvidence, } from '../../lib/scoringOutputPolish.js';
+import { polishScoringNarrative, jdHasAppliedAiSystemsOverlap, profileHasAiToolingEvidence, profilePassesProductionBarEvidence, applyProductionCompetitiveHiringBarCalibration, } from '../../lib/scoringOutputPolish.js';
 const ScoringOutputSchema = z.object({
     score: z.object({
         stackFit: z.number().min(0).max(25),
@@ -29,6 +29,8 @@ export const mapRecommendationFromScore = (total) => scoringPolicy.recommendatio
 /** True when recommendation should stay conservative (selective_yes allowed). */
 export const recommendationHardConstraints = (rules) => Boolean(rules.locationMismatch ||
     rules.explicitDegreeRisk ||
+    rules.credentialHeavyFintechAlgorithm ||
+    rules.goDistributedDataInfraCandidateGap ||
     rules.strictNewGradPipeline ||
     rules.explicitCoreLanguageMismatch ||
     rules.visaMismatch ||
@@ -41,6 +43,10 @@ export const recommendationHardConstraints = (rules) => Boolean(rules.locationMi
  * Strong scores default to "yes" when no gates; real gates pull high scores to selective_yes.
  */
 export const resolveRecommendation = (total, rules) => {
+    if (rules.credentialHeavyFintechAlgorithm)
+        return "no";
+    if (rules.goDistributedDataInfraCandidateGap)
+        return "no";
     if (total < 60)
         return "no";
     if (rules.researchHeavyAiRole && total < 70)
@@ -176,6 +182,8 @@ const deterministicFallback = (job, rules) => {
 export const scoreJobDeterministicPreview = (params) => deterministicFallback(params.extracted, params.rules);
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 const hardBlockersDominate = (rules) => Boolean(rules.explicitDegreeRisk ||
+    rules.credentialHeavyFintechAlgorithm ||
+    rules.goDistributedDataInfraCandidateGap ||
     rules.citizenshipMismatch ||
     rules.clearanceMismatch ||
     rules.strictNewGradPipeline ||
@@ -196,7 +204,10 @@ export const applyAlignedResumeStoryClarity = (params) => {
     const { score, extracted, rules, resumeContexts, userProfile } = params;
     if (rules.domainMismatch || rules.stackMismatch)
         return score;
-    if (rules.seniorityOverreach || rules.explicitDegreeRisk)
+    if (rules.seniorityOverreach ||
+        rules.explicitDegreeRisk ||
+        rules.credentialHeavyFintechAlgorithm ||
+        rules.goDistributedDataInfraCandidateGap)
         return score;
     const blob = normalizeText([
         extracted.title,
@@ -206,6 +217,10 @@ export const applyAlignedResumeStoryClarity = (params) => {
     ].join("\n"));
     if (!jdHasAppliedAiSystemsOverlap(blob) || !profileHasAiToolingEvidence(userProfile))
         return score;
+    if (rules.productionBarCompetitivePool &&
+        !profilePassesProductionBarEvidence(blob, userProfile)) {
+        return score;
+    }
     const signal = supportingResumeSignals(extracted, resumeContexts);
     if (signal < 10)
         return score;
@@ -336,15 +351,21 @@ export const scoreJob = async (params) => {
         resumeContexts: params.resumeContexts,
         userProfile: params.userProfile,
     });
+    const scoreFinal = applyProductionCompetitiveHiringBarCalibration({
+        score: scoreAfterStory,
+        extracted: params.extracted,
+        userProfile: params.userProfile,
+        rules: params.rules,
+    });
     return {
         scoring: {
             ...llmResult,
-            score: scoreAfterStory,
+            score: scoreFinal,
             topMatch: polished.topMatch,
             mainRisk: polished.mainRisk,
             risks: polished.risks,
             rationale: polished.rationale,
-            recommendation: resolveRecommendation(scoreAfterStory.total, params.rules),
+            recommendation: resolveRecommendation(scoreFinal.total, params.rules),
         },
         scoringDiagnostics: scoredRun.diagnostics,
         scoringLlmSucceeded: scoredRun.success,

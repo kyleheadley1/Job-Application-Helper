@@ -274,4 +274,106 @@ Series B startup. Not a bank.
     expect(rules.notes.some((n) => /independent production ownership/i.test(n))).toBe(true);
     expect(rules.notes.some((n) => /limited mentorship or structure/i.test(n))).toBe(true);
   });
+
+  it("flags credentialed fintech/accounting-systems JDs when CS degree is hard-required and profile lacks it", () => {
+    const rules = evaluateRules(
+      makeJob({
+        company: "Tabs",
+        title: "Software Engineer",
+        degreeRequirement: { level: "required", raw: "Bachelor's degree in Computer Science required" },
+        rawText: `
+Must have a Bachelor's degree in Computer Science.
+Must have 2+ years professional B2B SaaS software experience.
+Must have experience building software applications for financial workflows.
+Requires Java/C++ style object-oriented programming.
+Requires knowledge of U.S. GAAP and ASC 606.
+Requires demonstrated algorithm expertise through academic or industry publications in big data algorithms, distributed systems, or high-performance computing.
+Salary $150,000 - $200,000.
+        `.trim(),
+      }),
+      userProfile,
+    );
+    expect(rules.credentialHeavyFintechAlgorithm).toBe(true);
+    expect(rules.notes.some((n) => /Explicit CS degree requirement is a major screen risk/i.test(n))).toBe(true);
+    expect(rules.notes.some((n) => /GAAP and ASC 606/i.test(n))).toBe(true);
+    expect(rules.hardRuleNotes?.some((n) => /Credentialed fintech/i.test(n))).toBe(true);
+  });
+
+  it("does not flag credential-heavy when JD allows equivalent experience for the degree", () => {
+    const rules = evaluateRules(
+      makeJob({
+        company: "Tabs",
+        title: "Software Engineer",
+        degreeRequirement: { level: "equivalent_allowed", raw: "BS Computer Science or equivalent experience" },
+        rawText: `
+Bachelor's degree in Computer Science or equivalent experience required.
+Requires knowledge of U.S. GAAP and ASC 606.
+Requires demonstrated algorithm expertise through academic or industry publications in big data algorithms.
+Requires Java object-oriented programming.
+Must have 2+ years professional B2B SaaS software experience.
+        `.trim(),
+      }),
+      userProfile,
+    );
+    expect(rules.credentialHeavyFintechAlgorithm).toBe(false);
+  });
+
+  it("flags production bar + competitive pool for LivePerson-style JDs", () => {
+    const rules = evaluateRules(
+      makeJob({
+        company: "LivePerson",
+        title: "Software Engineer",
+        yearsExperience: { min: 2, max: 5, raw: "2+ years" },
+        rawText: `
+Series C company. 2+ years of professional software engineering experience required.
+Own features end-to-end in production. Production ownership and on-call rotation.
+Competitive applicant pool; we hire top engineers. Stack includes NestJS, Vue, Couchbase, and Python.
+        `.trim(),
+      }),
+      userProfile,
+    );
+    expect(rules.productionBarCompetitivePool).toBe(true);
+  });
+
+  it("classifies StackAdapt-style Go + streaming + warehouse data infrastructure roles", () => {
+    const rules = evaluateRules(
+      makeJob({
+        company: "StackAdapt",
+        title: "Stats & Analytics Engineer",
+        yearsExperience: { min: 2, max: 6, raw: "2+ years" },
+        rawText: `
+Go is our primary backend language. 2+ years professional backend experience required.
+Build real-time distributed microservices processing large datasets. Kafka and Kinesis for streaming.
+Redshift and ClickHouse for analytics. Performance and memory optimization. Microservices architecture.
+        `.trim(),
+      }),
+      userProfile,
+    );
+    expect(rules.goDistributedDataInfraRole).toBe(true);
+    expect(rules.goDistributedDataInfraCandidateGap).toBe(true);
+    expect(rules.notes.some((n) => /Go-first distributed data infrastructure/i.test(n))).toBe(true);
+  });
+
+  it("does not set Go/data-infra gap when profile shows Go and streaming production evidence", () => {
+    const profile = {
+      ...userProfile,
+      strengths: [...userProfile.strengths, "Go", "Kafka", "production backend services"],
+      flagshipProjects: userProfile.flagshipProjects.map((p) =>
+        p.name === "Backend-leaning full-stack product features"
+          ? { ...p, summary: `${p.summary} Shipped Kafka consumers in production at scale.` }
+          : p,
+      ),
+    };
+    const rules = evaluateRules(
+      makeJob({
+        company: "StackAdapt",
+        title: "Data Infrastructure Engineer",
+        rawText:
+          "Primary backend in Go. Kafka streaming pipelines. Snowflake warehouse. Distributed microservices.",
+      }),
+      profile,
+    );
+    expect(rules.goDistributedDataInfraRole).toBe(true);
+    expect(rules.goDistributedDataInfraCandidateGap).toBe(false);
+  });
 });

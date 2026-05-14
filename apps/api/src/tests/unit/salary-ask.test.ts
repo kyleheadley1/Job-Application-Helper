@@ -63,6 +63,28 @@ const scoreParts = (partial: Partial<ScoreBreakdown> & Pick<ScoreBreakdown, "sta
 };
 
 describe("computeSalaryAsk", () => {
+  it("returns empty salary for credential-heavy fintech/accounting skip roles", () => {
+    const ask = computeSalaryAsk({
+      extracted: { ...baseJob(), salary: { min: 150_000, max: 200_000 } },
+      score: scoreParts({ stackFit: 7, levelFit: 5, total: 40 }),
+      recommendation: "no",
+      rules: { ...baseRules(), credentialHeavyFintechAlgorithm: true },
+    });
+    expect(ask.number).toBeUndefined();
+    expect(ask.rangeMin).toBeUndefined();
+    expect(ask.rangeMax).toBeUndefined();
+  });
+
+  it("returns empty salary for Go/data-infra stretch skip roles", () => {
+    const ask = computeSalaryAsk({
+      extracted: { ...baseJob(), salary: { min: 140_000, max: 180_000 } },
+      score: scoreParts({ stackFit: 8, levelFit: 6, total: 52 }),
+      recommendation: "no",
+      rules: { ...baseRules(), goDistributedDataInfraCandidateGap: true },
+    });
+    expect(ask.number).toBeUndefined();
+  });
+
   it("uses upper-mid band for strong-but-imperfect stack/level on wide postings", () => {
     const ask = computeSalaryAsk({
       extracted: baseJob(),
