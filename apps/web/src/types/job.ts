@@ -52,6 +52,10 @@ export type RuleEvaluation = {
   researchHeavyAiRole?: boolean;
   fintechGoPrimaryStretch?: boolean;
   foundingEngineerStretch?: boolean;
+  credentialHeavyFintechAlgorithm?: boolean;
+  productionBarCompetitivePool?: boolean;
+  goDistributedDataInfraRole?: boolean;
+  goDistributedDataInfraCandidateGap?: boolean;
   hardRuleNotes?: string[];
   notes: string[];
 };

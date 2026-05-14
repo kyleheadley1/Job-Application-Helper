@@ -116,7 +116,7 @@ describe("applyCharlieHealthProductCalibration", () => {
       careerValue: 7,
       total: 70,
     };
-    const next = applyCharlieHealthProductCalibration({ score, extracted, rules });
+    const next = applyCharlieHealthProductCalibration({ score, extracted, rules, userProfile });
     expect(next.total).toBeGreaterThanOrEqual(82);
     expect(next.total).toBeLessThanOrEqual(85);
     expect(next.stackFit).toBeGreaterThanOrEqual(20);

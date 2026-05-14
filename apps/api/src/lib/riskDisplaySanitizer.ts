@@ -286,6 +286,12 @@ export function sanitizeVisibleRiskLine(text: string, ctx: VisibleSanitizeContex
       "Early-stage founder-level autonomy can still create stricter first-pass screening.",
     );
   }
+  if (ctx.rules?.goDistributedDataInfraCandidateGap) {
+    t = t.replace(
+      /\bstrong\s+(api|apis|typescript|ts\b|javascript|react|node\.?js|full[-\s]?stack)\b[^.]{0,80}\b(background|fit|overlap|alignment|lane|story)\b/gi,
+      "limited API/database overlap versus Go-first data infrastructure expectations",
+    );
+  }
   return cleanupVisibleLineFragments(t);
 }
 

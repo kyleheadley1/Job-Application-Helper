@@ -58,6 +58,24 @@ export type RuleEvaluation = {
   /** Founding/very-early startup role with high-autonomy ownership risk despite technical overlap. */
   foundingEngineerStretch?: boolean;
   /**
+   * JD requires a CS (or equivalent strict) degree plus multiple finance/accounting, publication,
+   * or legacy-OOP gates the profile does not satisfy — generic SWE overlap must not dominate.
+   */
+  credentialHeavyFintechAlgorithm?: boolean;
+  /**
+   * JD implies 2+ yrs professional bar, production ownership / meaningful scope, and a competitive hiring
+   * context — cap inflation from product/story overlap unless profile shows exact JD stack + production depth.
+   */
+  productionBarCompetitivePool?: boolean;
+  /**
+   * Go-first / distributed data-infrastructure role (streaming, warehouses, specialized stores).
+   */
+  goDistributedDataInfraRole?: boolean;
+  /**
+   * Candidate lacks demonstrated Go/streaming/warehouse production depth and role is not apprenticeship-oriented.
+   */
+  goDistributedDataInfraCandidateGap?: boolean;
+  /**
    * True first-pass gates only (UI "Hard-rule flags"): commutable location, degree, explicit core language.
    * Visa/citizenship/clearance and other notes stay in `notes` / key risks.
    */
