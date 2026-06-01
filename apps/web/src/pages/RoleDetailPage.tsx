@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { JobRecord, JobStatus } from "../types/job";
 import { JsonPanel } from "../components/JsonPanel";
-import { jdSourceText } from "../lib/jobDisplay";
+import { jdSourceText, jobHeaderLabel } from "../lib/jobDisplay";
 
 const statuses: JobStatus[] = [
   "to_review",
@@ -80,9 +80,7 @@ export const RoleDetailPage = () => {
         <Link to={`/jobs/${job.id}`}>← Scoring & generated assets</Link>
       </p>
       <div className="card">
-        <h3>
-          {job.extracted.company} - {job.extracted.title}
-        </h3>
+        <h3>{jobHeaderLabel(job.extracted)}</h3>
         <p>
           Score: <strong>{job.score.total}</strong> | Recommendation: <strong>{job.recommendation}</strong> | Resume:{" "}
           <strong>{job.recommendedResume}</strong>
