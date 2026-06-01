@@ -27,6 +27,7 @@ Required shape (field names must match exactly):
 - stack, requiredSkills, preferredSkills, domainTags, responsibilities, requirements: arrays of strings (empty arrays allowed).
 - Use the provided parsed companyName unless it is null or obviously incorrect. Do not replace a concrete company name with "Unknown Company".
 - Do not infer company from the role title. Ignore page chrome (Simplify+, Open user menu, Updated on, History, Summary, Full Job Posting).
+- For scraped layouts with metadata labels (position, time, remote, seniority, money, date), use pre-parsed company/title/location — the value after "position" is usually location, not job title.
 `.trim();
 
 export const metadataExtractionSystemPrompt = `
@@ -101,10 +102,20 @@ export const buildScoringPrompt = (params: {
   rules: RuleEvaluation;
   userProfile: UserProfile;
   scoringPolicy: unknown;
+  parsedMetadata?: {
+    companyName: string | null;
+    jobTitle: string | null;
+    location: string | null;
+    confidence?: "high" | "medium" | "low";
+  };
 }): string =>
   `
 Evaluate this role with conservative realism.
 Use extracted.company as the employer unless it is missing or clearly wrong (e.g. employment type or page chrome). Do not substitute "Unknown Company" when a concrete company is provided.
+
+Trusted parsed metadata (deterministic pre-score extraction — do NOT infer title/company/location from metadata labels when these are present):
+${JSON.stringify(params.parsedMetadata ?? { companyName: params.extracted.company, jobTitle: params.extracted.title, location: params.extracted.location ?? null, confidence: "medium" }, null, 2)}
+When parsedMetadata.confidence is "high" or "medium", treat companyName, jobTitle, and location as authoritative. Do not rewrite them from page labels such as position, time, remote, seniority, money, or date.
 
 Return EXACTLY these keys (and no others):
 {

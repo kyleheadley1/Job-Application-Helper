@@ -21,7 +21,9 @@ import {
   logJobPostingMetadataDebug,
   validateExtractedCompany,
   type JobPostingMetadata,
+  type PreScoringJobMetadata,
 } from "./jobPostingMetadataExtract.js";
+import { normalizeLocationPrefixedTitle } from "./preScoringMetadataExtract.js";
 
 const fallbackExtraction = (input: { url?: string; rawText?: string; companyHint?: string }): ExtractedJobData => ({
   company: input.companyHint ?? "Unknown Company",
@@ -38,16 +40,17 @@ const fallbackExtraction = (input: { url?: string; rawText?: string; companyHint
 });
 
 const applyPreParsedMetadata = (base: ExtractedJobData, meta: JobPostingMetadata): ExtractedJobData => {
+  const trusted = meta.preScoring?.confidence === "high" || meta.preScoring?.confidence === "medium";
   const company =
-    meta.companyName && isWeakOrPlaceholderCompany(base.company) ? meta.companyName : base.company;
-  const title = meta.jobTitle && isWeakJobTitle(base.title) ? meta.jobTitle : base.title;
+    meta.companyName && (trusted || isWeakOrPlaceholderCompany(base.company)) ? meta.companyName : base.company;
+  const title = meta.jobTitle && (trusted || isWeakJobTitle(base.title)) ? meta.jobTitle : base.title;
   return {
     ...base,
     company: company || base.company,
     title: title || base.title,
     employmentType: meta.employmentType ?? base.employmentType,
-    location: base.location ?? meta.location ?? undefined,
-    seniority: base.seniority ?? meta.seniority ?? undefined,
+    location: meta.location ?? base.location ?? undefined,
+    seniority: meta.seniority ?? base.seniority ?? undefined,
   };
 };
 
@@ -67,13 +70,24 @@ const applyMetadataFallback = (base: ExtractedJobData, meta: {
 });
 
 const finalizeExtracted = (extracted: ExtractedJobData, normalizedText: string, companyHint?: string): ExtractedJobData => {
+  let out = extracted;
+  if (out.title) {
+    const normalizedTitle = normalizeLocationPrefixedTitle(out.title);
+    if (normalizedTitle.jobTitle !== out.title) {
+      out = {
+        ...out,
+        title: normalizedTitle.jobTitle,
+        location: out.location ?? normalizedTitle.location ?? undefined,
+      };
+    }
+  }
   const company = validateExtractedCompany(
-    isWeakOrPlaceholderCompany(extracted.company) ? null : extracted.company,
+    isWeakOrPlaceholderCompany(out.company) ? null : out.company,
     normalizedText,
   );
-  let out = {
-    ...extracted,
-    company: company ?? (companyHint?.trim() || extracted.company),
+  out = {
+    ...out,
+    company: company ?? (companyHint?.trim() || out.company),
   };
   if (isWeakOrPlaceholderCompany(out.company) && companyHint?.trim()) {
     out = { ...out, company: companyHint.trim() };
@@ -86,6 +100,7 @@ export type ExtractJobDataResult = {
   llmExtractionSucceeded: boolean;
   extractionDiagnostics: StructuredCallDiagnostics;
   heuristicInferredFields: string[];
+  preScoringMetadata?: PreScoringJobMetadata;
 };
 
 export const extractJobData = async (input: {
@@ -157,5 +172,11 @@ export const extractJobData = async (input: {
     extracted = finalizeExtracted(extracted, normalized, input.companyHint);
   }
 
-  return { extracted, llmExtractionSucceeded, extractionDiagnostics: extractedRun.diagnostics, heuristicInferredFields };
+  return {
+    extracted,
+    llmExtractionSucceeded,
+    extractionDiagnostics: extractedRun.diagnostics,
+    heuristicInferredFields,
+    preScoringMetadata: preParsed?.preScoring,
+  };
 };

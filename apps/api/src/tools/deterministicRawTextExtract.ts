@@ -263,13 +263,13 @@ export const extractFromRawText = (normalizedText: string, companyHint?: string)
     partial.remoteType = metaRemote;
     inferredFields.push("remoteType");
   }
-  if (meta.location && !partial.location) {
+  if (meta.location) {
     partial.location = meta.location;
     inferredFields.push("location");
   }
 
   const { location, remoteType: locRemote } = parseLocationLine(text);
-  if (location) {
+  if (!meta.location && location) {
     partial.location = location;
     inferredFields.push("location");
   }
