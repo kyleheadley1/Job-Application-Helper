@@ -2,12 +2,12 @@ import type { ExtractedJobData, JobRecord, TrackerSpreadsheetFields } from "../t
 import { displayRoleTitle } from "./resultSummary";
 
 export function jobHeaderLabel(extracted: Pick<ExtractedJobData, "company" | "title" | "employmentType">): string {
-  const company = extracted.company?.trim() || "Unknown Company";
-  const role =
-    displayRoleTitle(extracted.title?.trim() ?? "") ||
-    extracted.employmentType?.trim() ||
-    "Role";
-  return `${company} - ${role}`;
+  const company = extracted.company?.trim();
+  const title = displayRoleTitle(extracted.title?.trim() ?? "");
+  if (company && title) return `${company} - ${title}`;
+  if (title) return title;
+  if (company) return company;
+  return "Untitled role";
 }
 
 /** Salary for display (internal structured fields). */

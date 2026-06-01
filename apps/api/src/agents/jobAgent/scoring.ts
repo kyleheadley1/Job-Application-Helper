@@ -383,6 +383,12 @@ export const scoreJob = async (params: {
   rules: RuleEvaluation;
   userProfile: UserProfile;
   resumeContexts?: ResumeContextSet;
+  preScoringMetadata?: {
+    companyName: string | null;
+    jobTitle: string | null;
+    location: string | null;
+    confidence?: 'high' | 'medium' | 'low';
+  };
 }): Promise<{
   scoring: ScoringResult;
   scoringDiagnostics: StructuredCallDiagnostics;
@@ -396,6 +402,12 @@ export const scoreJob = async (params: {
       rules: params.rules,
       userProfile: params.userProfile,
       scoringPolicy,
+      parsedMetadata: params.preScoringMetadata ?? {
+        companyName: params.extracted.company,
+        jobTitle: params.extracted.title,
+        location: params.extracted.location ?? null,
+        confidence: 'medium',
+      },
     }),
     schema: ScoringFromModelSchema,
     fallback,

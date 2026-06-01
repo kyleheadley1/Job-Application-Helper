@@ -3,6 +3,14 @@
  */
 import { logger } from "../lib/logger.js";
 import { env } from "../config/env.js";
+import {
+  extractPreScoringMetadata,
+  isLocationPrefixedTitle,
+  looksLikeLocation,
+  type PreScoringJobMetadata,
+} from "./preScoringMetadataExtract.js";
+
+export type { PreScoringJobMetadata } from "./preScoringMetadataExtract.js";
 
 export type JobPostingMetadata = {
   companyName: string | null;
@@ -12,6 +20,7 @@ export type JobPostingMetadata = {
   seniority: string | null;
   salary: string | null;
   workModel: string | null;
+  preScoring?: PreScoringJobMetadata;
 };
 
 export type CompanyCandidateScore = {
@@ -59,7 +68,7 @@ const NOISE_PREFIXES = [
 const NEGATIVE_COMPANY_PREFIXES = ["what ", "how ", "why ", "about ", "our company", "the "];
 
 const ROLE_TITLE_RE =
-  /\b(engineer|developer|scientist|architect|analyst|designer|manager|consultant|specialist|enablement|deployed|intern|programmer|administrator)\b/i;
+  /\b((?:full[\s-]?stack|fullstack|frontend|backend|platform|infrastructure|machine learning|site reliability|product)\s+)?(?:engineer|developer|software|devops|sre|scientist|architect|analyst|designer|programmer|enablement)\b|\b(?:forward deployed|ai enablement|ai engineer|full stack|fullstack)\b/i;
 
 const EMPLOYEE_COUNT_RE = /^\d[\d,]*\s*-\s*[\d,]+\s+employees$/i;
 const UPDATED_ON_RE = /^updated on\b/i;
@@ -91,6 +100,7 @@ export const isProbablyNotCompany = (line: string): boolean => {
   if (SENIORITY_LABELS.has(low)) return true;
   if (WORK_MODEL_LABELS.has(low)) return true;
   if (low === "no salary listed") return true;
+  if (looksLikeLocation(trimmed)) return true;
   if (UPDATED_ON_RE.test(low)) return true;
   if (isEmployeeCountLine(trimmed)) return true;
   if (SALARY_LINE_RE.test(trimmed)) return true;
@@ -240,7 +250,8 @@ export const extractCompanyName = (rawJobText: string): string | null => {
 
 export const extractJobPostingMetadata = (rawJobText: string): JobPostingMetadata => {
   const lines = normalizeJobLines(rawJobText);
-  return {
+  const preScoring = extractPreScoringMetadata(rawJobText);
+  const simplify = {
     companyName: extractCompanyName(rawJobText),
     jobTitle: extractJobTitleFromLines(lines),
     employmentType: extractEmploymentTypeFromLines(lines),
@@ -248,6 +259,18 @@ export const extractJobPostingMetadata = (rawJobText: string): JobPostingMetadat
     seniority: extractSeniorityFromLines(lines),
     salary: extractSalaryLabelFromLines(lines),
     workModel: extractWorkModelFromLines(lines),
+  };
+
+  const preferPreScoring = preScoring.confidence === "high" || preScoring.confidence === "medium";
+  return {
+    companyName: preferPreScoring ? preScoring.companyName ?? simplify.companyName : simplify.companyName ?? preScoring.companyName,
+    jobTitle: preferPreScoring ? preScoring.jobTitle ?? simplify.jobTitle : simplify.jobTitle ?? preScoring.jobTitle,
+    location: preScoring.location ?? simplify.location,
+    employmentType: simplify.employmentType,
+    seniority: simplify.seniority,
+    salary: simplify.salary,
+    workModel: simplify.workModel,
+    preScoring,
   };
 };
 
@@ -263,6 +286,8 @@ export const isWeakJobTitle = (title: string | undefined | null): boolean => {
   if (!t || /^unknown title$/i.test(t)) return true;
   if (EMPLOYMENT_TYPES.has(lineLower(t))) return true;
   if (isNoiseLine(t)) return true;
+  if (isLocationPrefixedTitle(t)) return true;
+  if (looksLikeLocation(t)) return true;
   if (!ROLE_TITLE_RE.test(t) && t.length < 12) return true;
   return false;
 };
@@ -300,7 +325,9 @@ export const logJobPostingMetadataDebug = (
     firstLines: lines.slice(0, 30),
     extractedJobTitle: meta.jobTitle,
     extractedCompanyName: meta.companyName,
+    extractedLocation: meta.location,
+    preScoring: meta.preScoring,
     companyCandidates: candidates,
-    selectedReason: selectedReason ?? (candidates[0]?.reasons.join(", ") || "none"),
+    selectedReason: selectedReason ?? (candidates[0]?.reasons.join(", ") || meta.preScoring?.rawTitleSource || "none"),
   });
 };

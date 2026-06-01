@@ -50,6 +50,7 @@ export const triageJob = async (input: {
     llmExtractionSucceeded,
     extractionDiagnostics,
     heuristicInferredFields,
+    preScoringMetadata,
   } = await extractJobData({
     url: input.url,
     rawText: parsedText,
@@ -68,7 +69,7 @@ export const triageJob = async (input: {
     scoring: scored,
     scoringDiagnostics,
     scoringLlmSucceeded,
-  } = await scoreJob({ extracted, rules, userProfile, resumeContexts });
+  } = await scoreJob({ extracted, rules, userProfile, resumeContexts, preScoringMetadata });
   stageMs.scoring = Date.now() - scoringStart;
   const salaryStart = Date.now();
   const salaryAsk = computeSalaryAsk({
