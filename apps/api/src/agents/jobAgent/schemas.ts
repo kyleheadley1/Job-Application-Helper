@@ -31,6 +31,7 @@ export const ExtractedJobDataSchema = z.object({
     })
     .optional(),
   seniority: z.string().optional(),
+  employmentType: z.string().optional(),
   yearsExperience: z
     .object({
       raw: z.string().optional(),
@@ -69,6 +70,17 @@ export const ExtractedJobFromModelSchema = z.preprocess(
   preprocessExtractionInput,
   ExtractedJobDataSchema,
 );
+
+/** Fallback metadata-only extraction when deterministic company parse fails. */
+export const JobMetadataFromModelSchema = z.object({
+  companyName: z.string().nullable(),
+  jobTitle: z.string().nullable(),
+  employmentType: z.string().nullable(),
+  location: z.string().nullable(),
+  seniority: z.string().nullable(),
+  salary: z.string().nullable(),
+  workModel: z.string().nullable(),
+});
 
 export const RuleEvaluationSchema = z.object({
   explicitDegreeRisk: z.boolean(),

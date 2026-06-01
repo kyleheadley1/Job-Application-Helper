@@ -1,3 +1,4 @@
+import type { JobPostingMetadata } from '../../tools/jobPostingMetadataExtract.js';
 import type { ExtractedJobData, JobRecord } from '../../types/job.js';
 import type { ResumeType } from '../../types/resume.js';
 import type { ResumeContext } from "../../types/resumeContext.js";
@@ -24,16 +25,40 @@ Required shape (field names must match exactly):
 - yearsExperience: if present, MUST be an object like { "raw": "2+", "min": 2, "max": 4 } — never a bare number or bare string at the top level.
 - degreeRequirement: if present, MUST be an object like { "raw": "Bachelor's required", "level": "required" } — never a bare string.
 - stack, requiredSkills, preferredSkills, domainTags, responsibilities, requirements: arrays of strings (empty arrays allowed).
+- Use the provided parsed companyName unless it is null or obviously incorrect. Do not replace a concrete company name with "Unknown Company".
+- Do not infer company from the role title. Ignore page chrome (Simplify+, Open user menu, Updated on, History, Summary, Full Job Posting).
+`.trim();
+
+export const metadataExtractionSystemPrompt = `
+You extract structured job posting metadata only.
+Return JSON with exactly these keys (use null when unknown):
+companyName, jobTitle, employmentType, location, seniority, salary, workModel.
+
+Rules:
+- Do not infer a company from the role title.
+- Ignore page chrome such as Simplify+, Open user menu, Updated on, History, Summary, and Full Job Posting.
+- Company names often appear near employee-count lines or repeated consecutively.
+- Never guess; use null when uncertain.
+`.trim();
+
+export const buildMetadataExtractionPrompt = (rawText: string): string => `
+Extract structured metadata from this pasted job posting.
+
+${rawText}
 `.trim();
 
 export const buildExtractionPrompt = (input: {
   url?: string;
   rawText?: string;
   companyHint?: string;
+  preParsed?: JobPostingMetadata;
 }): string => `
 Extract a job posting into the required schema.
 Company hint: ${input.companyHint ?? 'none'}
 URL: ${input.url ?? 'none'}
+
+Pre-parsed fields (deterministic; prefer these for company/title when present):
+${JSON.stringify(input.preParsed ?? {}, null, 2)}
 
 Job text:
 ${input.rawText ?? 'No raw text provided.'}
@@ -79,6 +104,7 @@ export const buildScoringPrompt = (params: {
 }): string =>
   `
 Evaluate this role with conservative realism.
+Use extracted.company as the employer unless it is missing or clearly wrong (e.g. employment type or page chrome). Do not substitute "Unknown Company" when a concrete company is provided.
 
 Return EXACTLY these keys (and no others):
 {

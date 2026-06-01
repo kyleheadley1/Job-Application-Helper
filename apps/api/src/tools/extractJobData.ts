@@ -1,5 +1,10 @@
-import { extractionSystemPrompt, buildExtractionPrompt } from "../agents/jobAgent/prompts.js";
-import { ExtractedJobFromModelSchema } from "../agents/jobAgent/schemas.js";
+import {
+  extractionSystemPrompt,
+  buildExtractionPrompt,
+  metadataExtractionSystemPrompt,
+  buildMetadataExtractionPrompt,
+} from "../agents/jobAgent/prompts.js";
+import { ExtractedJobFromModelSchema, JobMetadataFromModelSchema } from "../agents/jobAgent/schemas.js";
 import type { ExtractedJobData } from "../types/job.js";
 import { responsesClient } from "../services/llm/responsesClient.js";
 import type { StructuredCallDiagnostics } from "../services/llm/responsesClient.js";
@@ -9,6 +14,14 @@ import {
   extractFromRawText,
   mergeExtractedWithHeuristics,
 } from "./deterministicRawTextExtract.js";
+import {
+  extractJobPostingMetadata,
+  isWeakJobTitle,
+  isWeakOrPlaceholderCompany,
+  logJobPostingMetadataDebug,
+  validateExtractedCompany,
+  type JobPostingMetadata,
+} from "./jobPostingMetadataExtract.js";
 
 const fallbackExtraction = (input: { url?: string; rawText?: string; companyHint?: string }): ExtractedJobData => ({
   company: input.companyHint ?? "Unknown Company",
@@ -24,6 +37,50 @@ const fallbackExtraction = (input: { url?: string; rawText?: string; companyHint
   requirements: [],
 });
 
+const applyPreParsedMetadata = (base: ExtractedJobData, meta: JobPostingMetadata): ExtractedJobData => {
+  const company =
+    meta.companyName && isWeakOrPlaceholderCompany(base.company) ? meta.companyName : base.company;
+  const title = meta.jobTitle && isWeakJobTitle(base.title) ? meta.jobTitle : base.title;
+  return {
+    ...base,
+    company: company || base.company,
+    title: title || base.title,
+    employmentType: meta.employmentType ?? base.employmentType,
+    location: base.location ?? meta.location ?? undefined,
+    seniority: base.seniority ?? meta.seniority ?? undefined,
+  };
+};
+
+const applyMetadataFallback = (base: ExtractedJobData, meta: {
+  companyName: string | null;
+  jobTitle: string | null;
+  employmentType: string | null;
+  location: string | null;
+  seniority: string | null;
+}): ExtractedJobData => ({
+  ...base,
+  company: meta.companyName && isWeakOrPlaceholderCompany(base.company) ? meta.companyName : base.company,
+  title: meta.jobTitle && isWeakJobTitle(base.title) ? meta.jobTitle : base.title,
+  employmentType: meta.employmentType ?? base.employmentType,
+  location: base.location ?? meta.location ?? undefined,
+  seniority: base.seniority ?? meta.seniority ?? undefined,
+});
+
+const finalizeExtracted = (extracted: ExtractedJobData, normalizedText: string, companyHint?: string): ExtractedJobData => {
+  const company = validateExtractedCompany(
+    isWeakOrPlaceholderCompany(extracted.company) ? null : extracted.company,
+    normalizedText,
+  );
+  let out = {
+    ...extracted,
+    company: company ?? (companyHint?.trim() || extracted.company),
+  };
+  if (isWeakOrPlaceholderCompany(out.company) && companyHint?.trim()) {
+    out = { ...out, company: companyHint.trim() };
+  }
+  return out;
+};
+
 export type ExtractJobDataResult = {
   extracted: ExtractedJobData;
   llmExtractionSucceeded: boolean;
@@ -37,9 +94,18 @@ export const extractJobData = async (input: {
   companyHint?: string;
 }): Promise<ExtractJobDataResult> => {
   const fallback = () => fallbackExtraction(input);
+  let normalized: string | undefined;
+  let preParsed: JobPostingMetadata | undefined;
+
+  if (input.rawText?.trim()) {
+    normalized = parseJobText(input.rawText.replace(/\r\n/g, "\n")).normalized;
+    preParsed = extractJobPostingMetadata(normalized);
+    logJobPostingMetadataDebug(normalized, preParsed, "pre_llm");
+  }
+
   const extractedRun = await responsesClient.runStructured({
     systemPrompt: extractionSystemPrompt,
-    userPrompt: buildExtractionPrompt(input),
+    userPrompt: buildExtractionPrompt({ ...input, rawText: normalized ?? input.rawText, preParsed }),
     schema: ExtractedJobFromModelSchema,
     fallback,
   });
@@ -57,12 +123,38 @@ export const extractJobData = async (input: {
   let extracted = extractedRun.data;
   let heuristicInferredFields: string[] = [];
 
-  if (input.rawText?.trim()) {
-    const normalized = parseJobText(input.rawText.replace(/\r\n/g, "\n")).normalized;
+  if (preParsed) {
+    extracted = applyPreParsedMetadata(extracted, preParsed);
+  }
+
+  if (normalized) {
     const heur = extractFromRawText(normalized, input.companyHint);
     heuristicInferredFields = heur.inferredFields;
     extracted = mergeExtractedWithHeuristics(extracted, heur);
     extracted.rawText = extracted.rawText ?? input.rawText;
+    extracted = finalizeExtracted(extracted, normalized, input.companyHint);
+  }
+
+  if (normalized && isWeakOrPlaceholderCompany(extracted.company)) {
+    const metaRun = await responsesClient.runStructured({
+      systemPrompt: metadataExtractionSystemPrompt,
+      userPrompt: buildMetadataExtractionPrompt(normalized),
+      schema: JobMetadataFromModelSchema,
+      fallback: () => ({
+        companyName: preParsed?.companyName ?? null,
+        jobTitle: preParsed?.jobTitle ?? null,
+        employmentType: preParsed?.employmentType ?? null,
+        location: preParsed?.location ?? null,
+        seniority: preParsed?.seniority ?? null,
+        salary: preParsed?.salary ?? null,
+        workModel: preParsed?.workModel ?? null,
+      }),
+    });
+    if (!metaRun.success) {
+      logger.warn("Metadata fallback extraction used deterministic values", metaRun.diagnostics);
+    }
+    extracted = applyMetadataFallback(extracted, metaRun.data);
+    extracted = finalizeExtracted(extracted, normalized, input.companyHint);
   }
 
   return { extracted, llmExtractionSucceeded, extractionDiagnostics: extractedRun.diagnostics, heuristicInferredFields };

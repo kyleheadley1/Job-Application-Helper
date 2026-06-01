@@ -17,6 +17,8 @@ export type ExtractedJobData = {
   rawText?: string;
   location?: string;
   remoteType?: "remote" | "hybrid" | "onsite" | "unknown";
+  employmentType?: string;
+  seniority?: string;
   stack: string[];
   requiredSkills: string[];
   preferredSkills: string[];

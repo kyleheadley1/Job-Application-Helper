@@ -5,6 +5,13 @@
 import type { ExtractedJobData } from "../types/job.js";
 import { dedupeStrings, normalizeText } from "../lib/text.js";
 import {
+  extractJobPostingMetadata,
+  isWeakJobTitle,
+  isWeakOrPlaceholderCompany,
+  logJobPostingMetadataDebug,
+  validateExtractedCompany,
+} from "./jobPostingMetadataExtract.js";
+import {
   detectStrictFinanceEmployerContext,
   textImpliesNycMetroOrCommutableNj,
 } from "../lib/employerLocationSignals.js";
@@ -119,7 +126,7 @@ export const parseSalaryFromText = (raw: string): { min?: number; max?: number; 
   return undefined;
 };
 
-const parseTitleLine = (lines: string[]): string | undefined => {
+const parseTitleFromEmDashHeader = (lines: string[]): string | undefined => {
   if (!lines.length) return undefined;
   const first = lines[0].trim();
   const emDash = first.split(/\s*[—–-]\s*/);
@@ -131,18 +138,15 @@ const parseTitleLine = (lines: string[]): string | undefined => {
     }
     if (right.length > 3) return right;
   }
-  if (/engineer|developer|scientist|architect/i.test(first)) return first;
-  return first.length > 80 ? undefined : first;
+  return undefined;
 };
 
-const parseCompanyFromLine = (lines: string[], hint?: string): string | undefined => {
-  if (hint?.trim()) return hint.trim();
-  if (!lines.length) return undefined;
-  const first = lines[0].trim();
-  const emDash = first.split(/\s*[—–-]\s*/);
-  if (emDash.length >= 2 && emDash[0].length > 1 && emDash[0].length < 80) return emDash[0].trim();
-  const atCo = first.match(/\bat\s+(.+)$/i);
-  if (atCo) return atCo[1].trim();
+const workModelToRemoteType = (workModel: string | null): ExtractedJobData["remoteType"] | undefined => {
+  if (!workModel) return undefined;
+  const low = workModel.toLowerCase();
+  if (low === "hybrid") return "hybrid";
+  if (low === "remote") return "remote";
+  if (low === "in person" || low === "in-person" || low === "onsite" || low === "on-site") return "onsite";
   return undefined;
 };
 
@@ -227,17 +231,41 @@ export const extractFromRawText = (normalizedText: string, companyHint?: string)
   const lower = text.toLowerCase();
 
   const lines = text.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+  const meta = extractJobPostingMetadata(text);
+  logJobPostingMetadataDebug(text, meta);
 
-  const title = parseTitleLine(lines);
+  const emDashTitle = parseTitleFromEmDashHeader(lines);
+  const title = emDashTitle ?? meta.jobTitle ?? undefined;
   if (title) {
     partial.title = title;
     inferredFields.push("title");
   }
 
-  const company = parseCompanyFromLine(lines, companyHint);
+  const hintedCompany = companyHint?.trim();
+  const company =
+    validateExtractedCompany(hintedCompany || meta.companyName, text) ??
+    (hintedCompany || undefined);
   if (company) {
     partial.company = company;
     inferredFields.push("company");
+  }
+
+  if (meta.employmentType) {
+    partial.employmentType = meta.employmentType;
+    inferredFields.push("employmentType");
+  }
+  if (meta.seniority && !partial.seniority) {
+    partial.seniority = meta.seniority.toLowerCase();
+    inferredFields.push("seniority");
+  }
+  const metaRemote = workModelToRemoteType(meta.workModel);
+  if (metaRemote) {
+    partial.remoteType = metaRemote;
+    inferredFields.push("remoteType");
+  }
+  if (meta.location && !partial.location) {
+    partial.location = meta.location;
+    inferredFields.push("location");
   }
 
   const { location, remoteType: locRemote } = parseLocationLine(text);
@@ -406,8 +434,19 @@ export const mergeExtractedWithHeuristics = (
       : (h.locationIsCommutable ?? base.locationIsCommutable);
   const merged: ExtractedJobData = {
     ...base,
-    company: h.company && (base.company === "Unknown Company" || !base.company) ? h.company : base.company || h.company || "Unknown Company",
-    title: h.title && (base.title === "Unknown Title" || !base.title) ? h.title : base.title || h.title || "Unknown Title",
+    company:
+      h.company && isWeakOrPlaceholderCompany(base.company)
+        ? h.company
+        : base.company && !isWeakOrPlaceholderCompany(base.company)
+          ? base.company
+          : h.company || base.company || "Unknown Company",
+    title:
+      h.title && isWeakJobTitle(base.title)
+        ? h.title
+        : base.title && !isWeakJobTitle(base.title)
+          ? base.title
+          : h.title || base.title || "Unknown Title",
+    employmentType: h.employmentType ?? base.employmentType,
     location: h.location ?? base.location,
     remoteType:
       h.remoteType && (base.remoteType === "unknown" || base.remoteType === undefined)

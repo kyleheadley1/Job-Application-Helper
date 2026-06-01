@@ -5,8 +5,8 @@ import type { JobRecord } from "../types/job";
 import { ScoreBadge } from "../components/ScoreBadge";
 import { StatusBadge } from "../components/StatusBadge";
 import { JsonPanel } from "../components/JsonPanel";
-import { salaryAskLabel } from "../lib/jobDisplay";
-import { buildKeyRisks, decisionSummaryLine, displayRoleTitle, selectTopFits } from "../lib/resultSummary";
+import { jobHeaderLabel, salaryAskLabel } from "../lib/jobDisplay";
+import { buildKeyRisks, decisionSummaryLine, selectTopFits } from "../lib/resultSummary";
 import {
   formatDuration,
   progressForPhase,
@@ -154,15 +154,11 @@ export const JobResultPage = () => {
   const topRisks = buildKeyRisks(job, 5);
   const hardRules = job.rules.hardRuleNotes ?? [];
   const summaryLine = decisionSummaryLine(job);
-  const displayTitle = displayRoleTitle(job.extracted.title);
-
   return (
     <section className="stack">
       <header className="rowBetween">
         <div>
-          <h2>
-            {job.extracted.company} - {displayTitle}
-          </h2>
+          <h2>{jobHeaderLabel(job.extracted)}</h2>
           <p className="muted">{summaryLine}</p>
         </div>
         <div className="row">

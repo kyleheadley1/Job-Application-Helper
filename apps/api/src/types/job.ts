@@ -31,6 +31,7 @@ export type ExtractedJobData = {
     currency?: string;
   };
   seniority?: string;
+  employmentType?: string;
   yearsExperience?: {
     raw?: string;
     min?: number;
