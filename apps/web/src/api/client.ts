@@ -36,13 +36,21 @@ export const api = {
   triage: (payload: { url?: string; rawText?: string; companyHint?: string; fullPrep?: boolean }) =>
     request<JobRecord & { tracked?: boolean; canConfirmApplied?: boolean }>("/jobs/triage", {
       method: "POST",
+      cache: "no-store",
       body: JSON.stringify(payload),
+    }),
+  retriage: (id: string) =>
+    request<JobRecord & { tracked?: boolean; canConfirmApplied?: boolean }>(`/jobs/${id}/retriage`, {
+      method: "POST",
+      cache: "no-store",
+      body: JSON.stringify({}),
     }),
   listJobs: (query = "") =>
     request<{ items: JobRecord[]; total: number; totalAll?: number }>(`/jobs${query}`),
   getJob: (id: string) =>
     request<JobRecord & { statusHistory?: unknown[]; tracked?: boolean; canConfirmApplied?: boolean }>(
       `/jobs/${id}`,
+      { cache: "no-store" },
     ),
   confirmApplied: (id: string) => request<JobRecord>(`/jobs/${id}/confirm-applied`, { method: "POST" }),
   updateStatus: (id: string, status: JobStatus, note?: string) =>

@@ -39,6 +39,7 @@ export const AddJobPage = () => {
       navigate(`/jobs/${job.id}`, {
         state: {
           triageTiming: { startedAt: start },
+          triageResult: job,
         },
       });
     } catch (err) {
