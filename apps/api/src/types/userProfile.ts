@@ -24,4 +24,6 @@ export type UserProfile = {
   }>;
   recurringStory: string[];
   hardConstraints: string[];
+  /** When false, JD "no sponsorship" / work-auth language is not treated as a gate for this candidate. */
+  requiresSponsorship: boolean;
 };
