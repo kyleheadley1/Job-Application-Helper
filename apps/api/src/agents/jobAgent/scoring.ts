@@ -208,6 +208,13 @@ export const scoreJob = async (params: {
     });
   }
   const llmResult = scoredRun.data;
+  const rawScore = llmResult.score;
+  console.log('RAW_LLM_SCORES', JSON.stringify({
+    stackFit: rawScore.stackFit,
+    levelFit: rawScore.levelFit,
+    functionalOverlap: rawScore.functionalOverlap,
+    total: rawScore.total,
+  }));
 
   const scoreFinal = finalizeScore(llmResult.score, params.rules);
 
