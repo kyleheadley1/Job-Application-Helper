@@ -3,6 +3,7 @@ import { useLocation, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { JobRecord } from "../types/job";
 import { ScoreBadge } from "../components/ScoreBadge";
+import { formatScoreCategory } from "../lib/scoreCategoryMaxes";
 import { StatusBadge } from "../components/StatusBadge";
 import { JsonPanel } from "../components/JsonPanel";
 import { jobHeaderLabel, salaryAskLabel } from "../lib/jobDisplay";
@@ -193,13 +194,13 @@ export const JobResultPage = () => {
         <article className="card">
           <h3>Score Breakdown</h3>
           <ul>
-            <li>Stack: {job.score.stackFit}/25</li>
-            <li>Level: {job.score.levelFit}/15</li>
-            <li>Domain: {job.score.domainFit}/10</li>
-            <li>Story: {job.score.resumeStoryClarity}/15</li>
-            <li>Functional: {job.score.functionalOverlap}/10</li>
-            <li>Recruiter: {job.score.recruiterFriendliness}/15</li>
-            <li>Career value: {job.score.careerValue}/10</li>
+            <li>Stack: {formatScoreCategory(job.score.stackFit, "stackFit")}</li>
+            <li>Level: {formatScoreCategory(job.score.levelFit, "levelFit")}</li>
+            <li>Domain: {formatScoreCategory(job.score.domainFit, "domainFit")}</li>
+            <li>Story: {formatScoreCategory(job.score.resumeStoryClarity, "resumeStoryClarity")}</li>
+            <li>Functional: {formatScoreCategory(job.score.functionalOverlap, "functionalOverlap")}</li>
+            <li>Recruiter: {formatScoreCategory(job.score.recruiterFriendliness, "recruiterFriendliness")}</li>
+            <li>Career value: {formatScoreCategory(job.score.careerValue, "careerValue")}</li>
           </ul>
           <h4>Hard-rule flags</h4>
           {hardRules.length ? (

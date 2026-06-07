@@ -126,7 +126,32 @@ describe("preprocessScoringInput + ScoringFromModelSchema", () => {
     expect(parsed.success).toBe(true);
     if (!parsed.success) return;
     expect(parsed.data.score.stackFit).toBe(12);
+    expect(parsed.data.score.resumeStoryClarity).toBe(10);
     expect(parsed.data.score.total).toBe(64);
+  });
+
+  it("accepts realigned category maxes (functionalOverlap up to 15, stackFit up to 20)", () => {
+    const parsed = ScoringFromModelSchema.safeParse({
+      score: {
+        stackFit: 17,
+        levelFit: 16,
+        domainFit: 8,
+        resumeStoryClarity: 9,
+        functionalOverlap: 14,
+        recruiterFriendliness: 12,
+        careerValue: 8,
+        total: 84,
+      },
+      recommendation: "yes",
+      topMatch: "AI internal tools overlap",
+      mainRisk: "Low",
+      rationale: ["a", "b"],
+      risks: [],
+    });
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data.score.functionalOverlap).toBe(14);
+    expect(parsed.data.score.stackFit).toBe(17);
   });
 
   it("reconciles score.total to sum of categories", () => {
