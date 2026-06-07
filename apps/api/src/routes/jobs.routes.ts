@@ -14,8 +14,7 @@ import {
   UpdateJobNotesBodySchema,
   UpdateJobStatusBodySchema,
 } from "../agents/jobAgent/schemas.js";
-import { canConfirmApplied, JobNotFoundError, jobsService } from "../services/jobs/jobs.service.js";
-import { JobConfirmNotAllowedError } from "../services/jobs/jobs.service.js";
+import { canConfirmApplied, JobConfirmNotAllowedError, JobNoJdSourceError, JobNotFoundError, jobsService } from "../services/jobs/jobs.service.js";
 import { TRACKER_EXPORT_HEADERS } from "../tracker/canonicalSpreadsheet.js";
 
 export const jobsRouter = Router();
@@ -41,12 +40,36 @@ jobsRouter.post("/triage", async (req, res, next) => {
     const payload = TriageRequestSchema.parse(req.body);
     const result = await jobsService.runTriage(payload);
     const validated = TriageResponseSchema.parse(result);
+    res.setHeader("Cache-Control", "no-store");
     res.json({
       ...validated,
       tracked: false,
       canConfirmApplied: canConfirmApplied(validated),
     });
   } catch (error) {
+    next(error);
+  }
+});
+
+jobsRouter.post("/:id/retriage", async (req, res, next) => {
+  try {
+    const { job, tracked } = await jobsService.runRetriage(req.params.id);
+    const validated = JobRecordSchema.parse(job);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({
+      ...validated,
+      tracked,
+      canConfirmApplied: !tracked && canConfirmApplied(validated),
+    });
+  } catch (error) {
+    if (error instanceof JobNotFoundError) {
+      res.status(404).json({ error: error.code, message: error.message });
+      return;
+    }
+    if (error instanceof JobNoJdSourceError) {
+      res.status(400).json({ error: error.code, message: error.message });
+      return;
+    }
     next(error);
   }
 });
@@ -111,6 +134,7 @@ jobsRouter.get("/:id", async (req, res, next) => {
       return;
     }
     const validated = JobRecordSchema.parse(job);
+    res.setHeader("Cache-Control", "no-store");
     res.json({
       ...validated,
       tracked,

@@ -8,6 +8,7 @@ import {
 } from "../../agents/jobAgent/assetGeneration.js";
 import { userProfile } from "../../config/userProfile.js";
 import { getTrackerColor, shouldShortlist } from "../../config/scoringPolicy.js";
+import { buildTrackerSpreadsheetFromJob } from "../../tracker/canonicalSpreadsheet.js";
 import { jobsRepository } from "./jobs.repository.js";
 import { resumeContextService } from "../resume/resumeContext.js";
 
@@ -24,6 +25,14 @@ export class JobConfirmNotAllowedError extends Error {
   constructor() {
     super("This scored role is not eligible for confirm-applied.");
     this.name = "JobConfirmNotAllowedError";
+  }
+}
+
+export class JobNoJdSourceError extends Error {
+  readonly code = "JOB_NO_JD_SOURCE" as const;
+  constructor() {
+    super("This role has no stored JD text or URL to re-triage.");
+    this.name = "JobNoJdSourceError";
   }
 }
 
@@ -44,6 +53,78 @@ export class JobsService {
     const result = await triageJob(input);
     this.draftJobs.set(result.id, result);
     return result;
+  }
+
+  /** Re-run extraction, rules, and scoring for an existing draft or tracked role. */
+  async runRetriage(id: string): Promise<{ job: JobRecord; tracked: boolean }> {
+    const { job: prev, tracked } = await this.getByIdIncludingDraft(id);
+    if (!prev) throw new JobNotFoundError();
+
+    const rawText = prev.extracted.rawText?.trim();
+    const url = prev.extracted.url?.trim();
+    if (!rawText && !url) throw new JobNoJdSourceError();
+
+    const fresh = await triageJob({
+      url: url || undefined,
+      rawText: rawText || undefined,
+      companyHint: prev.extracted.company,
+      fullPrep: false,
+    });
+
+    const now = new Date().toISOString();
+    const historyEntry = {
+      scoredAt: now,
+      score: fresh.score,
+      recommendation: fresh.recommendation,
+    };
+    const ts = prev.trackerSpreadsheet ?? {};
+    const prevOriginal =
+      typeof ts.originalAltScore === "string" && ts.originalAltScore.trim()
+        ? ts.originalAltScore.trim()
+        : "";
+
+    const merged: JobRecord = {
+      ...prev,
+      extracted: fresh.extracted,
+      rules: fresh.rules,
+      score: fresh.score,
+      recommendation: fresh.recommendation,
+      salaryAsk: fresh.salaryAsk,
+      recommendedResume: fresh.recommendedResume,
+      resumeRationale: fresh.resumeRationale,
+      topMatch: fresh.topMatch,
+      mainRisk: fresh.mainRisk,
+      rationale: fresh.rationale,
+      risks: fresh.risks,
+      debugExtraction: fresh.debugExtraction,
+      generated: {},
+      updatedAt: now,
+      scoreHistory: [...(prev.scoreHistory ?? []), historyEntry],
+      tracker: {
+        ...prev.tracker,
+        priority: fresh.tracker.priority,
+        recommendedAction: fresh.tracker.recommendedAction,
+        notes: prev.tracker.notes,
+        statusOutcome: tracked ? (prev.tracker.statusOutcome ?? prev.status) : fresh.tracker.statusOutcome,
+        shortlist: shouldShortlist(fresh.score.total, prev.status),
+        color: getTrackerColor(prev.status, fresh.score.total),
+      },
+    };
+    merged.trackerSpreadsheet = buildTrackerSpreadsheetFromJob(merged);
+    if (tracked) {
+      merged.trackerSpreadsheet = {
+        ...merged.trackerSpreadsheet,
+        originalAltScore: prevOriginal || String(prev.score.total),
+        latestScore: String(fresh.score.total),
+      };
+    }
+
+    if (tracked) {
+      const saved = await jobsRepository.upsertJob(merged);
+      return { job: saved, tracked: true };
+    }
+    this.draftJobs.set(id, merged);
+    return { job: merged, tracked: false };
   }
 
   async getByIdIncludingDraft(id: string): Promise<{ job: JobRecord | null; tracked: boolean }> {

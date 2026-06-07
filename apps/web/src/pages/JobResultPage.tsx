@@ -6,7 +6,7 @@ import { ScoreBadge } from "../components/ScoreBadge";
 import { formatScoreCategory } from "../lib/scoreCategoryMaxes";
 import { StatusBadge } from "../components/StatusBadge";
 import { JsonPanel } from "../components/JsonPanel";
-import { jobHeaderLabel, salaryAskLabel } from "../lib/jobDisplay";
+import { hasJdSource, jobHeaderLabel, salaryAskLabel } from "../lib/jobDisplay";
 import { buildKeyRisks, decisionSummaryLine, selectTopFits } from "../lib/resultSummary";
 import {
   formatDuration,
@@ -40,7 +40,8 @@ function renderTextParagraphs(text: string, fallback = "Not generated") {
 export const JobResultPage = () => {
   const { id = "" } = useParams();
   const location = useLocation();
-  const navTiming = (location.state as { triageTiming?: TriageTimingPayload } | undefined)?.triageTiming;
+  const navTiming = (location.state as { triageTiming?: TriageTimingPayload; triageResult?: JobRecord } | undefined)?.triageTiming;
+  const navTriageResult = (location.state as { triageResult?: JobRecord } | undefined)?.triageResult;
   const [job, setJob] = useState<JobRecord | null>(null);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<AssetTab>("cover");
@@ -50,6 +51,8 @@ export const JobResultPage = () => {
   const [confirmMsg, setConfirmMsg] = useState("");
   const [assetBusy, setAssetBusy] = useState(false);
   const [assetMsg, setAssetMsg] = useState("");
+  const [retriageBusy, setRetriageBusy] = useState(false);
+  const [retriageMsg, setRetriageMsg] = useState("");
   const [startedAt, setStartedAt] = useState<number | null>(navTiming?.startedAt ?? null);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [finishedMs, setFinishedMs] = useState<number | null>(null);
@@ -57,6 +60,20 @@ export const JobResultPage = () => {
 
   useEffect(() => {
     if (!id) return;
+    if (navTriageResult?.id === id) {
+      const fresh = navTriageResult as JobRecord & { tracked?: boolean; canConfirmApplied?: boolean };
+      setJob(fresh);
+      setTracked(Boolean(fresh.tracked));
+      setCanConfirmApplied(Boolean(fresh.canConfirmApplied));
+      setProgressPhase("result_ready");
+      if (startedAt && finishedMs === null) {
+        const done = Date.now() - startedAt;
+        setFinishedMs(done);
+        setElapsedMs(done);
+        writeStoredTriageTiming(id, { startedAt, finishedMs: done });
+      }
+      return;
+    }
     const stored = readStoredTriageTiming(id);
     if (stored) {
       setStartedAt(stored.startedAt);
@@ -67,7 +84,7 @@ export const JobResultPage = () => {
       setFinishedMs(null);
       setProgressPhase("result_fetch_in_flight");
     }
-  }, [id, navTiming?.startedAt]);
+  }, [id, navTiming?.startedAt, navTriageResult, startedAt, finishedMs]);
 
   useEffect(() => {
     if (!startedAt || finishedMs !== null || !!job) return;
@@ -78,6 +95,7 @@ export const JobResultPage = () => {
   }, [startedAt, finishedMs, job]);
 
   useEffect(() => {
+    if (!id || navTriageResult?.id === id) return;
     setProgressPhase("result_fetch_in_flight");
     api
       .getJob(id)
@@ -94,7 +112,7 @@ export const JobResultPage = () => {
         }
       })
       .catch((err) => setError(err.message));
-  }, [id, startedAt, finishedMs]);
+  }, [id, startedAt, finishedMs, navTriageResult?.id]);
 
   const ensureAssets = async (nextTab: AssetTab) => {
     if (!job || nextTab === "raw" || tabHasContent(job, nextTab) || assetBusy) return;
@@ -130,6 +148,35 @@ export const JobResultPage = () => {
       setConfirmMsg(err instanceof Error ? err.message : "Could not confirm applied.");
     } finally {
       setBusyConfirm(false);
+    }
+  };
+
+  const rerunTriage = async () => {
+    if (!job || retriageBusy) return;
+    setRetriageBusy(true);
+    setRetriageMsg("");
+    setError("");
+    const start = Date.now();
+    setStartedAt(start);
+    setFinishedMs(null);
+    setElapsedMs(0);
+    setProgressPhase("triage_request_in_flight");
+    try {
+      const updated = await api.retriage(job.id);
+      setJob(updated);
+      setTracked(Boolean(updated.tracked));
+      setCanConfirmApplied(Boolean(updated.canConfirmApplied));
+      const done = Date.now() - start;
+      setFinishedMs(done);
+      setElapsedMs(done);
+      writeStoredTriageTiming(job.id, { startedAt: start, finishedMs: done });
+      setProgressPhase("result_ready");
+      setRetriageMsg("Re-scored with current rules.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Re-triage failed.");
+      setProgressPhase("idle");
+    } finally {
+      setRetriageBusy(false);
     }
   };
 
@@ -172,6 +219,12 @@ export const JobResultPage = () => {
         <article className="card">
           <h3>Decision</h3>
           <p>Apply: {job.recommendation}</p>
+          {hasJdSource(job) ? (
+            <button onClick={() => void rerunTriage()} disabled={retriageBusy || busyConfirm}>
+              {retriageBusy ? "Re-scoring..." : "Re-run triage"}
+            </button>
+          ) : null}
+          {retriageMsg ? <p className="muted">{retriageMsg}</p> : null}
           {!tracked ? (
             <p className="muted">Not added to tracker yet. It is saved only after you confirm you applied.</p>
           ) : (
