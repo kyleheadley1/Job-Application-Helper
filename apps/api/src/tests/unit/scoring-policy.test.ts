@@ -5,7 +5,7 @@ import {
   hasHardGateNote,
 } from "../../lib/scoringCaps.js";
 import type { RuleEvaluation } from "../../types/scoring.js";
-import { getTrackerColor, shouldShortlist } from "../../config/scoringPolicy.js";
+import { getTrackerColor, shouldShortlist, SCORE_CATEGORY_MAXES } from "../../config/scoringPolicy.js";
 
 const cleanRules = (): RuleEvaluation => ({
   explicitDegreeRisk: false,
@@ -26,6 +26,18 @@ const cleanRules = (): RuleEvaluation => ({
 });
 
 describe("scoring policy behavior", () => {
+  it("category maxes match realigned rubric", () => {
+    expect(SCORE_CATEGORY_MAXES).toEqual({
+      stackFit: 20,
+      levelFit: 20,
+      domainFit: 10,
+      resumeStoryClarity: 10,
+      functionalOverlap: 15,
+      recruiterFriendliness: 15,
+      careerValue: 10,
+    });
+  });
+
   it("maps recommendations by score band", () => {
     expect(mapRecommendationFromScore(86)).toBe("yes");
     expect(mapRecommendationFromScore(80)).toBe("yes");
