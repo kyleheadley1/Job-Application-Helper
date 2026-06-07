@@ -1724,75 +1724,6 @@ export function polishScoringNarrative(params: {
     userProfile: params.userProfile,
   });
   const rationale = polishRationaleBullets(params.narrative.rationale, 2, visibleCtx);
-  let score = applyAppliedAiDomainFloor({
-    score: params.score,
-    extracted: params.extracted,
-    userProfile: params.userProfile,
-    rules: params.rules,
-  });
-  score = applyAppliedAiStackFunctionalCalibration({
-    score,
-    extracted: params.extracted,
-    userProfile: params.userProfile,
-    rules: params.rules,
-  });
-  score = applyPythonFlexibleStackSupport({ score, rules: params.rules });
-  score = applyMidLevelOwnershipLevelCalibration({
-    score,
-    extracted: params.extracted,
-    rules: params.rules,
-  });
-  score = applyAssociateEntryBackendPlatformCalibration({
-    score,
-    extracted: params.extracted,
-    rules: params.rules,
-  });
-  score = applyNytCareerValueCalibration({
-    score,
-    extracted: params.extracted,
-    rules: params.rules,
-  });
-  score = applyHealthcareProductDomainCalibration({ score, rules: params.rules });
-  score = applyBackendApiInfraCalibration({
-    score,
-    extracted: params.extracted,
-    rules: params.rules,
-  });
-  score = applyMatureExplicitLanguageCalibration({ score, rules: params.rules });
-  score = applyFdeBuilderScoreCalibration({ score, rules: params.rules });
-  score = applyVagueEarlyStageAiCalibration({
-    score,
-    extracted: params.extracted,
-    rules: params.rules,
-  });
-  score = applyResearchHeavyAiCalibration({
-    score,
-    rules: params.rules,
-  });
-  score = applyFintechGoPrimaryCalibration({
-    score,
-    extracted: params.extracted,
-    rules: params.rules,
-  });
-  score = applyFoundingEngineerStretchCalibration({
-    score,
-    extracted: params.extracted,
-    rules: params.rules,
-  });
-  score = applyCharlieHealthProductCalibration({
-    score,
-    extracted: params.extracted,
-    rules: params.rules,
-    userProfile: params.userProfile,
-  });
-  score = applyCredentialHeavyFintechAlgorithmCalibration({
-    score,
-    rules: params.rules,
-  });
-  score = applyGoDistributedDataInfraCalibration({
-    score,
-    rules: params.rules,
-  });
   const rawTop = params.narrative.topMatch?.trim() ?? "";
   let topMatch = appendMatureLanguageShotGuidance(
     rawTop ? sanitizeNarrativeSentence(rawTop, 50) : rawTop,
@@ -1802,7 +1733,7 @@ export function polishScoringNarrative(params: {
   topMatch = appendFoundingStretchGuidance(topMatch, { rules: params.rules });
   topMatch = appendCredentialedAccountingSystemsGuidance(topMatch, { rules: params.rules });
   topMatch = appendGoDistributedDataInfraStretchGuidance(topMatch, { rules: params.rules });
-  topMatch = appendLotteryTicketGuidance(topMatch, { score, rules: params.rules });
+  topMatch = appendLotteryTicketGuidance(topMatch, { score: params.score, rules: params.rules });
   topMatch = sanitizeVisibleNarrativeLine(topMatch, visibleCtx);
-  return { score, topMatch, mainRisk, risks, rationale };
+  return { score: params.score, topMatch, mainRisk, risks, rationale };
 }

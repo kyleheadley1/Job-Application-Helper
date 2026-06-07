@@ -2,7 +2,8 @@ import type { JobRecord, JobStatus } from '../types/job.js';
 import type { TrackerSpreadsheetFields } from '../types/trackerSpreadsheet.js';
 import type { ResumeType } from '../types/resume.js';
 import type { Recommendation, ScoreBreakdown } from '../types/scoring.js';
-import { mapRecommendationFromScore } from '../agents/jobAgent/scoring.js';
+import { SCORE_CATEGORY_MAXES } from '../config/scoringPolicy.js';
+import { mapRecommendationFromScore } from '../lib/scoringCaps.js';
 
 /** Exact spreadsheet column labels and export order (canonical tracker). */
 export const TRACKER_EXPORT_HEADERS = [
@@ -214,13 +215,7 @@ const SCORE_KEYS: (keyof Omit<ScoreBreakdown, 'total'>)[] = [
 ];
 
 const SCORE_CAPS: Record<(typeof SCORE_KEYS)[number], number> = {
-  stackFit: 25,
-  levelFit: 15,
-  domainFit: 10,
-  resumeStoryClarity: 15,
-  functionalOverlap: 10,
-  recruiterFriendliness: 15,
-  careerValue: 10,
+  ...SCORE_CATEGORY_MAXES,
 };
 
 /** Deterministic breakdown summing exactly to `total` (0–100), within category caps. */

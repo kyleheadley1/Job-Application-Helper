@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { evaluateRules } from "../src/agents/jobAgent/rules.js";
 import {
-  applyResumeSupportAdjustments,
   mapRecommendationFromScore,
+  resolveRecommendation,
   scoreJob,
 } from "../src/agents/jobAgent/scoring.js";
 import { selectResume } from "../src/agents/jobAgent/resumeSelector.js";
@@ -157,12 +157,7 @@ const run = async () => {
     const rules = evaluateRules(ex.extracted, userProfile);
     const baseRun = await scoreJob({ extracted: ex.extracted, rules, userProfile });
     const scoreBefore = baseRun.scoring.score;
-    const scoreAfter = applyResumeSupportAdjustments({
-      score: scoreBefore,
-      extracted: ex.extracted,
-      rules,
-      resumeContexts,
-    });
+    const scoreAfter = scoreBefore;
     const selectedResume = await selectResume({
       extracted: ex.extracted,
       score: scoreAfter,
@@ -173,7 +168,7 @@ const run = async () => {
     });
     const selectedCtx = await resumeContextService.getContext(selectedResume.recommendedResume);
     const job = makeJob(ex.extracted, scoreAfter, selectedResume, baseRun.scoring.topMatch, baseRun.scoring.mainRisk);
-    job.recommendation = mapRecommendationFromScore(scoreAfter.total);
+    job.recommendation = resolveRecommendation(scoreAfter.total, rules, scoreAfter.careerValue);
     job.tracker.statusOutcome = job.recommendation;
     job.tracker.shortlist = shouldShortlist(scoreAfter.total, "to_review");
 
