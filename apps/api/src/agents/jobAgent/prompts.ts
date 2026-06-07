@@ -6,6 +6,8 @@ import type { ResumeContext } from "../../types/resumeContext.js";
 import type { RuleEvaluation, ScoreBreakdown } from '../../types/scoring.js';
 import type { UserProfile } from '../../types/userProfile.js';
 
+console.log('PROMPT_VERSION_2');
+
 export const extractionSystemPrompt = `
 You extract job posting details into ONE flat JSON object (no wrapper keys like "job" or "data").
 Rules:
