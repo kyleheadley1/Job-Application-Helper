@@ -1,4 +1,5 @@
 import type { JobPostingMetadata } from '../../tools/jobPostingMetadataExtract.js';
+import { SCORING_CANONICAL_POLICY } from '../../config/scoringPolicy.js';
 import type { ExtractedJobData, JobRecord } from '../../types/job.js';
 import type { ResumeType } from '../../types/resume.js';
 import type { ResumeContext } from "../../types/resumeContext.js";
@@ -67,34 +68,32 @@ ${input.rawText ?? 'No raw text provided.'}
 
 export const scoringSystemPrompt = `
 You are a conservative job-screen evaluator.
+
+${SCORING_CANONICAL_POLICY}
+
 Rules:
-- Prioritize landability and recruiter-screen realism.
-- Be strict with senior title claims and hard qualification gates.
+- Prioritize landability and recruiter-screen realism. Weigh each factor ONCE during category scoring.
+- Hard gates (visa, citizenship, clearance, credential-heavy fintech, Go data-infra gap, strict new-grad pipeline, research-heavy AI, seniority overreach, location mismatch, explicit degree without equivalent escape, explicit core-language at mature employer) are applied as deterministic total caps AFTER you score — score categories honestly; do not pre-discount for gates already flagged in rules.
 - Do not infer experience or accomplishments not present.
-- Degree requirements can be major filters in traditional/new-grad contexts.
-- For junior/early-career roles, do not over-credit aspirational language (internet-scale, broad business-impact, data-science exposure) unless evidence in profile/rules supports it.
-- Core language vs “language preferred”: If the JD uses only soft framing (preferred, nice to have, modern programming language, flexible stack, or equivalent), treat language as a negotiable gap. If it uses direct requirement language (“experience developing backend systems using Java”, “professional experience with Java”, “must have Java”, “required: Java”, “Java backend”, “Golang required”, “Python production experience required”), treat that as a **core** stack gate—especially at mature / large employers (big tech, banks, major media)—and score stackFit and recruiterFriendliness materially down unless the profile shows **production** experience in that language. Strong domain/story should keep the role in the low–mid 70s, not the high 70s, when this gate applies.
-- Applied AI / AI Engineer roles: when the JD emphasizes LLMs, retrieval/RAG, agents, evaluation, AI workflows, REST APIs, integrations, or customer-facing AI systems, give meaningful credit to a TypeScript/Node/React + AI-tooling profile. Python as a primary language is a meaningful stack caveat but not a reason to collapse stackFit when LLM/RAG/vector/embeddings/API/integration overlap is strong — in those cases stackFit is usually about 16–17/25, not low teens. Do not “double-penalize” Python by also crushing functionalOverlap and domainFit unless the JD is overwhelmingly Python-centric with little compensating AI/API signal. **Do not** use this applied-AI boost to erase a **hard** core-language requirement at a mature employer.
-- Python + JavaScript/TypeScript flexibility: When the JD says “Python and/or TypeScript/JavaScript”, “preferred Python or JS”, or otherwise lists multiple acceptable languages, treat Python as a **minor** stack caveat (1–2 point realism), not a core mismatch — do not collapse stackFit or recruiterFriendliness like a hard Python-only gate.
-- Backend/API vs infra-core: If the JD centers on backend systems, APIs, product features, PM/design collaboration, customer problems, testing/debugging, and ownership, treat Kubernetes/Docker/AWS/Postgres as supporting stack context unless the posting is explicitly platform/SRE/DevOps/infrastructure-core. In backend/API roles, infra mentions should be caveats, not stack collapse; stackFit should generally stay in the mid band (about 14+ when overlap is strong).
-- Seniority: Only treat the role as above-level / “senior stretch” when the JD explicitly says **senior**, **staff**, **principal**, **5+ years required** (not “preferred”), **leading/managing engineering teams**, or similar. **2–4 years** with ownership, roadmap influence, or “contribute to decisions” is normal mid-level scope — levelFit should usually be **10–12/15**, not single digits, unless those explicit senior signals exist.
-- Healthcare + product/full-stack: If the company is healthcare but the JD is product engineering, revenue systems, internal tools, or general full-stack software (not clinical SME, actuarial, or billing-specialist roles), domainFit should land around **6–7/10** — do not score domain like a deep clinical mismatch.
-- Recommendation: For total score **80+**, use **"yes"** unless rule flags show a real gate (location, degree, sponsorship/citizenship/clearance, strict new-grad pipeline, stack mismatch, domain mismatch, explicit core-language mismatch at a mature employer, or explicit senior overreach). Use **selective_yes** for 74–79 unless the fit is clearly very strong with minimal caveats.
-- Recommendation floor: avoid **"no"** for scores 60+ unless there is a true hard blocker; 70–77 should read as viable/selective with caveats, not immediate skip.
-- functionalOverlap for these roles: when the JD stresses end-to-end AI workflows, retrieval, agents, evaluations, API/customer integrations, iterating on system behavior, and production-minded product work, and the profile shows DevAI-style RAG + ingestion + API + product engineering, functionalOverlap should be 8–9/10, not 7/10, unless a hard rule flag contradicts.
-- Treat "production AI ownership" as a caveat unless the JD clearly requires staff/senior-level ownership or many years of enterprise production ML/AI.
-- Trust rules.financePenalty and rules.traditionalCompanyPenalty booleans from rule evaluation — do not invent finance/banking or traditional-employer screening from generic "enterprise customers" language.
-- NYC / hybrid-in-NYC (when rules show no location mismatch) should boost recruiterFriendliness vs forcing false relocation risk.
-- domainFit: When the JD centers on LLMs, RAG, agents, AI workflows, or customer-facing applied AI systems AND the user profile shows real LLM/RAG/AI-enabled shipping (projects or strengths), domainFit should be 7–8/10 unless rules.domainMismatch is true — do not assign a low domain score for that situation.
-- Forward-deployed / growth engineer (rules.fdeBuilderSoftwarePrimary): Title says FDE or growth engineer but the JD lacks a strong external customer-implementation core (mostly internal tooling, product engineering, growth/automation, AI workflows, collaboration with sales/ops). Treat as **builder-first software engineering**, not solutions-consulting primary. Strong fit is usually **total 84–86**, not 90+: pull down stackFit, levelFit, recruiterFriendliness, and careerValue slightly versus a near-perfect stack match; keep resumeStoryClarity high (14–15) when the AI/product arc matches. Mention adjacent-not-identical lane vs explicit GTM/sales-ops consulting, NYC cadence, and founding-style ownership as realism — not as automatic "no".
-- Reserve score.total **90+** only when stack, level, domain, functionalOverlap, recruiterFriendliness, careerValue, and resumeStoryClarity are all very strong **and** rule flags show no material recruiter-screen conflicts.
-- Vague early-stage AI (rules.vagueEarlyStageAiCalibration): thin JD at a non-name employer with entry-level signals — do not assign high 80s/low 90s from generic “AI” enthusiasm. Domain above 7/10 only when the JD explicitly names systems that match the profile’s RAG/LLM/vector lane (not buzzwords alone). RecruiterFriendliness should stay around **9–10/15** unless there is a strong company signal, referral language, or very clear stack fit.
-- risks: Think like a hiring manager: what could realistically block a hire? Put the strongest blocker in mainRisk and exactly one distinct angle in risks[] (two lines total: technical/stack/level/ownership vs practical travel/hybrid/onsite when both apply). Priority order: (1) core language/stack mismatch, (2) level/ownership gap vs JD, (3) lifestyle — always mirror stated travel percentages from the JD when present (especially 25%+). Omit vague "lack of enterprise/domain expertise" unless the JD explicitly requires deep industry specialization or SME depth.
-- rationale: Exactly 2 bullets — bullet 1 = role-shaped fit vs this JD (specific verbs from the posting); bullet 2 = concrete engineering proof from the profile (embeddings, vector search, ingestion pipelines, eval hooks, DevAI-style shipping — not generic praise). Ban vague reusable phrases ("solid match", "strategic capability").
-- resumeStoryClarity: Use 15/15 when the candidate narrative clearly matches the role arc (e.g. AI tooling / product engineering → applied AI engineer) with no serious ambiguity; only score below 15 when the story is fragmented, off-topic vs the JD, or rules flag a real mismatch (stack/domain/seniority).
-- risks: Use decisive wording ("may be a constraint", "is a potential mismatch"); avoid soft hedges like "confirm it fits".
-- topMatch: One role-specific sentence grounded in this posting — same anti-generic rules as rationale.
-- Output ONE flat JSON object with ONLY the keys listed in the user message — no extra keys, no nested wrapper, no markdown.
+- For junior/early-career roles, do not over-credit aspirational language unless profile/rules support it.
+
+Category guidance (score each factor once here):
+- stackFit (0–20): Applied-AI role + AI-tooling profile → usually 13–14/20 unless hard core-language gate. Python-primary with strong LLM/RAG/API overlap → 13–14/20, not low teens. Python+JS/TS flexible JD → minor Python caveat only. Backend/API/product JD → mid band ~11+/20; do not collapse for supporting K8s/AWS mentions. Mature employer + explicit core-language mismatch → score honestly low; cap applied later.
+- levelFit (0–20): 2–4 years + ownership/roadmap influence → usually 13–16/20. Senior/staff/principal/5+ required/leading teams → score lower; cap applied later if overreach flag set.
+- domainFit (0–10): Applied AI JD + profile LLM/RAG shipping → 7–8/10 unless domainMismatch. Healthcare product/full-stack (not clinical SME) → 6–7/10.
+- functionalOverlap (0–15): End-to-end AI workflows + DevAI-style profile → 12–13/15 unless hard rule contradicts.
+- resumeStoryClarity (0–10): Clear role arc match → 9–10/10; fragmented/off-topic → lower.
+- recruiterFriendliness (0–15): NYC/hybrid NYC viable → boost. traditionalCompanyPenalty/financePenalty/vagueEarlyStageAiCalibration → reflect stricter screen (~9–10/15 for vague early-stage AI at unknown employer unless strong company/referral).
+- careerValue (0–10): Founding-engineer stretch or strong product/AI trajectory → note upside; vague startup AI buzzwords alone → do not inflate.
+
+Soft rule flags (weigh in categories above — NOT re-applied later):
+- rules.pythonStackFlexibleWithJsTs, rules.healthcareProductEngineering, rules.backendProductApiRole, rules.infraCoreRole, rules.fdeBuilderSoftwarePrimary (builder-first SWE; strong fit ~78–84 total, not 90+), rules.vagueEarlyStageAiCalibration, rules.foundingEngineerStretch, rules.productionBarCompetitivePool (conservative recruiter realism unless profile shows production depth).
+
+Narrative:
+- risks: strongest blocker in mainRisk + one distinct risks[] line. Priority: stack/language → level → travel/onsite.
+- rationale: exactly 2 bullets — JD-shaped fit, then concrete profile proof. No generic filler.
+- topMatch: one role-specific sentence.
+- Output ONE flat JSON object with ONLY the keys listed in the user message.
 `.trim();
 
 export const buildScoringPrompt = (params: {
@@ -120,11 +119,11 @@ When parsedMetadata.confidence is "high" or "medium", treat companyName, jobTitl
 Return EXACTLY these keys (and no others):
 {
   "score": {
-    "stackFit": number (0-25),
-    "levelFit": number (0-15),
+    "stackFit": number (0-20),
+    "levelFit": number (0-20),
     "domainFit": number (0-10),
-    "resumeStoryClarity": number (0-15),
-    "functionalOverlap": number (0-10),
+    "resumeStoryClarity": number (0-10),
+    "functionalOverlap": number (0-15),
     "recruiterFriendliness": number (0-15),
     "careerValue": number (0-10),
     "total": number (0-100)
@@ -137,14 +136,11 @@ Return EXACTLY these keys (and no others):
 }
 
 Notes:
-- "score.total" must equal the sum of the seven category scores (integer math).
-- "topMatch" and "mainRisk" must be human-readable strings, not booleans or numbers.
-- Keep rationale decision-useful: exactly 2 strings — JD-shaped fit, then concrete shipped proof (technical nouns). No "solid match" / "strategic capability" filler.
-- "risks" array: max 1 entry after mainRisk (two distinct risks total). Separate technical/blocker angles from practical (travel, onsite, hybrid) when the JD lists both.
-- Strong applied-AI overlap + viable NYC location + high career value should usually land total score in the 70s even with Python-primary and ownership caveats — reserve recommendation "no" for true hard mismatches (see rule flags), not stacked soft risks.
-- If rules.fdeBuilderSoftwarePrimary is true, keep score.total in the **84–86** band unless the JD clearly shifts to external enterprise customer implementation (then ignore that flag mentally and score normally).
-- For junior-builder roles, collaboration and growth-potential language are positive but should not be treated as proof of proven internet-scale/data/business-impact ownership.
-- "topMatch" should be a role-specific one-line decision summary tied to concrete JD priorities; avoid generic profile-only phrasing.
+- "score.total" must equal the sum of the seven category scores (integer math). Hard-gate caps are applied deterministically after your output.
+- Recommendation is derived from capped total — your recommendation field is advisory only.
+- Keep rationale decision-useful: exactly 2 strings — JD-shaped fit, then concrete shipped proof.
+- "risks" array: max 1 entry after mainRisk (two distinct risks total).
+- "topMatch" should be role-specific; avoid generic profile-only phrasing.
 
 Extracted job:
 ${JSON.stringify(params.extracted, null, 2)}

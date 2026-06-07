@@ -51,7 +51,19 @@ function jdDegreeEquivalenceSoftened(
 ): boolean {
   return (
     degreeLevel === 'equivalent_allowed' ||
+    degreeLevel === 'preferred' ||
     /\bor equivalent experience\b/i.test(combinedText) ||
+    /\bor equivalent practical experience\b/i.test(combinedText) ||
+    /\bor comparable experience\b/i.test(combinedText) ||
+    /\brelevant experience may substitute\b/i.test(combinedText) ||
+    /\bexperience in lieu of a degree\b/i.test(combinedText) ||
+    /\b(bachelor'?s?|degree)\s+or\s+equivalent\b/i.test(combinedText) ||
+    /\bdegree preferred but not required\b/i.test(combinedText) ||
+    /\bdegree is a plus\b/i.test(combinedText) ||
+    /\b(preferred|nice to have|a plus)\b[^.\n]{0,80}\b(degree|bachelor)\b/i.test(combinedText) ||
+    /\b(bootcamp|open[-\s]?source|project experience)\b[^.\n]{0,100}\b(accepted|considered|welcome|qualify)\b/i.test(
+      combinedText,
+    ) ||
     /\b(bachelor|degree)[^.\n]{0,120}\bor equivalent\b/i.test(combinedText) ||
     /\bor equivalent[^.\n]{0,80}\b(bachelor|degree)\b/i.test(combinedText)
   );
@@ -171,11 +183,14 @@ export const evaluateRules = (
     !profileHasCsDegreeCred(profile) &&
     credentialHardSignalCount >= 2;
 
-  const explicitDegreeRisk =
+  const degreeRequiredSignal =
     degreeLevel === 'required' ||
     degreeRaw.includes('bachelor') ||
     degreeRaw.includes('bs in computer science') ||
     RAW_DEGREE.test(job.rawText ?? '');
+
+  const degreeEquivalenceEscape = jdDegreeEquivalenceSoftened(combinedText, degreeLevel);
+  const explicitDegreeRisk = degreeRequiredSignal && !degreeEquivalenceEscape;
 
   const strictNewGradPipeline =
     hasStrongPipelineMarkers(combinedText) &&
@@ -401,6 +416,11 @@ export const evaluateRules = (
     twoPlusProfessionalBar &&
     competitiveHiringContext;
 
+  if (degreeRequiredSignal && degreeEquivalenceEscape) {
+    notes.push(
+      'Degree mentioned but JD allows equivalent, project, or bootcamp experience — treat as a soft screen note, not a hard gate.',
+    );
+  }
   if (credentialHeavyFintechAlgorithm) {
     penaltyVector.credentialHeavy = 30;
     notes.push(

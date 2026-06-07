@@ -299,6 +299,22 @@ Salary $150,000 - $200,000.
     expect(rules.hardRuleNotes?.some((n) => /Credentialed fintech/i.test(n))).toBe(true);
   });
 
+  it("does not set explicitDegreeRisk when JD allows equivalent experience escape", () => {
+    const rules = evaluateRules(
+      makeJob({
+        title: "Software Engineer",
+        rawText: `
+Bachelor's degree or equivalent practical experience required.
+Build APIs with TypeScript and Node.js.
+        `.trim(),
+        degreeRequirement: { level: "required", raw: "Bachelor's or equivalent" },
+      }),
+      userProfile,
+    );
+    expect(rules.explicitDegreeRisk).toBe(false);
+    expect(rules.notes.some((n) => /soft screen note/i.test(n))).toBe(true);
+  });
+
   it("does not flag credential-heavy when JD allows equivalent experience for the degree", () => {
     const rules = evaluateRules(
       makeJob({

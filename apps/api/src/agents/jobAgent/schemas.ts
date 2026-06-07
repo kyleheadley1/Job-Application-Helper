@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SCORE_CATEGORY_MAXES } from '../../config/scoringPolicy.js';
 import { TRACKER_EXPORT_HEADERS } from '../../tracker/canonicalSpreadsheet.js';
 import { preprocessExtractionInput } from '../../tools/triageStructuredNormalize.js';
 
@@ -120,13 +121,13 @@ export const RuleEvaluationSchema = z.object({
 
 export const ScoreBreakdownSchema = z
   .object({
-    stackFit: z.number().min(0).max(25),
-    levelFit: z.number().min(0).max(15),
-    domainFit: z.number().min(0).max(10),
-    resumeStoryClarity: z.number().min(0).max(15),
-    functionalOverlap: z.number().min(0).max(10),
-    recruiterFriendliness: z.number().min(0).max(15),
-    careerValue: z.number().min(0).max(10),
+    stackFit: z.number().min(0).max(SCORE_CATEGORY_MAXES.stackFit),
+    levelFit: z.number().min(0).max(SCORE_CATEGORY_MAXES.levelFit),
+    domainFit: z.number().min(0).max(SCORE_CATEGORY_MAXES.domainFit),
+    resumeStoryClarity: z.number().min(0).max(SCORE_CATEGORY_MAXES.resumeStoryClarity),
+    functionalOverlap: z.number().min(0).max(SCORE_CATEGORY_MAXES.functionalOverlap),
+    recruiterFriendliness: z.number().min(0).max(SCORE_CATEGORY_MAXES.recruiterFriendliness),
+    careerValue: z.number().min(0).max(SCORE_CATEGORY_MAXES.careerValue),
     total: z.number().min(0).max(100),
   })
   .superRefine((v, ctx) => {
@@ -138,10 +139,10 @@ export const ScoreBreakdownSchema = z
       v.functionalOverlap +
       v.recruiterFriendliness +
       v.careerValue;
-    if (Math.abs(computed - v.total) > 2) {
+    if (v.total > computed + 2) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Score total should match category sum within tolerance.',
+        message: 'Score total cannot exceed category sum.',
       });
     }
   });

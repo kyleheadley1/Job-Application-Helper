@@ -4,6 +4,8 @@
  * not silent "best guesses" for domain facts.
  */
 
+import { SCORE_CATEGORY_MAXES } from '../config/scoringPolicy.js';
+
 const SCORE_KEYS = [
   "stackFit",
   "levelFit",
@@ -15,13 +17,7 @@ const SCORE_KEYS = [
 ] as const;
 
 const SCORE_MAX: Record<(typeof SCORE_KEYS)[number] | "total", number> = {
-  stackFit: 25,
-  levelFit: 15,
-  domainFit: 10,
-  resumeStoryClarity: 15,
-  functionalOverlap: 10,
-  recruiterFriendliness: 15,
-  careerValue: 10,
+  ...SCORE_CATEGORY_MAXES,
   total: 100,
 };
 

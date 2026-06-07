@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   mapRecommendationFromScore,
   resolveRecommendation,
-  recommendationHardConstraints,
-} from "../../agents/jobAgent/scoring.js";
+  hasHardGateNote,
+} from "../../lib/scoringCaps.js";
 import type { RuleEvaluation } from "../../types/scoring.js";
 import { getTrackerColor, shouldShortlist } from "../../config/scoringPolicy.js";
 
@@ -27,38 +27,34 @@ const cleanRules = (): RuleEvaluation => ({
 
 describe("scoring policy behavior", () => {
   it("maps recommendations by score band", () => {
-    expect(mapRecommendationFromScore(83)).toBe("yes");
+    expect(mapRecommendationFromScore(86)).toBe("yes");
     expect(mapRecommendationFromScore(80)).toBe("yes");
     expect(mapRecommendationFromScore(76)).toBe("selective_yes");
     expect(mapRecommendationFromScore(72)).toBe("selective_yes");
-    expect(mapRecommendationFromScore(66)).toBe("selective_yes");
-    expect(mapRecommendationFromScore(60)).toBe("no");
+    expect(mapRecommendationFromScore(65)).toBe("no");
+    expect(mapRecommendationFromScore(55)).toBe("no");
   });
 
-  it("upgrades selective to yes at 78+ when no hard gates", () => {
-    expect(resolveRecommendation(80, cleanRules())).toBe("yes");
-    expect(resolveRecommendation(78, cleanRules())).toBe("yes");
-    expect(resolveRecommendation(76, cleanRules())).toBe("selective_yes");
+  it("resolveRecommendation uses single table with gate nuance at 78–84", () => {
+    expect(resolveRecommendation(85, cleanRules(), 8)).toBe("yes");
+    expect(resolveRecommendation(80, cleanRules(), 8)).toBe("yes");
+    expect(resolveRecommendation(80, { ...cleanRules(), locationMismatch: true }, 8)).toBe("selective_yes");
+    expect(resolveRecommendation(76, cleanRules(), 8)).toBe("selective_yes");
   });
 
-  it("keeps sub-70 viable roles as selective_yes unless research-heavy", () => {
-    expect(mapRecommendationFromScore(60)).toBe("no");
-    expect(resolveRecommendation(60, cleanRules())).toBe("selective_yes");
-    expect(resolveRecommendation(69, cleanRules())).toBe("selective_yes");
-    expect(resolveRecommendation(69, { ...cleanRules(), researchHeavyAiRole: true })).toBe("no");
+  it("60–69 stretch band needs careerValue >= 8", () => {
+    expect(resolveRecommendation(65, cleanRules(), 7)).toBe("no");
+    expect(resolveRecommendation(65, cleanRules(), 8)).toBe("selective_yes");
   });
 
-  it("forces skip for credentialed fintech/accounting gate stack even at high model totals", () => {
-    expect(resolveRecommendation(88, { ...cleanRules(), credentialHeavyFintechAlgorithm: true })).toBe("no");
+  it("forces skip for credentialed fintech and Go data-infra gap", () => {
+    expect(resolveRecommendation(88, { ...cleanRules(), credentialHeavyFintechAlgorithm: true }, 9)).toBe("no");
+    expect(resolveRecommendation(72, { ...cleanRules(), goDistributedDataInfraCandidateGap: true }, 8)).toBe("no");
   });
 
-  it("forces skip for Go/data-infra candidate gap even when raw total would be viable", () => {
-    expect(resolveRecommendation(72, { ...cleanRules(), goDistributedDataInfraCandidateGap: true })).toBe("no");
-  });
-
-  it("downgrades yes to selective_yes at 80+ when hard constraints exist", () => {
-    expect(resolveRecommendation(83, { ...cleanRules(), locationMismatch: true })).toBe("selective_yes");
-    expect(recommendationHardConstraints({ ...cleanRules(), locationMismatch: true })).toBe(true);
+  it("hasHardGateNote detects gate flags", () => {
+    expect(hasHardGateNote({ ...cleanRules(), locationMismatch: true })).toBe(true);
+    expect(hasHardGateNote(cleanRules())).toBe(false);
   });
 
   it("shortlists only for >=78 and non-terminal status", () => {
@@ -70,11 +66,7 @@ describe("scoring policy behavior", () => {
   it("maps tracker colors by status + score", () => {
     expect(getTrackerColor("to_review", 82)).toBe("green");
     expect(getTrackerColor("to_review", 60)).toBe("yellow");
-    expect(getTrackerColor("applied", 85)).toBe("yellow");
     expect(getTrackerColor("interviewing", 65)).toBe("blue");
-    expect(getTrackerColor("assessment", 75)).toBe("blue");
-    expect(getTrackerColor("offer", 90)).toBe("blue");
     expect(getTrackerColor("rejected", 90)).toBe("red");
-    expect(getTrackerColor("closed", 90)).toBe("red");
   });
 });

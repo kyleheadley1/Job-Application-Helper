@@ -126,7 +126,7 @@ describe("preprocessScoringInput + ScoringFromModelSchema", () => {
     expect(parsed.success).toBe(true);
     if (!parsed.success) return;
     expect(parsed.data.score.stackFit).toBe(12);
-    expect(parsed.data.score.total).toBe(65);
+    expect(parsed.data.score.total).toBe(64);
   });
 
   it("reconciles score.total to sum of categories", () => {
