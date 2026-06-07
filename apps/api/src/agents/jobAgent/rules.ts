@@ -247,12 +247,14 @@ export const evaluateRules = (
     job.locationIsCommutable === false &&
     !nycOrNjViableInText;
 
-  const visaMismatch =
+  const jdSignalsVisaSponsorshipConstraint =
     includesAny(normalizeText(job.visaRequirement ?? ''), [
       'no sponsorship',
       'must be authorized',
       'unable to sponsor',
     ]) || RAW_VISA.test(job.rawText ?? '');
+
+  const visaMismatch = profile.requiresSponsorship && jdSignalsVisaSponsorshipConstraint;
 
   const citizenshipMismatch =
     Boolean(job.citizenshipRequirement) ||

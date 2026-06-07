@@ -66,4 +66,5 @@ export const userProfile: UserProfile = {
     "Treat explicit citizenship/clearance/degree gates as meaningful",
     "Bias toward landability realism over theoretical capability",
   ],
+  requiresSponsorship: false,
 };

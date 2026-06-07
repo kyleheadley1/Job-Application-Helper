@@ -46,6 +46,30 @@ describe("rule engine", () => {
     expect(rules.pythonStackFlexibleWithJsTs).toBe(true);
   });
 
+  it("does not flag visa mismatch when candidate does not require sponsorship", () => {
+    const rules = evaluateRules(
+      makeJob({
+        visaRequirement: "No visa sponsorship",
+        rawText: "Must be authorized to work in the US. No H1B sponsorship.",
+      }),
+      userProfile,
+    );
+    expect(rules.visaMismatch).toBe(false);
+    expect(rules.penaltyVector?.visa).toBeUndefined();
+  });
+
+  it("flags visa mismatch when candidate requires sponsorship and JD restricts it", () => {
+    const rules = evaluateRules(
+      makeJob({
+        visaRequirement: "No visa sponsorship",
+        rawText: "Unable to sponsor visas.",
+      }),
+      { ...userProfile, requiresSponsorship: true },
+    );
+    expect(rules.visaMismatch).toBe(true);
+    expect(rules.penaltyVector?.visa).toBeGreaterThan(0);
+  });
+
   it("flags finance/traditional strictness", () => {
     const rules = evaluateRules(
       makeJob({ company: "Heritage Bank", domainTags: ["finance"], requirements: ["banking systems experience"] }),
