@@ -70,6 +70,28 @@ const clampCategory = (score: ScoreBreakdown): ScoreBreakdown => ({
   total: score.total,
 });
 
+/** Clamp category scores to current rubric maxes; keep total ≤ sum(categories). */
+export const clampScoreToCategoryMaxes = (score: ScoreBreakdown): ScoreBreakdown => {
+  const clamped = clampCategory(score);
+  const sum = sumScoreBreakdown(clamped);
+  return { ...clamped, total: Math.min(Math.max(0, clamped.total), sum) };
+};
+
+/** Normalize persisted jobs scored under pre-realignment category caps (e.g. stackFit 25, story 15). */
+export const normalizeStoredJobScores = <T extends {
+  score: ScoreBreakdown;
+  scoreHistory?: Array<{ score: ScoreBreakdown; scoredAt: string; recommendation: import("../types/scoring.js").Recommendation }>;
+}>(
+  job: T,
+): T => ({
+  ...job,
+  score: clampScoreToCategoryMaxes(job.score),
+  scoreHistory: job.scoreHistory?.map((entry) => ({
+    ...entry,
+    score: clampScoreToCategoryMaxes(entry.score),
+  })),
+});
+
 /** Normalize LLM categories to new maxes, set total to sum, then apply caps. */
 export const finalizeScore = (score: ScoreBreakdown, rules: RuleEvaluation): ScoreBreakdown => {
   const clamped = clampCategory(score);

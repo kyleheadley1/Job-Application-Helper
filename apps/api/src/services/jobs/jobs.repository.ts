@@ -13,6 +13,7 @@ import type {
 } from "../../types/job.js";
 import type { JobExportRow } from "../../tracker/canonicalSpreadsheet.js";
 import { buildJobExportRow } from "../../tracker/canonicalSpreadsheet.js";
+import { normalizeStoredJobScores } from "../../lib/scoringCaps.js";
 import type { Filter, WithId } from "mongodb";
 
 export class JobsRepository {
@@ -23,7 +24,7 @@ export class JobsRepository {
 
   private fromDoc(doc: WithId<JobRecord & { _id: string }>): JobRecord {
     const { _id, ...rest } = doc;
-    return { ...rest, id: rest.id ?? _id };
+    return normalizeStoredJobScores({ ...rest, id: rest.id ?? _id });
   }
 
   private upsertTrackerFields(prev: JobRecord, nextStatus: JobStatus): JobRecord["tracker"] {
