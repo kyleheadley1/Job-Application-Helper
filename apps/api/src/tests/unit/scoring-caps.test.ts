@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyHardGateCaps,
+  clampScoreToCategoryMaxes,
   finalizeScore,
   hasHardGateNote,
   mapRecommendationFromScore,
@@ -39,6 +40,22 @@ const highScore = (): ScoreBreakdown => ({
 });
 
 describe("scoring caps and recommendations", () => {
+  it("clampScoreToCategoryMaxes fits legacy pre-realignment breakdowns into new caps", () => {
+    const legacy = clampScoreToCategoryMaxes({
+      stackFit: 22,
+      levelFit: 14,
+      domainFit: 8,
+      resumeStoryClarity: 14,
+      functionalOverlap: 9,
+      recruiterFriendliness: 12,
+      careerValue: 8,
+      total: 87,
+    });
+    expect(legacy.stackFit).toBe(20);
+    expect(legacy.resumeStoryClarity).toBe(10);
+    expect(legacy.total).toBeLessThanOrEqual(sumScoreBreakdown(legacy));
+  });
+
   it("total equals min(sum, lowest hard-gate cap)", () => {
     const sum = sumScoreBreakdown(highScore());
     const capped = applyHardGateCaps(highScore(), { ...cleanRules(), seniorityOverreach: true });
