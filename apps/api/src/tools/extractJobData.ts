@@ -24,6 +24,7 @@ import {
   type PreScoringJobMetadata,
 } from "./jobPostingMetadataExtract.js";
 import { normalizeLocationPrefixedTitle } from "./preScoringMetadataExtract.js";
+import { applyCompanyPresentation } from "./companyExtraction.js";
 
 const fallbackExtraction = (input: { url?: string; rawText?: string; companyHint?: string }): ExtractedJobData => ({
   company: input.companyHint ?? "Unknown Company",
@@ -92,6 +93,7 @@ const finalizeExtracted = (extracted: ExtractedJobData, normalizedText: string, 
   if (isWeakOrPlaceholderCompany(out.company) && companyHint?.trim()) {
     out = { ...out, company: companyHint.trim() };
   }
+  out = applyCompanyPresentation(out, companyHint);
   return out;
 };
 

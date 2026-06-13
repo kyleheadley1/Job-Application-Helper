@@ -64,6 +64,12 @@ export const ExtractedJobDataSchema = z.object({
   relocationRequired: z.boolean().optional(),
   responsibilities: z.array(z.string()).default([]),
   requirements: z.array(z.string()).default([]),
+  listingCompanyName: z.string().optional(),
+  employerCompanyName: z.string().nullable().optional(),
+  agencyCompanyName: z.string().nullable().optional(),
+  companyDisplayName: z.string().optional(),
+  companyConfidence: z.enum(["direct_or_unclear", "agency_only", "explicit_employer"]).optional(),
+  companyExtractionNotes: z.array(z.string()).optional(),
 });
 
 /** Live extraction JSON normalized then validated (safer URL/location/array coercion). */

@@ -67,7 +67,10 @@ export class JobsService {
     const fresh = await triageJob({
       url: url || undefined,
       rawText: rawText || undefined,
-      companyHint: prev.extracted.company,
+      companyHint:
+        prev.extracted.listingCompanyName?.trim() ||
+        prev.extracted.companyDisplayName?.trim() ||
+        prev.extracted.company,
       fullPrep: false,
     });
 

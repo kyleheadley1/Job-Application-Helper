@@ -65,10 +65,15 @@ export function buildTrackerSpreadsheetFromJob(job: JobRecord): TrackerSpreadshe
     (job.extracted.url ? `URL: ${job.extracted.url}` : '') ||
     '';
   const statusOutcome = job.tracker.statusOutcome ?? job.status;
+  const companyDisplay =
+    job.extracted.companyDisplayName?.trim() ||
+    job.extracted.listingCompanyName?.trim() ||
+    job.extracted.company;
+  const notesJoined = (job.extracted.companyExtractionNotes ?? []).join('; ');
   return {
     rank: '',
     discussed: '',
-    company: job.extracted.company,
+    company: companyDisplay,
     role: job.extracted.title,
     latestScore: String(job.score.total),
     originalAltScore: '',
@@ -81,6 +86,10 @@ export function buildTrackerSpreadsheetFromJob(job: JobRecord): TrackerSpreadshe
     mainRisk: job.mainRisk,
     notes: job.tracker.notes ?? '',
     resume: job.recommendedResume,
+    agencyCompanyName: job.extracted.agencyCompanyName ?? undefined,
+    employerCompanyName: job.extracted.employerCompanyName ?? undefined,
+    companyConfidence: job.extracted.companyConfidence,
+    companyExtractionNotes: notesJoined || undefined,
   };
 }
 

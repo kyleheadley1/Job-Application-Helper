@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { JobRecord, JobStatus } from "../types/job";
 import { JsonPanel } from "../components/JsonPanel";
-import { jdSourceText, jobHeaderLabel } from "../lib/jobDisplay";
+import { jdSourceText, agencyDisclosureNote, jobHeaderLabel } from "../lib/jobDisplay";
 
 const statuses: JobStatus[] = [
   "to_review",
@@ -73,6 +73,7 @@ export const RoleDetailPage = () => {
 
   const jdText = jdSourceText(job);
 
+  const agencyNote = agencyDisclosureNote(job.extracted);
   return (
     <section className="stack">
       <h2>Role Detail</h2>
@@ -81,6 +82,7 @@ export const RoleDetailPage = () => {
       </p>
       <div className="card">
         <h3>{jobHeaderLabel(job.extracted)}</h3>
+        {agencyNote ? <p className="muted agency-note">{agencyNote}</p> : null}
         <p>
           Score: <strong>{job.score.total}</strong> | Recommendation: <strong>{job.recommendation}</strong> | Resume:{" "}
           <strong>{job.recommendedResume}</strong>
