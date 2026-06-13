@@ -25,6 +25,12 @@ export type ExtractedJobData = {
   domainTags: string[];
   responsibilities: string[];
   requirements: string[];
+  listingCompanyName?: string;
+  employerCompanyName?: string | null;
+  agencyCompanyName?: string | null;
+  companyDisplayName?: string;
+  companyConfidence?: "direct_or_unclear" | "agency_only" | "explicit_employer";
+  companyExtractionNotes?: string[];
 };
 
 export type RuleEvaluation = {
@@ -114,6 +120,10 @@ export type TrackerSpreadsheetFields = {
   mainRisk?: string;
   notes?: string;
   resume?: string;
+  agencyCompanyName?: string;
+  employerCompanyName?: string;
+  companyConfidence?: string;
+  companyExtractionNotes?: string;
 };
 
 export type JobRecord = {

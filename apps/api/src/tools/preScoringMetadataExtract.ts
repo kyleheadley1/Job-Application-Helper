@@ -3,6 +3,7 @@
  * (Next Match AI / comma-title formats / location-prefixed titles).
  */
 import { logger } from "../lib/logger.js";
+import { isBoardMatchChromeLine } from "./jobBoardMatchExtract.js";
 
 export type PreScoringJobMetadata = {
   companyName: string | null;
@@ -81,6 +82,7 @@ export const looksLikeLocation = (line: string): boolean => {
 export const isScrapedNoiseLine = (line: string): boolean => {
   const low = lineLower(line);
   if (!low) return true;
+  if (isBoardMatchChromeLine(line.trim())) return true;
   if (SCRAPED_NOISE_EXACT.has(low)) return true;
   if (SCRAPED_NOISE_PREFIXES.some((p) => low.includes(p))) return true;
   if (RELATIVE_TIMESTAMP_RE.test(line.trim())) return true;

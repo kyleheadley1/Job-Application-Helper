@@ -15,6 +15,10 @@ export type TrackerSpreadsheetFields = {
   mainRisk: string;
   notes: string;
   resume: string;
+  agencyCompanyName?: string;
+  employerCompanyName?: string;
+  companyConfidence?: string;
+  companyExtractionNotes?: string;
 };
 
 export type JobImportSource = {

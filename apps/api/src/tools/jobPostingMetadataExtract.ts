@@ -9,6 +9,7 @@ import {
   looksLikeLocation,
   type PreScoringJobMetadata,
 } from "./preScoringMetadataExtract.js";
+import { isBoardMatchChromeLine } from "./jobBoardMatchExtract.js";
 
 export type { PreScoringJobMetadata } from "./preScoringMetadataExtract.js";
 
@@ -96,6 +97,7 @@ export const isProbablyNotCompany = (line: string): boolean => {
   const trimmed = line.trim();
   const low = lineLower(trimmed);
   if (!low) return true;
+  if (isBoardMatchChromeLine(trimmed)) return true;
   if (EMPLOYMENT_TYPES.has(low)) return true;
   if (SENIORITY_LABELS.has(low)) return true;
   if (WORK_MODEL_LABELS.has(low)) return true;
@@ -284,6 +286,8 @@ export const isWeakOrPlaceholderCompany = (company: string | undefined | null): 
 export const isWeakJobTitle = (title: string | undefined | null): boolean => {
   const t = title?.trim();
   if (!t || /^unknown title$/i.test(t)) return true;
+  if (/^\d{1,3}%$/.test(t)) return true;
+  if (isBoardMatchChromeLine(t)) return true;
   if (EMPLOYMENT_TYPES.has(lineLower(t))) return true;
   if (isNoiseLine(t)) return true;
   if (isLocationPrefixedTitle(t)) return true;

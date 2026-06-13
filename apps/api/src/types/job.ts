@@ -56,6 +56,16 @@ export type ExtractedJobData = {
   relocationRequired?: boolean;
   responsibilities: string[];
   requirements: string[];
+  /** Visible company from job board / source listing. */
+  listingCompanyName?: string;
+  /** Named end employer when explicitly disclosed in the JD. */
+  employerCompanyName?: string | null;
+  /** Recruiter/staffing firm when the listing is third-party representation. */
+  agencyCompanyName?: string | null;
+  /** User-facing company label (employer, agency client, or listing company). */
+  companyDisplayName?: string;
+  companyConfidence?: "direct_or_unclear" | "agency_only" | "explicit_employer";
+  companyExtractionNotes?: string[];
 };
 
 export type GeneratedAssets = {

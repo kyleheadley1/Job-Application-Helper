@@ -67,7 +67,12 @@ function isSortableKey(key: string): key is TrackerSortKey {
 }
 
 function companyCell(job: JobRecord): string {
-  return job.extracted.company || tsOnly(job, "company");
+  return (
+    job.extracted.companyDisplayName?.trim() ||
+    job.extracted.listingCompanyName?.trim() ||
+    job.extracted.company ||
+    tsOnly(job, "company")
+  );
 }
 
 function roleCell(job: JobRecord): string {

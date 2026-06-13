@@ -1,8 +1,33 @@
 import type { ExtractedJobData, JobRecord, TrackerSpreadsheetFields } from "../types/job";
 import { displayRoleTitle } from "./resultSummary";
 
-export function jobHeaderLabel(extracted: Pick<ExtractedJobData, "company" | "title" | "employmentType">): string {
-  const company = extracted.company?.trim();
+type CompanyFields = Pick<
+  ExtractedJobData,
+  "company" | "companyDisplayName" | "listingCompanyName" | "agencyCompanyName" | "companyConfidence"
+>;
+
+/** User-facing company label with fallbacks for legacy records. */
+export function companyDisplayLabel(extracted: Pick<ExtractedJobData, "companyDisplayName" | "listingCompanyName" | "company">): string {
+  return (
+    extracted.companyDisplayName?.trim() ||
+    extracted.listingCompanyName?.trim() ||
+    extracted.company?.trim() ||
+    ""
+  );
+}
+
+export function agencyDisclosureNote(extracted: CompanyFields): string | null {
+  if (extracted.companyConfidence !== "agency_only") return null;
+  const agency =
+    extracted.agencyCompanyName?.trim() ||
+    extracted.listingCompanyName?.trim() ||
+    extracted.company?.trim();
+  if (!agency) return null;
+  return `Actual employer not disclosed; posting is represented by ${agency}.`;
+}
+
+export function jobHeaderLabel(extracted: Pick<ExtractedJobData, "company" | "title" | "employmentType" | "companyDisplayName" | "listingCompanyName">): string {
+  const company = companyDisplayLabel(extracted);
   const title = displayRoleTitle(extracted.title?.trim() ?? "");
   if (company && title) return `${company} - ${title}`;
   if (title) return title;

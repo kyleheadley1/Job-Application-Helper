@@ -6,7 +6,8 @@ import { ScoreBadge } from "../components/ScoreBadge";
 import { formatScoreCategory } from "../lib/scoreCategoryMaxes";
 import { StatusBadge } from "../components/StatusBadge";
 import { JsonPanel } from "../components/JsonPanel";
-import { hasJdSource, jobHeaderLabel, salaryAskLabel } from "../lib/jobDisplay";
+import { hasJdSource, agencyDisclosureNote, jobHeaderLabel, salaryAskLabel } from "../lib/jobDisplay";
+import { extractBoardMatchPercent } from "../lib/jobBoardMatch";
 import { buildKeyRisks, decisionSummaryLine, selectTopFits } from "../lib/resultSummary";
 import {
   formatDuration,
@@ -202,14 +203,22 @@ export const JobResultPage = () => {
   const topRisks = buildKeyRisks(job, 5);
   const hardRules = job.rules.hardRuleNotes ?? [];
   const summaryLine = decisionSummaryLine(job);
+  const agencyNote = agencyDisclosureNote(job.extracted);
+  const boardMatchPct = extractBoardMatchPercent(job.extracted.rawText);
   return (
     <section className="stack">
       <header className="rowBetween">
         <div>
           <h2>{jobHeaderLabel(job.extracted)}</h2>
+          {agencyNote ? <p className="muted agency-note">{agencyNote}</p> : null}
           <p className="muted">{summaryLine}</p>
         </div>
         <div className="row">
+          {boardMatchPct != null ? (
+            <span className="pill neutral" title="Match percentage from pasted job-board UI, not app score">
+              Match {boardMatchPct}%
+            </span>
+          ) : null}
           <ScoreBadge score={job.score.total} />
           <StatusBadge status={job.status} />
         </div>
