@@ -93,6 +93,10 @@ describe("computeSalaryAsk", () => {
       rules: baseRules(),
     });
     expect(ask.number).toBe(190_000);
+    expect(ask.rangeMin).toBeGreaterThanOrEqual(150_000);
+    expect(ask.rangeMax).toBeLessThanOrEqual(250_000);
+    expect(ask.rangeMin).toBeLessThan(ask.number!);
+    expect(ask.rangeMax!).toBeGreaterThanOrEqual(ask.number!);
   });
 
   it("caps at 190k when ask would cross 200k without elite fit", () => {

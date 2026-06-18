@@ -36,7 +36,16 @@ export const emptyJobExportRow = (): JobExportRow =>
 
 function formatSalaryAskDisplay(job: JobRecord): string {
   const s = job.salaryAsk;
-  if (typeof s.number === 'number') return String(s.number);
+  const point = typeof s.number === 'number' ? String(s.number) : '';
+  const hasRange =
+    typeof s.rangeMin === 'number' &&
+    typeof s.rangeMax === 'number' &&
+    s.rangeMin !== s.rangeMax;
+  if (point && hasRange) {
+    return `${point} (${s.rangeMin} - ${s.rangeMax})`;
+  }
+  if (point) return point;
+  if (hasRange) return `${s.rangeMin} - ${s.rangeMax}`;
   if (typeof s.rangeMin === 'number' || typeof s.rangeMax === 'number') {
     const min = typeof s.rangeMin === 'number' ? String(s.rangeMin) : '';
     const max = typeof s.rangeMax === 'number' ? String(s.rangeMax) : '';

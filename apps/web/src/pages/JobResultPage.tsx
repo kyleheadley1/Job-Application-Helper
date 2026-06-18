@@ -6,7 +6,7 @@ import { ScoreBadge } from "../components/ScoreBadge";
 import { formatScoreCategory } from "../lib/scoreCategoryMaxes";
 import { StatusBadge } from "../components/StatusBadge";
 import { JsonPanel } from "../components/JsonPanel";
-import { hasJdSource, agencyDisclosureNote, jobHeaderLabel, salaryAskLabel } from "../lib/jobDisplay";
+import { hasJdSource, agencyDisclosureNote, jobHeaderLabel, salaryAskDisplay } from "../lib/jobDisplay";
 import { extractBoardMatchPercent } from "../lib/jobBoardMatch";
 import { buildKeyRisks, decisionSummaryLine, selectTopFits } from "../lib/resultSummary";
 import {
@@ -205,6 +205,7 @@ export const JobResultPage = () => {
   const summaryLine = decisionSummaryLine(job);
   const agencyNote = agencyDisclosureNote(job.extracted);
   const boardMatchPct = extractBoardMatchPercent(job.extracted.rawText);
+  const salaryDisplay = salaryAskDisplay(job);
   return (
     <section className="stack">
       <header className="rowBetween">
@@ -245,7 +246,10 @@ export const JobResultPage = () => {
             </button>
           ) : null}
           {confirmMsg ? <p className="muted">{confirmMsg}</p> : null}
-          <p>Salary ask: {salaryAskLabel(job) || "N/A"}</p>
+          <p>Salary ask: {salaryDisplay.point ?? "N/A"}</p>
+          {salaryDisplay.rangeIfNeeded ? (
+            <p className="muted">Range if needed: {salaryDisplay.rangeIfNeeded}</p>
+          ) : null}
           {finishedMs !== null ? <p className="muted">Finished in {formatDuration(finishedMs)}</p> : null}
           <p>Recommended resume: {job.recommendedResume}</p>
           <h4>Why consider</h4>
