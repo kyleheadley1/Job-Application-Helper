@@ -36,30 +36,68 @@ export function jobHeaderLabel(extracted: Pick<ExtractedJobData, "company" | "ti
 }
 
 /** Salary for display (internal structured fields). */
-export function salaryAskLabel(job: JobRecord): string {
+function formatSalaryUsd(n: number): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+}
+
+function salaryAskRange(s: JobRecord["salaryAsk"]): { min?: number; max?: number } | null {
+  const hasMin = typeof s.rangeMin === "number";
+  const hasMax = typeof s.rangeMax === "number";
+  if (!hasMin && !hasMax) return null;
+  if (hasMin && hasMax && s.rangeMin === s.rangeMax) return null;
+  return { min: s.rangeMin, max: s.rangeMax };
+}
+
+export type SalaryAskDisplay = {
+  point: string | null;
+  rangeIfNeeded: string | null;
+  combined: string;
+};
+
+export function salaryAskDisplay(job: JobRecord): SalaryAskDisplay {
   const s = job.salaryAsk;
-  if (typeof s.number === "number") return String(s.number);
-  if (typeof s.rangeMin === "number" || typeof s.rangeMax === "number") {
-    const min = typeof s.rangeMin === "number" ? String(s.rangeMin) : "";
-    const max = typeof s.rangeMax === "number" ? String(s.rangeMax) : "";
-    return [min, max].filter(Boolean).join(" – ");
+  const point = typeof s.number === "number" ? formatSalaryUsd(s.number) : null;
+  const range = salaryAskRange(s);
+  let rangeIfNeeded: string | null = null;
+  if (range?.min != null && range.max != null) {
+    rangeIfNeeded = `${formatSalaryUsd(range.min)} – ${formatSalaryUsd(range.max)}`;
+  } else if (range?.min != null) {
+    rangeIfNeeded = `${formatSalaryUsd(range.min)}+`;
+  } else if (range?.max != null) {
+    rangeIfNeeded = `≤${formatSalaryUsd(range.max)}`;
   }
-  return "";
+
+  let combined = "";
+  if (point && rangeIfNeeded) combined = `${point} (range if needed: ${rangeIfNeeded})`;
+  else if (point) combined = point;
+  else if (rangeIfNeeded) combined = rangeIfNeeded;
+
+  return { point, rangeIfNeeded, combined };
+}
+
+export function salaryAskLabel(job: JobRecord): string {
+  return salaryAskDisplay(job).combined;
 }
 
 /** Compact salary for dense table cells (full detail in `title` via `salaryAskLabel`). */
 export function salaryAskCompact(job: JobRecord): string {
   const s = job.salaryAsk;
   const k = (n: number) => (Math.abs(n) >= 1000 ? `${Math.round(n / 1000)}k` : String(Math.round(n)));
+  const range = salaryAskRange(s);
+  const rangeCompact =
+    range?.min != null && range.max != null
+      ? `$${k(range.min)}–${k(range.max)}`
+      : range?.min != null
+        ? `$${k(range.min)}+`
+        : range?.max != null
+          ? `≤$${k(range.max)}`
+          : "";
+
   if (typeof s.number === "number") {
-    return s.number >= 1000 ? `$${k(s.number)}` : `$${s.number}`;
+    const point = s.number >= 1000 ? `$${k(s.number)}` : `$${s.number}`;
+    return rangeCompact ? `${point} (${rangeCompact})` : point;
   }
-  if (typeof s.rangeMin === "number" && typeof s.rangeMax === "number") {
-    return `$${k(s.rangeMin)}–${k(s.rangeMax)}`;
-  }
-  if (typeof s.rangeMin === "number") return `$${k(s.rangeMin)}+`;
-  if (typeof s.rangeMax === "number") return `≤$${k(s.rangeMax)}`;
-  return "";
+  return rangeCompact;
 }
 
 /** Full JD / pasted input for detail views (internal first, then seeded sheet cell). */

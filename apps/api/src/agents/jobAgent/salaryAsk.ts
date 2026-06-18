@@ -5,6 +5,23 @@ import { jdHasAppliedAiSystemsOverlap } from "../../lib/scoringOutputPolish.js";
 
 const roundToNearest5k = (n: number): number => Math.round(n / 5_000) * 5_000;
 
+/** Tighter band around the point ask when a recruiter wants a range instead of one number. */
+const negotiationRangeAroundAsk = (
+  ask: number,
+  postedMin: number,
+  postedMax: number,
+  score: ScoreBreakdown,
+): { rangeMin: number; rangeMax: number } => {
+  const spread = score.total >= 80 ? 10_000 : score.total >= 70 ? 12_500 : 15_000;
+  let rangeMin = roundToNearest5k(Math.max(postedMin, ask - spread));
+  let rangeMax = roundToNearest5k(Math.min(postedMax, ask + Math.round(spread * 0.5)));
+  if (rangeMax <= rangeMin) {
+    rangeMin = roundToNearest5k(Math.max(postedMin, ask - 5_000));
+    rangeMax = roundToNearest5k(Math.min(postedMax, ask + 5_000));
+  }
+  return { rangeMin, rangeMax };
+};
+
 export const computeSalaryAsk = (params: {
   extracted: ExtractedJobData;
   score: ScoreBreakdown;
@@ -95,7 +112,8 @@ export const computeSalaryAsk = (params: {
     }
     ask = Math.min(postedMax, Math.max(postedMin, ask));
     ask = roundToNearest5k(ask);
-    return { number: ask, rangeMin: postedMin, rangeMax: postedMax };
+    const { rangeMin, rangeMax } = negotiationRangeAroundAsk(ask, postedMin, postedMax, score);
+    return { number: ask, rangeMin, rangeMax };
   }
 
   const impliedBlob = normalizeText(
