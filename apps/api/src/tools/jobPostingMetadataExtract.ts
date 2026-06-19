@@ -6,10 +6,22 @@ import { env } from "../config/env.js";
 import {
   extractPreScoringMetadata,
   isLocationPrefixedTitle,
+  isMetadataLabelLine,
+  isTitleLikeLine,
   looksLikeLocation,
   type PreScoringJobMetadata,
 } from "./preScoringMetadataExtract.js";
 import { isBoardMatchChromeLine } from "./jobBoardMatchExtract.js";
+import {
+  extractCompanyFromSelfDescription,
+  extractHeaderCompanyBeforeActivity,
+  findBodySectionStartIndex,
+  isActivityTimestampLine,
+  isHardRejectedCompanyCandidate,
+  isInBodySection,
+  looksLikeBrandCompanyName,
+  parseExplicitCompanyLabel,
+} from "./companyCandidateRules.js";
 
 export type { PreScoringJobMetadata } from "./preScoringMetadataExtract.js";
 
@@ -93,10 +105,15 @@ export const isNoiseLine = (line: string): boolean => {
 
 export const isEmployeeCountLine = (line: string): boolean => EMPLOYEE_COUNT_RE.test(line.trim());
 
-export const isProbablyNotCompany = (line: string): boolean => {
+export const isProbablyNotCompany = (line: string): boolean => isRejectedCompanyCandidate(line);
+
+/** Company-name-specific rejection (body prose, non-brand lines, listing noise). */
+export const isRejectedCompanyCandidate = (line: string): boolean => {
   const trimmed = line.trim();
   const low = lineLower(trimmed);
   if (!low) return true;
+  if (isHardRejectedCompanyCandidate(trimmed)) return true;
+  if (!looksLikeBrandCompanyName(trimmed)) return true;
   if (isBoardMatchChromeLine(trimmed)) return true;
   if (EMPLOYMENT_TYPES.has(low)) return true;
   if (SENIORITY_LABELS.has(low)) return true;
@@ -108,9 +125,23 @@ export const isProbablyNotCompany = (line: string): boolean => {
   if (SALARY_LINE_RE.test(trimmed)) return true;
   if (LOCATION_RE.test(trimmed)) return true;
   if (/\bemployees?\b/i.test(trimmed) && /\d/.test(trimmed)) return true;
-  if (trimmed.split(/\s+/).length > 6) return true;
-  if (/[.!?]$/.test(trimmed) && trimmed.split(/\s+/).length > 4) return true;
   if (NEGATIVE_COMPANY_PREFIXES.some((p) => low.startsWith(p))) return true;
+  return false;
+};
+
+const isLineUnusableForTitle = (line: string): boolean => {
+  const trimmed = line.trim();
+  const low = lineLower(trimmed);
+  if (!low) return true;
+  if (isNoiseLine(trimmed)) return true;
+  if (isBoardMatchChromeLine(trimmed)) return true;
+  if (isActivityTimestampLine(trimmed)) return true;
+  if (isMetadataLabelLine(trimmed)) return true;
+  if (EMPLOYMENT_TYPES.has(low)) return true;
+  if (looksLikeLocation(trimmed)) return true;
+  if (UPDATED_ON_RE.test(low)) return true;
+  if (isEmployeeCountLine(trimmed)) return true;
+  if (isHardRejectedCompanyCandidate(trimmed) && !isTitleLikeLine(trimmed)) return true;
   return false;
 };
 
@@ -132,7 +163,7 @@ export const extractJobTitleFromLines = (lines: string[]): string | null => {
 
   for (let i = 0; i < searchEnd; i++) {
     const line = lines[i]!;
-    if (isNoiseLine(line) || isProbablyNotCompany(line)) continue;
+    if (isLineUnusableForTitle(line)) continue;
     if (!ROLE_TITLE_RE.test(line)) continue;
     if (line.length > 120) continue;
     return line;
@@ -140,8 +171,8 @@ export const extractJobTitleFromLines = (lines: string[]): string | null => {
 
   for (let i = 0; i < searchEnd; i++) {
     const line = lines[i]!;
-    if (isNoiseLine(line) || EMPLOYMENT_TYPES.has(lineLower(line))) continue;
-    if (isProbablyNotCompany(line)) continue;
+    if (isLineUnusableForTitle(line)) continue;
+    if (isTitleLikeLine(line)) return line;
     if (line.length >= 8 && line.length <= 100) return line;
   }
   return null;
@@ -189,24 +220,40 @@ export const extractSalaryLabelFromLines = (lines: string[]): string | null => {
 export const scoreCompanyCandidates = (lines: string[]): CompanyCandidateScore[] => {
   const title = extractJobTitleFromLines(lines);
   const titleIdx = title ? lines.findIndex((l) => l === title) : -1;
-  const updatedIdx = findLineIndex(lines, (l) => UPDATED_ON_RE.test(l));
+  const positionIdx = lines.findIndex((l) => lineLower(l) === "position");
+  const bodyStart = findBodySectionStartIndex(lines);
+  const headerEnd = Math.min(
+    titleIdx >= 0 ? titleIdx : lines.length,
+    positionIdx >= 0 ? positionIdx : lines.length,
+    bodyStart,
+    15,
+  );
   const scores: CompanyCandidateScore[] = [];
 
-  for (let i = 0; i < Math.min(lines.length, 25); i++) {
+  for (let i = 0; i < Math.min(lines.length, 40); i++) {
     const line = lines[i]!;
-    if (isNoiseLine(line) || isProbablyNotCompany(line)) continue;
+    if (isNoiseLine(line)) continue;
     if (title && line === title) continue;
+    if (isTitleLikeLine(line)) continue;
+
+    const explicit = parseExplicitCompanyLabel(line);
+    if (explicit && looksLikeBrandCompanyName(explicit)) {
+      scores.push({ line: explicit, index: i, score: 500, reasons: ["explicit_label"] });
+      continue;
+    }
+
+    if (isInBodySection(lines, i)) continue;
+    if (isRejectedCompanyCandidate(line)) continue;
 
     let score = 0;
     const reasons: string[] = [];
 
     const prev = i > 0 ? lines[i - 1]! : "";
     const next = i + 1 < lines.length ? lines[i + 1]! : "";
-    if (prev && lineLower(prev) === lineLower(line)) {
-      score += 55;
-      reasons.push("consecutive_duplicate");
-    }
-    if (next && lineLower(next) === lineLower(line)) {
+    const duplicatePattern =
+      (prev && lineLower(prev) === lineLower(line)) || (next && lineLower(next) === lineLower(line));
+
+    if (duplicatePattern) {
       score += 55;
       reasons.push("consecutive_duplicate");
     }
@@ -214,12 +261,18 @@ export const scoreCompanyCandidates = (lines: string[]): CompanyCandidateScore[]
       score += 45;
       reasons.push("before_employee_count");
     }
-    if (titleIdx >= 0 && i > titleIdx && (updatedIdx < 0 || i > updatedIdx)) {
-      score += 12;
-      reasons.push("after_title_updated_block");
+    if (next && isActivityTimestampLine(next)) {
+      score += 120;
+      reasons.push("before_activity_timestamp");
     }
-    if (i < 25) {
-      score += Math.max(0, 8 - Math.floor(i / 3));
+    if (i < headerEnd) {
+      score += 50;
+      reasons.push("header_region");
+    } else if (!duplicatePattern && !(next && isEmployeeCountLine(next))) {
+      continue;
+    }
+    if (i < 8) {
+      score += Math.max(0, 10 - i);
       reasons.push("near_top");
     }
     const wordCount = line.split(/\s+/).length;
@@ -231,10 +284,6 @@ export const scoreCompanyCandidates = (lines: string[]): CompanyCandidateScore[]
       score += 8;
       reasons.push("brand_casing");
     }
-    if (next && !isEmployeeCountLine(next) && !isNoiseLine(next) && next.length > 20 && !isProbablyNotCompany(next)) {
-      score += 5;
-      reasons.push("before_industry_description");
-    }
 
     if (score > 0) scores.push({ line, index: i, score, reasons });
   }
@@ -245,9 +294,11 @@ export const scoreCompanyCandidates = (lines: string[]): CompanyCandidateScore[]
 
 export const extractCompanyName = (rawJobText: string): string | null => {
   const lines = normalizeJobLines(rawJobText);
+  const headerCompany = extractHeaderCompanyBeforeActivity(lines);
+  if (headerCompany) return headerCompany;
   const ranked = scoreCompanyCandidates(lines);
-  if (!ranked.length) return null;
-  return ranked[0]!.line;
+  if (ranked.length) return ranked[0]!.line;
+  return extractCompanyFromSelfDescription(rawJobText);
 };
 
 export const extractJobPostingMetadata = (rawJobText: string): JobPostingMetadata => {
@@ -304,6 +355,9 @@ export const validateExtractedCompany = (
   if (company?.trim() && !isWeakOrPlaceholderCompany(company)) return company.trim();
 
   const lines = normalizeJobLines(rawJobText);
+  const headerCompany = extractHeaderCompanyBeforeActivity(lines);
+  if (headerCompany) return headerCompany;
+
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i]!;
     const prev = lines[i - 1]!;
