@@ -4,6 +4,13 @@
  */
 import { logger } from "../lib/logger.js";
 import { isBoardMatchChromeLine } from "./jobBoardMatchExtract.js";
+import {
+  extractCompanyFromSelfDescription,
+  extractHeaderCompanyBeforeActivity,
+  isActivityTimestampLine,
+  isHardRejectedCompanyCandidate,
+  looksLikeBrandCompanyName,
+} from "./companyCandidateRules.js";
 
 export type PreScoringJobMetadata = {
   companyName: string | null;
@@ -85,7 +92,7 @@ export const isScrapedNoiseLine = (line: string): boolean => {
   if (isBoardMatchChromeLine(line.trim())) return true;
   if (SCRAPED_NOISE_EXACT.has(low)) return true;
   if (SCRAPED_NOISE_PREFIXES.some((p) => low.includes(p))) return true;
-  if (RELATIVE_TIMESTAMP_RE.test(line.trim())) return true;
+  if (RELATIVE_TIMESTAMP_RE.test(line.trim()) || isActivityTimestampLine(line)) return true;
   if (SALARY_SCRAPE_RE.test(line.trim())) return true;
   if (/^junior and mid level$/i.test(low)) return true;
   return false;
@@ -133,11 +140,13 @@ const extractLocationFromPositionLabel = (lines: string[]): string | null => {
 };
 
 const extractCompanyBeforeTimestamp = (lines: string[]): string | null => {
+  const header = extractHeaderCompanyBeforeActivity(lines);
+  if (header) return header;
   if (!lines.length) return null;
   const first = lines[0]!;
   if (isScrapedNoiseLine(first) || isMetadataLabelLine(first) || isTitleLikeLine(first)) return null;
   const second = lines[1];
-  if (second && RELATIVE_TIMESTAMP_RE.test(second)) return first;
+  if (second && (RELATIVE_TIMESTAMP_RE.test(second) || isActivityTimestampLine(second))) return first;
   return null;
 };
 
@@ -146,7 +155,7 @@ const extractTitleBeforePositionLabel = (lines: string[], companyName: string | 
   if (positionIdx === -1) return null;
 
   let start = 0;
-  const tsIdx = lines.findIndex((l) => RELATIVE_TIMESTAMP_RE.test(l));
+  const tsIdx = lines.findIndex((l) => RELATIVE_TIMESTAMP_RE.test(l) || isActivityTimestampLine(l));
   if (tsIdx >= 0) start = tsIdx + 1;
   else if (companyName && lines[0] === companyName) start = 1;
 
@@ -161,17 +170,20 @@ const extractTitleBeforePositionLabel = (lines: string[], companyName: string | 
 
 const findFallbackCompanyBlock = (lines: string[], knownCompany: string | null): string | null => {
   if (knownCompany) return knownCompany;
+  const header = extractHeaderCompanyBeforeActivity(lines);
+  if (header) return header;
   for (let i = 0; i < Math.min(lines.length, 20); i++) {
     const line = lines[i]!;
     if (isScrapedNoiseLine(line) || isMetadataLabelLine(line) || isTitleLikeLine(line)) continue;
     if (looksLikeLocation(line)) continue;
-    if (line.length > 40) continue;
+    if (isHardRejectedCompanyCandidate(line)) continue;
+    if (!looksLikeBrandCompanyName(line)) continue;
     const next = lines[i + 1];
     if (next && next.length > 25 && !isTitleLikeLine(next) && !isScrapedNoiseLine(next)) {
       return line;
     }
   }
-  return null;
+  return extractCompanyFromSelfDescription(lines.join("\n"));
 };
 
 const computeConfidence = (meta: Omit<PreScoringJobMetadata, "confidence">): "high" | "medium" | "low" => {
