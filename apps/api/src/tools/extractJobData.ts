@@ -16,6 +16,7 @@ import {
 } from "./deterministicRawTextExtract.js";
 import {
   extractJobPostingMetadata,
+  isRejectedCompanyCandidate,
   isWeakJobTitle,
   isWeakOrPlaceholderCompany,
   logJobPostingMetadataDebug,
@@ -23,6 +24,7 @@ import {
   type JobPostingMetadata,
   type PreScoringJobMetadata,
 } from "./jobPostingMetadataExtract.js";
+import { resolveCompanyFromText, sanitizeCompanyName } from "./companyCandidateRules.js";
 import { normalizeLocationPrefixedTitle } from "./preScoringMetadataExtract.js";
 import { applyCompanyPresentation } from "./companyExtraction.js";
 
@@ -40,10 +42,20 @@ const fallbackExtraction = (input: { url?: string; rawText?: string; companyHint
   requirements: [],
 });
 
-const applyPreParsedMetadata = (base: ExtractedJobData, meta: JobPostingMetadata): ExtractedJobData => {
+const applyPreParsedMetadata = (base: ExtractedJobData, meta: JobPostingMetadata, rawText: string): ExtractedJobData => {
   const trusted = meta.preScoring?.confidence === "high" || meta.preScoring?.confidence === "medium";
+  const resolved = resolveCompanyFromText(rawText, {
+    llmCompany: base.company,
+    preScoringCompany: meta.companyName,
+  });
+  const metaCompany = meta.companyName && !isRejectedCompanyCandidate(meta.companyName) ? meta.companyName : null;
   const company =
-    meta.companyName && (trusted || isWeakOrPlaceholderCompany(base.company)) ? meta.companyName : base.company;
+    resolved ??
+    (metaCompany && (trusted || isRejectedCompanyCandidate(base.company) || isWeakOrPlaceholderCompany(base.company))
+      ? metaCompany
+      : !isRejectedCompanyCandidate(base.company)
+        ? base.company
+        : metaCompany ?? base.company);
   const title = meta.jobTitle && (trusted || isWeakJobTitle(base.title)) ? meta.jobTitle : base.title;
   return {
     ...base,
@@ -63,12 +75,28 @@ const applyMetadataFallback = (base: ExtractedJobData, meta: {
   seniority: string | null;
 }): ExtractedJobData => ({
   ...base,
-  company: meta.companyName && isWeakOrPlaceholderCompany(base.company) ? meta.companyName : base.company,
+  company:
+    meta.companyName && !isRejectedCompanyCandidate(meta.companyName) &&
+    (isRejectedCompanyCandidate(base.company) || isWeakOrPlaceholderCompany(base.company))
+      ? meta.companyName
+      : !isRejectedCompanyCandidate(base.company)
+        ? base.company
+        : meta.companyName ?? base.company,
   title: meta.jobTitle && isWeakJobTitle(base.title) ? meta.jobTitle : base.title,
   employmentType: meta.employmentType ?? base.employmentType,
   location: base.location ?? meta.location ?? undefined,
   seniority: base.seniority ?? meta.seniority ?? undefined,
 });
+
+const resolveFinalCompany = (
+  company: string | undefined,
+  normalizedText: string,
+  companyHint?: string,
+): string =>
+  sanitizeCompanyName(company, normalizedText, companyHint) ??
+  resolveCompanyFromText(normalizedText, { companyHint, llmCompany: company }) ??
+  companyHint?.trim() ??
+  "Unknown Company";
 
 const finalizeExtracted = (extracted: ExtractedJobData, normalizedText: string, companyHint?: string): ExtractedJobData => {
   let out = extracted;
@@ -82,17 +110,10 @@ const finalizeExtracted = (extracted: ExtractedJobData, normalizedText: string, 
       };
     }
   }
-  const company = validateExtractedCompany(
-    isWeakOrPlaceholderCompany(out.company) ? null : out.company,
-    normalizedText,
-  );
   out = {
     ...out,
-    company: company ?? (companyHint?.trim() || out.company),
+    company: resolveFinalCompany(out.company, normalizedText, companyHint),
   };
-  if (isWeakOrPlaceholderCompany(out.company) && companyHint?.trim()) {
-    out = { ...out, company: companyHint.trim() };
-  }
   out = applyCompanyPresentation(out, companyHint);
   return out;
 };
@@ -141,7 +162,7 @@ export const extractJobData = async (input: {
   let heuristicInferredFields: string[] = [];
 
   if (preParsed) {
-    extracted = applyPreParsedMetadata(extracted, preParsed);
+    extracted = applyPreParsedMetadata(extracted, preParsed, normalized);
   }
 
   if (normalized) {

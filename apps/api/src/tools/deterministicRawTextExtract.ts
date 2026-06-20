@@ -6,11 +6,13 @@ import type { ExtractedJobData } from "../types/job.js";
 import { dedupeStrings, normalizeText } from "../lib/text.js";
 import {
   extractJobPostingMetadata,
+  isRejectedCompanyCandidate,
   isWeakJobTitle,
   isWeakOrPlaceholderCompany,
   logJobPostingMetadataDebug,
   validateExtractedCompany,
 } from "./jobPostingMetadataExtract.js";
+import { resolveCompanyFromText } from "./companyCandidateRules.js";
 import {
   detectStrictFinanceEmployerContext,
   textImpliesNycMetroOrCommutableNj,
@@ -243,8 +245,10 @@ export const extractFromRawText = (normalizedText: string, companyHint?: string)
 
   const hintedCompany = companyHint?.trim();
   const company =
-    validateExtractedCompany(hintedCompany || meta.companyName, text) ??
-    (hintedCompany || undefined);
+    resolveCompanyFromText(text, { companyHint: hintedCompany, preScoringCompany: meta.companyName }) ??
+    validateExtractedCompany(hintedCompany || meta.companyName, text, hintedCompany) ??
+    hintedCompany ??
+    undefined;
   if (company) {
     partial.company = company;
     inferredFields.push("company");
@@ -434,12 +438,19 @@ export const mergeExtractedWithHeuristics = (
       : (h.locationIsCommutable ?? base.locationIsCommutable);
   const merged: ExtractedJobData = {
     ...base,
-    company:
-      h.company && isWeakOrPlaceholderCompany(base.company)
-        ? h.company
-        : base.company && !isWeakOrPlaceholderCompany(base.company)
-          ? base.company
-          : h.company || base.company || "Unknown Company",
+    company: (() => {
+      const raw = base.rawText ?? "";
+      return (
+        resolveCompanyFromText(raw, {
+          llmCompany: base.company,
+          preScoringCompany: h.company,
+        }) ??
+        validateExtractedCompany(h.company ?? base.company, raw) ??
+        h.company ??
+        base.company ??
+        "Unknown Company"
+      );
+    })(),
     title:
       h.title && isWeakJobTitle(base.title)
         ? h.title

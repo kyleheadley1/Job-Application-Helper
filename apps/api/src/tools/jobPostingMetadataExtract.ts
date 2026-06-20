@@ -13,15 +13,21 @@ import {
 } from "./preScoringMetadataExtract.js";
 import { isBoardMatchChromeLine } from "./jobBoardMatchExtract.js";
 import {
+  EMPLOYEE_COUNT_RE,
   extractCompanyFromSelfDescription,
-  extractHeaderCompanyBeforeActivity,
+  extractDuplicateCompanyBeforeEmployeeCount,
   findBodySectionStartIndex,
-  isActivityTimestampLine,
-  isHardRejectedCompanyCandidate,
-  isInBodySection,
-  looksLikeBrandCompanyName,
+  isAfterBodySection,
+  isPostedTimestampLine,
+  isValidCompanyCandidate,
+  normalizeJobLines as normalizeCompanyLines,
   parseExplicitCompanyLabel,
+  resolveCompanyFromText,
+  sanitizeCompanyName,
 } from "./companyCandidateRules.js";
+
+export { isRejectedCompanyCandidate, isValidCompanyCandidate } from "./companyCandidateRules.js";
+import { isRejectedCompanyCandidate } from "./companyCandidateRules.js";
 
 export type { PreScoringJobMetadata } from "./preScoringMetadataExtract.js";
 
@@ -83,17 +89,12 @@ const NEGATIVE_COMPANY_PREFIXES = ["what ", "how ", "why ", "about ", "our compa
 const ROLE_TITLE_RE =
   /\b((?:full[\s-]?stack|fullstack|frontend|backend|platform|infrastructure|machine learning|site reliability|product)\s+)?(?:engineer|developer|software|devops|sre|scientist|architect|analyst|designer|programmer|enablement)\b|\b(?:forward deployed|ai enablement|ai engineer|full stack|fullstack)\b/i;
 
-const EMPLOYEE_COUNT_RE = /^\d[\d,]*\s*-\s*[\d,]+\s+employees$/i;
+const EMPLOYEE_COUNT_LINE_RE = EMPLOYEE_COUNT_RE;
 const UPDATED_ON_RE = /^updated on\b/i;
 const LOCATION_RE = /^[A-Za-z][A-Za-z .'-]+,\s*[A-Z]{2}(?:,\s*(?:USA|US))?$/;
 const SALARY_LINE_RE = /^\$?\d[\d,k.]*\s*-\s*\$?\d[\d,k.]*\s*\/\s*yr$/i;
 
-export const normalizeJobLines = (rawJobText: string): string[] =>
-  rawJobText
-    .replace(/\r\n/g, "\n")
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
+export const normalizeJobLines = (rawJobText: string): string[] => normalizeCompanyLines(rawJobText);
 
 const lineLower = (line: string): string => line.trim().toLowerCase();
 
@@ -103,31 +104,9 @@ export const isNoiseLine = (line: string): boolean => {
   return NOISE_PREFIXES.some((p) => low === p || low.startsWith(p));
 };
 
-export const isEmployeeCountLine = (line: string): boolean => EMPLOYEE_COUNT_RE.test(line.trim());
+export const isEmployeeCountLine = (line: string): boolean => EMPLOYEE_COUNT_LINE_RE.test(line.trim());
 
 export const isProbablyNotCompany = (line: string): boolean => isRejectedCompanyCandidate(line);
-
-/** Company-name-specific rejection (body prose, non-brand lines, listing noise). */
-export const isRejectedCompanyCandidate = (line: string): boolean => {
-  const trimmed = line.trim();
-  const low = lineLower(trimmed);
-  if (!low) return true;
-  if (isHardRejectedCompanyCandidate(trimmed)) return true;
-  if (!looksLikeBrandCompanyName(trimmed)) return true;
-  if (isBoardMatchChromeLine(trimmed)) return true;
-  if (EMPLOYMENT_TYPES.has(low)) return true;
-  if (SENIORITY_LABELS.has(low)) return true;
-  if (WORK_MODEL_LABELS.has(low)) return true;
-  if (low === "no salary listed") return true;
-  if (looksLikeLocation(trimmed)) return true;
-  if (UPDATED_ON_RE.test(low)) return true;
-  if (isEmployeeCountLine(trimmed)) return true;
-  if (SALARY_LINE_RE.test(trimmed)) return true;
-  if (LOCATION_RE.test(trimmed)) return true;
-  if (/\bemployees?\b/i.test(trimmed) && /\d/.test(trimmed)) return true;
-  if (NEGATIVE_COMPANY_PREFIXES.some((p) => low.startsWith(p))) return true;
-  return false;
-};
 
 const isLineUnusableForTitle = (line: string): boolean => {
   const trimmed = line.trim();
@@ -135,13 +114,13 @@ const isLineUnusableForTitle = (line: string): boolean => {
   if (!low) return true;
   if (isNoiseLine(trimmed)) return true;
   if (isBoardMatchChromeLine(trimmed)) return true;
-  if (isActivityTimestampLine(trimmed)) return true;
+  if (isPostedTimestampLine(trimmed)) return true;
   if (isMetadataLabelLine(trimmed)) return true;
   if (EMPLOYMENT_TYPES.has(low)) return true;
   if (looksLikeLocation(trimmed)) return true;
   if (UPDATED_ON_RE.test(low)) return true;
   if (isEmployeeCountLine(trimmed)) return true;
-  if (isHardRejectedCompanyCandidate(trimmed) && !isTitleLikeLine(trimmed)) return true;
+  if (isRejectedCompanyCandidate(trimmed) && !isTitleLikeLine(trimmed)) return true;
   return false;
 };
 
@@ -237,13 +216,13 @@ export const scoreCompanyCandidates = (lines: string[]): CompanyCandidateScore[]
     if (isTitleLikeLine(line)) continue;
 
     const explicit = parseExplicitCompanyLabel(line);
-    if (explicit && looksLikeBrandCompanyName(explicit)) {
+    if (explicit && isValidCompanyCandidate(explicit)) {
       scores.push({ line: explicit, index: i, score: 500, reasons: ["explicit_label"] });
       continue;
     }
 
-    if (isInBodySection(lines, i)) continue;
-    if (isRejectedCompanyCandidate(line)) continue;
+    if (isAfterBodySection(lines, i) && !parseExplicitCompanyLabel(line)) continue;
+    if (!isValidCompanyCandidate(line)) continue;
 
     let score = 0;
     const reasons: string[] = [];
@@ -261,7 +240,7 @@ export const scoreCompanyCandidates = (lines: string[]): CompanyCandidateScore[]
       score += 45;
       reasons.push("before_employee_count");
     }
-    if (next && isActivityTimestampLine(next)) {
+    if (next && isPostedTimestampLine(next)) {
       score += 120;
       reasons.push("before_activity_timestamp");
     }
@@ -292,14 +271,11 @@ export const scoreCompanyCandidates = (lines: string[]): CompanyCandidateScore[]
   return scores;
 };
 
-export const extractCompanyName = (rawJobText: string): string | null => {
-  const lines = normalizeJobLines(rawJobText);
-  const headerCompany = extractHeaderCompanyBeforeActivity(lines);
-  if (headerCompany) return headerCompany;
-  const ranked = scoreCompanyCandidates(lines);
-  if (ranked.length) return ranked[0]!.line;
-  return extractCompanyFromSelfDescription(rawJobText);
-};
+export const extractCompanyName = (rawJobText: string, options?: {
+  companyHint?: string | null;
+  llmCompany?: string | null;
+  preScoringCompany?: string | null;
+}): string | null => resolveCompanyFromText(rawJobText, options);
 
 export const extractJobPostingMetadata = (rawJobText: string): JobPostingMetadata => {
   const lines = normalizeJobLines(rawJobText);
@@ -351,25 +327,10 @@ export const isWeakJobTitle = (title: string | undefined | null): boolean => {
 export const validateExtractedCompany = (
   company: string | null | undefined,
   rawJobText: string,
-): string | null => {
-  if (company?.trim() && !isWeakOrPlaceholderCompany(company)) return company.trim();
-
-  const lines = normalizeJobLines(rawJobText);
-  const headerCompany = extractHeaderCompanyBeforeActivity(lines);
-  if (headerCompany) return headerCompany;
-
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i]!;
-    const prev = lines[i - 1]!;
-    if (lineLower(prev) !== lineLower(line)) continue;
-    if (isNoiseLine(line) || isProbablyNotCompany(line)) continue;
-    const next = lines[i + 1];
-    if (next && isEmployeeCountLine(next)) return line;
-  }
-
-  const extracted = extractCompanyName(rawJobText);
-  return extracted;
-};
+  companyHint?: string,
+): string | null =>
+  sanitizeCompanyName(company, rawJobText, companyHint) ??
+  resolveCompanyFromText(rawJobText, { companyHint, llmCompany: company ?? null });
 
 export const logJobPostingMetadataDebug = (
   rawJobText: string,
