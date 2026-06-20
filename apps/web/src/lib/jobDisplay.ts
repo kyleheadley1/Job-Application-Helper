@@ -1,4 +1,5 @@
 import type { ExtractedJobData, JobRecord, TrackerSpreadsheetFields } from "../types/job";
+import { pickDisplayCompanyName } from "./companyDisplaySanitize";
 import { displayRoleTitle } from "./resultSummary";
 
 type CompanyFields = Pick<
@@ -7,12 +8,15 @@ type CompanyFields = Pick<
 >;
 
 /** User-facing company label with fallbacks for legacy records. */
-export function companyDisplayLabel(extracted: Pick<ExtractedJobData, "companyDisplayName" | "listingCompanyName" | "company">): string {
-  return (
-    extracted.companyDisplayName?.trim() ||
-    extracted.listingCompanyName?.trim() ||
-    extracted.company?.trim() ||
-    ""
+export function companyDisplayLabel(
+  extracted: Pick<
+    ExtractedJobData,
+    "companyDisplayName" | "listingCompanyName" | "company" | "rawText"
+  >,
+): string {
+  return pickDisplayCompanyName(
+    [extracted.companyDisplayName, extracted.listingCompanyName, extracted.company],
+    extracted.rawText,
   );
 }
 

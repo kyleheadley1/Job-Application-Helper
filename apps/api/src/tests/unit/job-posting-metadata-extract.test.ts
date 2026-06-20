@@ -97,6 +97,10 @@ describe("job posting metadata extract (Simplify-style)", () => {
     expect(validateExtractedCompany("Contract", CASE_1)).toBe("GreenLite");
   });
 
+  it("validateExtractedCompany rejects LLM prose company in favor of Battelle header", () => {
+    expect(validateExtractedCompany("stakeholders including mathematicians", BATTELLE_JD)).toBe("Battelle");
+  });
+
   it("Battelle: header company before repost timestamp, not body prose", () => {
     expect(isHardRejectedCompanyCandidate("stakeholders including mathematicians")).toBe(true);
     expect(looksLikeBrandCompanyName("stakeholders including mathematicians")).toBe(false);

@@ -1,4 +1,9 @@
 import { normalizeText } from "../lib/text.js";
+import {
+  extractCompanyFromPostedHeader,
+  isValidCompanyCandidate,
+  resolveCompanyFromText,
+} from "./companyCandidateRules.js";
 
 export type CompanyConfidence = "direct_or_unclear" | "agency_only" | "explicit_employer";
 
@@ -98,11 +103,23 @@ export function resolveCompanyPresentation(params: {
   companyHint?: string;
 }): CompanyPresentation {
   const notes: string[] = [];
-  const listing =
+  let listing =
     params.listingCompanyName?.trim() ||
     params.companyHint?.trim() ||
     null;
+  if (listing && !isValidCompanyCandidate(listing)) {
+    notes.push(`Rejected prose-like listing company "${listing}".`);
+    listing = null;
+  }
   const rawText = params.rawText ?? "";
+
+  if (!listing && rawText.trim()) {
+    listing =
+      resolveCompanyFromText(rawText, { companyHint: params.companyHint }) ??
+      (params.companyHint?.trim() && isValidCompanyCandidate(params.companyHint)
+        ? params.companyHint.trim()
+        : null);
+  }
 
   if (!listing && !rawText.trim()) {
     return {
@@ -190,8 +207,15 @@ export function applyCompanyPresentation<T extends {
   extracted: T,
   companyHint?: string,
 ): T {
+  const sanitizedCompany =
+    extracted.company && isValidCompanyCandidate(extracted.company)
+      ? extracted.company
+      : undefined;
+  const resolvedListing =
+    sanitizedCompany ??
+    resolveCompanyFromText(extracted.rawText ?? "", { companyHint, llmCompany: extracted.company });
   const presentation = resolveCompanyPresentation({
-    listingCompanyName: extracted.listingCompanyName ?? extracted.company,
+    listingCompanyName: extracted.listingCompanyName ?? resolvedListing ?? undefined,
     rawText: extracted.rawText,
     companyHint,
   });
