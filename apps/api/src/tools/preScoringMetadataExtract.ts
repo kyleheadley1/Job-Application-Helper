@@ -228,7 +228,10 @@ export const extractPreScoringMetadata = (rawJobText: string): PreScoringJobMeta
   }
 
   const result: PreScoringJobMetadata = {
-    companyName,
+    companyName:
+      companyName && isValidCompanyCandidate(companyName)
+        ? companyName
+        : findFallbackCompanyBlock(lines, null),
     jobTitle,
     location,
     rawTitleSource,

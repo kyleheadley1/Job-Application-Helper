@@ -236,3 +236,65 @@ describe("Craft Digital company extraction", () => {
     expect(`${presented.companyDisplayName} - ${presented.title}`).toBe("Craft Digital - Junior Engineer");
   });
 });
+
+const OOMA_JD = `
+Software Engineer
+position
+United States
+time
+Full-time
+remote
+Remote
+seniority
+Entry Level
+money
+$94K/yr - $120K/yr
+92%
+STRONG MATCH
+Ooma, Inc. is a company that empowers people to connect through powerful communication experiences via their cloud-based platform.
+Telecommunications
+Responsibilities
+Design, build, and maintain a geographically distributed calling platform
+`.trim();
+
+describe("Ooma company extraction", () => {
+  it("extracts Ooma, Inc. from self-description when title-first layout has no company header", () => {
+    expect(extractCompanyName(OOMA_JD)).toBe("Ooma, Inc.");
+  });
+
+  it("rejects seniority metadata as company", () => {
+    expect(isValidCompanyCandidate("Entry Level")).toBe(false);
+    expect(isValidCompanyCandidate("Mid Level")).toBe(false);
+  });
+
+  it("accepts legal entity suffix company names", () => {
+    expect(isValidCompanyCandidate("Ooma, Inc.")).toBe(true);
+  });
+
+  it("sets display fields correctly when LLM returns seniority as company", () => {
+    const meta = extractJobPostingMetadata(OOMA_JD);
+    const heur = extractFromRawText(OOMA_JD);
+    const merged = mergeExtractedWithHeuristics(
+      {
+        company: "Entry Level",
+        title: meta.jobTitle!,
+        remoteType: "unknown",
+        stack: [],
+        requiredSkills: [],
+        preferredSkills: [],
+        domainTags: [],
+        responsibilities: [],
+        requirements: [],
+        rawText: OOMA_JD,
+      } satisfies ExtractedJobData,
+      heur,
+    );
+    const presented = applyCompanyPresentation(merged);
+
+    expect(presented.company).toBe("Ooma, Inc.");
+    expect(presented.listingCompanyName).toBe("Ooma, Inc.");
+    expect(presented.companyDisplayName).toBe("Ooma, Inc.");
+    expect(presented.title).toBe("Software Engineer");
+    expect(`${presented.companyDisplayName} - ${presented.title}`).toBe("Ooma, Inc. - Software Engineer");
+  });
+});

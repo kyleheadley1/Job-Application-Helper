@@ -4,8 +4,17 @@ const PROSE_RE =
 const JOB_TITLE_LIKE_RE =
   /\b((?:full[\s-]?stack|frontend|backend|platform|product|deployment|forward deployed|machine learning|site reliability|ai enablement)\s+)?(?:engineer|developer|software|devops|sre|scientist|architect|analyst|designer|programmer|manager|director|lead|specialist|coordinator)\b|\b(?:product\s*&\s*deployment|forward deployed)\b/i;
 
+const LEGAL_ENTITY_SUFFIX_RE =
+  /(?:,\s*)?(Inc|LLC|Corp|Corporation|Ltd|Co|Company|LP|LLP|PLC|GmbH)\.?$/i;
+
 const LOCATION_EXACT = new Set(
   ["us", "u.s.", "usa", "u.s.a.", "united states", "remote", "onsite", "on-site", "hybrid", "in person"].map(
+    (s) => s.toLowerCase(),
+  ),
+);
+
+const SENIORITY_EXACT = new Set(
+  ["entry level", "entry-level", "mid level", "mid-level", "senior level", "junior", "senior", "staff", "principal", "lead", "intern"].map(
     (s) => s.toLowerCase(),
   ),
 );
@@ -26,6 +35,24 @@ export function isLocationLikeCompanyName(name: string): boolean {
   return false;
 }
 
+function isSeniorityLikeCompanyName(name: string): boolean {
+  const key = name.trim().toLowerCase();
+  if (!key) return true;
+  if (SENIORITY_EXACT.has(key)) return true;
+  if (/^(entry|junior|mid|senior|staff|principal|lead)[\s-]?level$/i.test(key)) return true;
+  return false;
+}
+
+function isLegalEntityCompanyName(name: string): boolean {
+  const trimmed = name.trim();
+  if (!trimmed || trimmed.length > 48) return false;
+  if (!LEGAL_ENTITY_SUFFIX_RE.test(trimmed)) return false;
+  if (!/^[A-Z]/.test(trimmed)) return false;
+  if (isSeniorityLikeCompanyName(trimmed)) return false;
+  if (isLocationLikeCompanyName(trimmed)) return false;
+  return true;
+}
+
 function isJobTitleLikeLine(line: string): boolean {
   return JOB_TITLE_LIKE_RE.test(line.trim());
 }
@@ -34,6 +61,8 @@ export function isProseCompanyName(name: string): boolean {
   const trimmed = name.trim();
   if (!trimmed) return true;
   if (isJobTitleLikeLine(trimmed)) return true;
+  if (isSeniorityLikeCompanyName(trimmed)) return true;
+  if (isLegalEntityCompanyName(trimmed)) return false;
   if (trimmed.length > 60) return true;
   if (trimmed.split(/\s+/).length > 5) return true;
   if (/[,.;:!?]/.test(trimmed)) return true;
@@ -57,9 +86,7 @@ export function headerCompanyFromRawText(rawText?: string): string | null {
     return line;
   }
   for (const line of lines.slice(0, 40)) {
-    const m = line.match(
-      /^([A-Z][A-Za-z0-9&'.-]*(?:\s+[A-Z][A-Za-z0-9&'.-]*){0,2})\s+is\s+(?:a|an|the|building)\b/,
-    );
+    const m = line.match(/^(.{2,48}?)\s+is\s+(?:a|an|the|building)\b/i);
     if (m?.[1] && !isProseCompanyName(m[1])) return m[1].trim();
   }
   for (let i = 0; i < lines.length - 2; i++) {
