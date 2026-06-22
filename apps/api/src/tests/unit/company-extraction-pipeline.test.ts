@@ -186,3 +186,53 @@ describe("company candidate priority", () => {
     expect(resolveCompanyFromText(PALLET_JD, { llmCompany: "us" })).toBe("Pallet");
   });
 });
+
+const CRAFT_DIGITAL_JD = `
+Craft Digital
+· 2 hours ago
+Junior Engineer
+position
+United States
+Craft Digital is a company that focuses on delivering effective engineering solutions.
+Responsibilities
+Build dashboards, integrations, and features across the client stack
+Ask great questions, then drive yourself to the answer
+`.trim();
+
+describe("Craft Digital company extraction", () => {
+  it("extracts Craft Digital from posted header", () => {
+    expect(extractCompanyName(CRAFT_DIGITAL_JD)).toBe("Craft Digital");
+    expect(extractCompanyFromPostedHeader(normalizeJobLines(CRAFT_DIGITAL_JD))).toBe("Craft Digital");
+  });
+
+  it("rejects responsibility prose as company", () => {
+    expect(isValidCompanyCandidate("stack Ask great questions")).toBe(false);
+  });
+
+  it("sets display fields correctly when LLM returns responsibility prose", () => {
+    const meta = extractJobPostingMetadata(CRAFT_DIGITAL_JD);
+    const heur = extractFromRawText(CRAFT_DIGITAL_JD);
+    const merged = mergeExtractedWithHeuristics(
+      {
+        company: "stack Ask great questions",
+        title: meta.jobTitle!,
+        remoteType: "unknown",
+        stack: [],
+        requiredSkills: [],
+        preferredSkills: [],
+        domainTags: [],
+        responsibilities: [],
+        requirements: [],
+        rawText: CRAFT_DIGITAL_JD,
+      } satisfies ExtractedJobData,
+      heur,
+    );
+    const presented = applyCompanyPresentation(merged);
+
+    expect(presented.company).toBe("Craft Digital");
+    expect(presented.listingCompanyName).toBe("Craft Digital");
+    expect(presented.companyDisplayName).toBe("Craft Digital");
+    expect(presented.title).toBe("Junior Engineer");
+    expect(`${presented.companyDisplayName} - ${presented.title}`).toBe("Craft Digital - Junior Engineer");
+  });
+});

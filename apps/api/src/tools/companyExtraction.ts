@@ -37,8 +37,8 @@ const EXPLICIT_EMPLOYER_PATTERNS: Array<{ re: RegExp; label: string }> = [
     label: "our client",
   },
   {
-    re: /\bclient[,:\s]+([A-Z][A-Za-z0-9&.'\-\s]{1,48}?)(?:\s+is|\s+are|,|\.|\s+hiring|\s+looking)/i,
-    label: "client",
+    re: /(?:^|\n)\s*Client:\s*([A-Z][A-Za-z0-9&.'\- ]{1,48})\b/,
+    label: "Client:",
   },
   {
     re: /\b(?:representing|partnering with|on behalf of)\s+([A-Z][A-Za-z0-9&.'\-\s]{1,48}?)(?:[,.\s]|$)/i,
@@ -62,6 +62,7 @@ function cleanEmployerCandidate(raw: string): string | null {
   if (/^(the|a|an|our|their|this|that)\b/i.test(t)) return null;
   if (AGENCY_NAME_RE.test(t) && !/\b(ai|labs|tech)\b/i.test(t)) return null;
   if (/^(company|client|employer|organization|firm|team)$/i.test(t)) return null;
+  if (!isValidCompanyCandidate(t)) return null;
   return t;
 }
 
@@ -135,7 +136,14 @@ export function resolveCompanyPresentation(params: {
   const { employer, note: employerNote } = extractExplicitEmployerFromJd(rawText, listing);
   if (employerNote) notes.push(employerNote);
 
-  if (employer) {
+  const directListing =
+    listing &&
+    listingSelfDescribesAsEmployer(listing, rawText) &&
+    !looksLikeAgencyCompanyName(listing);
+
+  if (employer && directListing && normalizeText(employer) !== normalizeText(listing)) {
+    notes.push(`Ignored prose false-positive employer "${employer}"; listing self-describes as direct employer.`);
+  } else if (employer) {
     const agency =
       listing && (looksLikeAgencyCompanyName(listing) || jdSignalsAgencyRepresentation(rawText))
         ? listing
@@ -147,6 +155,17 @@ export function resolveCompanyPresentation(params: {
       agencyCompanyName: agency,
       companyDisplayName: employer,
       companyConfidence: "explicit_employer",
+      companyExtractionNotes: notes,
+    };
+  }
+
+  if (directListing && listing) {
+    return {
+      listingCompanyName: listing,
+      employerCompanyName: null,
+      agencyCompanyName: null,
+      companyDisplayName: listing,
+      companyConfidence: "direct_or_unclear",
       companyExtractionNotes: notes,
     };
   }
