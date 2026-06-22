@@ -141,7 +141,7 @@ export function resolveCompanyPresentation(params: {
     listingSelfDescribesAsEmployer(listing, rawText) &&
     !looksLikeAgencyCompanyName(listing);
 
-  if (employer && directListing && normalizeText(employer) !== normalizeText(listing)) {
+  if (employer && directListing && listing && normalizeText(employer) !== normalizeText(listing)) {
     notes.push(`Ignored prose false-positive employer "${employer}"; listing self-describes as direct employer.`);
   } else if (employer) {
     const agency =

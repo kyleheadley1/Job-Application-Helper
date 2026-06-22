@@ -120,6 +120,8 @@ describe("job posting metadata extract (Simplify-style)", () => {
       company: meta.companyName!,
       title: meta.jobTitle!,
       rawText: BATTELLE_JD,
+      listingCompanyName: meta.companyName!,
+      companyDisplayName: meta.companyName!,
       stack: [],
       requiredSkills: [],
       preferredSkills: [],

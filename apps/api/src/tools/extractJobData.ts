@@ -161,7 +161,7 @@ export const extractJobData = async (input: {
   let extracted = extractedRun.data;
   let heuristicInferredFields: string[] = [];
 
-  if (preParsed) {
+  if (preParsed && normalized) {
     extracted = applyPreParsedMetadata(extracted, preParsed, normalized);
   }
 

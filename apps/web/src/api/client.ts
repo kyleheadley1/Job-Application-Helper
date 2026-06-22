@@ -1,4 +1,5 @@
 import type { JobRecord, JobStatus } from "../types/job";
+import type { TopJobRecord, TopJobsSyncStatus } from "../types/topJob";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000/api";
 
@@ -85,4 +86,12 @@ export const api = {
   exportJobsCsv: (query = "") => fetchCsv(`/jobs/export${query}${query ? "&" : "?"}format=csv`),
   regenerateAssets: (id: string, force = false) =>
     request<JobRecord>(`/jobs/${id}/generate-assets`, { method: "POST", body: JSON.stringify({ force }) }),
+  listTopJobs: () => request<{ items: TopJobRecord[]; total: number }>("/top-jobs"),
+  getTopJob: (id: string) => request<TopJobRecord>(`/top-jobs/${id}`),
+  getTopJobsSyncStatus: () => request<TopJobsSyncStatus>("/top-jobs/sync/status"),
+  syncTopJobs: () =>
+    request<{ stats: TopJobsSyncStatus["lastSyncStats"]; status: TopJobsSyncStatus }>("/top-jobs/sync", {
+      method: "POST",
+    }),
+  promoteTopJob: (id: string) => request<JobRecord>(`/top-jobs/${id}/promote`, { method: "POST" }),
 };
