@@ -2,6 +2,7 @@
  * Centralized company candidate validation and ranked extraction.
  * Every company source must pass isValidCompanyCandidate before merge/display.
  */
+import { isBoardMatchChromeLine } from "./jobBoardMatchExtract.js";
 
 export type CompanySource =
   | "user_hint"
@@ -59,6 +60,37 @@ export const LOCATION_COMPANY_REJECT_EXACT = new Set(
   ].map((s) => s.toLowerCase()),
 );
 
+export const SENIORITY_COMPANY_REJECT_EXACT = new Set(
+  [
+    "entry level",
+    "entry-level",
+    "mid level",
+    "mid-level",
+    "senior level",
+    "senior-level",
+    "junior level",
+    "junior-level",
+    "junior",
+    "senior",
+    "staff",
+    "principal",
+    "lead",
+    "intern",
+    "internship",
+    "associate",
+    "director",
+    "manager",
+    "junior and mid level",
+  ].map((s) => s.toLowerCase()),
+);
+
+export const METADATA_LABEL_LINES = new Set(
+  ["position", "time", "remote", "seniority", "money", "date", "category"].map((s) => s.toLowerCase()),
+);
+
+export const LEGAL_ENTITY_SUFFIX_RE =
+  /(?:,\s*)?(Inc|LLC|Corp|Corporation|Ltd|Co|Company|LP|LLP|PLC|GmbH)\.?$/i;
+
 export const COMPANY_PROSE_REJECTORS: RegExp[] = [
   /\b(including|using|with|within|through|across|between|among|for|from|to)\b/i,
   /\b(stakeholders|clients|customers|users|teams|members|leaders|engineers|scientists|mathematicians|statisticians|epidemiologist|developers|operators|executives)\b/i,
@@ -112,10 +144,38 @@ export function isLocationOrCountryCompanyCandidate(line: string): boolean {
   if (/\bremote in\b/i.test(trimmed)) return true;
   if (/\+\s*\d+\s+more/i.test(trimmed)) return true;
   if (/^remote\b/i.test(trimmed) && trimmed.split(/\s+/).length > 1) return true;
-  if (/^[A-Z][A-Za-z .'-]+,\s*[A-Z]{2}(?:,\s*(?:USA|U\.S\.|United States))?/i.test(trimmed)) {
+  if (LEGAL_ENTITY_SUFFIX_RE.test(trimmed)) return false;
+  if (
+    /^[A-Z][A-Za-z .'-]+,\s*[A-Z]{2}\b(?:,\s*(?:USA|U\.S\.|United States))?\s*$/i.test(trimmed)
+  ) {
     return true;
   }
   return false;
+}
+
+export function isSeniorityOrLevelCompanyCandidate(line: string): boolean {
+  const key = normalizeCompanyCandidateKey(line);
+  if (!key) return true;
+  if (SENIORITY_COMPANY_REJECT_EXACT.has(key)) return true;
+  if (/^(entry|junior|mid|senior|staff|principal|lead)[\s-]?level$/i.test(key)) return true;
+  return false;
+}
+
+export function followsMetadataLabelLine(lines: string[], index: number): boolean {
+  if (index <= 0) return false;
+  return METADATA_LABEL_LINES.has(normalizeCompanyCandidateKey(lines[index - 1] ?? ""));
+}
+
+export function isLegalEntityCompanyName(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.length > 48) return false;
+  if (!LEGAL_ENTITY_SUFFIX_RE.test(trimmed)) return false;
+  if (!/^[A-Z]/.test(trimmed)) return false;
+  if (isSeniorityOrLevelCompanyCandidate(trimmed)) return false;
+  if (isLocationOrCountryCompanyCandidate(trimmed)) return false;
+  if (isJobTitleLikeLine(trimmed)) return false;
+  if (trimmed.split(/\s+/).length > 6) return false;
+  return true;
 }
 
 export function isJobTitleLikeLine(line: string): boolean {
@@ -128,6 +188,8 @@ export function isCompanyProseCandidate(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed) return true;
   if (isJobTitleLikeLine(trimmed)) return true;
+  if (isSeniorityOrLevelCompanyCandidate(trimmed)) return true;
+  if (isLegalEntityCompanyName(trimmed)) return false;
   if (trimmed.length > 60) return true;
   if (trimmed.split(/\s+/).length > 5) return true;
   if (/[,.;:!?]/.test(trimmed)) return true;
@@ -151,11 +213,13 @@ export function isBrandLikeCompany(line: string): boolean {
   if (!trimmed) return false;
   if (words.length < 1 || words.length > 4) return false;
   if (trimmed.length > 45) return false;
+  if (isSeniorityOrLevelCompanyCandidate(trimmed)) return false;
+  if (isLegalEntityCompanyName(trimmed)) return true;
   if (isLocationOrCountryCompanyCandidate(trimmed)) return false;
   if (isCompanyProseCandidate(trimmed)) return false;
 
   if (
-    /^(posted|reposted|position|time|remote|seniority|money|category|required|preferred|summary|history|full job posting|why this job is a match|contract|full-time|full time|part-time|part time|internship|temporary|freelance)$/i.test(
+    /^(posted|reposted|position|time|remote|seniority|money|category|required|preferred|summary|history|full job posting|why this job is a match|contract|full-time|full time|part-time|part time|internship|temporary|freelance|strong match|experience\. level|industry exp\.?)$/i.test(
       trimmed,
     )
   ) {
@@ -182,6 +246,10 @@ export function isBrandLikeCompany(line: string): boolean {
 export function isValidCompanyCandidate(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed) return false;
+  if (isBoardMatchChromeLine(trimmed)) return false;
+  if (/^\d{1,3}%$/.test(trimmed)) return false;
+  if (isSeniorityOrLevelCompanyCandidate(trimmed)) return false;
+  if (isLegalEntityCompanyName(trimmed)) return true;
   if (isLocationOrCountryCompanyCandidate(trimmed)) return false;
   if (isCompanyProseCandidate(trimmed)) return false;
   if (!isBrandLikeCompany(trimmed)) return false;
@@ -291,7 +359,7 @@ export function extractCompanyFromSelfDescriptionLines(lines: string[]): string 
   for (const line of lines.slice(0, 60)) {
     const trimmed = line.trim();
     const match = trimmed.match(
-      /^([A-Z][A-Za-z0-9&'.-]*(?:\s+[A-Z][A-Za-z0-9&'.-]*){0,3})\s+is\s+(?:a|an|the|building|hiring|looking|seeking)\b/i,
+      /^(.{2,48}?)\s+is\s+(?:a|an|the|building|hiring|looking|seeking)\b/i,
     );
     if (!match?.[1]) continue;
     const company = match[1].trim();
@@ -333,6 +401,7 @@ export function collectFallbackScoringCandidates(lines: string[]): CompanyCandid
   for (let i = 0; i < Math.min(lines.length, 30); i++) {
     const line = lines[i]!;
     if (isAfterBodySection(lines, i) && !parseExplicitCompanyLabel(line)) continue;
+    if (followsMetadataLabelLine(lines, i)) continue;
     if (isJobTitleLikeLine(line)) continue;
     if (!isValidCompanyCandidate(line)) continue;
     if (i >= headerEnd && i > 12) continue;

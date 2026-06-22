@@ -16,7 +16,8 @@ describe("companyCandidateRules", () => {
 
   it("rejects prose and punctuation-heavy candidates", () => {
     expect(isHardRejectedCompanyCandidate("stakeholders including mathematicians")).toBe(true);
-    expect(isHardRejectedCompanyCandidate("Acme, Inc.")).toBe(true);
+    expect(isHardRejectedCompanyCandidate("Acme, Inc.")).toBe(false);
+    expect(isHardRejectedCompanyCandidate("Entry Level")).toBe(true);
     expect(isHardRejectedCompanyCandidate("a very long company name that reads like a sentence")).toBe(true);
   });
 

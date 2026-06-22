@@ -17,6 +17,7 @@ import {
   extractCompanyFromSelfDescription,
   extractDuplicateCompanyBeforeEmployeeCount,
   findBodySectionStartIndex,
+  followsMetadataLabelLine,
   isAfterBodySection,
   isPostedTimestampLine,
   isValidCompanyCandidate,
@@ -222,6 +223,7 @@ export const scoreCompanyCandidates = (lines: string[]): CompanyCandidateScore[]
     }
 
     if (isAfterBodySection(lines, i) && !parseExplicitCompanyLabel(line)) continue;
+    if (followsMetadataLabelLine(lines, i)) continue;
     if (!isValidCompanyCandidate(line)) continue;
 
     let score = 0;
@@ -291,8 +293,17 @@ export const extractJobPostingMetadata = (rawJobText: string): JobPostingMetadat
   };
 
   const preferPreScoring = preScoring.confidence === "high" || preScoring.confidence === "medium";
+  const preScoringCompany =
+    preScoring.companyName && isValidCompanyCandidate(preScoring.companyName)
+      ? preScoring.companyName
+      : null;
+  const simplifyCompany = simplify.companyName && isValidCompanyCandidate(simplify.companyName)
+    ? simplify.companyName
+    : null;
   return {
-    companyName: preferPreScoring ? preScoring.companyName ?? simplify.companyName : simplify.companyName ?? preScoring.companyName,
+    companyName: preferPreScoring
+      ? preScoringCompany ?? simplifyCompany ?? extractCompanyName(rawJobText)
+      : simplifyCompany ?? preScoringCompany ?? extractCompanyName(rawJobText),
     jobTitle: preferPreScoring ? preScoring.jobTitle ?? simplify.jobTitle : simplify.jobTitle ?? preScoring.jobTitle,
     location: preScoring.location ?? simplify.location,
     employmentType: simplify.employmentType,
