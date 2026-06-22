@@ -522,6 +522,16 @@ tbody .tracker-sticky-left {
   font-weight: 600;
 }
 
+.top-jobs-posted {
+  cursor: help;
+  text-decoration: underline dotted transparent;
+  text-underline-offset: 0.15em;
+}
+
+.top-jobs-posted:hover {
+  text-decoration-color: currentColor;
+}
+
 .tracker-updated {
   font-size: 0.8rem;
   white-space: nowrap;

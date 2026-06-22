@@ -10,7 +10,8 @@
     "test": "vitest run src/tests",
     "import:tracker": "tsx scripts/import-tracker-xlsx.mts",
     "verify:tracker": "tsx scripts/verify-tracker-reseed.mts",
-    "rescore:tracker": "tsx scripts/rescore-tracker-roles.mts"
+    "rescore:tracker": "tsx scripts/rescore-tracker-roles.mts",
+    "sync:top-jobs": "tsx scripts/sync-top-jobs.mts"
   },
   "keywords": [],
   "author": "",
@@ -19,6 +20,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^25.6.0",
+    "@types/node-cron": "^3.0.11",
     "@types/supertest": "^7.2.0",
     "supertest": "^7.2.2",
     "tsx": "^4.21.0",
@@ -31,6 +33,7 @@
     "express": "^5.2.1",
     "helmet": "^8.1.0",
     "mongodb": "^7.1.1",
+    "node-cron": "^4.5.0",
     "pdf-parse": "^2.4.5",
     "xlsx": "^0.18.5",
     "zod": "^4.3.6"

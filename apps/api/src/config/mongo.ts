@@ -10,6 +10,7 @@ let indexesEnsured = false;
 const ensureIndexes = async (targetDb: Db): Promise<void> => {
   if (indexesEnsured) return;
   const jobs = targetDb.collection("jobs");
+  const topJobs = targetDb.collection("top_jobs");
   await Promise.all([
     jobs.createIndex(
       { importKey: 1 },
@@ -22,6 +23,10 @@ const ensureIndexes = async (targetDb: Db): Promise<void> => {
     jobs.createIndex({ "score.total": -1 }),
     jobs.createIndex({ "extracted.company": 1 }),
     jobs.createIndex({ updatedAt: -1 }),
+    topJobs.createIndex({ sourcePostedAt: -1 }),
+    topJobs.createIndex({ "score.total": -1 }),
+    topJobs.createIndex({ source: 1, externalId: 1 }, { unique: true }),
+    topJobs.createIndex({ applyUrl: 1 }),
   ]);
   indexesEnsured = true;
 };
