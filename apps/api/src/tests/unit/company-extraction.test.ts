@@ -56,4 +56,26 @@ Our client, Acme AI, is hiring a Platform Engineer.
     expect(out.employerCompanyName).toBeNull();
     expect(out.companyConfidence).toBe("agency_only");
   });
+
+  it("Craft Digital: does not treat 'the client stack' responsibility prose as explicit employer", () => {
+    const jd = `
+Craft Digital
+· 2 hours ago
+Junior Engineer
+position
+United States
+Craft Digital is a company that focuses on delivering effective engineering solutions.
+Responsibilities
+Build dashboards, integrations, and features across the client stack
+Ask great questions, then drive yourself to the answer
+    `.trim();
+    const out = resolveCompanyPresentation({
+      listingCompanyName: "Craft Digital",
+      rawText: jd,
+    });
+    expect(out.companyDisplayName).toBe("Craft Digital");
+    expect(out.listingCompanyName).toBe("Craft Digital");
+    expect(out.employerCompanyName).toBeNull();
+    expect(out.companyConfidence).toBe("direct_or_unclear");
+  });
 });
