@@ -25,6 +25,12 @@ export type RuleEvaluation = {
   citizenshipMismatch: boolean;
   clearanceMismatch: boolean;
   stackMismatch: boolean;
+  /** Required core languages missing from claimable stack (Tier 1). */
+  coreLanguageGap?: string[];
+  /** Same-language-family framework gaps, e.g. Vue required but React claimable (Tier 2). */
+  adjacentFrameworkGap?: string[];
+  /** Legacy infra/SRE shape signal — not the same as core-language stackMismatch. */
+  infraStackShapeMismatch?: boolean;
   domainMismatch: boolean;
   startupFounderMismatch: boolean;
   /** Big-tech / enterprise-style org where explicit stack gates are usually strict. */

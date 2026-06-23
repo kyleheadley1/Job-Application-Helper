@@ -27,6 +27,7 @@ import {
 import { resolveCompanyFromText, sanitizeCompanyName } from "./companyCandidateRules.js";
 import { normalizeLocationPrefixedTitle } from "./preScoringMetadataExtract.js";
 import { applyCompanyPresentation } from "./companyExtraction.js";
+import { reconcileSeniority } from "../lib/seniorityReconciliation.js";
 
 const fallbackExtraction = (input: { url?: string; rawText?: string; companyHint?: string }): ExtractedJobData => ({
   company: input.companyHint ?? "Unknown Company",
@@ -194,6 +195,9 @@ export const extractJobData = async (input: {
     extracted = applyMetadataFallback(extracted, metaRun.data);
     extracted = finalizeExtracted(extracted, normalized, input.companyHint);
   }
+
+  const reconciled = reconcileSeniority(extracted);
+  extracted = reconciled.job;
 
   return {
     extracted,

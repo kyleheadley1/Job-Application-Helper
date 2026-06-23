@@ -2,7 +2,11 @@ import { scoringPolicy } from '../../config/scoringPolicy.js';
 import type { ExtractedJobData } from '../../types/job.js';
 import type { RuleEvaluation } from '../../types/scoring.js';
 import type { UserProfile } from '../../types/userProfile.js';
+import type { ResumeContextSet } from '../../types/resumeContext.js';
+import type { ResumeType } from '../../types/resume.js';
 import { normalizeText } from '../../lib/text.js';
+import { claimableStackFromContexts } from '../../lib/claimableStack.js';
+import { analyzeStackMismatch } from '../../lib/stackMismatchAnalysis.js';
 import {
   detectStrictFinanceEmployerContext,
   detectTraditionalEmployerContextStrict,
@@ -112,6 +116,10 @@ const hasStrongPipelineMarkers = (combinedText: string): boolean =>
 export const evaluateRules = (
   job: ExtractedJobData,
   profile: UserProfile,
+  options?: {
+    resumeContexts?: ResumeContextSet;
+    activeResumeType?: ResumeType;
+  },
 ): RuleEvaluation => {
   const notes: string[] = [];
   const penaltyVector: Record<string, number> = {};
@@ -275,7 +283,7 @@ export const evaluateRules = (
       combinedText,
     ) &&
     !/\b(product features?|pm|design|customer problems?|full[-\s]?stack|backend api)\b/i.test(combinedText);
-  const stackMismatch =
+  const infraStackShapeMismatch =
     !backendProductApiRole &&
     !includesAny(combinedText, [
       'typescript',
@@ -292,6 +300,12 @@ export const evaluateRules = (
       'observability',
       'platform',
     ]);
+
+  const claimable = claimableStackFromContexts(options?.resumeContexts, options?.activeResumeType ?? 'SWE');
+  const stackAnalysis = analyzeStackMismatch(job, claimable);
+  const stackMismatch = stackAnalysis.stackMismatch;
+  const coreLanguageGap = stackAnalysis.coreLanguageGap;
+  const adjacentFrameworkGap = stackAnalysis.adjacentFrameworkGap;
 
   const healthcareProductEngineering =
     /\b(healthcare|health\s+care|behavioral\s+health|clinical|patient|hospital|therapy|ehr|hipaa)\b/i.test(
@@ -487,7 +501,16 @@ export const evaluateRules = (
   }
   if (stackMismatch) {
     penaltyVector.stack = scoringPolicy.hardPenalties.stackMismatch;
-    notes.push('Core technical story does not align with role stack shape.');
+    notes.push(
+      `Required core language gap: ${coreLanguageGap.join(', ')} — not in claimable stack.`,
+    );
+  } else if (adjacentFrameworkGap.length > 0) {
+    notes.push(
+      `Adjacent framework gap (${adjacentFrameworkGap.join(', ')}) — same language family, learnable stretch.`,
+    );
+  } else if (infraStackShapeMismatch) {
+    penaltyVector.stack = scoringPolicy.hardPenalties.stackMismatch;
+    notes.push('Core technical story does not align with role stack shape (infra/SRE).');
   } else if (associateEntryRole && preferredPlatformStackGap) {
     notes.push(
       "Preferred Go/GraphQL/platform stack is not the candidate's strongest lane, but baseline backend expectations appear accessible.",
@@ -617,6 +640,10 @@ export const evaluateRules = (
   }
   if (explicitCoreLanguageMismatch && coreLang.language) {
     hardRuleNotes.push(explicitCoreLanguageRiskSummary(coreLang.language));
+  } else if (stackMismatch && coreLanguageGap.length > 0) {
+    hardRuleNotes.push(
+      `Required core stack gap (${coreLanguageGap.join(', ')}) — major recruiter-screen risk.`,
+    );
   }
 
   return {
@@ -632,6 +659,9 @@ export const evaluateRules = (
     citizenshipMismatch,
     clearanceMismatch,
     stackMismatch,
+    coreLanguageGap,
+    adjacentFrameworkGap,
+    infraStackShapeMismatch,
     domainMismatch,
     startupFounderMismatch,
     matureStructuredEmployer,

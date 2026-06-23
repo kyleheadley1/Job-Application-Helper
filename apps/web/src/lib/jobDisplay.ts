@@ -62,6 +62,20 @@ export function formatPostedAgo(isoDate: string | undefined | null): string {
   });
 }
 
+/** Countdown until a future ISO time (e.g. manual refresh cooldown). */
+export function formatAvailableIn(isoDate: string | undefined | null): string {
+  if (!isoDate?.trim()) return "soon";
+  const then = new Date(isoDate).getTime();
+  if (Number.isNaN(then)) return isoDate;
+  const diffMs = then - Date.now();
+  if (diffMs <= 0) return "now";
+  const minutes = Math.ceil(diffMs / 60_000);
+  if (minutes < 60) return `in ${minutes} minute${minutes === 1 ? "" : "s"}`;
+  const hours = Math.ceil(minutes / 60);
+  if (hours < 24) return `in ${hours} hour${hours === 1 ? "" : "s"}`;
+  return new Date(isoDate).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
 /** Salary for display (internal structured fields). */
 function formatSalaryUsd(n: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);

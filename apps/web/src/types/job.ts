@@ -46,6 +46,9 @@ export type RuleEvaluation = {
   citizenshipMismatch: boolean;
   clearanceMismatch: boolean;
   stackMismatch: boolean;
+  coreLanguageGap?: string[];
+  adjacentFrameworkGap?: string[];
+  infraStackShapeMismatch?: boolean;
   domainMismatch: boolean;
   startupFounderMismatch: boolean;
   matureStructuredEmployer?: boolean;

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { logger } from "../lib/logger.js";
+import { DEFAULT_TOP_JOBS_SYNC_TIMEZONE } from "../services/topJobs/topJobsScheduleTime.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -69,14 +70,29 @@ export const env = {
   ),
   rapidApiKey: process.env.RAPIDAPI_KEY,
   topJobsSyncEnabled: parseBooleanEnv(process.env.TOP_JOBS_SYNC_ENABLED, false),
+  /** Cron in TOP_JOBS_SYNC_TIMEZONE — default 6:00 AM US Eastern daily. */
   topJobsSyncCron: process.env.TOP_JOBS_SYNC_CRON ?? "0 6 * * *",
+  topJobsSyncTimezone: process.env.TOP_JOBS_SYNC_TIMEZONE ?? DEFAULT_TOP_JOBS_SYNC_TIMEZONE,
+  topJobsSyncScheduleHour: Number(process.env.TOP_JOBS_SYNC_SCHEDULE_HOUR ?? 6),
+  topJobsSyncScheduleMinute: Number(process.env.TOP_JOBS_SYNC_SCHEDULE_MINUTE ?? 0),
+  topJobsSyncCatchupOnStart: parseBooleanEnv(process.env.TOP_JOBS_SYNC_CATCHUP_ON_START, true),
   topJobsMaxTriagesPerSync: Number(process.env.TOP_JOBS_MAX_TRIAGES_PER_SYNC ?? 15),
-  topJobsMinScore: Number(process.env.TOP_JOBS_MIN_SCORE ?? 78),
-  topJobsManualRefreshCooldownMin: Number(process.env.TOP_JOBS_MANUAL_REFRESH_COOLDOWN_MIN ?? 60),
+  topJobsMinScore: Number(process.env.TOP_JOBS_MIN_SCORE ?? 70),
+  /** Max listing age for discovery fetch (days). Default 14 = two weeks. */
+  topJobsListingMaxAgeDays: Number(process.env.TOP_JOBS_LISTING_MAX_AGE_DAYS ?? 14),
+  topJobsManualRefreshCooldownMin: Number(
+    process.env.TOP_JOBS_MANUAL_REFRESH_COOLDOWN_MIN ??
+      (process.env.NODE_ENV === "development" ? 1 : 60),
+  ),
   topJobsSource: (process.env.TOP_JOBS_SOURCE ?? "auto") as "auto" | "jsearch" | "jobsbase",
   jsearchMonthlyCap: Number(process.env.JSEARCH_MONTHLY_CAP ?? 180),
   jsearchNumPages: Number(process.env.JSEARCH_NUM_PAGES ?? 2),
-  jsearchDatePosted: (process.env.JSEARCH_DATE_POSTED ?? "week") as "week" | "month" | "3days" | "today" | "all",
+  jsearchDatePosted: (process.env.JSEARCH_DATE_POSTED ?? "month") as
+    | "week"
+    | "month"
+    | "3days"
+    | "today"
+    | "all",
   /** Resolved path used for dotenv (audit / support). */
   rootEnvPath,
   rootEnvFileExists: fs.existsSync(rootEnvPath),

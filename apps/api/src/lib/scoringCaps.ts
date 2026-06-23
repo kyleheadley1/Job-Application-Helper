@@ -1,4 +1,4 @@
-import { SCORE_CATEGORY_MAXES } from "../config/scoringPolicy.js";
+import { SCORE_CATEGORY_MAXES, STACK_MISMATCH_CAPS } from "../config/scoringPolicy.js";
 import type { Recommendation, RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
 
 /** Sum of the seven category scores (excludes cap; use for audit). */
@@ -23,6 +23,7 @@ const HARD_GATE_TOTAL_CAPS: Array<{ when: (rules: RuleEvaluation) => boolean; ca
   { when: (r) => Boolean(r.seniorityOverreach), cap: 66 },
   { when: (r) => Boolean(r.locationMismatch), cap: 68 },
   { when: (r) => Boolean(r.explicitDegreeRisk), cap: 70 },
+  { when: (r) => Boolean(r.stackMismatch), cap: STACK_MISMATCH_CAPS.tier1TotalCap },
   { when: (r) => Boolean(r.explicitCoreLanguageMismatch), cap: 74 },
 ];
 
@@ -40,6 +41,7 @@ export const hasHardGateNote = (rules: RuleEvaluation): boolean =>
       rules.seniorityOverreach ||
       rules.locationMismatch ||
       rules.explicitDegreeRisk ||
+      rules.stackMismatch ||
       rules.explicitCoreLanguageMismatch,
   );
 
@@ -49,7 +51,13 @@ export const hasHardGateNote = (rules: RuleEvaluation): boolean =>
  */
 export const applyHardGateCaps = (score: ScoreBreakdown, rules: RuleEvaluation): ScoreBreakdown => {
   let next: ScoreBreakdown = { ...score };
-  if (rules.explicitCoreLanguageMismatch) {
+  if (rules.stackMismatch) {
+    next.stackFit = Math.min(next.stackFit, STACK_MISMATCH_CAPS.tier1StackFitMax);
+    next.resumeStoryClarity = Math.min(next.resumeStoryClarity, STACK_MISMATCH_CAPS.tier1ResumeStoryClarityMax);
+  } else if ((rules.adjacentFrameworkGap?.length ?? 0) > 0) {
+    next.stackFit = Math.min(next.stackFit, STACK_MISMATCH_CAPS.tier2StackFitMax);
+  }
+  if (rules.explicitCoreLanguageMismatch && !rules.stackMismatch) {
     next.stackFit = Math.min(next.stackFit, 11);
   }
   const sum = sumScoreBreakdown(next);
@@ -108,7 +116,7 @@ export const resolveRecommendation = (
   if (rules.credentialHeavyFintechAlgorithm) return "no";
   if (rules.goDistributedDataInfraCandidateGap) return "no";
 
-  if (cappedTotal >= 85) return "yes";
+  if (cappedTotal >= 85) return rules.stackMismatch ? "selective_yes" : "yes";
   if (cappedTotal >= 78) return hasHardGateNote(rules) ? "selective_yes" : "yes";
   if (cappedTotal >= 70) return "selective_yes";
   if (cappedTotal >= 60) {

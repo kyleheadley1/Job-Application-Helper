@@ -36,11 +36,27 @@ const deterministicResumeSelection = (
     ].join(" "),
   );
   /** Do not treat title-only "Forward Deployed" or generic "implementation" as SIE; see countStrongSieRoleDescriptorHits. */
+  const negatedNewGrad = /\b(no|not)\s+new\s+grad\b/i.test(text);
   const explicitEarlyPipeline =
-    /\b(new grad|new graduate|entry[-\s]?level|early[-\s]?career|software engineer i\b|swe i\b|intern\b|apprentice|rotational program|rotation program|0\s*[-–]\s*2\s+years|university graduate program)\b/i.test(
+    !negatedNewGrad &&
+    /\b(new\s+grad(?:uate)?|recent\s+graduate|0\s*[-–]\s*1\s+years?|entry\s+pipeline|campus\s+(?:hire|recruiting)|rotational\s+program|rotation\s+program|early\s+career\s+program|university\s+graduate|engineering\s+residency|intern(?:ship)?\s+program|apprentice(?:ship)?\s+program|software\s+engineer\s+i\b|swe\s+i\b)\b/i.test(
       text,
     );
-  const earlySignals = ["new grad", "new graduate", "entry level", "early career", "rotational program", "rotation program", "software engineer i", "swe i", "intern", "apprentice", "0-2 years", "0–2 years"];
+  const earlySignals = [
+    "new grad",
+    "new graduate",
+    "recent graduate",
+    "rotational program",
+    "rotation program",
+    "early career program",
+    "campus hire",
+    "software engineer i",
+    "swe i",
+    "intern",
+    "apprentice",
+    "0-1 years",
+    "0–1 years",
+  ];
   const sweSignals = [
     "software engineer",
     "full-stack",
@@ -72,6 +88,9 @@ const deterministicResumeSelection = (
 
   const strongSieHits = countStrongSieRoleDescriptorHits(text);
   const fdeBuilderPrimary = isFdeBuilderSoftwarePrimaryShape(job);
+  const juniorTitleOnly = /\bjunior\b/i.test(text) && !explicitEarlyPipeline;
+  const productionWorkSignals =
+    /\b(production|shipped|ship(ped|ping)?|ownership|on[-\s]?call|end[-\s]?to[-\s]?end)\b/i.test(text);
   const earlyHits = explicitEarlyPipeline
     ? earlySignals.filter((needle) => text.includes(needle)).length + 2
     : earlySignals.filter((needle) => text.includes(needle)).length;
@@ -124,8 +143,14 @@ const deterministicResumeSelection = (
     combinedByType.EARLY_CAREER += 2;
     combinedByType.SIE -= 2;
   } else if (juniorBuilderHits > 0 && strongSieHits < 2 && !explicitEarlyPipeline) {
-    combinedByType.SWE += 2;
-    combinedByType.EARLY_CAREER = Math.min(combinedByType.EARLY_CAREER, 1);
+    combinedByType.SWE += 4;
+    combinedByType.EARLY_CAREER = Math.min(combinedByType.EARLY_CAREER, 0);
+  }
+
+  if (juniorTitleOnly && productionWorkSignals) {
+    combinedByType.SWE += 10;
+    combinedByType.EARLY_CAREER = 0;
+    combinedByType.SIE = Math.min(combinedByType.SIE, 0);
   }
 
   if (fdeBuilderPrimary) {
@@ -140,6 +165,17 @@ const deterministicResumeSelection = (
     combinedByType.SIE += 2;
   }
   const ordered = (Object.entries(combinedByType) as Array<[ResumeType, number]>).sort((a, b) => b[1] - a[1]);
+
+  if (juniorTitleOnly && productionWorkSignals) {
+    const profile = resumeProfiles.find((r) => r.type === "SWE");
+    return {
+      recommendedResume: "SWE",
+      confidence: 0.88,
+      rationale: profile?.exampleRationale ?? ["Junior title with production scope — use SWE variant, not early-career framing."],
+      ambiguous: false,
+    };
+  }
+
   const ambiguous = Math.abs((ordered[0]?.[1] ?? 0) - (ordered[1]?.[1] ?? 0)) <= 1;
   const recommendedResume: ResumeType = ordered[0]?.[0] ?? "SWE";
 
