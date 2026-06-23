@@ -17,6 +17,7 @@ import {
   detectStrictFinanceEmployerContext,
   textImpliesNycMetroOrCommutableNj,
 } from "../lib/employerLocationSignals.js";
+import { parseSalaryFromText } from "../lib/salaryConversion.js";
 
 export type DeterministicExtractResult = {
   partial: Partial<ExtractedJobData>;
@@ -76,57 +77,7 @@ const STACK_KEYS: Array<{ re: RegExp; label: string }> = [
   { re: /\bllm\b|\bgenerative\s+ai\b|\bopenai\b|\brag\b/i, label: "LLM / AI applications" },
 ];
 
-const stripCurrency = (s: string): number | undefined => {
-  const cleaned = s.replace(/[$,\s]/g, "").replace(/usd/gi, "");
-  const n = Number.parseInt(cleaned, 10);
-  return Number.isFinite(n) && n > 1000 ? n : undefined;
-};
-
-const parseMoneyToken = (token: string): number | undefined => {
-  const t = token.trim().toLowerCase();
-  const k = t.includes("k");
-  const n = Number.parseFloat(t.replace(/[$,]/g, "").replace(/k/gi, ""));
-  if (!Number.isFinite(n)) return undefined;
-  const scaled = k && n < 1000 ? Math.round(n * 1000) : Math.round(n);
-  return scaled > 1000 ? scaled : undefined;
-};
-
-/** Parse salary from common JD formats into min/max USD-ish numbers. */
-export const parseSalaryFromText = (raw: string): { min?: number; max?: number; currency?: string } | undefined => {
-  const t = raw.replace(/\u2013|\u2014/g, "-");
-
-  const kBand = /\$\s*([\d,]+)\s*k\s*[-–]\s*\$\s*([\d,]+)\s*k/gi.exec(t);
-  if (kBand) {
-    const a = Number.parseInt(kBand[1].replace(/,/g, ""), 10) * 1000;
-    const b = Number.parseInt(kBand[2].replace(/,/g, ""), 10) * 1000;
-    if (Number.isFinite(a) && Number.isFinite(b)) {
-      const min = Math.min(a, b);
-      const max = Math.max(a, b);
-      if (min >= 20000 && max <= 500000) return { min, max, currency: "USD" };
-    }
-  }
-
-  const patterns: RegExp[] = [
-    /\$\s*([\d,]+)\s*[-–]\s*\$\s*([\d,]+)/g,
-    /\b([\d,]+)\s*usd\s*[-–]\s*([\d,]+)\s*usd\b/gi,
-    /\b(?:between|from)\s*\$?\s*([\d,]+)\s*(?:and|to|-|–)\s*\$?\s*([\d,]+)\b/gi,
-    /compensation[^$]{0,120}\$\s*([\d,]+)\s*(?:and|to|-|–)\s*\$\s*([\d,]+)/gi,
-  ];
-
-  for (const re of patterns) {
-    re.lastIndex = 0;
-    const m = re.exec(t);
-    if (!m) continue;
-    let a = parseMoneyToken(m[1]) ?? stripCurrency(m[1]);
-    let b = parseMoneyToken(m[2]) ?? stripCurrency(m[2]);
-    if (a && b) {
-      const min = Math.min(a, b);
-      const max = Math.max(a, b);
-      if (min >= 20000 && max <= 500000) return { min, max, currency: "USD" };
-    }
-  }
-  return undefined;
-};
+export { parseSalaryFromText } from "../lib/salaryConversion.js";
 
 const parseTitleFromEmDashHeader = (lines: string[]): string | undefined => {
   if (!lines.length) return undefined;

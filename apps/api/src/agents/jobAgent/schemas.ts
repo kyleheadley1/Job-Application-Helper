@@ -124,6 +124,16 @@ export const RuleEvaluationSchema = z.object({
   goDistributedDataInfraRole: z.boolean().optional().default(false),
   goDistributedDataInfraCandidateGap: z.boolean().optional().default(false),
   hardRuleNotes: z.array(z.string()).optional().default([]),
+  hardRuleFlags: z
+    .array(
+      z.object({
+        id: z.string(),
+        message: z.string(),
+      }),
+    )
+    .optional()
+    .default([]),
+  roleShapeOutsideLane: z.boolean().optional().default(false),
   notes: z.array(z.string()).default([]),
   penaltyVector: z.record(z.string(), z.number()).optional(),
 });

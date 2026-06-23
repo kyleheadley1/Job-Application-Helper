@@ -1,6 +1,7 @@
 import type { ExtractedJobData } from "../../types/job.js";
 import type { Recommendation, RuleEvaluation, SalaryAsk, ScoreBreakdown } from "../../types/scoring.js";
 import { normalizeText } from "../../lib/text.js";
+import { resolvePostedSalary } from "../../lib/salaryConversion.js";
 import { jdHasAppliedAiSystemsOverlap } from "../../lib/scoringOutputPolish.js";
 
 const roundToNearest5k = (n: number): number => Math.round(n / 5_000) * 5_000;
@@ -29,8 +30,9 @@ export const computeSalaryAsk = (params: {
   rules: RuleEvaluation;
 }): SalaryAsk => {
   const { extracted: job, score, recommendation, rules } = params;
-  const postedMin = job.salary?.min;
-  const postedMax = job.salary?.max;
+  const posted = resolvePostedSalary(job);
+  const postedMin = posted.min;
+  const postedMax = posted.max;
 
   if (
     (rules.credentialHeavyFintechAlgorithm || rules.goDistributedDataInfraCandidateGap) &&

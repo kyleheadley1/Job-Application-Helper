@@ -1,0 +1,258 @@
+import { SCORING_CLAMP_POLICY } from "../config/scoringClampPolicy.js";
+import type { ExtractedJobData } from "../types/job.js";
+import type { HardRuleFlag, RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
+import { normalizeText } from "./text.js";
+
+const jobBlob = (job: ExtractedJobData): string =>
+  normalizeText(
+    [
+      job.company,
+      job.title,
+      job.seniority,
+      job.location,
+      job.rawText ?? "",
+      ...(job.stack ?? []),
+      ...(job.requiredSkills ?? []),
+      ...(job.preferredSkills ?? []),
+      ...(job.domainTags ?? []),
+      ...(job.requirements ?? []),
+      ...(job.responsibilities ?? []),
+    ].join("\n"),
+  );
+
+const FINANCE_DOMAIN_RE =
+  /\b(finance|fintech|trading|quant(?:itative)?|banking|investment|asset management|hedge fund|market maker|retirement|401k|pension|insurance|prudential|jane street|citadel|two sigma|goldman|jpmorgan|blackrock)\b/i;
+
+const QUANT_TRADING_RE =
+  /\b(quant(?:itative)?\s+trading|trading\s+firm|market\s+maker|proprietary\s+trading|jane\s+street|citadel|two\s+sigma|hudson\s+river|de\s+shaw)\b/i;
+
+const STAFFING_AGENCY_RE =
+  /\b(consulting|staffing|recruiting|talent\s+solutions|tech\s+consulting|jsr\s+tech|contractor|staff\s+aug|staff-aug)\b/i;
+
+const HOURLY_W2_RE =
+  /\b(hourly|\/hr|per\s+hour|w-?2\s+contract|contract\s+to\s+hire|c2h)\b/i;
+
+const INFRA_PLATFORM_SHAPE_RE =
+  /\b(edge\s+computing|cloudflare\s+workers|fastly|terraform|kubernetes|\bk8s\b|\biac\b|infrastructure\s+as\s+code|site\s+reliability|\bsre\b|observability|platform\s+architecture|edge\s+platform|cdn)\b/i;
+
+const ML_RESEARCH_SHAPE_RE =
+  /\b(pytorch|tensorflow|modeling|machine\s+learning\s+research|research\s+scientist|ml\s+research|deep\s+learning\s+research|training\s+models|neural\s+network\s+research)\b/i;
+
+const OUT_OF_LANE_CORE_LANG: Array<{ re: RegExp; label: string }> = [
+  { re: /\bocaml\b/i, label: "OCaml" },
+  { re: /\bgolang\b|\bgo\b/i, label: "Go" },
+  { re: /\bjava\b(?!script)/i, label: "Java" },
+  { re: /\bruby\b|\brails\b/i, label: "Ruby" },
+  { re: /\bc\+\+\b|\bc\/c\+\+\b/i, label: "C++" },
+  { re: /\bdjango\b/i, label: "Django/Python" },
+  { re: /\bscala\b/i, label: "Scala" },
+  { re: /\bhaskell\b/i, label: "Haskell" },
+  { re: /\berlang\b/i, label: "Erlang" },
+];
+
+const hasCoreLanguageClamp = (rules: RuleEvaluation): boolean =>
+  Boolean(
+    rules.stackMismatch ||
+      rules.explicitCoreLanguageMismatch ||
+      (rules.coreLanguageGap?.length ?? 0) > 0 ||
+      rules.hardRuleFlags?.some((f) => f.id === "coreLanguageMismatch"),
+  );
+
+export const detectRoleShapeOutsideLane = (job: ExtractedJobData): boolean => {
+  const blob = jobBlob(job);
+  return INFRA_PLATFORM_SHAPE_RE.test(blob) || ML_RESEARCH_SHAPE_RE.test(blob);
+};
+
+export const detectOutOfLaneCoreLanguage = (job: ExtractedJobData): string[] => {
+  const blob = jobBlob(job);
+  const found: string[] = [];
+  for (const { re, label } of OUT_OF_LANE_CORE_LANG) {
+    if (re.test(blob) && !found.includes(label)) found.push(label);
+  }
+  return found;
+};
+
+export const detectFinanceClampContext = (
+  job: ExtractedJobData,
+  rules: RuleEvaluation,
+): { financePenalty: boolean; quantTrading: boolean } => {
+  const blob = jobBlob(job);
+  const financeDomain =
+    rules.financePenalty ||
+    (job.domainTags ?? []).some((t) => FINANCE_DOMAIN_RE.test(t)) ||
+    FINANCE_DOMAIN_RE.test(blob);
+  if (!financeDomain) return { financePenalty: false, quantTrading: false };
+
+  const staffingPlacement =
+    Boolean(job.agencyCompanyName?.trim()) ||
+    Boolean(job.employerCompanyName?.trim() && job.listingCompanyName?.trim() &&
+      normalizeText(job.employerCompanyName!) !== normalizeText(job.listingCompanyName!)) ||
+    STAFFING_AGENCY_RE.test(normalizeText(job.company ?? "")) ||
+    STAFFING_AGENCY_RE.test(blob);
+
+  const credentialHeavy =
+    rules.credentialHeavyFintechAlgorithm ||
+    rules.explicitDegreeRisk ||
+    /\b(gaap|series\s+\d+|licensed|cfa|frm|actuarial)\b/i.test(blob);
+
+  const quantTrading = QUANT_TRADING_RE.test(blob);
+  const financePenalty = credentialHeavy || staffingPlacement || quantTrading || rules.financePenalty;
+
+  return { financePenalty, quantTrading };
+};
+
+export const detectStaffAugContractRole = (job: ExtractedJobData): boolean => {
+  const blob = jobBlob(job);
+  if (HOURLY_W2_RE.test(blob)) return true;
+  if (STAFFING_AGENCY_RE.test(normalizeText(job.company ?? ""))) return true;
+  if (job.agencyCompanyName?.trim()) return true;
+  if (
+    job.employerCompanyName?.trim() &&
+    job.listingCompanyName?.trim() &&
+    normalizeText(job.employerCompanyName) !== normalizeText(job.listingCompanyName)
+  ) {
+    return true;
+  }
+  return false;
+};
+
+export const buildHardRuleFlags = (
+  job: ExtractedJobData,
+  rules: RuleEvaluation,
+): HardRuleFlag[] => {
+  const flags: HardRuleFlag[] = [];
+  const seen = new Set<string>();
+
+  const push = (flag: HardRuleFlag) => {
+    if (seen.has(flag.id)) return;
+    seen.add(flag.id);
+    flags.push(flag);
+  };
+
+  if (rules.seniorityOverreach) {
+    push({
+      id: "seniorityOverreach",
+      message:
+        "Seniority overreach — role reads Senior/Staff or expects experienced ownership beyond early-career profile.",
+    });
+  }
+
+  const outOfLane = [
+    ...(rules.coreLanguageGap ?? []),
+    ...detectOutOfLaneCoreLanguage(job).filter(
+      (l) => !(rules.coreLanguageGap ?? []).includes(l),
+    ),
+  ];
+  const coreLanguageMismatch =
+    rules.stackMismatch ||
+    rules.explicitCoreLanguageMismatch ||
+    outOfLane.length > 0;
+
+  if (coreLanguageMismatch) {
+    const langs = [...new Set(outOfLane.length ? outOfLane : rules.coreLanguageGap ?? ["core backend language"])];
+    push({
+      id: "coreLanguageMismatch",
+      message: `Core language mismatch — role backend (${langs.join(", ")}) is outside TS/Node claimable lane.`,
+    });
+  }
+
+  if (rules.explicitDegreeRisk && rules.matureStructuredEmployer) {
+    push({
+      id: "degreeGateStructuredEmployer",
+      message:
+        "Degree gate at structured employer — bootcamp/equivalent language rarely survives first-pass ATS screen.",
+    });
+  }
+
+  const finance = detectFinanceClampContext(job, rules);
+  if (finance.financePenalty) {
+    push({
+      id: "financePenalty",
+      message:
+        "Finance/trading/insurance placement — credential-heavy screen or staffing into financial institution.",
+    });
+  }
+  if (finance.quantTrading) {
+    push({
+      id: "quantTradingMismatch",
+      message: "Quant/trading role shape — domain and core-language bar outside product SWE lane.",
+    });
+  }
+
+  return flags;
+};
+
+export type ScoringClampResult = {
+  score: ScoreBreakdown;
+  rules: RuleEvaluation;
+};
+
+/**
+ * Post-processing clamp layer: apply category caps/flags after raw LLM scores, before sum + total ceiling.
+ * Does not modify raw scoring prompts or LLM logic.
+ */
+export const applyScoringClampLayer = (params: {
+  score: ScoreBreakdown;
+  extracted: ExtractedJobData;
+  rules: RuleEvaluation;
+}): ScoringClampResult => {
+  const hardRuleFlags = buildHardRuleFlags(params.extracted, params.rules);
+  const financeCtx = detectFinanceClampContext(params.extracted, params.rules);
+
+  const rules: RuleEvaluation = {
+    ...params.rules,
+    financePenalty: financeCtx.financePenalty || params.rules.financePenalty,
+    hardRuleFlags,
+    roleShapeOutsideLane: detectRoleShapeOutsideLane(params.extracted),
+  };
+
+  let score = { ...params.score };
+
+  // Rule 1 — story & functional under core-language / stack mismatch
+  if (hasCoreLanguageClamp(rules)) {
+    score.resumeStoryClarity = Math.min(
+      score.resumeStoryClarity,
+      SCORING_CLAMP_POLICY.storyFunctionalUnderCoreLanguageGap.resumeStoryClarityMax,
+    );
+    score.functionalOverlap = Math.min(
+      score.functionalOverlap,
+      SCORING_CLAMP_POLICY.storyFunctionalUnderCoreLanguageGap.functionalOverlapMax,
+    );
+  }
+
+  // Rule 2 — stack shape vs keyword match
+  if (rules.roleShapeOutsideLane) {
+    score.stackFit = Math.min(score.stackFit, SCORING_CLAMP_POLICY.roleShapeOutsideLane.stackFitMax);
+  }
+
+  // Rule 4 — finance domain
+  if (rules.financePenalty) {
+    score.domainFit = Math.min(score.domainFit, SCORING_CLAMP_POLICY.financeDomain.domainFitMax);
+  }
+
+  // Rule 5 — recruiter friendliness at structured employers with degree risk
+  if (rules.matureStructuredEmployer && rules.explicitDegreeRisk) {
+    score.recruiterFriendliness = Math.min(
+      score.recruiterFriendliness,
+      SCORING_CLAMP_POLICY.matureStructuredDegreeRisk.recruiterFriendlinessMax,
+    );
+  }
+
+  // Rule 7 — contract / staffing-agency roles
+  if (detectStaffAugContractRole(params.extracted)) {
+    score.careerValue = Math.min(score.careerValue, SCORING_CLAMP_POLICY.staffAugContract.careerValueMax);
+  }
+
+  return { score, rules };
+};
+
+export const hardFlagTotalCeiling = (rules: RuleEvaluation): number | null => {
+  const hasCore = rules.hardRuleFlags?.some((f) => f.id === "coreLanguageMismatch") ?? false;
+  const hasSenior = rules.hardRuleFlags?.some((f) => f.id === "seniorityOverreach") ?? false;
+  const caps = SCORING_CLAMP_POLICY.hardFlagTotalCeilings;
+
+  if (hasCore && hasSenior) return caps.coreLanguageAndSeniority;
+  if (hasCore) return caps.coreLanguageMismatch;
+  if (hasSenior) return caps.seniorityOverreach;
+  return null;
+};
