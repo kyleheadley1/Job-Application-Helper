@@ -72,6 +72,7 @@ export const triageJob = async (input: {
   const scoringStart = Date.now();
   const {
     scoring: scored,
+    rules: scoredRules,
     scoringDiagnostics,
     scoringLlmSucceeded,
   } = await scoreJob({ extracted, rules, userProfile, resumeContexts, preScoringMetadata });
@@ -81,7 +82,7 @@ export const triageJob = async (input: {
     extracted,
     score: scored.score,
     recommendation: scored.recommendation,
-    rules,
+    rules: scoredRules,
   });
   stageMs.salary = Date.now() - salaryStart;
   const resumeSelStart = Date.now();
@@ -99,7 +100,7 @@ export const triageJob = async (input: {
   const initialRecord: JobRecord = {
     id: randomUUID(),
     extracted,
-    rules,
+    rules: scoredRules,
     score: scored.score,
     recommendation: scored.recommendation,
     salaryAsk,

@@ -1,5 +1,10 @@
 export type Recommendation = 'yes' | 'selective_yes' | 'no';
 
+export type HardRuleFlag = {
+  id: string;
+  message: string;
+};
+
 export type ScoreBreakdown = {
   stackFit: number;
   levelFit: number;
@@ -86,6 +91,10 @@ export type RuleEvaluation = {
    * Visa/citizenship/clearance and other notes stay in `notes` / key risks.
    */
   hardRuleNotes?: string[];
+  /** Post-clamp structural disqualifiers surfaced in UI (Rule 3+). */
+  hardRuleFlags?: HardRuleFlag[];
+  /** Infra/platform or ML-research role shape outside product SWE lane (Rule 2). */
+  roleShapeOutsideLane?: boolean;
   notes: string[];
   penaltyVector?: Record<string, number>;
 };

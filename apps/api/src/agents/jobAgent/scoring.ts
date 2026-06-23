@@ -21,6 +21,7 @@ import {
   resolveRecommendation,
   sumScoreBreakdown,
 } from '../../lib/scoringCaps.js';
+import { applyScoringClampLayer } from '../../lib/scoringClampLayer.js';
 
 const categorySchema = z.object({
   stackFit: z.number().min(0).max(SCORE_CATEGORY_MAXES.stackFit),
@@ -129,8 +130,8 @@ const deterministicFallback = (
     domainFit = Math.min(10, domainFit);
   }
 
-  const scoreFinal = finalizeScore(
-    {
+  const clamped = applyScoringClampLayer({
+    score: {
       stackFit,
       levelFit,
       domainFit,
@@ -140,8 +141,10 @@ const deterministicFallback = (
       careerValue,
       total: 0,
     },
+    extracted: job,
     rules,
-  );
+  });
+  const scoreFinal = finalizeScore(clamped.score, clamped.rules);
 
   return {
     score: scoreFinal,
@@ -176,6 +179,7 @@ export const scoreJob = async (params: {
   };
 }): Promise<{
   scoring: ScoringResult;
+  rules: RuleEvaluation;
   scoringDiagnostics: StructuredCallDiagnostics;
   scoringLlmSucceeded: boolean;
 }> => {
@@ -216,7 +220,12 @@ export const scoreJob = async (params: {
     total: rawScore.total,
   }));
 
-  const scoreFinal = finalizeScore(llmResult.score, params.rules);
+  const clamped = applyScoringClampLayer({
+    score: llmResult.score,
+    extracted: params.extracted,
+    rules: params.rules,
+  });
+  const scoreFinal = finalizeScore(clamped.score, clamped.rules);
 
   const polished = polishScoringNarrative({
     narrative: {
@@ -228,7 +237,7 @@ export const scoreJob = async (params: {
     score: scoreFinal,
     extracted: params.extracted,
     userProfile: params.userProfile,
-    rules: params.rules,
+    rules: clamped.rules,
   });
 
   return {
@@ -239,8 +248,9 @@ export const scoreJob = async (params: {
       mainRisk: polished.mainRisk,
       risks: polished.risks,
       rationale: polished.rationale,
-      recommendation: resolveRecommendation(polished.score.total, params.rules, polished.score.careerValue),
+      recommendation: resolveRecommendation(polished.score.total, clamped.rules, polished.score.careerValue),
     },
+    rules: clamped.rules,
     scoringDiagnostics: scoredRun.diagnostics,
     scoringLlmSucceeded: scoredRun.success,
   };

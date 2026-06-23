@@ -1,4 +1,5 @@
 import type { JobPostingMetadata } from '../../tools/jobPostingMetadataExtract.js';
+import { stripBoardMatchChromeFromText } from '../../tools/jobBoardMatchExtract.js';
 import { SCORING_CANONICAL_POLICY } from '../../config/scoringPolicy.js';
 import type { ExtractedJobData, JobRecord } from '../../types/job.js';
 import type { ResumeType } from '../../types/resume.js';
@@ -98,6 +99,14 @@ Narrative:
 - Output ONE flat JSON object with ONLY the keys listed in the user message.
 `.trim();
 
+const extractedForScoring = (extracted: ExtractedJobData): ExtractedJobData => {
+  if (!extracted.rawText?.trim()) return extracted;
+  return {
+    ...extracted,
+    rawText: stripBoardMatchChromeFromText(extracted.rawText),
+  };
+};
+
 export const buildScoringPrompt = (params: {
   extracted: ExtractedJobData;
   rules: RuleEvaluation;
@@ -145,7 +154,7 @@ Notes:
 - "topMatch" should be role-specific; avoid generic profile-only phrasing.
 
 Extracted job:
-${JSON.stringify(params.extracted, null, 2)}
+${JSON.stringify(extractedForScoring(params.extracted), null, 2)}
 
 Rule evaluation:
 ${JSON.stringify(params.rules, null, 2)}

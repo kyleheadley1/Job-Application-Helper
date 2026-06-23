@@ -201,7 +201,12 @@ export const JobResultPage = () => {
   }
   const topFits = selectTopFits(job, 2);
   const topRisks = buildKeyRisks(job, 5);
+  const hardRuleFlags = job.rules.hardRuleFlags ?? [];
   const hardRules = job.rules.hardRuleNotes ?? [];
+  const hardRuleDisplay =
+    hardRuleFlags.length > 0
+      ? hardRuleFlags.map((flag) => flag.message)
+      : hardRules;
   const summaryLine = decisionSummaryLine(job);
   const agencyNote = agencyDisclosureNote(job.extracted);
   const boardMatchPct = extractBoardMatchPercent(job.extracted.rawText);
@@ -216,8 +221,8 @@ export const JobResultPage = () => {
         </div>
         <div className="row">
           {boardMatchPct != null ? (
-            <span className="pill neutral" title="Match percentage from pasted job-board UI, not app score">
-              Match {boardMatchPct}%
+            <span className="pill neutral" title="Untrusted third-party match % from pasted job-board UI — not used in app score">
+              Board match {boardMatchPct}% (untrusted)
             </span>
           ) : null}
           <ScoreBadge score={job.score.total} />
@@ -269,8 +274,8 @@ export const JobResultPage = () => {
             <li>Career value: {formatScoreCategory(job.score.careerValue, "careerValue")}</li>
           </ul>
           <h4>Hard-rule flags</h4>
-          {hardRules.length ? (
-            <ul>{hardRules.map((note) => <li key={note}>{note}</li>)}</ul>
+          {hardRuleDisplay.length ? (
+            <ul>{hardRuleDisplay.map((note) => <li key={note}>{note}</li>)}</ul>
           ) : (
             <p className="muted">None identified.</p>
           )}

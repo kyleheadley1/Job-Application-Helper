@@ -68,6 +68,8 @@ export type RuleEvaluation = {
   goDistributedDataInfraRole?: boolean;
   goDistributedDataInfraCandidateGap?: boolean;
   hardRuleNotes?: string[];
+  hardRuleFlags?: Array<{ id: string; message: string }>;
+  roleShapeOutsideLane?: boolean;
   notes: string[];
 };
 

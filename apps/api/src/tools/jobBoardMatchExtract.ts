@@ -10,6 +10,17 @@ export function isBoardMatchChromeLine(line: string): boolean {
   return false;
 }
 
+/** Remove pasted job-board match chrome so it is never fed into scoring prompts. */
+export function stripBoardMatchChromeFromText(rawText: string): string {
+  return rawText
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .filter((line) => !isBoardMatchChromeLine(line))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 /** Best-effort percent from pasted job-board match widgets (not triage score). */
 export function extractBoardMatchPercent(rawText: string): number | null {
   const lines = rawText

@@ -1,4 +1,5 @@
 import { SCORE_CATEGORY_MAXES, STACK_MISMATCH_CAPS } from "../config/scoringPolicy.js";
+import { hardFlagTotalCeiling } from "./scoringClampLayer.js";
 import type { Recommendation, RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
 
 /** Sum of the seven category scores (excludes cap; use for audit). */
@@ -30,6 +31,7 @@ const HARD_GATE_TOTAL_CAPS: Array<{ when: (rules: RuleEvaluation) => boolean; ca
 /** Hard gates that warrant "apply with caveats" wording in the 78–84 band. */
 export const hasHardGateNote = (rules: RuleEvaluation): boolean =>
   Boolean(
+    (rules.hardRuleFlags?.length ?? 0) > 0 ||
     (rules.hardRuleNotes?.length ?? 0) > 0 ||
       rules.visaMismatch ||
       rules.citizenshipMismatch ||
@@ -62,6 +64,8 @@ export const applyHardGateCaps = (score: ScoreBreakdown, rules: RuleEvaluation):
   }
   const sum = sumScoreBreakdown(next);
   const caps = HARD_GATE_TOTAL_CAPS.filter((g) => g.when(rules)).map((g) => g.cap);
+  const flagCeiling = hardFlagTotalCeiling(rules);
+  if (flagCeiling !== null) caps.push(flagCeiling);
   const lowestCap = caps.length ? Math.min(...caps) : 100;
   next.total = Math.min(sum, lowestCap);
   return next;
