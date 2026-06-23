@@ -184,9 +184,17 @@ export function isJobTitleLikeLine(line: string): boolean {
   return JOB_TITLE_LIKE_RE.test(trimmed);
 }
 
+/** Short dotted brands (e.Republic, St. Jude) — not prose despite punctuation. */
+export function isStylizedDottedBrandName(name: string): boolean {
+  const trimmed = name.trim();
+  if (!trimmed || trimmed.length > 32) return false;
+  return /^[A-Za-z0-9]{1,4}\.[A-Za-z][A-Za-z0-9'-]{0,24}$/.test(trimmed);
+}
+
 export function isCompanyProseCandidate(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed) return true;
+  if (isStylizedDottedBrandName(trimmed)) return false;
   if (isJobTitleLikeLine(trimmed)) return true;
   if (isSeniorityOrLevelCompanyCandidate(trimmed)) return true;
   if (isLegalEntityCompanyName(trimmed)) return false;
@@ -228,6 +236,7 @@ export function isBrandLikeCompany(line: string): boolean {
 
   if (
     /^[A-Z][A-Za-z0-9&'.-]*(?:\s+[A-Z][A-Za-z0-9&'.-]*){0,3}$/.test(trimmed) ||
+    isStylizedDottedBrandName(trimmed) ||
     (hasAcceptableCompanyWordCasing(trimmed) &&
       /^[A-Z][A-Za-z0-9&'.-]*/.test(trimmed) &&
       words.length <= 4)
