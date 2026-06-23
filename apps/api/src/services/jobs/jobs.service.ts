@@ -11,6 +11,7 @@ import { getTrackerColor, shouldShortlist } from "../../config/scoringPolicy.js"
 import { buildTrackerSpreadsheetFromJob } from "../../tracker/canonicalSpreadsheet.js";
 import { jobsRepository } from "./jobs.repository.js";
 import { resumeContextService } from "../resume/resumeContext.js";
+import { companyHintFromExtracted, preserveCompanyOnRetriage } from "../../lib/preserveCompanyOnRetriage.js";
 
 export class JobNotFoundError extends Error {
   readonly code = "JOB_NOT_FOUND" as const;
@@ -64,15 +65,16 @@ export class JobsService {
     const url = prev.extracted.url?.trim();
     if (!rawText && !url) throw new JobNoJdSourceError();
 
+    const companyHint = companyHintFromExtracted(prev.extracted);
+
     const fresh = await triageJob({
       url: url || undefined,
       rawText: rawText || undefined,
-      companyHint:
-        prev.extracted.listingCompanyName?.trim() ||
-        prev.extracted.companyDisplayName?.trim() ||
-        prev.extracted.company,
+      companyHint,
       fullPrep: false,
     });
+
+    const extracted = preserveCompanyOnRetriage(prev.extracted, fresh.extracted);
 
     const now = new Date().toISOString();
     const historyEntry = {
@@ -88,7 +90,7 @@ export class JobsService {
 
     const merged: JobRecord = {
       ...prev,
-      extracted: fresh.extracted,
+      extracted,
       rules: fresh.rules,
       score: fresh.score,
       recommendation: fresh.recommendation,

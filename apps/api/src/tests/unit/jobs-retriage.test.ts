@@ -114,19 +114,43 @@ describe("jobsService.runRetriage", () => {
           scoreHistory: [{ scoredAt: "2026-01-01T00:00:00.000Z", score: score62, recommendation: "selective_yes" }],
         }),
       )
-      .mockResolvedValueOnce(triageResult({ id: "ignored" }));
+      .mockResolvedValueOnce(
+        triageResult({
+          id: "ignored",
+          extracted: {
+            company: "Unknown Company",
+            title: "Engineer",
+            companyDisplayName: "Unknown Company",
+            rawText: "Build internal AI tools with Claude Code.",
+            stack: [],
+            requiredSkills: [],
+            preferredSkills: [],
+            domainTags: [],
+            responsibilities: [],
+            requirements: [],
+          },
+        }),
+      );
 
-    const seeded = await jobsService.runTriage({ rawText: "Build internal AI tools with Claude Code." });
+    const seeded = await jobsService.runTriage({
+      rawText: "Build internal AI tools with Claude Code.",
+      companyHint: "Acme",
+    });
     const { job, tracked } = await jobsService.runRetriage(seeded.id);
 
     expect(tracked).toBe(false);
     expect(job.id).toBe("draft-1");
     expect(job.score.total).toBe(85);
+    expect(job.extracted.company).toBe("Acme");
+    expect(job.extracted.companyDisplayName).toBe("Acme");
     expect(job.topMatch).toBe("Fresh match");
     expect(job.generated).toEqual({});
     expect(job.scoreHistory?.length).toBe(2);
     expect(triageJobMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ rawText: "Build internal AI tools with Claude Code." }),
+      expect.objectContaining({
+        rawText: "Build internal AI tools with Claude Code.",
+        companyHint: "Acme",
+      }),
     );
   });
 

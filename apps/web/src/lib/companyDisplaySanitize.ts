@@ -60,6 +60,7 @@ function isJobTitleLikeLine(line: string): boolean {
 export function isProseCompanyName(name: string): boolean {
   const trimmed = name.trim();
   if (!trimmed) return true;
+  if (/^[A-Za-z0-9]{1,4}\.[A-Za-z][A-Za-z0-9'-]{0,24}$/.test(trimmed)) return false;
   if (isJobTitleLikeLine(trimmed)) return true;
   if (isSeniorityLikeCompanyName(trimmed)) return true;
   if (isLegalEntityCompanyName(trimmed)) return false;

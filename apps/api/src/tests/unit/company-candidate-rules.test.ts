@@ -4,6 +4,7 @@ import {
   extractHeaderCompanyBeforeActivity,
   isActivityTimestampLine,
   isHardRejectedCompanyCandidate,
+  isValidCompanyCandidate,
   looksLikeBrandCompanyName,
 } from "../../tools/companyCandidateRules.js";
 
@@ -21,10 +22,16 @@ describe("companyCandidateRules", () => {
     expect(isHardRejectedCompanyCandidate("a very long company name that reads like a sentence")).toBe(true);
   });
 
+  it("accepts stylized dotted brand names like e.Republic", () => {
+    expect(isValidCompanyCandidate("e.Republic")).toBe(true);
+    expect(isHardRejectedCompanyCandidate("e.Republic")).toBe(false);
+  });
+
   it("accepts short brand-like names", () => {
     expect(looksLikeBrandCompanyName("Battelle")).toBe(true);
     expect(looksLikeBrandCompanyName("Acme AI")).toBe(true);
     expect(looksLikeBrandCompanyName("Bank of America")).toBe(true);
+    expect(looksLikeBrandCompanyName("e.Republic")).toBe(true);
   });
 
   it("extracts header company before activity timestamp", () => {
