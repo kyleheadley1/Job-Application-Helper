@@ -43,8 +43,11 @@ export type TopJobsSyncStats = {
   triaged: number;
   stored: number;
   skippedExisting: number;
+  belowMinScore: number;
   source: TopJobSource | "mixed";
   jsearchCreditsUsed: number;
+  jsearchListings: number;
+  jobsbaseListings: number;
 };
 
 export type TopJobsSyncMeta = {
@@ -68,4 +71,6 @@ export type TopJobsSyncStatus = {
   manualRefreshCooldownMin: number;
   canManualRefresh: boolean;
   manualRefreshAvailableAt: string | null;
+  rapidApiKeyConfigured: boolean;
+  openAiKeyConfigured: boolean;
 };

@@ -58,12 +58,17 @@ export const triageJob = async (input: {
   });
   stageMs.extraction = Date.now() - extractionStart;
 
-  const rulesStart = Date.now();
-  const rules = withSanitizedRuleNotes(evaluateRules(extracted, userProfile), extracted, userProfile);
-  stageMs.rules = Date.now() - rulesStart;
   const resumeCtxStart = Date.now();
   const resumeContexts = await resumeContextService.getAvailableContexts();
   stageMs.resumeContext = Date.now() - resumeCtxStart;
+
+  const rulesStart = Date.now();
+  const rules = withSanitizedRuleNotes(
+    evaluateRules(extracted, userProfile, { resumeContexts, activeResumeType: 'SWE' }),
+    extracted,
+    userProfile,
+  );
+  stageMs.rules = Date.now() - rulesStart;
   const scoringStart = Date.now();
   const {
     scoring: scored,

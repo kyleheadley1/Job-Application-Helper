@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { TopJobRecord, TopJobsSyncStatus } from "../types/topJob";
 import { ScoreBadge } from "../components/ScoreBadge";
-import { companyDisplayLabel, formatPostedAgo } from "../lib/jobDisplay";
+import { companyDisplayLabel, formatAvailableIn, formatPostedAgo } from "../lib/jobDisplay";
 import { displayRoleTitle } from "../lib/resultSummary";
 import {
   postedRecencyTooltip,
@@ -64,6 +64,12 @@ export function TopJobsPage() {
 
   const sortedItems = useMemo(() => sortTopJobs(items, sortMode), [items, sortMode]);
 
+  const refreshBlocked =
+    status !== null && !status.canManualRefresh && !syncing;
+  const refreshTitle = refreshBlocked
+    ? `On cooldown — available ${formatAvailableIn(status.manualRefreshAvailableAt)}`
+    : "Fetch and score new listings";
+
   const handleRefresh = async () => {
     setSyncing(true);
     setError(null);
@@ -115,14 +121,43 @@ export function TopJobsPage() {
         <div>
           <h2>Top Jobs</h2>
           <p className="muted">
-            Scored listings ≥78 from discovery sync. Default order: fit × recency (multiplicative — fresh
-            strong matches beat stale perfect fits).
+            Scored listings ≥70 from discovery sync (posted within 2 weeks). Default order: fit ×
+            recency (multiplicative — fresh strong matches beat stale perfect fits).
           </p>
           {status && (
             <p className="muted">
               Last synced: {status.lastSyncAt ? formatPostedAgo(status.lastSyncAt) : "Never"}
               {" · "}
               JSearch credits: {status.jsearchCreditsRemaining}/{status.jsearchMonthlyCap} remaining
+              {status.lastSyncStats && (
+                <>
+                  {" · "}
+                  Last run: {status.lastSyncStats.fetched} fetched → {status.lastSyncStats.preFiltered}{" "}
+                  pre-filtered → {status.lastSyncStats.triaged} triaged → {status.lastSyncStats.stored} stored
+                  {(status.lastSyncStats.belowMinScore ?? 0) > 0 && (
+                    <> · {status.lastSyncStats.belowMinScore} below 70</>
+                  )}
+                  {" · "}
+                  {status.lastSyncStats.source}
+                  {status.lastSyncStats.jsearchListings != null &&
+                    status.lastSyncStats.jobsbaseListings != null && (
+                      <>
+                        {" "}
+                        ({status.lastSyncStats.jsearchListings} jsearch +{" "}
+                        {status.lastSyncStats.jobsbaseListings} jobsbase)
+                      </>
+                    )}
+                </>
+              )}
+            </p>
+          )}
+          {status && !status.rapidApiKeyConfigured && (
+            <p className="error-text">
+              RAPIDAPI_KEY is not set in .env — JSearch discovery is disabled. Add a free key from{" "}
+              <a href="https://rapidapi.com/letscrape-6bRBa3QguO5/api/jsearch" target="_blank" rel="noopener noreferrer">
+                RapidAPI JSearch
+              </a>{" "}
+              and restart the API.
             </p>
           )}
         </div>
@@ -141,16 +176,20 @@ export function TopJobsPage() {
             type="button"
             className="btn"
             onClick={() => void handleRefresh()}
-            disabled={syncing || (status !== null && !status.canManualRefresh)}
+            disabled={syncing || refreshBlocked}
+            title={refreshTitle}
           >
-            {syncing ? "Syncing…" : "Refresh"}
+            {syncing ? "Syncing…" : refreshBlocked ? "On cooldown" : "Refresh"}
           </button>
         </div>
       </div>
 
-      {status && !status.canManualRefresh && status.manualRefreshAvailableAt && (
+      {refreshBlocked && status.manualRefreshAvailableAt && (
         <p className="muted">
-          Manual refresh available {formatPostedAgo(status.manualRefreshAvailableAt).replace(" ago", "")}
+          Manual refresh on cooldown ({status.manualRefreshCooldownMin} min) — available{" "}
+          {formatAvailableIn(status.manualRefreshAvailableAt)}.
+          {" "}
+          For local dev, set <code>TOP_JOBS_MANUAL_REFRESH_COOLDOWN_MIN=1</code> in <code>.env</code> and restart the API.
         </p>
       )}
       {status?.lastSyncError && <p className="error-text">Last sync error: {status.lastSyncError}</p>}

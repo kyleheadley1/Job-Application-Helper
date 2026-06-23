@@ -158,6 +158,8 @@ export class TopJobsRepository {
       manualRefreshCooldownMin: env.topJobsManualRefreshCooldownMin,
       canManualRefresh,
       manualRefreshAvailableAt: canManualRefresh ? null : new Date(cooldownEnds).toISOString(),
+      rapidApiKeyConfigured: Boolean(env.rapidApiKey?.trim()),
+      openAiKeyConfigured: Boolean(env.openAiApiKey?.trim()),
     };
   }
 

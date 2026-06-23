@@ -64,6 +64,36 @@ describe("scoring caps and recommendations", () => {
     expect(capped.stackFit).toBe(highScore().stackFit);
   });
 
+  it("stackMismatch Tier 1 caps stackFit, resumeStoryClarity, and total", () => {
+    const capped = applyHardGateCaps(highScore(), {
+      ...cleanRules(),
+      stackMismatch: true,
+      coreLanguageGap: ["PHP"],
+    });
+    expect(capped.stackFit).toBeLessThanOrEqual(10);
+    expect(capped.resumeStoryClarity).toBeLessThanOrEqual(5);
+    expect(capped.total).toBeLessThanOrEqual(74);
+  });
+
+  it("adjacentFrameworkGap caps stackFit at Tier 2 max without full stackMismatch", () => {
+    const capped = applyHardGateCaps(highScore(), {
+      ...cleanRules(),
+      stackMismatch: false,
+      adjacentFrameworkGap: ["Vue"],
+    });
+    expect(capped.stackFit).toBeLessThanOrEqual(15);
+    expect(capped.stackFit).toBeGreaterThan(10);
+    expect(capped.total).toBe(
+      highScore().levelFit +
+        15 +
+        highScore().domainFit +
+        highScore().resumeStoryClarity +
+        highScore().functionalOverlap +
+        highScore().recruiterFriendliness +
+        highScore().careerValue,
+    );
+  });
+
   it("explicit core language caps stackFit and total", () => {
     const capped = applyHardGateCaps(highScore(), {
       ...cleanRules(),

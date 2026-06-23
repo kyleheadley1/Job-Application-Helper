@@ -58,8 +58,47 @@ const listingToTopJob = (
   resumeRationale: job.resumeRationale,
 });
 
-export const runTopJobsSync = async (options?: { manual?: boolean }): Promise<TopJobsSyncStats> => {
+let syncInProgress = false;
+
+export const runTopJobsSync = async (options?: {
+  manual?: boolean;
+  skipConcurrencyGuard?: boolean;
+}): Promise<TopJobsSyncStats> => {
   const manual = options?.manual ?? false;
+
+  if (!options?.skipConcurrencyGuard && syncInProgress) {
+    logger.info("Top jobs sync skipped — already in progress");
+    const meta = await topJobsRepository.getSyncMeta();
+    return (
+      meta.lastSyncStats ?? {
+        fetched: 0,
+        preFiltered: 0,
+        triaged: 0,
+        stored: 0,
+        skippedExisting: 0,
+        belowMinScore: 0,
+        source: "jobsbase",
+        jsearchCreditsUsed: 0,
+        jsearchListings: 0,
+        jobsbaseListings: 0,
+      }
+    );
+  }
+
+  if (!options?.skipConcurrencyGuard) {
+    syncInProgress = true;
+  }
+
+  try {
+    return await runTopJobsSyncInner(manual);
+  } finally {
+    if (!options?.skipConcurrencyGuard) {
+      syncInProgress = false;
+    }
+  }
+};
+
+const runTopJobsSyncInner = async (manual: boolean): Promise<TopJobsSyncStats> => {
 
   if (manual) {
     const status = await topJobsRepository.getSyncStatus();
@@ -77,8 +116,11 @@ export const runTopJobsSync = async (options?: { manual?: boolean }): Promise<To
     triaged: 0,
     stored: 0,
     skippedExisting: 0,
+    belowMinScore: 0,
     source: "jobsbase",
     jsearchCreditsUsed: 0,
+    jsearchListings: 0,
+    jobsbaseListings: 0,
   };
 
   try {
@@ -87,6 +129,8 @@ export const runTopJobsSync = async (options?: { manual?: boolean }): Promise<To
     });
     stats.jsearchCreditsUsed = fetchResult.jsearchCreditsUsed;
     stats.source = fetchResult.source;
+    stats.jsearchListings = fetchResult.jsearchCount;
+    stats.jobsbaseListings = fetchResult.jobsbaseCount;
 
     const sorted = sortListingsByPostedDesc(dedupeListings(fetchResult.listings));
     stats.fetched = sorted.length;
@@ -139,7 +183,10 @@ export const runTopJobsSync = async (options?: { manual?: boolean }): Promise<To
       triageCount += 1;
       stats.triaged += 1;
 
-      if (rawJob.score.total < env.topJobsMinScore) continue;
+      if (rawJob.score.total < env.topJobsMinScore) {
+        stats.belowMinScore += 1;
+        continue;
+      }
 
       const record = listingToTopJob(listing, rawJob, now);
       record.id = existing?.id ?? topJobsRepository.createId();
@@ -198,7 +245,7 @@ export const promoteTopJobToTracker = async (topJobId: string): Promise<JobRecor
     risks: [],
     generated: {},
     tracker: {
-      priority: topJob.score.total >= 78 ? "high" : "medium",
+      priority: topJob.score.total >= env.topJobsMinScore ? "high" : "medium",
       recommendedAction: "Review from Top Jobs",
       statusOutcome: topJob.recommendation,
       shortlist: topJob.score.total >= 78,

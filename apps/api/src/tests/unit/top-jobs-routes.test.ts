@@ -10,8 +10,11 @@ vi.mock("../../services/topJobs/topJobsSync.js", () => ({
     triaged: 2,
     stored: 1,
     skippedExisting: 0,
-    source: "jobsbase",
-    jsearchCreditsUsed: 0,
+    belowMinScore: 0,
+    source: "mixed",
+    jsearchCreditsUsed: 4,
+    jsearchListings: 8,
+    jobsbaseListings: 5,
   })),
   promoteTopJobToTracker: vi.fn(),
   TopJobsSyncCooldownError: class extends Error {},
@@ -97,6 +100,8 @@ describe("top jobs routes", () => {
       manualRefreshCooldownMin: 60,
       canManualRefresh: true,
       manualRefreshAvailableAt: null,
+      rapidApiKeyConfigured: false,
+      openAiKeyConfigured: true,
     });
 
     const res = await request(app).get("/api/top-jobs/sync/status");

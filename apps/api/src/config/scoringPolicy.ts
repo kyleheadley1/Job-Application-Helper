@@ -11,6 +11,14 @@ export const SCORE_CATEGORY_MAXES = {
   careerValue: 10,
 } as const;
 
+/** Tunable caps for two-tier stack mismatch (applied after normal scoring). */
+export const STACK_MISMATCH_CAPS = {
+  tier1StackFitMax: 10,
+  tier1ResumeStoryClarityMax: 5,
+  tier2StackFitMax: 15,
+  tier1TotalCap: 74,
+} as const;
+
 export const SCORING_CANONICAL_POLICY = `
 CATEGORY MAXES: stackFit 20, levelFit 20, domainFit 10, functionalOverlap 15,
                 resumeStoryClarity 10, recruiterFriendliness 15, careerValue 10

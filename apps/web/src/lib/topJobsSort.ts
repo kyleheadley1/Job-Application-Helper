@@ -9,11 +9,11 @@ export const TOP_JOBS_SORT_LS_KEY = "topJobsSortMode";
  * Minimum app score for Top Jobs storage (see TOP_JOBS_MIN_SCORE).
  * Replaces the generic 0.65 fit gate — nothing below this enters the list.
  */
-export const TOP_JOBS_MIN_STORED_SCORE = 78;
+export const TOP_JOBS_MIN_STORED_SCORE = 70;
 
 /**
  * Normalized fit score (0.0–1.0) from triage total.
- * Top Jobs only stores scores >= 78, so effective range here is 0.78–1.0.
+ * Top Jobs only stores scores >= 70, so effective range here is 0.70–1.0.
  */
 export function fitScore(total: number): number {
   return Math.min(100, Math.max(0, total)) / 100;
@@ -41,7 +41,7 @@ export function recencyMultiplier(postedAt: string, nowMs = Date.now()): number 
 /**
  * Default apply-priority rank: Fit × Recency (multiplicative, not additive).
  *
- * Fit is the gatekeeper at ingest (>= 78). Recency then scales how urgently
+ * Fit is the gatekeeper at ingest (>= 70). Recency then scales how urgently
  * a viable match is worth applying to — a 95-fit job at 6 days scores ~0.095.
  */
 export function priorityRankScore(job: TopJobRecord, nowMs = Date.now()): number {

@@ -322,7 +322,9 @@ export const buildDeterministicGeneratedAssets = (
     avoidClaiming.push("Seniority: posting reads above your level story — don't claim staff-level ownership.");
   }
   if (rules.stackMismatch) {
-    avoidClaiming.push("Stack shape: don't claim deep ownership in the posting's infra/SRE lane if that's not your story.");
+    avoidClaiming.push(
+      "Stack: required core language is outside your claimable stack — do not claim production depth in that language.",
+    );
   }
   if (rules.domainMismatch) {
     avoidClaiming.push("Domain: don't claim specialized domain depth the posting asks for without overlap.");

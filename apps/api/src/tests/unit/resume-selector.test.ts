@@ -130,8 +130,7 @@ describe("resume selection", () => {
       mainRisk: "Scale expectations",
       userProfile,
     });
-    expect(result.recommendedResume).not.toBe("SIE");
-    expect(["EARLY_CAREER", "SWE"]).toContain(result.recommendedResume);
+    expect(result.recommendedResume).toBe("SWE");
   });
 
   it("defaults to SWE (not EARLY_CAREER) for normal 1-4 year backend roles", async () => {
