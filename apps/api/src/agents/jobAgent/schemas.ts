@@ -163,6 +163,18 @@ export const SurvivabilityDisplayRowSchema = z.object({
   contribution: z.number(),
   lever: z.enum(["referral", "resume", "cover_letter", "none"]),
   leverLabel: z.string(),
+  bindingness: z.enum(["binding", "material", "cosmetic", "structural"]),
+  penaltyName: z.string(),
+});
+
+export const StrategicLeverSelectionSchema = z.object({
+  key: z.string(),
+  lever: z.enum(["referral", "resume", "cover_letter", "none"]),
+  leverLabel: z.string(),
+  penaltyName: z.string(),
+  bindingness: z.enum(["binding", "material", "cosmetic", "structural"]),
+  strategicValue: z.number(),
+  isCollapsedReferral: z.boolean(),
 });
 
 export const ScoreDisplaySchema = z.object({
@@ -179,6 +191,7 @@ export const ScoreDisplaySchema = z.object({
       leverLabel: z.string(),
     }),
   ),
+  dominantLever: StrategicLeverSelectionSchema.optional(),
   actionLine: z.string(),
 });
 

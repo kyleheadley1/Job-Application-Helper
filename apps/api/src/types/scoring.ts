@@ -27,6 +27,8 @@ export type LegacyScoreDimension =
 
 export type SurvivabilityLever = "referral" | "resume" | "cover_letter" | "none";
 
+export type BindingnessTier = "binding" | "material" | "cosmetic" | "structural";
+
 export type CapabilityBreakdown = {
   stackFit: number;
   levelFit: number;
@@ -41,12 +43,24 @@ export type SurvivabilityDisplayRow = {
   contribution: number;
   lever: SurvivabilityLever;
   leverLabel: string;
+  bindingness: BindingnessTier;
+  penaltyName: string;
 };
 
 export type SurvivabilityPenalty = {
   message: string;
   lever: SurvivabilityLever;
   leverLabel: string;
+};
+
+export type StrategicLeverSelection = {
+  key: string;
+  lever: SurvivabilityLever;
+  leverLabel: string;
+  penaltyName: string;
+  bindingness: BindingnessTier;
+  strategicValue: number;
+  isCollapsedReferral: boolean;
 };
 
 export type ScoreDisplay = {
@@ -57,6 +71,7 @@ export type ScoreDisplay = {
   survivabilityRows: SurvivabilityDisplayRow[];
   hardGates: string[];
   survivabilityPenalties: SurvivabilityPenalty[];
+  dominantLever?: StrategicLeverSelection;
   actionLine: string;
 };
 

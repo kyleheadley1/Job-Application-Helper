@@ -1,6 +1,9 @@
 import {
   CAPABILITY_MAXES,
   LEGACY_CAPABILITY_SOURCE_MAXES,
+  resolveSubFactorBindingness,
+  resolveSubFactorPenaltyName,
+  SURVIVABILITY_SUB_FACTOR_META,
   SURVIVABILITY_TUNING,
   SURVIVABILITY_WEIGHTS,
   type SurvivabilitySubFactorKey,
@@ -13,16 +16,22 @@ import type {
   RuleEvaluation,
   ScoreBreakdown,
   ScoreDisplay,
+  StrategicLeverSelection,
   SurvivabilityDisplayRow,
   SurvivabilityLever,
   SurvivabilityPenalty,
 } from "../types/scoring.js";
 import { evaluateHardGates } from "./hardGates.js";
+import {
+  isStructuralOnly,
+  selectDominantLever,
+} from "./strategicLever.js";
 import type { SurvivabilityBreakdown } from "./survivabilityScore.js";
 
 export type {
   CapabilityBreakdown,
   ScoreDisplay,
+  StrategicLeverSelection,
   SurvivabilityDisplayRow,
   SurvivabilityLever,
   SurvivabilityPenalty,
@@ -68,50 +77,15 @@ export const assertCapabilityBreakdownMatchesHeadline = (
   }
 };
 
-const SUB_FACTOR_META: Record<
-  SurvivabilitySubFactorKey,
-  { label: string; lever: SurvivabilityLever; leverLabel: string }
-> = {
-  employerRecognizability: {
-    label: "Employer recognizability",
-    lever: "referral",
-    leverLabel: "resume framing / referral",
-  },
-  credentialSignal: {
-    label: "Credential signal",
-    lever: "referral",
-    leverLabel: "REFERRAL routes around this",
-  },
-  impactMetricQuality: {
-    label: "Impact metric quality",
-    lever: "resume",
-    leverLabel: "stronger metrics on resume",
-  },
-  resumeStoryCoherence: {
-    label: "Resume story coherence",
-    lever: "resume",
-    leverLabel: "resume framing",
-  },
-  domainMatchForListing: {
-    label: "Domain match (this listing)",
-    lever: "cover_letter",
-    leverLabel: "tailored resume / cover letter",
-  },
-  poolFriendliness: {
-    label: "Pool friendliness",
-    lever: "none",
-    leverLabel: "NONE — structural, can't fix",
-  },
-};
-
 export const buildSurvivabilityRows = (
   breakdown: SurvivabilityBreakdown,
+  rules: RuleEvaluation,
 ): SurvivabilityDisplayRow[] => {
   const rows = (Object.keys(SURVIVABILITY_WEIGHTS) as SurvivabilitySubFactorKey[]).map(
     (key) => {
       const score = breakdown[key];
       const weight = SURVIVABILITY_WEIGHTS[key];
-      const meta = SUB_FACTOR_META[key];
+      const meta = SURVIVABILITY_SUB_FACTOR_META[key];
       return {
         key: key as string,
         label: meta.label,
@@ -120,6 +94,8 @@ export const buildSurvivabilityRows = (
         contribution: score * weight,
         lever: meta.lever,
         leverLabel: meta.leverLabel,
+        bindingness: resolveSubFactorBindingness(key, rules),
+        penaltyName: resolveSubFactorPenaltyName(key, rules),
       };
     },
   );
@@ -229,55 +205,83 @@ const pathwaySource = (notes?: string): string => {
   return first;
 };
 
-const dominantNonStructuralRow = (
-  rows: SurvivabilityDisplayRow[],
-): SurvivabilityDisplayRow | undefined =>
-  rows.filter((row) => row.lever !== "none").sort((a, b) => a.score - b.score)[0];
-
-const lowestStructuralRow = (
-  rows: SurvivabilityDisplayRow[],
-): SurvivabilityDisplayRow | undefined =>
-  rows.filter((row) => row.lever === "none").sort((a, b) => a.score - b.score)[0];
+const structuralReason = (rows: SurvivabilityDisplayRow[]): string => {
+  const structural = rows.filter((row) => row.bindingness === "structural");
+  if (structural.length) {
+    return structural.sort((a, b) => a.score - b.score)[0]!.label.toLowerCase();
+  }
+  return "competitive applicant pool";
+};
 
 export const deriveActionLine = (params: {
   recommendation: Recommendation;
   survivabilityRows: SurvivabilityDisplayRow[];
+  rules: RuleEvaluation;
   referralPathwayAvailable?: boolean;
   referralPathwayNotes?: string;
   hardGates?: string[];
+  dominantLever?: StrategicLeverSelection;
 }): string => {
-  const { recommendation, survivabilityRows, referralPathwayAvailable, referralPathwayNotes } =
-    params;
-  const dominant = dominantNonStructuralRow(survivabilityRows);
+  const {
+    recommendation,
+    survivabilityRows,
+    referralPathwayAvailable,
+    referralPathwayNotes,
+  } = params;
+
+  const dominant =
+    params.dominantLever ??
+    selectDominantLever(survivabilityRows, params.rules, referralPathwayAvailable);
 
   if (recommendation === "no") {
     const reason = params.hardGates?.[0] ?? "hard gate fired";
     return `Do not apply — ${reason.charAt(0).toLowerCase()}${reason.slice(1)}`;
   }
 
-  if (recommendation === "referral_gated" && referralPathwayAvailable) {
-    const source = pathwaySource(referralPathwayNotes);
-    const penalty = dominant?.label.toLowerCase() ?? "credential signal";
-    return `Use the ${source} connection — a referral routes around the ${penalty}.`;
-  }
-
-  if (recommendation === "referral_gated" || recommendation === "selective_yes") {
-    const lever = dominant?.leverLabel ?? "resume framing";
-    return `Worth a tailored application; cold odds are low. Best lever: ${lever}.`;
-  }
-
   if (recommendation === "apply_cold" || recommendation === "yes") {
     return "Strong odds — apply directly.";
   }
 
-  if (recommendation === "stretch_signal") {
-    const lever = dominant?.leverLabel ?? "resume framing";
-    return `Stretch fit — signal may carry you. Best lever: ${lever}.`;
+  if (isStructuralOnly(survivabilityRows, Boolean(referralPathwayAvailable))) {
+    const reason = structuralReason(survivabilityRows);
+    if (recommendation === "skip") {
+      return `Weak fit and weak odds — odds are structural — ${reason}; effort won't move them much.`;
+    }
+    return `Odds are structural — ${reason}; effort won't move them much.`;
+  }
+
+  if (
+    recommendation === "referral_gated" &&
+    referralPathwayAvailable &&
+    dominant?.lever === "referral"
+  ) {
+    const source = pathwaySource(referralPathwayNotes);
+    return `Use the ${source} connection — a referral routes around the ${dominant.penaltyName}.`;
+  }
+
+  if (
+    recommendation === "referral_gated" ||
+    recommendation === "selective_yes" ||
+    recommendation === "stretch_signal"
+  ) {
+    const prefix =
+      recommendation === "stretch_signal"
+        ? "Stretch fit — signal may carry you."
+        : "Worth a tailored application; cold odds are low.";
+    if (!dominant) {
+      return prefix;
+    }
+    const leverName =
+      dominant.lever === "cover_letter"
+        ? "tailored cover letter"
+        : dominant.lever === "resume"
+          ? "resume polish"
+          : dominant.leverLabel.toLowerCase();
+    return `${prefix} Best lever: ${leverName} to address ${dominant.penaltyName}.`;
   }
 
   if (recommendation === "skip") {
-    const structural = lowestStructuralRow(survivabilityRows);
-    const reason = structural?.label.toLowerCase() ?? "structural mismatch";
+    const reason = dominant?.penaltyName ?? structuralReason(survivabilityRows);
     return `Weak fit and weak odds — ${reason}.`;
   }
 
@@ -312,16 +316,24 @@ export const buildScoreDisplay = (params: {
 
   let survivabilityRows: SurvivabilityDisplayRow[] = [];
   if (breakdown && typeof breakdown.weightedAverage === "number") {
-    survivabilityRows = buildSurvivabilityRows(breakdown);
+    survivabilityRows = buildSurvivabilityRows(breakdown, params.rules);
     assertSurvivabilityRowsMatchMultiplier(breakdown, survivabilityRows);
   }
+
+  const dominantLever = selectDominantLever(
+    survivabilityRows,
+    params.rules,
+    params.referralPathwayAvailable,
+  );
 
   const actionLine = deriveActionLine({
     recommendation: params.recommendation,
     survivabilityRows,
+    rules: params.rules,
     referralPathwayAvailable: params.referralPathwayAvailable,
     referralPathwayNotes: params.referralPathwayNotes,
     hardGates,
+    dominantLever,
   });
 
   return {
@@ -332,6 +344,9 @@ export const buildScoreDisplay = (params: {
     survivabilityRows,
     hardGates,
     survivabilityPenalties,
+    dominantLever,
     actionLine,
   };
 };
+
+export { selectDominantLever, computeStrategicValue } from "./strategicLever.js";

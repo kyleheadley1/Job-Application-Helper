@@ -12,6 +12,7 @@ import {
 } from "../../lib/disjunctiveLanguageRequirement.js";
 import { detectReferralPathway } from "../../lib/referralPathway.js";
 import { applyScoringClampLayer } from "../../lib/scoringClampLayer.js";
+import { buildScoreDisplay } from "../../lib/scoreDisplayModel.js";
 import type { ExtractedJobData } from "../../types/job.js";
 import type { ResumeContextSet } from "../../types/resumeContext.js";
 import type { ScoreBreakdown } from "../../types/scoring.js";
@@ -149,5 +150,61 @@ describe("Aledade calibration anchor", () => {
     expect(composite.score.total).toBe(scoreWithoutPathway.score.total);
     expect(composite.score.capability).toBe(scoreWithoutPathway.score.capability);
     expect(composite.score.survivability).toBe(scoreWithoutPathway.score.survivability);
+
+    const display = buildScoreDisplay({
+      score: composite.score,
+      rules: clamped.rules,
+      extracted: ALEDADE_JOB,
+      recommendation: composite.recommendation,
+      referralPathwayAvailable: pathway.referralPathwayAvailable,
+      referralPathwayNotes: pathway.referralPathwayNotes,
+    });
+
+    expect(display?.dominantLever?.lever).toBe("referral");
+    expect(display?.dominantLever?.penaltyName).toBe("degree requirement");
+    expect(display?.dominantLever?.isCollapsedReferral).toBe(true);
+    expect(display?.actionLine).toMatch(/Codesmith/i);
+    expect(display?.actionLine).toMatch(/degree requirement/i);
+    expect(display?.actionLine).not.toMatch(/impact metric quality/i);
+
+    const jitteredLines = [0.28, 0.32, 0.35].map((impactMetricQuality) => {
+      const jitteredBreakdown = {
+        ...composite.score.survivabilityBreakdown!,
+        impactMetricQuality,
+      };
+      let weightedAverage = 0;
+      for (const [key, weight] of Object.entries({
+          employerRecognizability: 0.22,
+          credentialSignal: 0.15,
+          impactMetricQuality: 0.18,
+          resumeStoryCoherence: 0.15,
+          domainMatchForListing: 0.15,
+          poolFriendliness: 0.15,
+        })) {
+        weightedAverage +=
+          (jitteredBreakdown as Record<string, number>)[key]! * weight;
+      }
+      const jitteredScore = {
+        ...composite.score,
+        survivabilityBreakdown: {
+          ...jitteredBreakdown,
+          weightedAverage,
+          multiplier: Math.min(1, Math.max(0.3, weightedAverage)),
+        },
+      };
+      return buildScoreDisplay({
+        score: jitteredScore,
+        rules: clamped.rules,
+        extracted: ALEDADE_JOB,
+        recommendation: composite.recommendation,
+        referralPathwayAvailable: pathway.referralPathwayAvailable,
+        referralPathwayNotes: pathway.referralPathwayNotes,
+      });
+    });
+
+    for (const jittered of jitteredLines) {
+      expect(jittered?.dominantLever?.penaltyName).toBe("degree requirement");
+      expect(jittered?.actionLine).toMatch(/degree requirement/i);
+    }
   });
 });
