@@ -6,6 +6,7 @@ import {
 } from '../../config/scoringPolicy.js';
 import type { JobRecord } from '../../types/job.js';
 import { buildTrackerSpreadsheetFromJob } from '../../tracker/canonicalSpreadsheet.js';
+import { detectReferralPathway } from '../../lib/referralPathway.js';
 import { evaluateRules } from './rules.js';
 import { scoreJob } from './scoring.js';
 import { computeSalaryAsk } from './salaryAsk.js';
@@ -96,6 +97,12 @@ export const triageJob = async (input: {
   });
   stageMs.resumeSelection = Date.now() - resumeSelStart;
 
+  const referralPathway = detectReferralPathway({
+    profile: userProfile,
+    extracted,
+    resumeText: resumeContexts?.SWE?.rawText,
+  });
+
   const now = new Date().toISOString();
   const initialRecord: JobRecord = {
     id: randomUUID(),
@@ -103,6 +110,8 @@ export const triageJob = async (input: {
     rules: scoredRules,
     score: scored.score,
     recommendation: scored.recommendation,
+    referralPathwayAvailable: referralPathway.referralPathwayAvailable,
+    referralPathwayNotes: referralPathway.referralPathwayNotes,
     salaryAsk,
     recommendedResume: resumeSelection.recommendedResume,
     resumeRationale: resumeSelection.rationale,

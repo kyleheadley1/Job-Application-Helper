@@ -123,6 +123,9 @@ export type RuleEvaluation = {
   hardRuleFlags?: HardRuleFlag[];
   /** Infra/platform or ML-research role shape outside product SWE lane (Rule 2). */
   roleShapeOutsideLane?: boolean;
+  /** JD accepts any of a listed language set; candidate matches ≥1 — no core-language gate. */
+  disjunctiveLanguageRequirementSatisfied?: boolean;
+  disjunctiveAcceptedLanguages?: string[];
   notes: string[];
   penaltyVector?: Record<string, number>;
 };

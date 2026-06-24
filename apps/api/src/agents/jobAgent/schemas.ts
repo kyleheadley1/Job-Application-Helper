@@ -143,6 +143,8 @@ export const RuleEvaluationSchema = z.object({
     .optional()
     .default([]),
   roleShapeOutsideLane: z.boolean().optional().default(false),
+  disjunctiveLanguageRequirementSatisfied: z.boolean().optional().default(false),
+  disjunctiveAcceptedLanguages: z.array(z.string()).optional().default([]),
   notes: z.array(z.string()).default([]),
   penaltyVector: z.record(z.string(), z.number()).optional(),
 });
@@ -279,6 +281,8 @@ export const JobRecordSchema = z.object({
   mainRisk: z.string(),
   rationale: z.array(z.string()).default([]),
   risks: z.array(z.string()).default([]),
+  referralPathwayAvailable: z.boolean().optional().default(false),
+  referralPathwayNotes: z.string().optional().default(""),
   generated: GeneratedAssetsSchema.default({}),
   debugExtraction: TriageDebugExtractionSchema.optional(),
   debugAssetGeneration: DebugAssetGenerationSchema.optional(),

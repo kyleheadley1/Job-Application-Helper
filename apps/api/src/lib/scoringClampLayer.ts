@@ -2,6 +2,7 @@ import { SCORING_CLAMP_POLICY } from "../config/scoringClampPolicy.js";
 import { STACK_MISMATCH_CAPS } from "../config/scoringPolicy.js";
 import type { ExtractedJobData } from "../types/job.js";
 import type { HardRuleFlag, RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
+import { filterOutOfLaneAfterDisjunctiveMatch } from "./disjunctiveLanguageRequirement.js";
 import { normalizeText } from "./text.js";
 
 const jobBlob = (job: ExtractedJobData): string =>
@@ -53,10 +54,11 @@ const OUT_OF_LANE_CORE_LANG: Array<{ re: RegExp; label: string }> = [
 
 const hasCoreLanguageClamp = (rules: RuleEvaluation): boolean =>
   Boolean(
-    rules.stackMismatch ||
-      rules.explicitCoreLanguageMismatch ||
-      (rules.coreLanguageGap?.length ?? 0) > 0 ||
-      rules.hardRuleFlags?.some((f) => f.id === "coreLanguageMismatch"),
+    !rules.disjunctiveLanguageRequirementSatisfied &&
+      (rules.stackMismatch ||
+        rules.explicitCoreLanguageMismatch ||
+        (rules.coreLanguageGap?.length ?? 0) > 0 ||
+        rules.hardRuleFlags?.some((f) => f.id === "coreLanguageMismatch")),
   );
 
 export const detectRoleShapeOutsideLane = (job: ExtractedJobData): boolean => {
@@ -64,11 +66,17 @@ export const detectRoleShapeOutsideLane = (job: ExtractedJobData): boolean => {
   return INFRA_PLATFORM_SHAPE_RE.test(blob) || ML_RESEARCH_SHAPE_RE.test(blob);
 };
 
-export const detectOutOfLaneCoreLanguage = (job: ExtractedJobData): string[] => {
+export const detectOutOfLaneCoreLanguage = (job: ExtractedJobData, rules?: RuleEvaluation): string[] => {
   const blob = jobBlob(job);
   const found: string[] = [];
   for (const { re, label } of OUT_OF_LANE_CORE_LANG) {
     if (re.test(blob) && !found.includes(label)) found.push(label);
+  }
+  if (rules?.disjunctiveLanguageRequirementSatisfied) {
+    return filterOutOfLaneAfterDisjunctiveMatch(found, {
+      satisfied: true,
+      acceptedLabels: rules.disjunctiveAcceptedLanguages ?? [],
+    });
   }
   return found;
 };
@@ -140,14 +148,15 @@ export const buildHardRuleFlags = (
 
   const outOfLane = [
     ...(rules.coreLanguageGap ?? []),
-    ...detectOutOfLaneCoreLanguage(job).filter(
+    ...detectOutOfLaneCoreLanguage(job, rules).filter(
       (l) => !(rules.coreLanguageGap ?? []).includes(l),
     ),
   ];
   const coreLanguageMismatch =
-    rules.stackMismatch ||
-    rules.explicitCoreLanguageMismatch ||
-    outOfLane.length > 0;
+    !rules.disjunctiveLanguageRequirementSatisfied &&
+    (rules.stackMismatch ||
+      rules.explicitCoreLanguageMismatch ||
+      outOfLane.length > 0);
 
   if (coreLanguageMismatch) {
     const langs = [...new Set(outOfLane.length ? outOfLane : rules.coreLanguageGap ?? ["core backend language"])];

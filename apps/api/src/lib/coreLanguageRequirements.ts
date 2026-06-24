@@ -1,5 +1,7 @@
 import type { ExtractedJobData } from "../types/job.js";
 import type { UserProfile } from "../types/userProfile.js";
+import type { ClaimableStack } from "./claimableStack.js";
+import { evaluateDisjunctiveLanguageRequirement } from "./disjunctiveLanguageRequirement.js";
 import { normalizeText } from "./text.js";
 
 export type CoreLanguageId = "java" | "go" | "python";
@@ -119,9 +121,21 @@ function matchesExplicitSet(blob: string, patterns: RegExp[]): boolean {
 export function analyzeCoreLanguageRequirement(
   job: ExtractedJobData,
   profile: UserProfile,
+  claimable?: ClaimableStack,
 ): CoreLanguageAnalysis {
   const blob = blobForLanguageScan(job);
   const profileBlob = profileLanguageBlob(profile);
+
+  if (claimable) {
+    const disjunctive = evaluateDisjunctiveLanguageRequirement(job, claimable);
+    if (disjunctive.satisfied) {
+      return {
+        language: null,
+        explicitHardRequirement: false,
+        candidateHasProductionLanguage: true,
+      };
+    }
+  }
 
   let language: CoreLanguageId | null = null;
   let explicit = false;

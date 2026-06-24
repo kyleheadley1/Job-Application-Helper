@@ -234,6 +234,14 @@ export const JobResultPage = () => {
         <article className="card">
           <h3>Decision</h3>
           <p>Apply: {job.recommendation}</p>
+          {job.referralPathwayAvailable ? (
+            <p className="pill neutral" title={job.referralPathwayNotes ?? undefined}>
+              Referral pathway available
+            </p>
+          ) : null}
+          {job.referralPathwayNotes ? (
+            <p className="muted">{job.referralPathwayNotes}</p>
+          ) : null}
           {job.score.recommendationLabel ? (
             <p className="muted">{job.score.recommendationLabel}</p>
           ) : null}

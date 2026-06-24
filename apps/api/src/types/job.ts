@@ -128,6 +128,9 @@ export type JobRecord = {
   mainRisk: string;
   rationale: string[];
   risks: string[];
+  /** Display-only — not used in score math. */
+  referralPathwayAvailable?: boolean;
+  referralPathwayNotes?: string;
   generated: GeneratedAssets;
   debugExtraction?: TriageDebugExtraction;
   debugAssetGeneration?: DebugAssetGeneration;
