@@ -73,10 +73,10 @@ describe("scoreDisplayModel", () => {
   });
 
   it("survivability rows reproduce survivability multiplier within rounding", () => {
-    const { composite } = compositeFixture();
+    const { composite, rules } = compositeFixture();
     const breakdown = composite.score.survivabilityBreakdown;
     expect(breakdown).toBeDefined();
-    const rows = buildSurvivabilityRows(breakdown!);
+    const rows = buildSurvivabilityRows(breakdown!, rules);
     expect(rows[0]!.score).toBeLessThanOrEqual(rows[rows.length - 1]!.score);
     assertSurvivabilityRowsMatchMultiplier(breakdown!, rows);
   });

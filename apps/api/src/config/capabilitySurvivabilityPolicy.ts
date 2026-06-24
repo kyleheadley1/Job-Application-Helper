@@ -34,7 +34,127 @@ export const SURVIVABILITY_WEIGHTS = {
 
 export type SurvivabilitySubFactorKey = keyof typeof SURVIVABILITY_WEIGHTS;
 
+/** How decisively a sub-factor causes first-pass rejection (stable, not score-derived). */
+export type BindingnessTier = "binding" | "material" | "cosmetic" | "structural";
+
+export const BINDINGNESS_TIER_WEIGHT: Record<BindingnessTier, number> = {
+  binding: 3,
+  material: 2,
+  cosmetic: 1,
+  structural: 0,
+};
+
+export const BINDINGNESS_TIER_RANK: Record<BindingnessTier, number> = {
+  binding: 3,
+  material: 2,
+  cosmetic: 1,
+  structural: 0,
+};
+
+export const LEVER_TYPE_RANK: Record<"referral" | "cover_letter" | "resume" | "none", number> = {
+  referral: 3,
+  cover_letter: 2,
+  resume: 1,
+  none: 0,
+};
+
+/** Target sub-factor score for headroom calculation. */
+export const SURVIVABILITY_TARGET_NEUTRAL = 0.7;
+
+/** Strategic-value ties within this band use tier → priority → lever type. */
+export const STRATEGIC_VALUE_EPSILON = 0.05;
+
+/** Stable tiebreak order — never use raw sub-scores. */
+export const SURVIVABILITY_SUB_FACTOR_PRIORITY: SurvivabilitySubFactorKey[] = [
+  "credentialSignal",
+  "employerRecognizability",
+  "domainMatchForListing",
+  "impactMetricQuality",
+  "resumeStoryCoherence",
+  "poolFriendliness",
+];
+
+export type SurvivabilitySubFactorMeta = {
+  label: string;
+  lever: "referral" | "resume" | "cover_letter" | "none";
+  leverLabel: string;
+  baseBindingness: BindingnessTier;
+};
+
+/** Static metadata per sub-factor — bindingness may be adjusted at runtime for context. */
+export const SURVIVABILITY_SUB_FACTOR_META: Record<
+  SurvivabilitySubFactorKey,
+  SurvivabilitySubFactorMeta
+> = {
+  employerRecognizability: {
+    label: "Employer recognizability",
+    lever: "referral",
+    leverLabel: "resume framing / referral",
+    baseBindingness: "material",
+  },
+  credentialSignal: {
+    label: "Credential signal",
+    lever: "referral",
+    leverLabel: "REFERRAL routes around this",
+    baseBindingness: "binding",
+  },
+  impactMetricQuality: {
+    label: "Impact metric quality",
+    lever: "resume",
+    leverLabel: "stronger metrics on resume",
+    baseBindingness: "cosmetic",
+  },
+  resumeStoryCoherence: {
+    label: "Resume story coherence",
+    lever: "resume",
+    leverLabel: "resume framing",
+    baseBindingness: "cosmetic",
+  },
+  domainMatchForListing: {
+    label: "Domain match (this listing)",
+    lever: "cover_letter",
+    leverLabel: "tailored resume / cover letter",
+    baseBindingness: "material",
+  },
+  poolFriendliness: {
+    label: "Pool friendliness",
+    lever: "none",
+    leverLabel: "NONE — structural, can't fix",
+    baseBindingness: "structural",
+  },
+};
+
 import type { Recommendation } from "../types/scoring.js";
+import type { RuleEvaluation } from "../types/scoring.js";
+
+/** Credential-dense pools treat employer recognizability as binding. */
+export const isCredentialDensePool = (rules: RuleEvaluation): boolean =>
+  Boolean(
+    rules.productionBarCompetitivePool ||
+      rules.matureStructuredEmployer ||
+      rules.explicitDegreeRisk,
+  );
+
+export const resolveSubFactorBindingness = (
+  key: SurvivabilitySubFactorKey,
+  rules: RuleEvaluation,
+): BindingnessTier => {
+  const meta = SURVIVABILITY_SUB_FACTOR_META[key];
+  if (key === "employerRecognizability" && isCredentialDensePool(rules)) {
+    return "binding";
+  }
+  return meta.baseBindingness;
+};
+
+export const resolveSubFactorPenaltyName = (
+  key: SurvivabilitySubFactorKey,
+  rules: RuleEvaluation,
+): string => {
+  if (key === "credentialSignal" && rules.explicitDegreeRisk) {
+    return "degree requirement";
+  }
+  return SURVIVABILITY_SUB_FACTOR_META[key].label.toLowerCase();
+};
 
 export const RECOMMENDATION_LABELS: Record<Recommendation, string> = {
   apply_cold: "Strong fit, good screen odds",
