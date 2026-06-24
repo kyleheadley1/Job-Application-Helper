@@ -25,8 +25,10 @@ const clampCategory = (score: ScoreBreakdown): ScoreBreakdown => ({
   careerValue: Math.min(SCORE_CATEGORY_MAXES.careerValue, Math.max(0, score.careerValue)),
   total: score.total,
   capability: score.capability,
+  capabilityBreakdown: score.capabilityBreakdown,
   survivability: score.survivability,
   survivabilityBreakdown: score.survivabilityBreakdown,
+  scoreDisplay: score.scoreDisplay,
   recommendationLabel: score.recommendationLabel,
 });
 

@@ -149,6 +149,39 @@ export const RuleEvaluationSchema = z.object({
   penaltyVector: z.record(z.string(), z.number()).optional(),
 });
 
+export const CapabilityBreakdownSchema = z.object({
+  stackFit: z.number(),
+  levelFit: z.number(),
+  functionalOverlap: z.number(),
+});
+
+export const SurvivabilityDisplayRowSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  score: z.number(),
+  weight: z.number(),
+  contribution: z.number(),
+  lever: z.enum(["referral", "resume", "cover_letter", "none"]),
+  leverLabel: z.string(),
+});
+
+export const ScoreDisplaySchema = z.object({
+  capability: z.number(),
+  capabilityBreakdown: CapabilityBreakdownSchema,
+  survivability: z.number(),
+  final: z.number(),
+  survivabilityRows: z.array(SurvivabilityDisplayRowSchema),
+  hardGates: z.array(z.string()),
+  survivabilityPenalties: z.array(
+    z.object({
+      message: z.string(),
+      lever: z.enum(["referral", "resume", "cover_letter", "none"]),
+      leverLabel: z.string(),
+    }),
+  ),
+  actionLine: z.string(),
+});
+
 export const ScoreBreakdownSchema = z
   .object({
     stackFit: z.number().min(0).max(SCORE_CATEGORY_MAXES.stackFit),
@@ -159,8 +192,10 @@ export const ScoreBreakdownSchema = z
     recruiterFriendliness: z.number().min(0).max(SCORE_CATEGORY_MAXES.recruiterFriendliness),
     careerValue: z.number().min(0).max(SCORE_CATEGORY_MAXES.careerValue),
     capability: z.number().min(0).max(100).optional(),
+    capabilityBreakdown: CapabilityBreakdownSchema.optional(),
     survivability: z.number().min(0).max(1).optional(),
     survivabilityBreakdown: z.record(z.string(), z.number()).optional(),
+    scoreDisplay: ScoreDisplaySchema.optional(),
     recommendationLabel: z.string().optional(),
     total: z.number().min(0).max(100),
   })

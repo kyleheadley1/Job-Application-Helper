@@ -648,3 +648,84 @@ tbody .tracker-sticky-left {
   border: 1px solid #30363d;
   border-radius: 8px;
 }
+
+.decisionRecommendation {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.actionLine {
+  font-size: 0.95rem;
+  line-height: 1.45;
+  margin: 0.35rem 0 0.75rem;
+  color: #e6edf3;
+}
+
+.scoreSection {
+  margin-top: 1rem;
+}
+
+.scoreSection h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.scoreDecomp {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.scoreDecomp li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  align-items: baseline;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid #21262d;
+}
+
+.scoreFactor {
+  flex: 1 1 12rem;
+  min-width: 10rem;
+}
+
+.scoreValue {
+  font-variant-numeric: tabular-nums;
+  color: #7ee787;
+}
+
+.scoreFinal {
+  margin-top: 1rem;
+  font-weight: 600;
+}
+
+.scoreLever {
+  font-size: 0.78rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.scoreLever.referral {
+  background: #1f3d2a;
+  color: #7ee787;
+}
+
+.scoreLever.resume {
+  background: #1a2a3d;
+  color: #79c0ff;
+}
+
+.scoreLever.cover_letter {
+  background: #2d2a1f;
+  color: #f2cc60;
+}
+
+.scoreLever.structural {
+  background: #3d1f1f;
+  color: #ffa198;
+  border: 1px dashed #6e3030;
+}

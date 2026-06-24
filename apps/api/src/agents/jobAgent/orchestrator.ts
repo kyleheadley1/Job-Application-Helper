@@ -7,6 +7,7 @@ import {
 import type { JobRecord } from '../../types/job.js';
 import { buildTrackerSpreadsheetFromJob } from '../../tracker/canonicalSpreadsheet.js';
 import { detectReferralPathway } from '../../lib/referralPathway.js';
+import { buildScoreDisplay } from '../../lib/scoreDisplayModel.js';
 import { evaluateRules } from './rules.js';
 import { scoreJob } from './scoring.js';
 import { computeSalaryAsk } from './salaryAsk.js';
@@ -103,12 +104,25 @@ export const triageJob = async (input: {
     resumeText: resumeContexts?.SWE?.rawText,
   });
 
+  const scoreDisplay = buildScoreDisplay({
+    score: scored.score,
+    rules: scoredRules,
+    extracted,
+    recommendation: scored.recommendation,
+    referralPathwayAvailable: referralPathway.referralPathwayAvailable,
+    referralPathwayNotes: referralPathway.referralPathwayNotes,
+  });
+
+  const scoreWithDisplay = scoreDisplay
+    ? { ...scored.score, scoreDisplay }
+    : scored.score;
+
   const now = new Date().toISOString();
   const initialRecord: JobRecord = {
     id: randomUUID(),
     extracted,
     rules: scoredRules,
-    score: scored.score,
+    score: scoreWithDisplay,
     recommendation: scored.recommendation,
     referralPathwayAvailable: referralPathway.referralPathwayAvailable,
     referralPathwayNotes: referralPathway.referralPathwayNotes,
