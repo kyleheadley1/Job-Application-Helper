@@ -14,14 +14,9 @@ import { preprocessScoringInput } from '../../tools/triageStructuredNormalize.js
 import { responsesClient } from '../../services/llm/responsesClient.js';
 import type { StructuredCallDiagnostics } from '../../services/llm/responsesClient.js';
 import { polishScoringNarrative } from '../../lib/scoringOutputPolish.js';
-import {
-  applyHardGateCaps,
-  finalizeScore,
-  mapRecommendationFromScore,
-  resolveRecommendation,
-  sumScoreBreakdown,
-} from '../../lib/scoringCaps.js';
 import { applyScoringClampLayer } from '../../lib/scoringClampLayer.js';
+import { computeCompositeScore } from '../../lib/compositeScoreModel.js';
+import { userProfile as defaultUserProfile } from '../../config/userProfile.js';
 
 const categorySchema = z.object({
   stackFit: z.number().min(0).max(SCORE_CATEGORY_MAXES.stackFit),
@@ -36,14 +31,16 @@ const categorySchema = z.object({
 
 const ScoringOutputSchema = z.object({
   score: categorySchema,
-  recommendation: z.enum(['yes', 'selective_yes', 'no']),
+  recommendation: z
+    .enum(['apply_cold', 'referral_gated', 'stretch_signal', 'skip', 'no', 'yes', 'selective_yes'])
+    .optional(),
   topMatch: z.string(),
   mainRisk: z.string(),
   rationale: z.array(z.string()).default([]),
   risks: z.array(z.string()).default([]),
 });
 
-type ScoringResult = z.infer<typeof ScoringOutputSchema>;
+type ScoringResult = z.infer<typeof ScoringOutputSchema> & { recommendation: Recommendation };
 
 /** Exported for regression tests (live-output normalization). */
 export const ScoringFromModelSchema = z.preprocess(
@@ -51,11 +48,27 @@ export const ScoringFromModelSchema = z.preprocess(
   ScoringOutputSchema,
 );
 
-export { mapRecommendationFromScore, resolveRecommendation, sumScoreBreakdown, applyHardGateCaps, finalizeScore };
+export { computeCompositeScore } from '../../lib/compositeScoreModel.js';
+
+const compositeFromCategories = (params: {
+  score: ScoreBreakdown;
+  extracted: ExtractedJobData;
+  rules: RuleEvaluation;
+  profile: UserProfile;
+  resumeText?: string;
+}) => computeCompositeScore({
+  rawScore: params.score,
+  rules: params.rules,
+  extracted: params.extracted,
+  profile: params.profile,
+  resumeText: params.resumeText,
+});
 
 const deterministicFallback = (
   job: ExtractedJobData,
   rules: RuleEvaluation,
+  profile: UserProfile,
+  resumeText?: string,
 ): ScoringResult => {
   const stackHits = [job.stack, job.requiredSkills, job.preferredSkills]
     .flat()
@@ -144,17 +157,26 @@ const deterministicFallback = (
     extracted: job,
     rules,
   });
-  const scoreFinal = finalizeScore(clamped.score, clamped.rules);
+  const composite = compositeFromCategories({
+    score: clamped.score,
+    extracted: job,
+    rules: clamped.rules,
+    profile,
+    resumeText,
+  });
 
   return {
-    score: scoreFinal,
-    recommendation: resolveRecommendation(scoreFinal.total, rules, scoreFinal.careerValue),
+    score: composite.score,
+    recommendation: composite.recommendation,
     topMatch: 'Backend-leaning product engineering and API overlap.',
     mainRisk:
-      rules.hardRuleNotes?.[0] ?? rules.notes[0] ?? 'Recruiter screen realism risk.',
+      composite.hardGateReasons[0] ??
+      rules.hardRuleNotes?.[0] ??
+      rules.notes[0] ??
+      'Recruiter screen realism risk.',
     rationale: [
-      'Score uses conservative fit plus recruiter-screen realism.',
-      'Hard gates cap total via min(sum, lowest applicable cap).',
+      `Capability ${composite.score.capability ?? 0} × survivability ${(composite.score.survivability ?? 0).toFixed(2)} → final ${composite.score.total}.`,
+      composite.recommendationLabel,
     ],
     risks: [...(rules.hardRuleNotes ?? []), ...rules.notes].slice(0, 2),
   };
@@ -164,7 +186,15 @@ const deterministicFallback = (
 export const scoreJobDeterministicPreview = (params: {
   extracted: ExtractedJobData;
   rules: RuleEvaluation;
-}): ScoringResult => deterministicFallback(params.extracted, params.rules);
+  userProfile?: UserProfile;
+  resumeText?: string;
+}): ScoringResult =>
+  deterministicFallback(
+    params.extracted,
+    params.rules,
+    params.userProfile ?? defaultUserProfile,
+    params.resumeText,
+  );
 
 export const scoreJob = async (params: {
   extracted: ExtractedJobData;
@@ -183,7 +213,13 @@ export const scoreJob = async (params: {
   scoringDiagnostics: StructuredCallDiagnostics;
   scoringLlmSucceeded: boolean;
 }> => {
-  const fallback = () => deterministicFallback(params.extracted, params.rules);
+  const fallback = () =>
+    deterministicFallback(
+      params.extracted,
+      params.rules,
+      params.userProfile,
+      params.resumeContexts?.SWE?.rawText,
+    );
   const scoredRun = await responsesClient.runStructured({
     systemPrompt: scoringSystemPrompt,
     userPrompt: buildScoringPrompt({
@@ -225,7 +261,13 @@ export const scoreJob = async (params: {
     extracted: params.extracted,
     rules: params.rules,
   });
-  const scoreFinal = finalizeScore(clamped.score, clamped.rules);
+  const composite = compositeFromCategories({
+    score: clamped.score,
+    extracted: params.extracted,
+    rules: clamped.rules,
+    profile: params.userProfile,
+    resumeText: params.resumeContexts?.SWE?.rawText,
+  });
 
   const polished = polishScoringNarrative({
     narrative: {
@@ -234,7 +276,7 @@ export const scoreJob = async (params: {
       risks: llmResult.risks,
       rationale: llmResult.rationale,
     },
-    score: scoreFinal,
+    score: composite.score,
     extracted: params.extracted,
     userProfile: params.userProfile,
     rules: clamped.rules,
@@ -248,7 +290,7 @@ export const scoreJob = async (params: {
       mainRisk: polished.mainRisk,
       risks: polished.risks,
       rationale: polished.rationale,
-      recommendation: resolveRecommendation(polished.score.total, clamped.rules, polished.score.careerValue),
+      recommendation: composite.recommendation,
     },
     rules: clamped.rules,
     scoringDiagnostics: scoredRun.diagnostics,

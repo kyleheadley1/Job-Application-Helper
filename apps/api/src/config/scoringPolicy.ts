@@ -85,11 +85,10 @@ export const scoringPolicy: ScoringPolicy = {
     startupFounderMismatch: 8,
   },
   recommendationMapping: [
-    { min: 85, max: 100, recommendation: "yes", note: "top / strong target" },
-    { min: 78, max: 84, recommendation: "yes", note: "strong (caveats if gated)" },
-    { min: 70, max: 77, recommendation: "selective_yes", note: "viable" },
-    { min: 60, max: 69, recommendation: "no", note: "stretch — needs upside" },
-    { min: 0, max: 59, recommendation: "no", note: "skip" },
+    { min: 70, max: 100, recommendation: "apply_cold" as Recommendation, note: "strong fit, good screen odds" },
+    { min: 50, max: 69, recommendation: "referral_gated" as Recommendation, note: "strong fit, low cold-apply odds" },
+    { min: 35, max: 49, recommendation: "stretch_signal" as Recommendation, note: "stretch on skills" },
+    { min: 0, max: 34, recommendation: "skip" as Recommendation, note: "weak fit and weak odds" },
   ],
   shortlist: {
     minScore: 78,
@@ -100,9 +99,9 @@ export const scoringPolicy: ScoringPolicy = {
 export const getTrackerColor = (status: JobStatus, score: number): "green" | "yellow" | "red" | "blue" => {
   if (status === "rejected" || status === "closed") return "red";
   if (status === "interviewing" || status === "assessment" || status === "offer") return "blue";
-  if (status === "to_review" && score >= 78) return "green";
+  if (status === "to_review" && score >= 50) return "green";
   return "yellow";
 };
 
 export const shouldShortlist = (score: number, status: JobStatus): boolean =>
-  score >= scoringPolicy.shortlist.minScore && !scoringPolicy.shortlist.blockedStatuses.includes(status);
+  score >= 50 && !scoringPolicy.shortlist.blockedStatuses.includes(status);

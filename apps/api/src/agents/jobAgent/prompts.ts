@@ -1,3 +1,4 @@
+import { toLegacyRecommendation } from "../../lib/recommendationMapping.js";
 import type { JobPostingMetadata } from '../../tools/jobPostingMetadataExtract.js';
 import { stripBoardMatchChromeFromText } from '../../tools/jobBoardMatchExtract.js';
 import { SCORING_CANONICAL_POLICY } from '../../config/scoringPolicy.js';
@@ -365,7 +366,7 @@ export function buildCoverLetterGuidance(job: JobRecord, userProfile: UserProfil
     priorities,
     selectedProjectNames: selected.names,
     selectedProjectSummaries: selected.summaries,
-    bandInstruction: recommendationBandInstruction(job.recommendation),
+    bandInstruction: recommendationBandInstruction(toLegacyRecommendation(job.recommendation)),
   };
 }
 

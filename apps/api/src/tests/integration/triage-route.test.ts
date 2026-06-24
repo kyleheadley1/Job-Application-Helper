@@ -32,7 +32,9 @@ describe('POST /api/jobs/triage', () => {
       extracted: expect.any(Object),
       rules: expect.any(Object),
       score: expect.any(Object),
-      recommendation: expect.stringMatching(/yes|selective_yes|no/),
+      recommendation: expect.stringMatching(
+        /apply_cold|referral_gated|stretch_signal|skip|no|yes|selective_yes/,
+      ),
       salaryAsk: expect.any(Object),
       recommendedResume: expect.stringMatching(/SWE|SIE|EARLY_CAREER/),
       resumeRationale: expect.any(Array),

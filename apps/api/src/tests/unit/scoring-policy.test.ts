@@ -4,6 +4,7 @@ import {
   resolveRecommendation,
   hasHardGateNote,
 } from "../../lib/scoringCaps.js";
+import { resolveCompositeRecommendation } from "../../lib/compositeScoreModel.js";
 import type { RuleEvaluation } from "../../types/scoring.js";
 import { getTrackerColor, shouldShortlist, SCORE_CATEGORY_MAXES } from "../../config/scoringPolicy.js";
 
@@ -26,7 +27,7 @@ const cleanRules = (): RuleEvaluation => ({
 });
 
 describe("scoring policy behavior", () => {
-  it("category maxes match realigned rubric", () => {
+  it("category maxes match LLM rubric (transparency dimensions)", () => {
     expect(SCORE_CATEGORY_MAXES).toEqual({
       stackFit: 20,
       levelFit: 20,
@@ -38,30 +39,23 @@ describe("scoring policy behavior", () => {
     });
   });
 
-  it("maps recommendations by score band", () => {
-    expect(mapRecommendationFromScore(86)).toBe("yes");
-    expect(mapRecommendationFromScore(80)).toBe("yes");
-    expect(mapRecommendationFromScore(76)).toBe("selective_yes");
-    expect(mapRecommendationFromScore(72)).toBe("selective_yes");
-    expect(mapRecommendationFromScore(65)).toBe("no");
-    expect(mapRecommendationFromScore(55)).toBe("no");
+  it("maps recommendations by composite final score bands", () => {
+    expect(mapRecommendationFromScore(75)).toBe("apply_cold");
+    expect(mapRecommendationFromScore(55)).toBe("referral_gated");
+    expect(mapRecommendationFromScore(40)).toBe("stretch_signal");
+    expect(mapRecommendationFromScore(25)).toBe("skip");
   });
 
-  it("resolveRecommendation uses single table with gate nuance at 78–84", () => {
-    expect(resolveRecommendation(85, cleanRules(), 8)).toBe("yes");
-    expect(resolveRecommendation(80, cleanRules(), 8)).toBe("yes");
-    expect(resolveRecommendation(80, { ...cleanRules(), locationMismatch: true }, 8)).toBe("selective_yes");
-    expect(resolveRecommendation(76, cleanRules(), 8)).toBe("selective_yes");
+  it("2x2 matrix separates capability from survivability", () => {
+    expect(resolveCompositeRecommendation(75, 0.6)).toBe("apply_cold");
+    expect(resolveCompositeRecommendation(75, 0.4)).toBe("referral_gated");
+    expect(resolveCompositeRecommendation(60, 0.6)).toBe("stretch_signal");
+    expect(resolveCompositeRecommendation(60, 0.4)).toBe("skip");
   });
 
-  it("60–69 stretch band needs careerValue >= 8", () => {
-    expect(resolveRecommendation(65, cleanRules(), 7)).toBe("no");
-    expect(resolveRecommendation(65, cleanRules(), 8)).toBe("selective_yes");
-  });
-
-  it("forces skip for credentialed fintech and Go data-infra gap", () => {
-    expect(resolveRecommendation(88, { ...cleanRules(), credentialHeavyFintechAlgorithm: true }, 9)).toBe("no");
-    expect(resolveRecommendation(72, { ...cleanRules(), goDistributedDataInfraCandidateGap: true }, 8)).toBe("no");
+  it("resolveRecommendation uses capability/survivability when provided", () => {
+    expect(resolveRecommendation(32, cleanRules(), 8, 78, 0.4)).toBe("referral_gated");
+    expect(resolveRecommendation(48, cleanRules(), 8, 78, 0.62)).toBe("apply_cold");
   });
 
   it("hasHardGateNote detects gate flags", () => {
@@ -69,15 +63,15 @@ describe("scoring policy behavior", () => {
     expect(hasHardGateNote(cleanRules())).toBe(false);
   });
 
-  it("shortlists only for >=78 and non-terminal status", () => {
-    expect(shouldShortlist(79, "to_review")).toBe(true);
+  it("shortlists for composite finals >= 50 on to_review", () => {
+    expect(shouldShortlist(55, "to_review")).toBe(true);
     expect(shouldShortlist(90, "rejected")).toBe(false);
-    expect(shouldShortlist(77, "to_review")).toBe(false);
+    expect(shouldShortlist(40, "to_review")).toBe(false);
   });
 
   it("maps tracker colors by status + score", () => {
-    expect(getTrackerColor("to_review", 82)).toBe("green");
-    expect(getTrackerColor("to_review", 60)).toBe("yellow");
+    expect(getTrackerColor("to_review", 55)).toBe("green");
+    expect(getTrackerColor("to_review", 30)).toBe("yellow");
     expect(getTrackerColor("interviewing", 65)).toBe("blue");
     expect(getTrackerColor("rejected", 90)).toBe("red");
   });

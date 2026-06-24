@@ -5,6 +5,7 @@
  */
 
 import { SCORE_CATEGORY_MAXES } from '../config/scoringPolicy.js';
+import type { Recommendation } from '../types/scoring.js';
 
 const SCORE_KEYS = [
   "stackFit",
@@ -298,9 +299,20 @@ const coerceMainRiskString = (raw: unknown): string => {
   return "Recruiter screen realism risk (unspecified).";
 };
 
-const coerceRecommendation = (raw: unknown): "yes" | "selective_yes" | "no" => {
-  if (raw === "yes" || raw === "selective_yes" || raw === "no") return raw;
-  return "selective_yes";
+const coerceRecommendation = (raw: unknown): Recommendation => {
+  const values = [
+    "apply_cold",
+    "referral_gated",
+    "stretch_signal",
+    "skip",
+    "no",
+    "yes",
+    "selective_yes",
+  ] as const;
+  if (typeof raw === "string" && (values as readonly string[]).includes(raw)) {
+    return raw as Recommendation;
+  }
+  return "referral_gated";
 };
 
 /** Preprocess raw model JSON before `ScoringOutputSchema` parse. */

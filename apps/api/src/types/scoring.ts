@@ -1,9 +1,29 @@
-export type Recommendation = 'yes' | 'selective_yes' | 'no';
+export type Recommendation =
+  | "apply_cold"
+  | "referral_gated"
+  | "stretch_signal"
+  | "skip"
+  | "no"
+  | "yes"
+  | "selective_yes";
+
+/** Pre-composite model values kept for persisted job migration. */
+export type LegacyRecommendation = "yes" | "selective_yes" | "no";
 
 export type HardRuleFlag = {
   id: string;
   message: string;
 };
+
+/** LLM-scored transparency dimensions (not composite axes). */
+export type LegacyScoreDimension =
+  | "stackFit"
+  | "levelFit"
+  | "domainFit"
+  | "resumeStoryClarity"
+  | "functionalOverlap"
+  | "recruiterFriendliness"
+  | "careerValue";
 
 export type ScoreBreakdown = {
   stackFit: number;
@@ -13,6 +33,14 @@ export type ScoreBreakdown = {
   functionalOverlap: number;
   recruiterFriendliness: number;
   careerValue: number;
+  /** Capability axis (stack + level + functional), 0–100. */
+  capability?: number;
+  /** Survivability multiplier, 0.30–1.00. */
+  survivability?: number;
+  survivabilityBreakdown?: Record<string, number>;
+  /** Human-readable 2x2 quadrant label. */
+  recommendationLabel?: string;
+  /** Final score = round(capability × survivability), or hard-gate floor. */
   total: number;
 };
 

@@ -1,5 +1,12 @@
 export type ResumeType = "SWE" | "SIE" | "EARLY_CAREER";
-export type Recommendation = "yes" | "selective_yes" | "no";
+export type Recommendation =
+  | "apply_cold"
+  | "referral_gated"
+  | "stretch_signal"
+  | "skip"
+  | "no"
+  | "yes"
+  | "selective_yes";
 export type JobStatus =
   | "to_review"
   | "applied"
@@ -81,6 +88,10 @@ export type ScoreBreakdown = {
   functionalOverlap: number;
   recruiterFriendliness: number;
   careerValue: number;
+  capability?: number;
+  survivability?: number;
+  survivabilityBreakdown?: Record<string, number>;
+  recommendationLabel?: string;
   total: number;
 };
 

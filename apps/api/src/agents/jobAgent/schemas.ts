@@ -4,7 +4,16 @@ import { TRACKER_EXPORT_HEADERS } from '../../tracker/canonicalSpreadsheet.js';
 import { preprocessExtractionInput } from '../../tools/triageStructuredNormalize.js';
 
 export const ResumeTypeSchema = z.enum(['SWE', 'SIE', 'EARLY_CAREER']);
-export const RecommendationSchema = z.enum(['yes', 'selective_yes', 'no']);
+export const RecommendationSchema = z.enum([
+  'apply_cold',
+  'referral_gated',
+  'stretch_signal',
+  'skip',
+  'no',
+  /** @deprecated legacy persisted values */
+  'yes',
+  'selective_yes',
+]);
 export const JobStatusSchema = z.enum([
   'to_review',
   'applied',
@@ -147,10 +156,14 @@ export const ScoreBreakdownSchema = z
     functionalOverlap: z.number().min(0).max(SCORE_CATEGORY_MAXES.functionalOverlap),
     recruiterFriendliness: z.number().min(0).max(SCORE_CATEGORY_MAXES.recruiterFriendliness),
     careerValue: z.number().min(0).max(SCORE_CATEGORY_MAXES.careerValue),
+    capability: z.number().min(0).max(100).optional(),
+    survivability: z.number().min(0).max(1).optional(),
+    survivabilityBreakdown: z.record(z.string(), z.number()).optional(),
+    recommendationLabel: z.string().optional(),
     total: z.number().min(0).max(100),
   })
   .superRefine((v, ctx) => {
-    const computed =
+    const legacySum =
       v.stackFit +
       v.levelFit +
       v.domainFit +
@@ -158,10 +171,10 @@ export const ScoreBreakdownSchema = z
       v.functionalOverlap +
       v.recruiterFriendliness +
       v.careerValue;
-    if (v.total > computed + 2) {
+    if (v.capability == null && v.total > legacySum + 2) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Score total cannot exceed category sum.',
+        message: "Legacy score total cannot exceed category sum.",
       });
     }
   });

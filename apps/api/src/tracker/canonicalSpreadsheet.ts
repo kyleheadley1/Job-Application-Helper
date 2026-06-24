@@ -222,7 +222,7 @@ export function parseLatestScore(text: string): number {
   return Number.isFinite(n) ? Math.round(Math.max(0, Math.min(100, n))) : 0;
 }
 
-const SCORE_KEYS: (keyof Omit<ScoreBreakdown, 'total'>)[] = [
+const SCORE_KEYS = [
   'stackFit',
   'levelFit',
   'domainFit',
@@ -230,7 +230,7 @@ const SCORE_KEYS: (keyof Omit<ScoreBreakdown, 'total'>)[] = [
   'functionalOverlap',
   'recruiterFriendliness',
   'careerValue',
-];
+] as const;
 
 const SCORE_CAPS: Record<(typeof SCORE_KEYS)[number], number> = {
   ...SCORE_CATEGORY_MAXES,

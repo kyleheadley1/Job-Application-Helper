@@ -6,7 +6,8 @@ import { evaluateRules } from "../../agents/jobAgent/rules.js";
 import { selectResume } from "../../agents/jobAgent/resumeSelector.js";
 import { userProfile } from "../../config/userProfile.js";
 import { deriveClaimableStackFromText } from "../../lib/claimableStack.js";
-import { finalizeScore, resolveRecommendation } from "../../lib/scoringCaps.js";
+import { computeCompositeScore, resolveCompositeRecommendation } from "../../lib/compositeScoreModel.js";
+import { applyScoringClampLayer } from "../../lib/scoringClampLayer.js";
 import { reconcileSeniority } from "../../lib/seniorityReconciliation.js";
 import { analyzeStackMismatch } from "../../lib/stackMismatchAnalysis.js";
 import type { ExtractedJobData } from "../../types/job.js";
@@ -89,26 +90,30 @@ describe("stack mismatch two-tier detection", () => {
     expect(rules.stackMismatch).toBe(true);
     expect(rules.coreLanguageGap).toContain("PHP");
 
-    const capped = finalizeScore(
-      {
-        stackFit: 17,
-        levelFit: 16,
-        domainFit: 8,
-        resumeStoryClarity: 9,
-        functionalOverlap: 13,
-        recruiterFriendliness: 12,
-        careerValue: 8,
-        total: 0,
-      },
-      rules,
-    );
-    expect(capped.stackFit).toBeLessThanOrEqual(10);
-    expect(capped.resumeStoryClarity).toBeLessThanOrEqual(5);
-    expect(capped.total).toBeGreaterThanOrEqual(68);
-    expect(capped.total).toBeLessThanOrEqual(74);
+    const rawScore = {
+      stackFit: 17,
+      levelFit: 16,
+      domainFit: 8,
+      resumeStoryClarity: 9,
+      functionalOverlap: 13,
+      recruiterFriendliness: 12,
+      careerValue: 8,
+      total: 0,
+    };
+    const clamped = applyScoringClampLayer({ score: rawScore, extracted: job, rules });
+    expect(clamped.score.stackFit).toBeLessThanOrEqual(10);
+    expect(clamped.score.resumeStoryClarity).toBeLessThanOrEqual(5);
+    expect(clamped.score.functionalOverlap).toBeLessThanOrEqual(7);
 
-    const recommendation = resolveRecommendation(capped.total, rules, capped.careerValue);
-    expect(recommendation).not.toBe("yes");
+    const composite = computeCompositeScore({
+      rawScore: clamped.score,
+      rules: clamped.rules,
+      extracted: job,
+      profile: userProfile,
+      resumeText: SWE_RESUME,
+    });
+    expect(composite.score.capability).toBeLessThan(75);
+    expect(composite.recommendation).not.toBe("apply_cold");
   });
 
   it("Node/TS/React role with all required core present → no mismatch", () => {
@@ -123,8 +128,8 @@ describe("stack mismatch two-tier detection", () => {
     expect(rules.coreLanguageGap).toEqual([]);
     expect(rules.adjacentFrameworkGap).toEqual([]);
 
-    const capped = finalizeScore(
-      {
+    const composite = computeCompositeScore({
+      rawScore: {
         stackFit: 18,
         levelFit: 16,
         domainFit: 8,
@@ -135,9 +140,12 @@ describe("stack mismatch two-tier detection", () => {
         total: 0,
       },
       rules,
-    );
-    expect(capped.stackFit).toBe(18);
-    expect(capped.total).toBe(84);
+      extracted: job,
+      profile: userProfile,
+      resumeText: SWE_RESUME,
+    });
+    expect(composite.score.stackFit).toBe(18);
+    expect(composite.score.capability).toBeGreaterThan(70);
   });
 
   it("Go-core service role without Go → Tier 1 caps", () => {
@@ -151,8 +159,8 @@ describe("stack mismatch two-tier detection", () => {
     expect(rules.stackMismatch).toBe(true);
     expect(rules.coreLanguageGap).toContain("Go");
 
-    const capped = finalizeScore(
-      {
+    const clamped = applyScoringClampLayer({
+      score: {
         stackFit: 19,
         levelFit: 15,
         domainFit: 7,
@@ -162,10 +170,10 @@ describe("stack mismatch two-tier detection", () => {
         careerValue: 7,
         total: 0,
       },
+      extracted: job,
       rules,
-    );
-    expect(capped.stackFit).toBeLessThanOrEqual(10);
-    expect(capped.total).toBeLessThanOrEqual(74);
+    });
+    expect(clamped.score.stackFit).toBeLessThanOrEqual(10);
   });
 
   it("Vue required with React claimable → Tier 2, not full stackMismatch", () => {
@@ -178,8 +186,8 @@ describe("stack mismatch two-tier detection", () => {
     expect(rules.stackMismatch).toBe(false);
     expect(rules.adjacentFrameworkGap).toContain("Vue");
 
-    const capped = finalizeScore(
-      {
+    const clamped = applyScoringClampLayer({
+      score: {
         stackFit: 18,
         levelFit: 14,
         domainFit: 7,
@@ -189,10 +197,11 @@ describe("stack mismatch two-tier detection", () => {
         careerValue: 7,
         total: 0,
       },
+      extracted: job,
       rules,
-    );
-    expect(capped.stackFit).toBeLessThanOrEqual(15);
-    expect(capped.stackFit).toBeGreaterThan(10);
+    });
+    expect(clamped.score.stackFit).toBeLessThanOrEqual(15);
+    expect(clamped.score.stackFit).toBeGreaterThan(10);
   });
 
   it("PHP only under nice-to-have with Node core → no mismatch", () => {

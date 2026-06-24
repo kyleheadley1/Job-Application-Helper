@@ -1,8 +1,11 @@
-import { SCORE_CATEGORY_MAXES, STACK_MISMATCH_CAPS } from "../config/scoringPolicy.js";
-import { hardFlagTotalCeiling } from "./scoringClampLayer.js";
+import { SCORE_CATEGORY_MAXES } from "../config/scoringPolicy.js";
+import type { ExtractedJobData } from "../types/job.js";
 import type { Recommendation, RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
+import type { UserProfile } from "../types/userProfile.js";
+import { userProfile as defaultUserProfile } from "../config/userProfile.js";
+import { computeCompositeScore, resolveCompositeRecommendation } from "./compositeScoreModel.js";
 
-/** Sum of the seven category scores (excludes cap; use for audit). */
+/** Sum of legacy seven category scores (audit only — not the final model). */
 export const sumScoreBreakdown = (s: ScoreBreakdown): number =>
   s.stackFit +
   s.levelFit +
@@ -11,65 +14,6 @@ export const sumScoreBreakdown = (s: ScoreBreakdown): number =>
   s.functionalOverlap +
   s.recruiterFriendliness +
   s.careerValue;
-
-const HARD_GATE_TOTAL_CAPS: Array<{ when: (rules: RuleEvaluation) => boolean; cap: number }> = [
-  {
-    when: (r) => Boolean(r.visaMismatch || r.citizenshipMismatch || r.clearanceMismatch),
-    cap: 45,
-  },
-  { when: (r) => Boolean(r.credentialHeavyFintechAlgorithm), cap: 45 },
-  { when: (r) => Boolean(r.goDistributedDataInfraCandidateGap), cap: 50 },
-  { when: (r) => Boolean(r.strictNewGradPipeline), cap: 62 },
-  { when: (r) => Boolean(r.researchHeavyAiRole), cap: 64 },
-  { when: (r) => Boolean(r.seniorityOverreach), cap: 66 },
-  { when: (r) => Boolean(r.locationMismatch), cap: 68 },
-  { when: (r) => Boolean(r.explicitDegreeRisk), cap: 70 },
-  { when: (r) => Boolean(r.stackMismatch), cap: STACK_MISMATCH_CAPS.tier1TotalCap },
-  { when: (r) => Boolean(r.explicitCoreLanguageMismatch), cap: 74 },
-];
-
-/** Hard gates that warrant "apply with caveats" wording in the 78–84 band. */
-export const hasHardGateNote = (rules: RuleEvaluation): boolean =>
-  Boolean(
-    (rules.hardRuleFlags?.length ?? 0) > 0 ||
-    (rules.hardRuleNotes?.length ?? 0) > 0 ||
-      rules.visaMismatch ||
-      rules.citizenshipMismatch ||
-      rules.clearanceMismatch ||
-      rules.credentialHeavyFintechAlgorithm ||
-      rules.goDistributedDataInfraCandidateGap ||
-      rules.strictNewGradPipeline ||
-      rules.researchHeavyAiRole ||
-      rules.seniorityOverreach ||
-      rules.locationMismatch ||
-      rules.explicitDegreeRisk ||
-      rules.stackMismatch ||
-      rules.explicitCoreLanguageMismatch,
-  );
-
-/**
- * Apply deterministic hard-gate caps after LLM scoring.
- * total = min(sum(categories), lowest applicable cap).
- */
-export const applyHardGateCaps = (score: ScoreBreakdown, rules: RuleEvaluation): ScoreBreakdown => {
-  let next: ScoreBreakdown = { ...score };
-  if (rules.stackMismatch) {
-    next.stackFit = Math.min(next.stackFit, STACK_MISMATCH_CAPS.tier1StackFitMax);
-    next.resumeStoryClarity = Math.min(next.resumeStoryClarity, STACK_MISMATCH_CAPS.tier1ResumeStoryClarityMax);
-  } else if ((rules.adjacentFrameworkGap?.length ?? 0) > 0) {
-    next.stackFit = Math.min(next.stackFit, STACK_MISMATCH_CAPS.tier2StackFitMax);
-  }
-  if (rules.explicitCoreLanguageMismatch && !rules.stackMismatch) {
-    next.stackFit = Math.min(next.stackFit, 11);
-  }
-  const sum = sumScoreBreakdown(next);
-  const caps = HARD_GATE_TOTAL_CAPS.filter((g) => g.when(rules)).map((g) => g.cap);
-  const flagCeiling = hardFlagTotalCeiling(rules);
-  if (flagCeiling !== null) caps.push(flagCeiling);
-  const lowestCap = caps.length ? Math.min(...caps) : 100;
-  next.total = Math.min(sum, lowestCap);
-  return next;
-};
 
 const clampCategory = (score: ScoreBreakdown): ScoreBreakdown => ({
   stackFit: Math.min(SCORE_CATEGORY_MAXES.stackFit, Math.max(0, score.stackFit)),
@@ -80,19 +24,20 @@ const clampCategory = (score: ScoreBreakdown): ScoreBreakdown => ({
   recruiterFriendliness: Math.min(SCORE_CATEGORY_MAXES.recruiterFriendliness, Math.max(0, score.recruiterFriendliness)),
   careerValue: Math.min(SCORE_CATEGORY_MAXES.careerValue, Math.max(0, score.careerValue)),
   total: score.total,
+  capability: score.capability,
+  survivability: score.survivability,
+  survivabilityBreakdown: score.survivabilityBreakdown,
+  recommendationLabel: score.recommendationLabel,
 });
 
-/** Clamp category scores to current rubric maxes; keep total ≤ sum(categories). */
-export const clampScoreToCategoryMaxes = (score: ScoreBreakdown): ScoreBreakdown => {
-  const clamped = clampCategory(score);
-  const sum = sumScoreBreakdown(clamped);
-  return { ...clamped, total: Math.min(Math.max(0, clamped.total), sum) };
-};
+/** Clamp legacy category scores to rubric maxes. */
+export const clampScoreToCategoryMaxes = (score: ScoreBreakdown): ScoreBreakdown =>
+  clampCategory(score);
 
-/** Normalize persisted jobs scored under pre-realignment category caps (e.g. stackFit 25, story 15). */
+/** Normalize persisted jobs scored under pre-realignment category caps. */
 export const normalizeStoredJobScores = <T extends {
   score: ScoreBreakdown;
-  scoreHistory?: Array<{ score: ScoreBreakdown; scoredAt: string; recommendation: import("../types/scoring.js").Recommendation }>;
+  scoreHistory?: Array<{ score: ScoreBreakdown; scoredAt: string; recommendation: Recommendation }>;
 }>(
   job: T,
 ): T => ({
@@ -104,39 +49,72 @@ export const normalizeStoredJobScores = <T extends {
   })),
 });
 
-/** Normalize LLM categories to new maxes, set total to sum, then apply caps. */
-export const finalizeScore = (score: ScoreBreakdown, rules: RuleEvaluation): ScoreBreakdown => {
-  const clamped = clampCategory(score);
-  const summed = { ...clamped, total: sumScoreBreakdown(clamped) };
-  return applyHardGateCaps(summed, rules);
+export type FinalizeScoreContext = {
+  extracted?: ExtractedJobData;
+  profile?: UserProfile;
+  resumeText?: string;
 };
 
-/** Single recommendation table — reads capped total only. */
+/** Composite model: capability × survivability (replaces additive total). */
+export const finalizeScore = (
+  score: ScoreBreakdown,
+  rules: RuleEvaluation,
+  context: FinalizeScoreContext = {},
+): ScoreBreakdown => {
+  const clamped = clampCategory(score);
+  if (!context.extracted) {
+    return { ...clamped, total: clamped.total || sumScoreBreakdown(clamped) };
+  }
+  const composite = computeCompositeScore({
+    rawScore: clamped,
+    rules,
+    extracted: context.extracted,
+    profile: context.profile ?? defaultUserProfile,
+    resumeText: context.resumeText,
+  });
+  return composite.score;
+};
+
+/** @deprecated additive caps — kept for legacy tests; returns input unchanged when composite context absent. */
+export const applyHardGateCaps = (score: ScoreBreakdown, rules: RuleEvaluation): ScoreBreakdown =>
+  finalizeScore(score, rules);
+
+export const hasHardGateNote = (rules: RuleEvaluation): boolean =>
+  Boolean(
+    (rules.hardRuleFlags?.length ?? 0) > 0 ||
+    (rules.hardRuleNotes?.length ?? 0) > 0 ||
+    rules.visaMismatch ||
+    rules.citizenshipMismatch ||
+    rules.clearanceMismatch ||
+    rules.explicitCoreLanguageMismatch ||
+    rules.seniorityOverreach ||
+    rules.locationMismatch,
+  );
+
+/** Resolve recommendation from composite axes when available, else heuristic from total. */
 export const resolveRecommendation = (
   cappedTotal: number,
   rules: RuleEvaluation,
-  careerValue: number,
+  _careerValue: number,
+  capability?: number,
+  survivability?: number,
 ): Recommendation => {
-  if (rules.credentialHeavyFintechAlgorithm) return "no";
-  if (rules.goDistributedDataInfraCandidateGap) return "no";
-
-  if (cappedTotal >= 85) return rules.stackMismatch ? "selective_yes" : "yes";
-  if (cappedTotal >= 78) return hasHardGateNote(rules) ? "selective_yes" : "yes";
-  if (cappedTotal >= 70) return "selective_yes";
-  if (cappedTotal >= 60) {
-    const hasUpside =
-      careerValue >= 8 ||
-      rules.notes.some((n) => /\b(upside|worth applying|strong target|high career value)\b/i.test(n));
-    return hasUpside ? "selective_yes" : "no";
+  if (capability != null && survivability != null) {
+    return resolveCompositeRecommendation(capability, survivability);
   }
-  return "no";
+  if (rules.explicitCoreLanguageMismatch || rules.visaMismatch || rules.citizenshipMismatch) {
+    return "no";
+  }
+  if (cappedTotal >= 70) return "apply_cold";
+  if (cappedTotal >= 50) return "referral_gated";
+  if (cappedTotal >= 35) return "stretch_signal";
+  return "skip";
 };
 
-/** Score-band mapping without gate nuance (78–84 always maps to yes at band level). */
+/** Heuristic band mapping for imported spreadsheet totals. */
 export const mapRecommendationFromScore = (total: number): Recommendation => {
-  if (total >= 85) return "yes";
-  if (total >= 78) return "yes";
-  if (total >= 70) return "selective_yes";
-  if (total >= 60) return "no";
-  return "no";
+  if (total >= 70) return "apply_cold";
+  if (total >= 50) return "referral_gated";
+  if (total >= 35) return "stretch_signal";
+  return "skip";
 };

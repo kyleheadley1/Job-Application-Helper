@@ -138,17 +138,21 @@ export const triageJob = async (input: {
     },
     tracker: {
       priority:
-        scored.score.total >= 78
+        scored.recommendation === 'apply_cold'
           ? 'high'
-          : scored.score.total >= 70
+          : scored.recommendation === 'referral_gated' || scored.recommendation === 'stretch_signal'
             ? 'medium'
             : 'low',
       recommendedAction:
-        scored.recommendation === 'yes'
+        scored.recommendation === 'apply_cold'
           ? 'Apply with urgency'
-          : scored.recommendation === 'selective_yes'
-            ? 'Apply selectively with caveats'
-            : 'Skip unless special reason',
+          : scored.recommendation === 'referral_gated'
+            ? 'Pursue via referral or heavily tailored apply'
+            : scored.recommendation === 'stretch_signal'
+              ? 'Apply selectively — signal-dependent'
+              : scored.recommendation === 'skip'
+                ? 'Skip unless special reason'
+                : 'Do not apply — hard gate',
       statusOutcome: scored.recommendation,
       shortlist: shouldShortlist(scored.score.total, 'to_review'),
       color: getTrackerColor('to_review', scored.score.total),
