@@ -18,6 +18,7 @@ import {
   isMatureStructuredEmployer,
   jdPythonFlexibleWithJsOrTs,
 } from '../../lib/coreLanguageRequirements.js';
+import { evaluateDisjunctiveLanguageRequirement, filterGapsAfterDisjunctiveMatch } from '../../lib/disjunctiveLanguageRequirement.js';
 import { isFdeBuilderSoftwarePrimaryShape } from '../../lib/fdeBuilderRole.js';
 import {
   jdHasAppliedAiSystemsOverlap,
@@ -307,8 +308,13 @@ export const evaluateRules = (
 
   const claimable = claimableStackFromContexts(options?.resumeContexts, options?.activeResumeType ?? 'SWE');
   const stackAnalysis = analyzeStackMismatch(job, claimable);
-  const stackMismatch = stackAnalysis.stackMismatch;
-  const coreLanguageGap = stackAnalysis.coreLanguageGap;
+  const disjunctiveLanguage = evaluateDisjunctiveLanguageRequirement(job, claimable);
+  let stackMismatch = stackAnalysis.stackMismatch;
+  let coreLanguageGap = filterGapsAfterDisjunctiveMatch(
+    stackAnalysis.coreLanguageGap,
+    disjunctiveLanguage,
+  );
+  if (coreLanguageGap.length === 0) stackMismatch = false;
   const adjacentFrameworkGap = stackAnalysis.adjacentFrameworkGap;
 
   const healthcareProductEngineering =
@@ -600,7 +606,7 @@ export const evaluateRules = (
     );
   }
 
-  const coreLang = analyzeCoreLanguageRequirement(job, profile);
+  const coreLang = analyzeCoreLanguageRequirement(job, profile, claimable);
   const ventureFundedStartup = isVentureFundedStartupShape(combinedText);
   const matureStructuredEmployer =
     !ventureFundedStartup &&
@@ -608,7 +614,8 @@ export const evaluateRules = (
   const explicitCoreLanguageMismatch =
     matureStructuredEmployer &&
     coreLang.explicitHardRequirement &&
-    !coreLang.candidateHasProductionLanguage;
+    !coreLang.candidateHasProductionLanguage &&
+    !disjunctiveLanguage.satisfied;
   const knownStrongEmployer =
     /\b(google|alphabet|meta|facebook|amazon|aws|microsoft|apple|netflix|uber|spotify|salesforce|oracle|ibm|stripe|airbnb|databricks|palantir|openai|anthropic|goldman|jpmorgan|jp\s*morgan|bloomberg)\b/i.test(
       companyNorm,
@@ -688,6 +695,8 @@ export const evaluateRules = (
     productionBarCompetitivePool,
     goDistributedDataInfraRole,
     goDistributedDataInfraCandidateGap,
+    disjunctiveLanguageRequirementSatisfied: disjunctiveLanguage.satisfied,
+    disjunctiveAcceptedLanguages: disjunctiveLanguage.acceptedLabels,
     hardRuleNotes,
     notes: [...new Set(notes)],
     penaltyVector,

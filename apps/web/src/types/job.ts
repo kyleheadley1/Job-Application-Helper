@@ -77,6 +77,8 @@ export type RuleEvaluation = {
   hardRuleNotes?: string[];
   hardRuleFlags?: Array<{ id: string; message: string }>;
   roleShapeOutsideLane?: boolean;
+  disjunctiveLanguageRequirementSatisfied?: boolean;
+  disjunctiveAcceptedLanguages?: string[];
   notes: string[];
 };
 
@@ -155,6 +157,8 @@ export type JobRecord = {
   mainRisk: string;
   rationale: string[];
   risks: string[];
+  referralPathwayAvailable?: boolean;
+  referralPathwayNotes?: string;
   generated: GeneratedAssets;
   debugAssetGeneration?: DebugAssetGeneration;
   trackerSpreadsheet?: Partial<TrackerSpreadsheetFields>;

@@ -1,4 +1,5 @@
 import type { ExtractedJobData } from "../types/job.js";
+import { evaluateDisjunctiveLanguageRequirement, filterGapsAfterDisjunctiveMatch } from "./disjunctiveLanguageRequirement.js";
 import { normalizeText } from "./text.js";
 import type { ClaimableStack } from "./claimableStack.js";
 import { hasClaimableCoverage } from "./claimableStack.js";
@@ -172,7 +173,10 @@ export const analyzeStackMismatch = (
     }
   }
 
-  const uniqueCore = [...new Set(coreLanguageGaps)];
+  const uniqueCore = filterGapsAfterDisjunctiveMatch(
+    [...new Set(coreLanguageGaps)],
+    evaluateDisjunctiveLanguageRequirement(job, claimable),
+  );
   const uniqueAdjacent = [...new Set(adjacentFrameworkGaps)].filter(
     (label) => !uniqueCore.includes(label),
   );
