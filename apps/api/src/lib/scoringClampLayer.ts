@@ -3,6 +3,7 @@ import { STACK_MISMATCH_CAPS } from "../config/scoringPolicy.js";
 import type { ExtractedJobData } from "../types/job.js";
 import type { HardRuleFlag, RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
 import { filterOutOfLaneAfterDisjunctiveMatch } from "./disjunctiveLanguageRequirement.js";
+import { filterLanguagesToJdPresence } from "./jdLanguagePresence.js";
 import { normalizeText } from "./text.js";
 
 const jobBlob = (job: ExtractedJobData): string =>
@@ -33,6 +34,9 @@ const STAFFING_AGENCY_RE =
 
 const HOURLY_W2_RE =
   /\b(hourly|\/hr|per\s+hour|w-?2\s+contract|contract\s+to\s+hire|c2h)\b/i;
+
+const RAW_DEGREE =
+  /\b(bachelor'?s?\s+degree|bachelors\s+degree|bs\s+in|b\.s\.|ba\s+in)[^.\n]{0,160}\brequired\b|\bdegree\s+in\s+(computer science|cs|engineering)\s+required\b/i;
 
 const INFRA_PLATFORM_SHAPE_RE =
   /\b(edge\s+computing|cloudflare\s+workers|fastly|terraform|kubernetes|\bk8s\b|\biac\b|infrastructure\s+as\s+code|site\s+reliability|\bsre\b|observability|platform\s+architecture|edge\s+platform|cdn)\b/i;
@@ -66,19 +70,31 @@ export const detectRoleShapeOutsideLane = (job: ExtractedJobData): boolean => {
   return INFRA_PLATFORM_SHAPE_RE.test(blob) || ML_RESEARCH_SHAPE_RE.test(blob);
 };
 
+const structuredJdBlob = (job: ExtractedJobData): string =>
+  normalizeText(
+    [
+      ...(job.stack ?? []),
+      ...(job.requiredSkills ?? []),
+      ...(job.preferredSkills ?? []),
+      ...(job.requirements ?? []),
+      ...(job.responsibilities ?? []),
+    ].join("\n"),
+  );
+
 export const detectOutOfLaneCoreLanguage = (job: ExtractedJobData, rules?: RuleEvaluation): string[] => {
-  const blob = jobBlob(job);
+  const blob = structuredJdBlob(job);
   const found: string[] = [];
   for (const { re, label } of OUT_OF_LANE_CORE_LANG) {
     if (re.test(blob) && !found.includes(label)) found.push(label);
   }
+  const filtered = filterLanguagesToJdPresence(found, job);
   if (rules?.disjunctiveLanguageRequirementSatisfied) {
-    return filterOutOfLaneAfterDisjunctiveMatch(found, {
+    return filterOutOfLaneAfterDisjunctiveMatch(filtered, {
       satisfied: true,
       acceptedLabels: rules.disjunctiveAcceptedLanguages ?? [],
     });
   }
-  return found;
+  return filtered;
 };
 
 export const detectFinanceClampContext = (
@@ -146,12 +162,15 @@ export const buildHardRuleFlags = (
     });
   }
 
-  const outOfLane = [
-    ...(rules.coreLanguageGap ?? []),
-    ...detectOutOfLaneCoreLanguage(job, rules).filter(
-      (l) => !(rules.coreLanguageGap ?? []).includes(l),
-    ),
-  ];
+  const outOfLane = filterLanguagesToJdPresence(
+    [
+      ...(rules.coreLanguageGap ?? []),
+      ...detectOutOfLaneCoreLanguage(job, rules).filter(
+        (l) => !(rules.coreLanguageGap ?? []).includes(l),
+      ),
+    ],
+    job,
+  );
   const coreLanguageMismatch =
     !rules.disjunctiveLanguageRequirementSatisfied &&
     (rules.stackMismatch ||
@@ -159,11 +178,14 @@ export const buildHardRuleFlags = (
       outOfLane.length > 0);
 
   if (coreLanguageMismatch) {
-    const langs = [...new Set(outOfLane.length ? outOfLane : rules.coreLanguageGap ?? ["core backend language"])];
-    push({
-      id: "coreLanguageMismatch",
-      message: `Core language mismatch — role backend (${langs.join(", ")}) is outside TS/Node claimable lane.`,
-    });
+    const langs = [...new Set(outOfLane)];
+    if (langs.length > 0) {
+      push({
+        id: "coreLanguageMismatch",
+        citedLanguages: langs,
+        message: `Core language mismatch — role backend (${langs.join(", ")}) is outside TS/Node claimable lane.`,
+      });
+    }
   }
 
   if (rules.explicitDegreeRisk && rules.matureStructuredEmployer) {
@@ -171,6 +193,17 @@ export const buildHardRuleFlags = (
       id: "degreeGateStructuredEmployer",
       message:
         "Degree gate at structured employer — bootcamp/equivalent language rarely survives first-pass ATS screen.",
+    });
+  } else if (
+    rules.degreeHasEquivalencyClause &&
+    (job.degreeRequirement?.level === "required" ||
+      Boolean(job.degreeRequirement?.raw?.trim()) ||
+      RAW_DEGREE.test(job.rawText ?? ""))
+  ) {
+    push({
+      id: "degreePreferenceWithEquivalency",
+      message:
+        "Degree listed but JD allows related/equivalent experience — soft preference, not a first-pass filter.",
     });
   }
 

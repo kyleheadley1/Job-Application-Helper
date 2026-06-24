@@ -15,6 +15,7 @@ import { responsesClient } from '../../services/llm/responsesClient.js';
 import type { StructuredCallDiagnostics } from '../../services/llm/responsesClient.js';
 import { polishScoringNarrative } from '../../lib/scoringOutputPolish.js';
 import { applyScoringClampLayer } from '../../lib/scoringClampLayer.js';
+import { detectCapabilityGap } from '../../lib/capabilityGap.js';
 import { computeCompositeScore } from '../../lib/compositeScoreModel.js';
 import { userProfile as defaultUserProfile } from '../../config/userProfile.js';
 
@@ -157,10 +158,12 @@ const deterministicFallback = (
     extracted: job,
     rules,
   });
+  const capabilityGap = detectCapabilityGap(job, clamped.score);
+  const rulesWithGap = { ...clamped.rules, capabilityGap };
   const composite = compositeFromCategories({
     score: clamped.score,
     extracted: job,
-    rules: clamped.rules,
+    rules: rulesWithGap,
     profile,
     resumeText,
   });
@@ -261,10 +264,15 @@ export const scoreJob = async (params: {
     extracted: params.extracted,
     rules: params.rules,
   });
+  const capabilityGap = detectCapabilityGap(params.extracted, clamped.score);
+  const rulesWithGap: RuleEvaluation = {
+    ...clamped.rules,
+    capabilityGap,
+  };
   const composite = compositeFromCategories({
     score: clamped.score,
     extracted: params.extracted,
-    rules: clamped.rules,
+    rules: rulesWithGap,
     profile: params.userProfile,
     resumeText: params.resumeContexts?.SWE?.rawText,
   });
@@ -279,7 +287,7 @@ export const scoreJob = async (params: {
     score: composite.score,
     extracted: params.extracted,
     userProfile: params.userProfile,
-    rules: clamped.rules,
+    rules: rulesWithGap,
   });
 
   return {
@@ -292,7 +300,7 @@ export const scoreJob = async (params: {
       rationale: polished.rationale,
       recommendation: composite.recommendation,
     },
-    rules: clamped.rules,
+    rules: rulesWithGap,
     scoringDiagnostics: scoredRun.diagnostics,
     scoringLlmSucceeded: scoredRun.success,
   };

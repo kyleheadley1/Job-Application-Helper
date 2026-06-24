@@ -25,6 +25,7 @@ import {
   jdIsStructurallyVague,
   profileHasGoDataInfraProductionEvidence,
 } from '../../lib/scoringOutputPolish.js';
+import { filterLanguagesToJdPresence } from '../../lib/jdLanguagePresence.js';
 import {
   detectCompetitivePoolSignals,
   isVentureFundedStartupShape,
@@ -61,6 +62,7 @@ function jdDegreeEquivalenceSoftened(
   return (
     degreeLevel === 'equivalent_allowed' ||
     degreeLevel === 'preferred' ||
+    /\bor related experience\b/i.test(combinedText) ||
     /\bor equivalent experience\b/i.test(combinedText) ||
     /\bor equivalent practical experience\b/i.test(combinedText) ||
     /\bor comparable experience\b/i.test(combinedText) ||
@@ -203,6 +205,7 @@ export const evaluateRules = (
     RAW_DEGREE.test(job.rawText ?? '');
 
   const degreeEquivalenceEscape = jdDegreeEquivalenceSoftened(combinedText, degreeLevel);
+  const degreeHasEquivalencyClause = degreeEquivalenceEscape;
   const explicitDegreeRisk = degreeRequiredSignal && !degreeEquivalenceEscape;
 
   const strictNewGradPipeline =
@@ -314,6 +317,7 @@ export const evaluateRules = (
     stackAnalysis.coreLanguageGap,
     disjunctiveLanguage,
   );
+  coreLanguageGap = filterLanguagesToJdPresence(coreLanguageGap, job);
   if (coreLanguageGap.length === 0) stackMismatch = false;
   const adjacentFrameworkGap = stackAnalysis.adjacentFrameworkGap;
 
@@ -524,9 +528,11 @@ export const evaluateRules = (
     penaltyVector.stack = scoringPolicy.hardPenalties.stackMismatch;
     notes.push('Core technical story does not align with role stack shape (infra/SRE).');
   } else if (associateEntryRole && preferredPlatformStackGap) {
-    notes.push(
-      "Preferred Go/GraphQL/platform stack is not the candidate's strongest lane, but baseline backend expectations appear accessible.",
-    );
+    const jdLangs = filterLanguagesToJdPresence(["Go"], job);
+    const goNote = jdLangs.includes("Go")
+      ? "Preferred Go/GraphQL/platform stack is not the candidate's strongest lane, but baseline backend expectations appear accessible."
+      : "Preferred GraphQL/platform stack is not the candidate's strongest lane, but baseline backend expectations appear accessible.";
+    notes.push(goNote);
   } else if (backendProductApiRole && !infraCoreRole) {
     const companyLabel = job.company?.trim() || 'This company';
     const matureFintechApi =
@@ -663,6 +669,7 @@ export const evaluateRules = (
 
   return {
     explicitDegreeRisk,
+    degreeHasEquivalencyClause,
     traditionalCompanyPenalty: isTraditionalCompany,
     financePenalty: isFinance,
     strictNewGradPipeline,

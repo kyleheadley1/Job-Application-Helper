@@ -2,6 +2,7 @@ import type { ExtractedJobData } from "../types/job.js";
 import type { UserProfile } from "../types/userProfile.js";
 import type { ClaimableStack } from "./claimableStack.js";
 import { evaluateDisjunctiveLanguageRequirement } from "./disjunctiveLanguageRequirement.js";
+import { languagePresentInJd } from "./jdLanguagePresence.js";
 import { normalizeText } from "./text.js";
 
 export type CoreLanguageId = "java" | "go" | "python";
@@ -152,6 +153,17 @@ export function analyzeCoreLanguageRequirement(
   }
 
   if (language === "python" && explicit && jdPythonFlexibleWithJsOrTs(blob)) {
+    language = null;
+    explicit = false;
+  }
+
+  if (language === "java" && !languagePresentInJd("Java", job)) {
+    language = null;
+    explicit = false;
+  } else if (language === "go" && !languagePresentInJd("Go", job)) {
+    language = null;
+    explicit = false;
+  } else if (language === "python" && !languagePresentInJd("Python", job)) {
     language = null;
     explicit = false;
   }

@@ -1,5 +1,6 @@
 import type { ExtractedJobData } from "../types/job.js";
 import { evaluateDisjunctiveLanguageRequirement, filterGapsAfterDisjunctiveMatch } from "./disjunctiveLanguageRequirement.js";
+import { filterLanguagesToJdPresence } from "./jdLanguagePresence.js";
 import { normalizeText } from "./text.js";
 import type { ClaimableStack } from "./claimableStack.js";
 import { hasClaimableCoverage } from "./claimableStack.js";
@@ -177,15 +178,16 @@ export const analyzeStackMismatch = (
     [...new Set(coreLanguageGaps)],
     evaluateDisjunctiveLanguageRequirement(job, claimable),
   );
+  const jdValidatedCore = filterLanguagesToJdPresence(uniqueCore, job);
   const uniqueAdjacent = [...new Set(adjacentFrameworkGaps)].filter(
-    (label) => !uniqueCore.includes(label),
+    (label) => !jdValidatedCore.includes(label),
   );
 
-  if (uniqueCore.length > 0) {
+  if (jdValidatedCore.length > 0) {
     return {
       tier: "tier1_core_language",
       stackMismatch: true,
-      coreLanguageGap: uniqueCore,
+      coreLanguageGap: jdValidatedCore,
       adjacentFrameworkGap: uniqueAdjacent,
     };
   }

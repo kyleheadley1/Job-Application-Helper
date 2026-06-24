@@ -13,6 +13,13 @@ export type LegacyRecommendation = "yes" | "selective_yes" | "no";
 export type HardRuleFlag = {
   id: string;
   message: string;
+  /** Structured language citation — must be validated against JD language set. */
+  citedLanguages?: string[];
+};
+
+export type CapabilityGap = {
+  kind: "specialization" | "stack_depth";
+  reason: string;
 };
 
 /** LLM-scored transparency dimensions (not composite axes). */
@@ -167,6 +174,10 @@ export type RuleEvaluation = {
    * Candidate lacks demonstrated Go/streaming/warehouse production depth and role is not apprenticeship-oriented.
    */
   goDistributedDataInfraCandidateGap?: boolean;
+  /** JD allows related/equivalent experience in lieu of a degree — softens credential penalty. */
+  degreeHasEquivalencyClause?: boolean;
+  /** Non-addressable capability/specialization gap (valid skip driver). */
+  capabilityGap?: CapabilityGap;
   /**
    * True first-pass gates only (UI "Hard-rule flags"): commutable location, degree, explicit core language.
    * Visa/citizenship/clearance and other notes stay in `notes` / key risks.

@@ -140,6 +140,7 @@ const flagIsHardGate = (
 
 const flagPenaltyLever = (flagId: string): SurvivabilityLever => {
   if (flagId === "degreeGateStructuredEmployer") return "referral";
+  if (flagId === "degreePreferenceWithEquivalency") return "resume";
   if (flagId === "financePenalty" || flagId === "quantTradingMismatch") return "referral";
   if (flagId === "coreLanguageMismatch") return "resume";
   return "none";
@@ -147,6 +148,9 @@ const flagPenaltyLever = (flagId: string): SurvivabilityLever => {
 
 const flagPenaltyLeverLabel = (flagId: string): string => {
   const lever = flagPenaltyLever(flagId);
+  if (flagId === "degreePreferenceWithEquivalency") {
+    return "tailor resume to emphasize related experience";
+  }
   if (lever === "referral") return "REFERRAL routes around this";
   if (lever === "resume") return "resume framing";
   if (lever === "cover_letter") return "tailored resume / cover letter";
@@ -281,6 +285,9 @@ export const deriveActionLine = (params: {
   }
 
   if (recommendation === "skip") {
+    if (params.rules.capabilityGap) {
+      return `Weak fit and weak odds — ${params.rules.capabilityGap.reason}.`;
+    }
     const reason = dominant?.penaltyName ?? structuralReason(survivabilityRows);
     return `Weak fit and weak odds — ${reason}.`;
   }
