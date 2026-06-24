@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { finalizeScore, resolveRecommendation } from "../../lib/scoringCaps.js";
+import { userProfile } from "../../config/userProfile.js";
+import { computeCompositeScore } from "../../lib/compositeScoreModel.js";
 import {
   applyScoringClampLayer,
   buildHardRuleFlags,
@@ -57,7 +58,13 @@ const finalizeWithClamp = (
   rules: RuleEvaluation,
 ) => {
   const clamped = applyScoringClampLayer({ score, extracted, rules });
-  return { ...clamped, score: finalizeScore(clamped.score, clamped.rules) };
+  const composite = computeCompositeScore({
+    rawScore: clamped.score,
+    rules: clamped.rules,
+    extracted,
+    profile: userProfile,
+  });
+  return { score: composite.score, rules: clamped.rules, recommendation: composite.recommendation };
 };
 
 describe("scoring clamp layer", () => {
@@ -66,7 +73,8 @@ describe("scoring clamp layer", () => {
       company: "Jane Street",
       stack: ["OCaml"],
       responsibilities: ["Build trading systems in OCaml"],
-      rawText: "Core backend in OCaml. Proprietary trading.",
+      rawText: "Core backend in OCaml. Proprietary trading. Senior software engineer.",
+      seniority: "Senior",
     });
     const rules = {
       ...cleanRules(),
@@ -75,12 +83,16 @@ describe("scoring clamp layer", () => {
       explicitCoreLanguageMismatch: true,
       seniorityOverreach: true,
     };
-    const { score, rules: clampedRules } = finalizeWithClamp(inflatedLlmScore(), extracted, rules);
+    const { score, rules: clampedRules, recommendation } = finalizeWithClamp(
+      inflatedLlmScore(),
+      extracted,
+      rules,
+    );
     expect(score.resumeStoryClarity).toBeLessThanOrEqual(5);
     expect(score.functionalOverlap).toBeLessThanOrEqual(7);
     expect(clampedRules.hardRuleFlags?.some((f) => f.id === "coreLanguageMismatch")).toBe(true);
+    expect(recommendation).toBe("no");
     expect(score.total).toBeLessThanOrEqual(45);
-    expect(resolveRecommendation(score.total, clampedRules, score.careerValue)).toBe("no");
   });
 
   it("Rule 2 — MLB-style edge/platform role clamps stackFit even when Node/TS keywords match", () => {

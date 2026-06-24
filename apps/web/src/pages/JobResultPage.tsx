@@ -234,6 +234,9 @@ export const JobResultPage = () => {
         <article className="card">
           <h3>Decision</h3>
           <p>Apply: {job.recommendation}</p>
+          {job.score.recommendationLabel ? (
+            <p className="muted">{job.score.recommendationLabel}</p>
+          ) : null}
           {hasJdSource(job) ? (
             <button onClick={() => void rerunTriage()} disabled={retriageBusy || busyConfirm}>
               {retriageBusy ? "Re-scoring..." : "Re-run triage"}
@@ -264,6 +267,14 @@ export const JobResultPage = () => {
         </article>
         <article className="card">
           <h3>Score Breakdown</h3>
+          {job.score.capability != null ? (
+            <ul>
+              <li>Capability: {job.score.capability}/100</li>
+              <li>Survivability: {(job.score.survivability ?? 0).toFixed(2)}</li>
+              <li>Final: {job.score.total}/100</li>
+            </ul>
+          ) : null}
+          <h4>Category detail</h4>
           <ul>
             <li>Stack: {formatScoreCategory(job.score.stackFit, "stackFit")}</li>
             <li>Level: {formatScoreCategory(job.score.levelFit, "levelFit")}</li>

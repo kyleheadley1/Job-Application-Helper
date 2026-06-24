@@ -4,7 +4,7 @@ import {
 } from "./coreLanguageRequirements.js";
 import { fdeBuilderPrimaryRiskSummary } from "./fdeBuilderRole.js";
 import type { ExtractedJobData } from "../types/job.js";
-import type { RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
+import type { LegacyScoreDimension, RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
 import type { UserProfile } from "../types/userProfile.js";
 import { normalizeText } from "./text.js";
 import {
@@ -154,7 +154,7 @@ export function applyProductionCompetitiveHiringBarCalibration(params: {
   let next = { ...score };
 
   if (!strong) {
-    type Dim = keyof Omit<ScoreBreakdown, "total">;
+    type Dim = LegacyScoreDimension;
     const pullOrder: Dim[] = [
       "resumeStoryClarity",
       "functionalOverlap",
@@ -775,7 +775,7 @@ export function applyAssociateEntryBackendPlatformCalibration(params: {
 
   const targetLo = 79;
   const targetHi = 82;
-  const ups: Array<keyof Omit<ScoreBreakdown, "total">> = [
+  const ups: Array<LegacyScoreDimension> = [
     "careerValue",
     "recruiterFriendliness",
     "functionalOverlap",
@@ -784,7 +784,7 @@ export function applyAssociateEntryBackendPlatformCalibration(params: {
     "domainFit",
     "resumeStoryClarity",
   ];
-  const upsMax: Partial<Record<keyof Omit<ScoreBreakdown, "total">, number>> = {
+  const upsMax: Partial<Record<LegacyScoreDimension, number>> = {
     careerValue: 10,
     recruiterFriendliness: 11,
     functionalOverlap: 9,
@@ -809,7 +809,7 @@ export function applyAssociateEntryBackendPlatformCalibration(params: {
   }
 
   if (next.total > 82) {
-    const dims: Array<keyof Omit<ScoreBreakdown, "total">> = [
+    const dims: Array<LegacyScoreDimension> = [
       "stackFit",
       "recruiterFriendliness",
       "functionalOverlap",
@@ -818,7 +818,7 @@ export function applyAssociateEntryBackendPlatformCalibration(params: {
       "careerValue",
       "resumeStoryClarity",
     ];
-    const mins: Partial<Record<keyof Omit<ScoreBreakdown, "total">, number>> = {
+    const mins: Partial<Record<LegacyScoreDimension, number>> = {
       stackFit: 16,
       recruiterFriendliness: 10,
       functionalOverlap: 8,
@@ -844,7 +844,7 @@ export function applyAssociateEntryBackendPlatformCalibration(params: {
   }
   if (next.total > targetHi) {
     let guard = 0;
-    const dims: Array<keyof Omit<ScoreBreakdown, "total">> = [
+    const dims: Array<LegacyScoreDimension> = [
       "stackFit",
       "recruiterFriendliness",
       "functionalOverlap",
@@ -853,7 +853,7 @@ export function applyAssociateEntryBackendPlatformCalibration(params: {
       "careerValue",
       "resumeStoryClarity",
     ];
-    const mins: Partial<Record<keyof Omit<ScoreBreakdown, "total">, number>> = {
+    const mins: Partial<Record<LegacyScoreDimension, number>> = {
       stackFit: 16,
       recruiterFriendliness: 10,
       functionalOverlap: 8,
@@ -1005,7 +1005,7 @@ export function applyFdeBuilderScoreCalibration(params: {
   next.recruiterFriendliness = Math.min(12, next.recruiterFriendliness);
   next.careerValue = Math.min(10, next.careerValue);
 
-  type Dim = keyof Omit<ScoreBreakdown, "total">;
+  type Dim = LegacyScoreDimension;
   const order: Dim[] = [
     "stackFit",
     "recruiterFriendliness",
@@ -1066,7 +1066,7 @@ export function applyVagueEarlyStageAiCalibration(params: {
   if (!escapeRecruiterCap) {
     next.recruiterFriendliness = Math.min(next.recruiterFriendliness, 10);
   }
-  type Dim = keyof Omit<ScoreBreakdown, "total">;
+  type Dim = LegacyScoreDimension;
   const order: Dim[] = [
     "stackFit",
     "functionalOverlap",
@@ -1128,7 +1128,7 @@ export function applyResearchHeavyAiCalibration(params: {
 
   const targetLo = 55;
   const targetHi = 60;
-  type Dim = keyof Omit<ScoreBreakdown, "total">;
+  type Dim = LegacyScoreDimension;
   const downOrder: Dim[] = [
     "stackFit",
     "resumeStoryClarity",
@@ -1217,7 +1217,7 @@ export function applyFintechGoPrimaryCalibration(params: {
 
   const targetLo = 66;
   const targetHi = 70;
-  type Dim = keyof Omit<ScoreBreakdown, "total">;
+  type Dim = LegacyScoreDimension;
   const downOrder: Dim[] = [
     "stackFit",
     "resumeStoryClarity",
@@ -1301,7 +1301,7 @@ export function applyFoundingEngineerStretchCalibration(params: {
 
   const targetLo = 77;
   const targetHi = 79;
-  type Dim = keyof Omit<ScoreBreakdown, "total">;
+  type Dim = LegacyScoreDimension;
   const downOrder: Dim[] = ["stackFit", "resumeStoryClarity", "recruiterFriendliness", "levelFit"];
   const mins: Partial<Record<Dim, number>> = {
     stackFit: 21,
@@ -1374,7 +1374,7 @@ export function applyCredentialHeavyFintechAlgorithmCalibration(params: {
 
   const targetLo = 35;
   const targetHi = 45;
-  type Dim = keyof Omit<ScoreBreakdown, "total">;
+  type Dim = LegacyScoreDimension;
   const downOrder: Dim[] = [
     "stackFit",
     "resumeStoryClarity",
@@ -1478,7 +1478,7 @@ export function applyGoDistributedDataInfraCalibration(params: {
 
   const targetLo = 48;
   const targetHi = 55;
-  type Dim = keyof Omit<ScoreBreakdown, "total">;
+  type Dim = LegacyScoreDimension;
   const downOrder: Dim[] = [
     "stackFit",
     "resumeStoryClarity",
@@ -1572,7 +1572,7 @@ export function applyCharlieHealthProductCalibration(params: {
   const conservativeBar =
     Boolean(rules.productionBarCompetitivePool) && isNonTraditionalEarlyCareerProfile(userProfile);
 
-  type Dim = keyof Omit<ScoreBreakdown, "total">;
+  type Dim = LegacyScoreDimension;
   const bands: Record<Dim, [number, number]> = conservativeBar
     ? {
         stackFit: [18, 21],

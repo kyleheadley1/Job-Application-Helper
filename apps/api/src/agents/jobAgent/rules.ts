@@ -24,6 +24,10 @@ import {
   jdIsStructurallyVague,
   profileHasGoDataInfraProductionEvidence,
 } from '../../lib/scoringOutputPolish.js';
+import {
+  detectCompetitivePoolSignals,
+  isVentureFundedStartupShape,
+} from '../../lib/poolCompetitiveness.js';
 
 const includesAny = (haystack: string, needles: string[]): boolean =>
   needles.some((needle) => haystack.includes(needle));
@@ -421,16 +425,18 @@ export const evaluateRules = (
     isTraditionalCompany ||
     isFinance ||
     /\b(fortune\b|enterprise\s+saas|global\s+scale)\b/i.test(combinedText);
+  const competitivePoolSignals = detectCompetitivePoolSignals(job, combinedText);
   const productionBarCompetitivePool =
-    !earlyCareerFriendlyRole &&
-    !associateEntryRole &&
-    !researchHeavyAiRole &&
-    !credentialHeavyFintechAlgorithm &&
-    !foundingEngineerStretch &&
-    !goDistributedDataInfraCandidateGap &&
-    productionOwnershipJd &&
-    twoPlusProfessionalBar &&
-    competitiveHiringContext;
+    (!earlyCareerFriendlyRole &&
+      !associateEntryRole &&
+      !researchHeavyAiRole &&
+      !credentialHeavyFintechAlgorithm &&
+      !foundingEngineerStretch &&
+      !goDistributedDataInfraCandidateGap &&
+      productionOwnershipJd &&
+      twoPlusProfessionalBar &&
+      competitiveHiringContext) ||
+    competitivePoolSignals.signalCount >= 3;
 
   if (degreeRequiredSignal && degreeEquivalenceEscape) {
     notes.push(
@@ -595,8 +601,10 @@ export const evaluateRules = (
   }
 
   const coreLang = analyzeCoreLanguageRequirement(job, profile);
+  const ventureFundedStartup = isVentureFundedStartupShape(combinedText);
   const matureStructuredEmployer =
-    isMatureStructuredEmployer(job.company ?? '', combinedText) || harshEmployerContext;
+    !ventureFundedStartup &&
+    (isMatureStructuredEmployer(job.company ?? '', combinedText) || harshEmployerContext);
   const explicitCoreLanguageMismatch =
     matureStructuredEmployer &&
     coreLang.explicitHardRequirement &&

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  applyHardGateCaps,
   clampScoreToCategoryMaxes,
   finalizeScore,
   hasHardGateNote,
@@ -8,6 +7,9 @@ import {
   resolveRecommendation,
   sumScoreBreakdown,
 } from "../../lib/scoringCaps.js";
+import { computeCompositeScore, resolveCompositeRecommendation } from "../../lib/compositeScoreModel.js";
+import { userProfile } from "../../config/userProfile.js";
+import type { ExtractedJobData } from "../../types/job.js";
 import type { RuleEvaluation, ScoreBreakdown } from "../../types/scoring.js";
 
 const cleanRules = (): RuleEvaluation => ({
@@ -28,6 +30,18 @@ const cleanRules = (): RuleEvaluation => ({
   notes: [],
 });
 
+const makeJob = (): ExtractedJobData => ({
+  company: "TestCo",
+  title: "Software Engineer",
+  stack: ["TypeScript"],
+  requiredSkills: [],
+  preferredSkills: [],
+  domainTags: [],
+  responsibilities: [],
+  requirements: [],
+  remoteType: "remote",
+});
+
 const highScore = (): ScoreBreakdown => ({
   stackFit: 18,
   levelFit: 17,
@@ -39,8 +53,8 @@ const highScore = (): ScoreBreakdown => ({
   total: 0,
 });
 
-describe("scoring caps and recommendations", () => {
-  it("clampScoreToCategoryMaxes fits legacy pre-realignment breakdowns into new caps", () => {
+describe("scoring caps and composite model", () => {
+  it("clampScoreToCategoryMaxes fits legacy breakdowns into rubric caps", () => {
     const legacy = clampScoreToCategoryMaxes({
       stackFit: 22,
       levelFit: 14,
@@ -53,57 +67,34 @@ describe("scoring caps and recommendations", () => {
     });
     expect(legacy.stackFit).toBe(20);
     expect(legacy.resumeStoryClarity).toBe(10);
-    expect(legacy.total).toBeLessThanOrEqual(sumScoreBreakdown(legacy));
   });
 
-  it("total equals min(sum, lowest hard-gate cap)", () => {
-    const sum = sumScoreBreakdown(highScore());
-    const capped = applyHardGateCaps(highScore(), { ...cleanRules(), seniorityOverreach: true });
-    expect(sum).toBeGreaterThan(66);
-    expect(capped.total).toBe(66);
-    expect(capped.stackFit).toBe(highScore().stackFit);
-  });
-
-  it("stackMismatch Tier 1 caps stackFit, resumeStoryClarity, and total", () => {
-    const capped = applyHardGateCaps(highScore(), {
-      ...cleanRules(),
-      stackMismatch: true,
-      coreLanguageGap: ["PHP"],
+  it("hard gate fires before composite scoring", () => {
+    const composite = computeCompositeScore({
+      rawScore: highScore(),
+      rules: { ...cleanRules(), seniorityOverreach: true },
+      extracted: makeJob(),
+      profile: userProfile,
     });
-    expect(capped.stackFit).toBeLessThanOrEqual(10);
-    expect(capped.resumeStoryClarity).toBeLessThanOrEqual(5);
-    expect(capped.total).toBeLessThanOrEqual(74);
+    expect(composite.recommendation).toBe("no");
+    expect(composite.score.total).toBe(25);
   });
 
-  it("adjacentFrameworkGap caps stackFit at Tier 2 max without full stackMismatch", () => {
-    const capped = applyHardGateCaps(highScore(), {
-      ...cleanRules(),
-      stackMismatch: false,
-      adjacentFrameworkGap: ["Vue"],
+  it("composite final = round(capability × survivability)", () => {
+    const composite = computeCompositeScore({
+      rawScore: highScore(),
+      rules: cleanRules(),
+      extracted: makeJob(),
+      profile: userProfile,
     });
-    expect(capped.stackFit).toBeLessThanOrEqual(15);
-    expect(capped.stackFit).toBeGreaterThan(10);
-    expect(capped.total).toBe(
-      highScore().levelFit +
-        15 +
-        highScore().domainFit +
-        highScore().resumeStoryClarity +
-        highScore().functionalOverlap +
-        highScore().recruiterFriendliness +
-        highScore().careerValue,
+    expect(composite.score.capability).toBeGreaterThan(0);
+    expect(composite.score.survivability).toBeGreaterThanOrEqual(0.3);
+    expect(composite.score.total).toBe(
+      Math.round((composite.score.capability ?? 0) * (composite.score.survivability ?? 0)),
     );
   });
 
-  it("explicit core language caps stackFit and total", () => {
-    const capped = applyHardGateCaps(highScore(), {
-      ...cleanRules(),
-      explicitCoreLanguageMismatch: true,
-    });
-    expect(capped.stackFit).toBeLessThanOrEqual(11);
-    expect(capped.total).toBeLessThanOrEqual(74);
-  });
-
-  it("finalizeScore clamps categories to new maxes", () => {
+  it("finalizeScore without context clamps categories only", () => {
     const out = finalizeScore(
       {
         stackFit: 99,
@@ -118,31 +109,25 @@ describe("scoring caps and recommendations", () => {
       cleanRules(),
     );
     expect(out.stackFit).toBe(20);
-    expect(out.levelFit).toBe(20);
     expect(out.functionalOverlap).toBe(15);
-    expect(out.total).toBe(100);
+    expect(out.total).toBe(sumScoreBreakdown(out));
   });
 
-  it("maps recommendations from capped total (single table)", () => {
-    expect(mapRecommendationFromScore(86)).toBe("yes");
-    expect(mapRecommendationFromScore(80)).toBe("yes");
-    expect(mapRecommendationFromScore(72)).toBe("selective_yes");
-    expect(mapRecommendationFromScore(65)).toBe("no");
+  it("maps recommendations from composite final score heuristics", () => {
+    expect(mapRecommendationFromScore(75)).toBe("apply_cold");
+    expect(mapRecommendationFromScore(55)).toBe("referral_gated");
+    expect(mapRecommendationFromScore(40)).toBe("stretch_signal");
+    expect(mapRecommendationFromScore(25)).toBe("skip");
   });
 
-  it("resolveRecommendation applies gate nuance at 78–84", () => {
-    expect(resolveRecommendation(82, cleanRules(), 8)).toBe("yes");
-    expect(resolveRecommendation(82, { ...cleanRules(), locationMismatch: true }, 8)).toBe("selective_yes");
+  it("2x2 matrix resolves referral_gated for strong capability + low survivability", () => {
+    expect(resolveCompositeRecommendation(78, 0.4)).toBe("referral_gated");
+    expect(resolveCompositeRecommendation(78, 0.6)).toBe("apply_cold");
+    expect(resolveRecommendation(32, cleanRules(), 8, 78, 0.4)).toBe("referral_gated");
+  });
+
+  it("hasHardGateNote detects gate flags", () => {
     expect(hasHardGateNote({ ...cleanRules(), locationMismatch: true })).toBe(true);
-  });
-
-  it("60–69 requires upside for selective_yes", () => {
-    expect(resolveRecommendation(65, cleanRules(), 7)).toBe("no");
-    expect(resolveRecommendation(65, cleanRules(), 8)).toBe("selective_yes");
-  });
-
-  it("credential-heavy and Go data-infra gap force no", () => {
-    expect(resolveRecommendation(90, { ...cleanRules(), credentialHeavyFintechAlgorithm: true }, 9)).toBe("no");
-    expect(resolveRecommendation(72, { ...cleanRules(), goDistributedDataInfraCandidateGap: true }, 8)).toBe("no");
+    expect(hasHardGateNote(cleanRules())).toBe(false);
   });
 });

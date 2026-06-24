@@ -18,6 +18,13 @@ import {
   whyCompanyAssetSystemPrompt,
 } from "./prompts.js";
 import { formatWhyCompanyForSIE, stripPastedJdHeaderFromCoverLetter } from "../../tools/triageStructuredNormalize.js";
+import { toLegacyRecommendation } from "../../lib/recommendationMapping.js";
+
+const legacyRecBand = (rec: JobRecord["recommendation"]): "yes" | "selective_yes" | "no" =>
+  toLegacyRecommendation(rec);
+
+const isSkipRec = (rec: JobRecord["recommendation"]): boolean =>
+  rec === "no" || rec === "skip";
 
 const CoverLetterOut = z.object({ coverLetter: z.string().min(1) });
 const WhyCompanyOut = z.object({ whyCompany: z.string().min(1) });
@@ -92,8 +99,8 @@ const polishCoverLetterTextbox = (text: string, recommendation: JobRecord["recom
       keptSentences.push(sentence);
       continue;
     }
-    if (recommendation === "yes") continue;
-    if (recommendation === "selective_yes") {
+    if (legacyRecBand(recommendation) === "yes") continue;
+    if (legacyRecBand(recommendation) === "selective_yes") {
       if (!keptCaveat && caveatHelpfulRe.test(sentence)) {
         caveatSentence = sentence;
         keptCaveat = true;
@@ -141,8 +148,8 @@ const caveatHits = (text: string): number =>
 
 const hasExcessiveCaveatLanguage = (text: string, recommendation: JobRecord["recommendation"]): boolean => {
   const hits = caveatHits(text.toLowerCase());
-  if (recommendation === "yes") return hits > 1;
-  if (recommendation === "selective_yes") return hits > 2;
+  if (legacyRecBand(recommendation) === "yes") return hits > 1;
+  if (legacyRecBand(recommendation) === "selective_yes") return hits > 2;
   return hits > 3;
 };
 
@@ -197,18 +204,18 @@ export const buildDeterministicGeneratedAssets = (
           evidenceBits[1],
         ).replace(/\.$/, "")}.`
       : `${normalizeSnippetStart(evidenceBits[0] ?? profile.flagshipProjects[0]?.summary ?? profile.headline).replace(/\.$/, ".")}`;
-  const p3ByBand: Record<JobRecord["recommendation"], string> = {
+  const p3ByBand: Record<"yes" | "selective_yes" | "no", string> = {
     yes: `I'd be excited to contribute quickly in this role and keep building practical product value with your team. If helpful, I can share concrete examples of how I'd approach the first few priorities in your posting.`,
     selective_yes: `If this scope is a match, I'd welcome a conversation on how I'd contribute quickly while ramping where needed. I care most about being clear on near-term impact and delivering consistently from there.`,
     no: `I recognize this role may be a stretch in parts, but I'd still bring practical execution and clear communication from day one. If there is flexibility on exact background profile, I'd be glad to discuss where I can add immediate value.`,
   };
-  const rawCoverLetter = [p1, p2, p3ByBand[job.recommendation]].join("\n\n");
+  const rawCoverLetter = [p1, p2, p3ByBand[legacyRecBand(job.recommendation)]].join("\n\n");
   const coverLetter = enforceCoverLetterWordBand(polishCoverLetterTextbox(rawCoverLetter, job.recommendation), rawCoverLetter, {
     min: 120,
     max: 200,
   });
 
-  const whyTone: Record<JobRecord["recommendation"], string> = {
+  const whyTone: Record<"yes" | "selective_yes" | "no", string> = {
     yes: "This aligns with the direction I want to keep building in.",
     selective_yes: "This is the kind of role I'd pursue where overlap is strong and growth is realistic.",
     no: "This looks more selective for my background, but the role shape still connects to work I care about.",
@@ -218,7 +225,7 @@ export const buildDeterministicGeneratedAssets = (
       guidance.priorities[1] ?? "clear product impact"
     }.`,
     `A relevant overlap from my background is ${guidance.selectedProjectSummaries[0] ?? profile.flagshipProjects[0]?.summary ?? profile.headline}.`,
-    whyTone[job.recommendation],
+    whyTone[legacyRecBand(job.recommendation)],
   ].join(" ");
 
   const talkingPoints: string[] = [];
@@ -265,7 +272,7 @@ export const buildDeterministicGeneratedAssets = (
       "I approach fit risks directly, but keep focus on where I can deliver immediate value in this role.",
     );
   }
-  const normalizedTalkingPoints = uniqueKeepOrder(talkingPoints).slice(0, job.recommendation === "no" ? 3 : 5);
+  const normalizedTalkingPoints = uniqueKeepOrder(talkingPoints).slice(0, isSkipRec(job.recommendation) ? 3 : 5);
 
   const bulletLeads =
     recommendedResume === "SIE"
@@ -291,7 +298,7 @@ export const buildDeterministicGeneratedAssets = (
             "Built API-first product features and internal tooling with a backend-leaning full-stack approach.",
             "Collaborated with stakeholders to scope and ship pragmatic increments tied to product needs.",
           ];
-  const tailoredBulletCandidates = uniqueKeepOrder([...baseBullets, ...roleBullets]).slice(0, job.recommendation === "no" ? 3 : 5);
+  const tailoredBulletCandidates = uniqueKeepOrder([...baseBullets, ...roleBullets]).slice(0, isSkipRec(job.recommendation) ? 3 : 5);
 
   const emphasize: string[] = [
     ...profile.recurringStory.slice(0, 2),
@@ -368,7 +375,7 @@ export type GenerateJobAssetsResult = {
 export const generateJobAssets = async (params: GenerateJobAssetsParams): Promise<GenerateJobAssetsResult> => {
   const { job, userProfile, selectedResumeContext, force } = params;
 
-  if (job.recommendation === "no" && !force) {
+  if (isSkipRec(job.recommendation) && !force) {
     return {
       generated: {},
       skipped: true,

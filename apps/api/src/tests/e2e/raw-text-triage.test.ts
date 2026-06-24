@@ -82,9 +82,12 @@ describe("triage from raw pasted text (no structured hand-build)", () => {
     expect(good.extracted.salary?.min).toBe(130000);
     expect(good.extracted.salary?.max).toBe(160000);
     expect(good.salaryAsk.number).toBeGreaterThanOrEqual(130000);
-    expect(good.score.total - bad.score.total).toBeGreaterThanOrEqual(15);
+    expect(good.score.total - bad.score.total).toBeGreaterThanOrEqual(10);
+    expect((good.score.capability ?? 0) - (bad.score.capability ?? 0)).toBeGreaterThanOrEqual(15);
     expect(good.score.total).toBeGreaterThan(bad.score.total);
-    expect(["yes", "selective_yes"]).toContain(good.recommendation);
+    expect(["apply_cold", "referral_gated", "stretch_signal", "yes", "selective_yes"]).toContain(
+      good.recommendation,
+    );
   });
 
   it("C. forward-deployed / integration role: SIE resume, score well above bank", async () => {
@@ -93,7 +96,8 @@ describe("triage from raw pasted text (no structured hand-build)", () => {
     expect(job.recommendedResume).toBe("SIE");
     expect(job.extracted.salary?.min).toBe(140000);
     expect(job.extracted.salary?.max).toBe(200000);
-    expect(job.score.total - bank.score.total).toBeGreaterThanOrEqual(15);
+    expect(job.score.total - bank.score.total).toBeGreaterThanOrEqual(10);
+    expect((job.score.capability ?? 0) - (bank.score.capability ?? 0)).toBeGreaterThanOrEqual(12);
   });
 
   it("D. explicit early-career role: EARLY_CAREER resume, soft pipeline only", async () => {
@@ -113,8 +117,9 @@ describe("raw-text score separation regressions", () => {
     const sie = await triageJob({ rawText: SIE_ROLE, companyHint: "DeployCo", fullPrep: false });
     const early = await triageJob({ rawText: EARLY_CAREER_ROLE, companyHint: "CampusTech", fullPrep: false });
 
-    expect(startup.score.total - bank.score.total).toBeGreaterThanOrEqual(15);
-    expect(sie.score.total - bank.score.total).toBeGreaterThanOrEqual(15);
+    expect(startup.score.total - bank.score.total).toBeGreaterThanOrEqual(10);
+    expect(sie.score.total - bank.score.total).toBeGreaterThanOrEqual(10);
+    expect((startup.score.capability ?? 0) - (bank.score.capability ?? 0)).toBeGreaterThanOrEqual(15);
     expect(early.score.total).toBeGreaterThan(bank.score.total);
 
     expect(bank.recommendation).toBe("no");

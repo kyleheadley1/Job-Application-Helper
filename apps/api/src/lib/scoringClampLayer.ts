@@ -1,4 +1,5 @@
 import { SCORING_CLAMP_POLICY } from "../config/scoringClampPolicy.js";
+import { STACK_MISMATCH_CAPS } from "../config/scoringPolicy.js";
 import type { ExtractedJobData } from "../types/job.js";
 import type { HardRuleFlag, RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
 import { normalizeText } from "./text.js";
@@ -218,6 +219,14 @@ export const applyScoringClampLayer = (params: {
       score.functionalOverlap,
       SCORING_CLAMP_POLICY.storyFunctionalUnderCoreLanguageGap.functionalOverlapMax,
     );
+  }
+
+  if (rules.stackMismatch) {
+    score.stackFit = Math.min(score.stackFit, STACK_MISMATCH_CAPS.tier1StackFitMax);
+  } else if ((rules.adjacentFrameworkGap?.length ?? 0) > 0) {
+    score.stackFit = Math.min(score.stackFit, STACK_MISMATCH_CAPS.tier2StackFitMax);
+  } else if (rules.explicitCoreLanguageMismatch) {
+    score.stackFit = Math.min(score.stackFit, 11);
   }
 
   // Rule 2 — stack shape vs keyword match

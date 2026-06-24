@@ -1,3 +1,4 @@
+import { isApplyRecommendation, toLegacyRecommendation } from "../../lib/recommendationMapping.js";
 import type { ExtractedJobData } from "../../types/job.js";
 import type { Recommendation, RuleEvaluation, SalaryAsk, ScoreBreakdown } from "../../types/scoring.js";
 import { normalizeText } from "../../lib/text.js";
@@ -30,6 +31,7 @@ export const computeSalaryAsk = (params: {
   rules: RuleEvaluation;
 }): SalaryAsk => {
   const { extracted: job, score, recommendation, rules } = params;
+  const legacyRec = toLegacyRecommendation(recommendation);
   const posted = resolvePostedSalary(job);
   const postedMin = posted.min;
   const postedMax = posted.max;
@@ -44,9 +46,9 @@ export const computeSalaryAsk = (params: {
   if (postedMin && postedMax) {
     const band = postedMax - postedMin;
     let conservativeAdjustment: number =
-      recommendation === "yes"
+      legacyRec === "yes"
         ? 0.55
-        : recommendation === "selective_yes"
+        : legacyRec === "selective_yes"
           ? 0.51
           : score.total >= 70
             ? 0.48
@@ -171,7 +173,7 @@ export const computeSalaryAsk = (params: {
   }
   if (rules.financePenalty || rules.traditionalCompanyPenalty) base -= 5000;
   if (recommendation === "no") base -= 10000;
-  if (score.total >= 80 && recommendation === "yes") base += 5000;
+  if (score.total >= 80 && legacyRec === "yes") base += 5000;
 
   const spread = score.total >= 80 ? 12000 : 10000;
   return { number: roundToNearest5k(base), rangeMin: base - spread, rangeMax: base + spread };

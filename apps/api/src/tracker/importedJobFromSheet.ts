@@ -80,8 +80,11 @@ function defaultTrackerPriority(scoreTotal: number): string {
 }
 
 function defaultRecommendedAction(rec: JobRecord['recommendation']): string {
-  if (rec === 'yes') return 'Apply with urgency';
-  if (rec === 'selective_yes') return 'Apply selectively with caveats';
+  if (rec === 'apply_cold' || rec === 'yes') return 'Apply with urgency';
+  if (rec === 'referral_gated' || rec === 'stretch_signal' || rec === 'selective_yes') {
+    return 'Apply selectively with caveats';
+  }
+  if (rec === 'no') return 'Do not apply — hard gate';
   return 'Skip unless special reason';
 }
 
