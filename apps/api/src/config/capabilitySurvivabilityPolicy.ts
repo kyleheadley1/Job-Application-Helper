@@ -150,7 +150,7 @@ export const resolveSubFactorPenaltyName = (
   key: SurvivabilitySubFactorKey,
   rules: RuleEvaluation,
 ): string => {
-  if (key === "credentialSignal" && rules.explicitDegreeRisk) {
+  if (key === "credentialSignal" && rules.explicitDegreeRisk && !rules.degreeHasEquivalencyClause) {
     return "degree requirement";
   }
   return SURVIVABILITY_SUB_FACTOR_META[key].label.toLowerCase();

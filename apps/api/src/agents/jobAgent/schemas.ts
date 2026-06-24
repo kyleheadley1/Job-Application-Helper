@@ -132,12 +132,20 @@ export const RuleEvaluationSchema = z.object({
   productionBarCompetitivePool: z.boolean().optional().default(false),
   goDistributedDataInfraRole: z.boolean().optional().default(false),
   goDistributedDataInfraCandidateGap: z.boolean().optional().default(false),
+  degreeHasEquivalencyClause: z.boolean().optional().default(false),
+  capabilityGap: z
+    .object({
+      kind: z.enum(["specialization", "stack_depth"]),
+      reason: z.string(),
+    })
+    .optional(),
   hardRuleNotes: z.array(z.string()).optional().default([]),
   hardRuleFlags: z
     .array(
       z.object({
         id: z.string(),
         message: z.string(),
+        citedLanguages: z.array(z.string()).optional(),
       }),
     )
     .optional()

@@ -1,7 +1,8 @@
-import { normalizeText } from "./text.js";
+import { languagePresentInJd, suppressAbsentLanguageClaims } from "./jdLanguagePresence.js";
 import type { ExtractedJobData } from "../types/job.js";
 import type { RuleEvaluation } from "../types/scoring.js";
 import type { UserProfile } from "../types/userProfile.js";
+import { normalizeText } from "./text.js";
 
 /** Canonical tech keys used for allowlisting and stripping. */
 export type TechCanon =
@@ -151,9 +152,9 @@ export function buildAllowedTechCanonicalSet(params: {
   collectTechFromText(jobBlobForAllowlist(params.extracted), allowed);
   if (params.userProfile) collectTechFromText(profileBlob(params.userProfile), allowed);
   const lang = params.rules?.explicitCoreLanguage?.toLowerCase();
-  if (lang === "go") allowed.add("go");
-  if (lang === "python") allowed.add("python");
-  if (lang === "java") allowed.add("java");
+  if (lang === "go" && languagePresentInJd("Go", params.extracted)) allowed.add("go");
+  if (lang === "python" && languagePresentInJd("Python", params.extracted)) allowed.add("python");
+  if (lang === "java" && languagePresentInJd("Java", params.extracted)) allowed.add("java");
   return allowed;
 }
 
@@ -217,12 +218,14 @@ export type VisibleSanitizeContext = {
 
 export function sanitizeVisibleRiskLine(text: string, ctx: VisibleSanitizeContext): string {
   if (!text.trim()) return text;
+  const suppressed = suppressAbsentLanguageClaims(text, ctx.extracted);
+  if (!suppressed.trim()) return "";
   const allowed = buildAllowedTechCanonicalSet({
     extracted: ctx.extracted,
     userProfile: ctx.userProfile,
     rules: ctx.rules,
   });
-  let t = stripEvaluatorJargon(text, ctx.extracted.company);
+  let t = stripEvaluatorJargon(suppressed, ctx.extracted.company);
   t = stripDisallowedTech(t, allowed);
   const evidenceBlob = normalizeText(
     [

@@ -8,6 +8,8 @@ import type { JobRecord } from '../../types/job.js';
 import { buildTrackerSpreadsheetFromJob } from '../../tracker/canonicalSpreadsheet.js';
 import { detectReferralPathway } from '../../lib/referralPathway.js';
 import { buildScoreDisplay } from '../../lib/scoreDisplayModel.js';
+import { guardCompositeRecommendation } from '../../lib/recommendationGuard.js';
+import { RECOMMENDATION_LABELS } from '../../config/capabilitySurvivabilityPolicy.js';
 import { evaluateRules } from './rules.js';
 import { scoreJob } from './scoring.js';
 import { computeSalaryAsk } from './salaryAsk.js';
@@ -113,9 +115,34 @@ export const triageJob = async (input: {
     referralPathwayNotes: referralPathway.referralPathwayNotes,
   });
 
-  const scoreWithDisplay = scoreDisplay
-    ? { ...scored.score, scoreDisplay }
-    : scored.score;
+  const finalRecommendation = guardCompositeRecommendation({
+    recommendation: scored.recommendation,
+    capability: scored.score.capability ?? 0,
+    survivability: scored.score.survivability ?? 0,
+    rules: scoredRules,
+    survivabilityPenalties: scoreDisplay?.survivabilityPenalties ?? [],
+    referralPathwayAvailable: referralPathway.referralPathwayAvailable,
+  });
+
+  const scoreDisplayFinal = buildScoreDisplay({
+    score: scored.score,
+    rules: scoredRules,
+    extracted,
+    recommendation: finalRecommendation,
+    referralPathwayAvailable: referralPathway.referralPathwayAvailable,
+    referralPathwayNotes: referralPathway.referralPathwayNotes,
+  });
+
+  const scoreWithDisplay = scoreDisplayFinal
+    ? {
+        ...scored.score,
+        scoreDisplay: scoreDisplayFinal,
+        recommendationLabel: RECOMMENDATION_LABELS[finalRecommendation],
+      }
+    : {
+        ...scored.score,
+        recommendationLabel: RECOMMENDATION_LABELS[finalRecommendation],
+      };
 
   const now = new Date().toISOString();
   const initialRecord: JobRecord = {
@@ -123,7 +150,7 @@ export const triageJob = async (input: {
     extracted,
     rules: scoredRules,
     score: scoreWithDisplay,
-    recommendation: scored.recommendation,
+    recommendation: finalRecommendation,
     referralPathwayAvailable: referralPathway.referralPathwayAvailable,
     referralPathwayNotes: referralPathway.referralPathwayNotes,
     salaryAsk,
@@ -161,22 +188,22 @@ export const triageJob = async (input: {
     },
     tracker: {
       priority:
-        scored.recommendation === 'apply_cold'
+        finalRecommendation === 'apply_cold'
           ? 'high'
-          : scored.recommendation === 'referral_gated' || scored.recommendation === 'stretch_signal'
+          : finalRecommendation === 'referral_gated' || finalRecommendation === 'stretch_signal'
             ? 'medium'
             : 'low',
       recommendedAction:
-        scored.recommendation === 'apply_cold'
+        finalRecommendation === 'apply_cold'
           ? 'Apply with urgency'
-          : scored.recommendation === 'referral_gated'
+          : finalRecommendation === 'referral_gated'
             ? 'Pursue via referral or heavily tailored apply'
-            : scored.recommendation === 'stretch_signal'
+            : finalRecommendation === 'stretch_signal'
               ? 'Apply selectively — signal-dependent'
-              : scored.recommendation === 'skip'
+              : finalRecommendation === 'skip'
                 ? 'Skip unless special reason'
                 : 'Do not apply — hard gate',
-      statusOutcome: scored.recommendation,
+      statusOutcome: finalRecommendation,
       shortlist: shouldShortlist(scored.score.total, 'to_review'),
       color: getTrackerColor('to_review', scored.score.total),
     },
@@ -187,7 +214,7 @@ export const triageJob = async (input: {
       {
         scoredAt: now,
         score: scored.score,
-        recommendation: scored.recommendation,
+        recommendation: finalRecommendation,
       },
     ],
   };

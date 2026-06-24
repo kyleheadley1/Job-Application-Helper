@@ -339,6 +339,24 @@ Build APIs with TypeScript and Node.js.
     expect(rules.notes.some((n) => /soft screen note/i.test(n))).toBe(true);
   });
 
+  it("sets degreeHasEquivalencyClause for or related experience wording", () => {
+    const rules = evaluateRules(
+      makeJob({
+        title: "Software Engineer II",
+        rawText: `
+Bachelor's or master's degree in Computer Science or related field, or related experience required.
+        `.trim(),
+        degreeRequirement: {
+          level: "required",
+          raw: "Bachelor's or master's or related experience required",
+        },
+      }),
+      userProfile,
+    );
+    expect(rules.degreeHasEquivalencyClause).toBe(true);
+    expect(rules.explicitDegreeRisk).toBe(false);
+  });
+
   it("does not flag credential-heavy when JD allows equivalent experience for the degree", () => {
     const rules = evaluateRules(
       makeJob({
