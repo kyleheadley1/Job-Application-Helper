@@ -25,6 +25,41 @@ export type LegacyScoreDimension =
   | "recruiterFriendliness"
   | "careerValue";
 
+export type SurvivabilityLever = "referral" | "resume" | "cover_letter" | "none";
+
+export type CapabilityBreakdown = {
+  stackFit: number;
+  levelFit: number;
+  functionalOverlap: number;
+};
+
+export type SurvivabilityDisplayRow = {
+  key: string;
+  label: string;
+  score: number;
+  weight: number;
+  contribution: number;
+  lever: SurvivabilityLever;
+  leverLabel: string;
+};
+
+export type SurvivabilityPenalty = {
+  message: string;
+  lever: SurvivabilityLever;
+  leverLabel: string;
+};
+
+export type ScoreDisplay = {
+  capability: number;
+  capabilityBreakdown: CapabilityBreakdown;
+  survivability: number;
+  final: number;
+  survivabilityRows: SurvivabilityDisplayRow[];
+  hardGates: string[];
+  survivabilityPenalties: SurvivabilityPenalty[];
+  actionLine: string;
+};
+
 export type ScoreBreakdown = {
   stackFit: number;
   levelFit: number;
@@ -35,9 +70,12 @@ export type ScoreBreakdown = {
   careerValue: number;
   /** Capability axis (stack + level + functional), 0–100. */
   capability?: number;
+  capabilityBreakdown?: CapabilityBreakdown;
   /** Survivability multiplier, 0.30–1.00. */
   survivability?: number;
   survivabilityBreakdown?: Record<string, number>;
+  /** UI-ready decomposition derived from capability × survivability model. */
+  scoreDisplay?: ScoreDisplay;
   /** Human-readable 2x2 quadrant label. */
   recommendationLabel?: string;
   /** Final score = round(capability × survivability), or hard-gate floor. */

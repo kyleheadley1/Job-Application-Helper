@@ -1,6 +1,4 @@
 import {
-  CAPABILITY_MAXES,
-  LEGACY_CAPABILITY_SOURCE_MAXES,
   RECOMMENDATION_LABELS,
   SURVIVABILITY_TUNING,
 } from "../config/capabilitySurvivabilityPolicy.js";
@@ -8,6 +6,10 @@ import type { ExtractedJobData } from "../types/job.js";
 import type { Recommendation, RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
 import type { UserProfile } from "../types/userProfile.js";
 import { evaluateHardGates } from "./hardGates.js";
+import {
+  computeCapabilityBreakdown,
+  type CapabilityBreakdown,
+} from "./scoreDisplayModel.js";
 import { computeSurvivability, type SurvivabilityBreakdown } from "./survivabilityScore.js";
 import { SCORE_CATEGORY_MAXES } from "../config/scoringPolicy.js";
 
@@ -21,32 +23,23 @@ const clampCategory = (score: ScoreBreakdown): ScoreBreakdown => ({
   careerValue: Math.min(SCORE_CATEGORY_MAXES.careerValue, Math.max(0, score.careerValue)),
   total: score.total,
   capability: score.capability,
+  capabilityBreakdown: score.capabilityBreakdown,
   survivability: score.survivability,
   survivabilityBreakdown: score.survivabilityBreakdown,
+  scoreDisplay: score.scoreDisplay,
   recommendationLabel: score.recommendationLabel,
 });
 
-const scaleToCapability = (raw: number, legacyMax: number, capabilityMax: number): number =>
-  Math.round((raw / legacyMax) * capabilityMax);
-
 export const computeCapability = (rawScore: ScoreBreakdown): number => {
-  const stack = scaleToCapability(
-    rawScore.stackFit,
-    LEGACY_CAPABILITY_SOURCE_MAXES.stackFit,
-    CAPABILITY_MAXES.stackFit,
+  const breakdown = computeCapabilityBreakdown(rawScore);
+  return Math.min(
+    100,
+    breakdown.stackFit + breakdown.levelFit + breakdown.functionalOverlap,
   );
-  const level = scaleToCapability(
-    rawScore.levelFit,
-    LEGACY_CAPABILITY_SOURCE_MAXES.levelFit,
-    CAPABILITY_MAXES.levelFit,
-  );
-  const functional = scaleToCapability(
-    rawScore.functionalOverlap,
-    LEGACY_CAPABILITY_SOURCE_MAXES.functionalOverlap,
-    CAPABILITY_MAXES.functionalOverlap,
-  );
-  return Math.min(100, stack + level + functional);
 };
+
+export type { CapabilityBreakdown };
+export { computeCapabilityBreakdown };
 
 export const resolveCompositeRecommendation = (
   capability: number,
@@ -79,11 +72,18 @@ export const computeCompositeScore = (params: {
   const gate = evaluateHardGates(params.rules, params.extracted);
 
   if (gate.fired) {
-    const capability = computeCapability(clamped);
+    const capabilityBreakdown = computeCapabilityBreakdown(clamped);
+    const capability = Math.min(
+      100,
+      capabilityBreakdown.stackFit +
+        capabilityBreakdown.levelFit +
+        capabilityBreakdown.functionalOverlap,
+    );
     return {
       score: {
         ...clamped,
         capability,
+        capabilityBreakdown,
         survivability: 0,
         total: SURVIVABILITY_TUNING.hardGateScoreFloor,
         recommendationLabel: RECOMMENDATION_LABELS.no,
@@ -95,7 +95,13 @@ export const computeCompositeScore = (params: {
     };
   }
 
-  const capability = computeCapability(clamped);
+  const capabilityBreakdown = computeCapabilityBreakdown(clamped);
+  const capability = Math.min(
+    100,
+    capabilityBreakdown.stackFit +
+      capabilityBreakdown.levelFit +
+      capabilityBreakdown.functionalOverlap,
+  );
   const survivabilityResult = computeSurvivability({
     extracted: params.extracted,
     rules: params.rules,
@@ -110,6 +116,7 @@ export const computeCompositeScore = (params: {
     score: {
       ...clamped,
       capability,
+      capabilityBreakdown,
       survivability: survivabilityResult.multiplier,
       survivabilityBreakdown: survivabilityResult,
       total: finalScore,

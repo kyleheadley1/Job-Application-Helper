@@ -3,11 +3,16 @@ import { useLocation, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { JobRecord } from "../types/job";
 import { ScoreBadge } from "../components/ScoreBadge";
-import { formatScoreCategory } from "../lib/scoreCategoryMaxes";
 import { StatusBadge } from "../components/StatusBadge";
 import { JsonPanel } from "../components/JsonPanel";
 import { hasJdSource, agencyDisclosureNote, jobHeaderLabel, salaryAskDisplay } from "../lib/jobDisplay";
 import { extractBoardMatchPercent } from "../lib/jobBoardMatch";
+import {
+  CAPABILITY_MAX_LABELS,
+  formatLeverTag,
+  getScoreDisplay,
+  leverClassName,
+} from "../lib/scoreDisplay";
 import { buildKeyRisks, decisionSummaryLine, selectTopFits } from "../lib/resultSummary";
 import {
   formatDuration,
@@ -201,12 +206,7 @@ export const JobResultPage = () => {
   }
   const topFits = selectTopFits(job, 2);
   const topRisks = buildKeyRisks(job, 5);
-  const hardRuleFlags = job.rules.hardRuleFlags ?? [];
-  const hardRules = job.rules.hardRuleNotes ?? [];
-  const hardRuleDisplay =
-    hardRuleFlags.length > 0
-      ? hardRuleFlags.map((flag) => flag.message)
-      : hardRules;
+  const scoreDisplay = getScoreDisplay(job.score);
   const summaryLine = decisionSummaryLine(job);
   const agencyNote = agencyDisclosureNote(job.extracted);
   const boardMatchPct = extractBoardMatchPercent(job.extracted.rawText);
@@ -233,7 +233,10 @@ export const JobResultPage = () => {
       <div className="grid cols2">
         <article className="card">
           <h3>Decision</h3>
-          <p>Apply: {job.recommendation}</p>
+          <p className="decisionRecommendation">Apply: {job.recommendation}</p>
+          {scoreDisplay?.actionLine ? (
+            <p className="actionLine">{scoreDisplay.actionLine}</p>
+          ) : null}
           {job.referralPathwayAvailable ? (
             <p className="pill neutral" title={job.referralPathwayNotes ?? undefined}>
               Referral pathway available
@@ -275,28 +278,90 @@ export const JobResultPage = () => {
         </article>
         <article className="card">
           <h3>Score Breakdown</h3>
-          {job.score.capability != null ? (
-            <ul>
-              <li>Capability: {job.score.capability}/100</li>
-              <li>Survivability: {(job.score.survivability ?? 0).toFixed(2)}</li>
-              <li>Final: {job.score.total}/100</li>
-            </ul>
-          ) : null}
-          <h4>Category detail</h4>
-          <ul>
-            <li>Stack: {formatScoreCategory(job.score.stackFit, "stackFit")}</li>
-            <li>Level: {formatScoreCategory(job.score.levelFit, "levelFit")}</li>
-            <li>Domain: {formatScoreCategory(job.score.domainFit, "domainFit")}</li>
-            <li>Story: {formatScoreCategory(job.score.resumeStoryClarity, "resumeStoryClarity")}</li>
-            <li>Functional: {formatScoreCategory(job.score.functionalOverlap, "functionalOverlap")}</li>
-            <li>Recruiter: {formatScoreCategory(job.score.recruiterFriendliness, "recruiterFriendliness")}</li>
-            <li>Career value: {formatScoreCategory(job.score.careerValue, "careerValue")}</li>
-          </ul>
-          <h4>Hard-rule flags</h4>
-          {hardRuleDisplay.length ? (
-            <ul>{hardRuleDisplay.map((note) => <li key={note}>{note}</li>)}</ul>
+          {scoreDisplay ? (
+            <>
+              <div className="scoreSection">
+                <h4>Capability: {scoreDisplay.capability}/100</h4>
+                <ul className="scoreDecomp">
+                  <li>
+                    Stack fit{" "}
+                    <span className="scoreValue">
+                      {scoreDisplay.capabilityBreakdown.stackFit}/{CAPABILITY_MAX_LABELS.stackFit}
+                    </span>
+                  </li>
+                  <li>
+                    Level fit{" "}
+                    <span className="scoreValue">
+                      {scoreDisplay.capabilityBreakdown.levelFit}/{CAPABILITY_MAX_LABELS.levelFit}
+                    </span>
+                  </li>
+                  <li>
+                    Functional overlap{" "}
+                    <span className="scoreValue">
+                      {scoreDisplay.capabilityBreakdown.functionalOverlap}/
+                      {CAPABILITY_MAX_LABELS.functionalOverlap}
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="scoreSection">
+                <h4>
+                  Survivability: {scoreDisplay.survivability.toFixed(2)}{" "}
+                  <span className="muted">(multiplier on capability)</span>
+                </h4>
+                <ul className="scoreDecomp">
+                  {scoreDisplay.survivabilityRows.map((row) => (
+                    <li key={row.key}>
+                      <span className="scoreFactor">{row.label}</span>{" "}
+                      <span className="scoreValue">{row.score.toFixed(2)}</span>{" "}
+                      <span className={leverClassName(row.lever)}>
+                        {formatLeverTag(row.lever, row.leverLabel)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <p className="scoreFinal">
+                Final: {scoreDisplay.final}/100{" "}
+                <span className="muted">
+                  (round({scoreDisplay.capability} × {scoreDisplay.survivability.toFixed(2)}))
+                </span>
+              </p>
+
+              <div className="scoreSection">
+                <h4>Hard gates (auto-disqualify)</h4>
+                {scoreDisplay.hardGates.length ? (
+                  <ul>{scoreDisplay.hardGates.map((gate) => <li key={gate}>{gate}</li>)}</ul>
+                ) : (
+                  <p className="muted">None — no auto-disqualifiers.</p>
+                )}
+              </div>
+
+              <div className="scoreSection">
+                <h4>Survivability penalties</h4>
+                {scoreDisplay.survivabilityPenalties.length ? (
+                  <ul className="scoreDecomp">
+                    {scoreDisplay.survivabilityPenalties.map((penalty) => (
+                      <li key={penalty.message}>
+                        {penalty.message}{" "}
+                        <span className={leverClassName(penalty.lever)}>
+                          {formatLeverTag(penalty.lever, penalty.leverLabel)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="muted">None identified.</p>
+                )}
+              </div>
+            </>
           ) : (
-            <p className="muted">None identified.</p>
+            <p className="muted">
+              Full breakdown unavailable for this score. Re-run triage to refresh with the capability ×
+              survivability model.
+            </p>
           )}
         </article>
       </div>

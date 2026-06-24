@@ -91,10 +91,49 @@ export type ScoreBreakdown = {
   recruiterFriendliness: number;
   careerValue: number;
   capability?: number;
+  capabilityBreakdown?: {
+    stackFit: number;
+    levelFit: number;
+    functionalOverlap: number;
+  };
   survivability?: number;
   survivabilityBreakdown?: Record<string, number>;
+  scoreDisplay?: ScoreDisplay;
   recommendationLabel?: string;
   total: number;
+};
+
+export type SurvivabilityLever = "referral" | "resume" | "cover_letter" | "none";
+
+export type SurvivabilityDisplayRow = {
+  key: string;
+  label: string;
+  score: number;
+  weight: number;
+  contribution: number;
+  lever: SurvivabilityLever;
+  leverLabel: string;
+};
+
+export type SurvivabilityPenalty = {
+  message: string;
+  lever: SurvivabilityLever;
+  leverLabel: string;
+};
+
+export type ScoreDisplay = {
+  capability: number;
+  capabilityBreakdown: {
+    stackFit: number;
+    levelFit: number;
+    functionalOverlap: number;
+  };
+  survivability: number;
+  final: number;
+  survivabilityRows: SurvivabilityDisplayRow[];
+  hardGates: string[];
+  survivabilityPenalties: SurvivabilityPenalty[];
+  actionLine: string;
 };
 
 export type GeneratedAssets = {
