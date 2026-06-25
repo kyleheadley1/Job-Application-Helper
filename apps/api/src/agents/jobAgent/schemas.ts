@@ -139,6 +139,14 @@ export const RuleEvaluationSchema = z.object({
       reason: z.string(),
     })
     .optional(),
+  specializationGap: z
+    .object({
+      name: z.string(),
+      evidence: z.string(),
+      severity: z.enum(["high", "medium", "low"]),
+      lever: z.enum(["none", "portfolio", "upskill"]),
+    })
+    .optional(),
   hardRuleNotes: z.array(z.string()).optional().default([]),
   hardRuleFlags: z
     .array(

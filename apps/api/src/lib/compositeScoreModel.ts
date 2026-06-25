@@ -3,8 +3,12 @@ import {
   SURVIVABILITY_TUNING,
 } from "../config/capabilitySurvivabilityPolicy.js";
 import type { ExtractedJobData } from "../types/job.js";
-import type { Recommendation, RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
+import type { Recommendation, RuleEvaluation, ScoreBreakdown, SpecializationGap } from "../types/scoring.js";
 import type { UserProfile } from "../types/userProfile.js";
+import {
+  applySpecializationGapToBreakdown,
+  specializationGapIsNonAddressable,
+} from "./capabilityGap.js";
 import { evaluateHardGates } from "./hardGates.js";
 import {
   computeCapabilityBreakdown,
@@ -53,6 +57,18 @@ export const resolveCompositeRecommendation = (
   return "skip";
 };
 
+export const adjustRecommendationForSpecializationGap = (
+  recommendation: Recommendation,
+  gap: SpecializationGap | undefined,
+): Recommendation => {
+  if (!gap || !specializationGapIsNonAddressable(gap)) return recommendation;
+  if (recommendation === "referral_gated" || recommendation === "apply_cold") {
+    return "stretch_signal";
+  }
+  if (recommendation === "skip" && gap.severity === "high") return "skip";
+  return recommendation;
+};
+
 export type CompositeScoreResult = {
   score: ScoreBreakdown;
   recommendation: Recommendation;
@@ -95,7 +111,10 @@ export const computeCompositeScore = (params: {
     };
   }
 
-  const capabilityBreakdown = computeCapabilityBreakdown(clamped);
+  const capabilityBreakdown = applySpecializationGapToBreakdown(
+    computeCapabilityBreakdown(clamped),
+    params.rules.specializationGap,
+  );
   const capability = Math.min(
     100,
     capabilityBreakdown.stackFit +
@@ -110,7 +129,10 @@ export const computeCompositeScore = (params: {
     resumeText: params.resumeText,
   });
   const finalScore = Math.round(capability * survivabilityResult.multiplier);
-  const recommendation = resolveCompositeRecommendation(capability, survivabilityResult.multiplier);
+  const recommendation = adjustRecommendationForSpecializationGap(
+    resolveCompositeRecommendation(capability, survivabilityResult.multiplier),
+    params.rules.specializationGap,
+  );
 
   return {
     score: {

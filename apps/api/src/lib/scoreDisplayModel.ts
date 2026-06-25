@@ -22,6 +22,7 @@ import type {
   SurvivabilityPenalty,
 } from "../types/scoring.js";
 import { evaluateHardGates } from "./hardGates.js";
+import { applySpecializationGapToBreakdown } from "./capabilityGap.js";
 import {
   isStructuralOnly,
   selectDominantLever,
@@ -157,12 +158,30 @@ const flagPenaltyLeverLabel = (flagId: string): string => {
   return "NONE — structural, can't fix";
 };
 
+const specializationPenaltyLeverLabel = (lever: SurvivabilityLever): string => {
+  if (lever === "portfolio") return "build portfolio evidence";
+  if (lever === "upskill") return "upskill with real project work";
+  return "NONE — structural, can't fix in-loop";
+};
+
 export const buildSurvivabilityPenalties = (
   rules: RuleEvaluation,
   extracted: ExtractedJobData,
 ): SurvivabilityPenalty[] => {
   const penalties: SurvivabilityPenalty[] = [];
   const seen = new Set<string>();
+
+  if (rules.specializationGap) {
+    const gap = rules.specializationGap;
+    const lever: SurvivabilityLever =
+      gap.lever === "portfolio" ? "portfolio" : gap.lever === "upskill" ? "upskill" : "none";
+    penalties.push({
+      message: `${gap.name} — ${gap.evidence}`,
+      lever,
+      leverLabel: specializationPenaltyLeverLabel(lever),
+    });
+    seen.add("specializationGap");
+  }
 
   for (const flag of rules.hardRuleFlags ?? []) {
     if (flagIsHardGate(flag, rules, extracted)) continue;
@@ -257,7 +276,8 @@ export const deriveActionLine = (params: {
   if (
     recommendation === "referral_gated" &&
     referralPathwayAvailable &&
-    dominant?.lever === "referral"
+    dominant?.lever === "referral" &&
+    !params.rules.specializationGap
   ) {
     const source = pathwaySource(referralPathwayNotes);
     return `Use the ${source} connection — a referral routes around the ${dominant.penaltyName}.`;
@@ -268,6 +288,17 @@ export const deriveActionLine = (params: {
     recommendation === "selective_yes" ||
     recommendation === "stretch_signal"
   ) {
+    if (params.rules.specializationGap && recommendation === "stretch_signal") {
+      const gap = params.rules.specializationGap;
+      const pillar = gap.name.toLowerCase();
+      if (gap.lever === "portfolio") {
+        return `Stretch — strong on one pillar; the ${pillar} pillar is central and a referral won't close it in the loop. Best move: build ${pillar} evidence.`;
+      }
+      if (gap.lever === "upskill") {
+        return `Stretch — ${pillar} is load-bearing; close the gap with real project work, not application tactics.`;
+      }
+      return `Stretch — ${pillar} specialization gap is structural for this role.`;
+    }
     const prefix =
       recommendation === "stretch_signal"
         ? "Stretch fit — signal may carry you."
@@ -285,6 +316,9 @@ export const deriveActionLine = (params: {
   }
 
   if (recommendation === "skip") {
+    if (params.rules.specializationGap) {
+      return `Weak fit and weak odds — ${params.rules.specializationGap.name}.`;
+    }
     if (params.rules.capabilityGap) {
       return `Weak fit and weak odds — ${params.rules.capabilityGap.reason}.`;
     }
@@ -304,10 +338,16 @@ export const buildScoreDisplay = (params: {
   referralPathwayNotes?: string;
   hardGateReasons?: string[];
 }): ScoreDisplay | undefined => {
-  const capability = params.score.capability;
-  if (capability == null) return undefined;
+  const headlineCapability = params.score.capability;
+  if (headlineCapability == null && params.rules.specializationGap == null) return undefined;
 
-  const capabilityBreakdown = computeCapabilityBreakdown(params.score);
+  const capabilityBreakdown = applySpecializationGapToBreakdown(
+    computeCapabilityBreakdown(params.score),
+    params.rules.specializationGap,
+  );
+  const capabilityFromBreakdown = sumCapabilityBreakdown(capabilityBreakdown);
+  const capability =
+    params.rules.specializationGap != null ? capabilityFromBreakdown : (params.score.capability ?? capabilityFromBreakdown);
   assertCapabilityBreakdownMatchesHeadline(capability, capabilityBreakdown);
 
   const hardGates = buildHardGatesList(

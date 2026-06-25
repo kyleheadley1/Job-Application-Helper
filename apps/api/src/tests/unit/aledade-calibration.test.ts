@@ -70,6 +70,7 @@ Aledade — Software Engineer I
 Remote | Entry level | Healthcare technology
 Bachelor's degree (BS/BTech) required.
 Expertise in at least 1 server-side web technology (e.g. Node.js, Java, Python, Scala, C#, C++, Go, JVM).
+Internal referral from Etana Kopin welcomed.
 We build tools for primary care and value-based care.
   `.trim(),
 };
@@ -125,7 +126,8 @@ describe("Aledade calibration anchor", () => {
       resumeText: SWE_RESUME,
     });
     expect(pathway.referralPathwayAvailable).toBe(true);
-    expect(pathway.referralPathwayNotes).toContain("Codesmith");
+    expect(pathway.referralBasis).toBe("named_connection");
+    expect(pathway.referralPathwayNotes).toMatch(/Etana Kopin/i);
 
     const clamped = applyScoringClampLayer({
       score: ALEDADE_RAW_SCORE,
@@ -163,7 +165,7 @@ describe("Aledade calibration anchor", () => {
     expect(display?.dominantLever?.lever).toBe("referral");
     expect(display?.dominantLever?.penaltyName).toBe("degree requirement");
     expect(display?.dominantLever?.isCollapsedReferral).toBe(true);
-    expect(display?.actionLine).toMatch(/Codesmith/i);
+    expect(display?.actionLine).toMatch(/Etana Kopin/i);
     expect(display?.actionLine).toMatch(/degree requirement/i);
     expect(display?.actionLine).not.toMatch(/impact metric quality/i);
 
