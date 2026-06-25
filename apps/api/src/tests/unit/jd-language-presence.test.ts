@@ -178,7 +178,6 @@ const runOptimizelyScoringPipeline = (rules: RuleEvaluation) => {
     survivability: composite.score.survivability ?? 0,
     rules: rulesWithGap,
     survivabilityPenalties: display?.survivabilityPenalties ?? [],
-    referralPathwayAvailable: false,
   });
   const keyRisks = [
     ...(rulesWithGap.hardRuleNotes ?? []),

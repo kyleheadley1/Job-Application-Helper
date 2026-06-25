@@ -162,11 +162,10 @@ describe("Aledade calibration anchor", () => {
       referralPathwayNotes: pathway.referralPathwayNotes,
     });
 
-    expect(display?.dominantLever?.lever).toBe("referral");
-    expect(display?.dominantLever?.penaltyName).toBe("degree requirement");
-    expect(display?.dominantLever?.isCollapsedReferral).toBe(true);
+    expect(display?.dominantLever?.lever).not.toBe("referral");
     expect(display?.actionLine).toMatch(/tailored|Strong shot|Worth applying/i);
-    expect(display?.referralSubtext).toMatch(/Etana Kopin/i);
+    expect(display?.referralAdvice).toMatch(/Etana Kopin/i);
+    expect(display?.referralUrgency).toMatch(/strongly_advised|advised/);
     expect(display?.actionLine).not.toMatch(/Etana Kopin/i);
     expect(display?.actionLine).not.toMatch(/impact metric quality/i);
 
@@ -206,9 +205,8 @@ describe("Aledade calibration anchor", () => {
     });
 
     for (const jittered of jitteredLines) {
-      expect(jittered?.dominantLever?.penaltyName).toBe("degree requirement");
       expect(jittered?.actionLine).toMatch(/tailored|Strong shot|Worth applying/i);
-      expect(jittered?.referralSubtext).toMatch(/Etana Kopin/i);
+      expect(jittered?.referralAdvice).toMatch(/Etana Kopin/i);
       expect(jittered?.actionLine).not.toMatch(/impact metric quality/i);
     }
   });

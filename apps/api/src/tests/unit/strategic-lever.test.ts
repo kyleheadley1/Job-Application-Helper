@@ -57,10 +57,10 @@ const rowsFromBreakdown = (breakdown: SurvivabilityBreakdown): SurvivabilityDisp
   buildSurvivabilityRows(breakdown, RULES);
 
 describe("strategicLever selection", () => {
-  it("binding penalty at 0.45 outranks cosmetic penalty at 0.30", () => {
+  it("binding resume-framing penalty outranks cosmetic resume penalty", () => {
     expect(
-      computeStrategicValue("binding", 0.45, "referral", true),
-    ).toBeGreaterThan(computeStrategicValue("cosmetic", 0.3, "resume", true));
+      computeStrategicValue("binding", 0.45, "resume"),
+    ).toBeGreaterThan(computeStrategicValue("cosmetic", 0.3, "resume"));
 
     const rows = rowsFromBreakdown(
       makeBreakdown({
@@ -72,12 +72,12 @@ describe("strategicLever selection", () => {
         poolFriendliness: 0.85,
       }),
     );
-    const dominant = selectDominantLever(rows, RULES, true);
-    expect(dominant?.key).toBe("credentialSignal");
-    expect(dominant?.bindingness).toBe("binding");
+    const dominant = selectDominantLever(rows, RULES);
+    expect(dominant?.key).toBe("impactMetricQuality");
+    expect(dominant?.lever).toBe("resume");
   });
 
-  it("collapses referral cluster and names highest-tier penalty in cluster", () => {
+  it("credential signal with none lever is excluded from dominant selection", () => {
     const rows = rowsFromBreakdown(
       makeBreakdown({
         credentialSignal: 0.4,
@@ -85,10 +85,10 @@ describe("strategicLever selection", () => {
         impactMetricQuality: 0.32,
       }),
     );
-    const dominant = selectDominantLever(rows, RULES, true);
-    expect(dominant?.lever).toBe("referral");
-    expect(dominant?.isCollapsedReferral).toBe(true);
-    expect(dominant?.penaltyName).toBe("degree requirement");
+    const dominant = selectDominantLever(rows, RULES);
+    expect(dominant?.lever).not.toBe("referral");
+    expect(dominant?.isCollapsedReferral).toBe(false);
+    expect(dominant?.penaltyName).not.toBe("degree requirement");
   });
 
   it("stays stable when cosmetic sub-scores jitter below binding tier", () => {
@@ -100,7 +100,7 @@ describe("strategicLever selection", () => {
         impactMetricQuality,
       });
       const rows = rowsFromBreakdown(breakdown);
-      const dominant = selectDominantLever(rows, RULES, true);
+      const dominant = selectDominantLever(rows, RULES);
       return {
         key: dominant?.key,
         penaltyName: dominant?.penaltyName,
@@ -109,11 +109,9 @@ describe("strategicLever selection", () => {
     });
 
     for (const selection of selections) {
-      expect(selection).toEqual({
-        key: "credentialSignal",
-        penaltyName: "degree requirement",
-        lever: "referral",
-      });
+      expect(selection.lever).not.toBe("referral");
+      expect(selection.key).toBe("employerRecognizability");
+      expect(selection.lever).toBe("resume");
     }
   });
 
@@ -159,6 +157,7 @@ describe("strategicLever selection", () => {
       expect(line).toMatch(/tailored|Strong shot|Worth applying/i);
       expect(line).not.toMatch(/impact metric quality/i);
       expect(line).not.toMatch(/Codesmith/i);
+      expect(line).not.toMatch(/referral/i);
     }
     expect(new Set(lines).size).toBe(1);
   });

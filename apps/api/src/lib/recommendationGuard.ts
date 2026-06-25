@@ -2,43 +2,35 @@ import { SURVIVABILITY_TUNING } from "../config/capabilitySurvivabilityPolicy.js
 import type { Recommendation, RuleEvaluation, SurvivabilityPenalty } from "../types/scoring.js";
 import { specializationGapIsNonAddressable } from "./capabilityGap.js";
 
-const isPenaltyAddressable = (
-  penalty: SurvivabilityPenalty,
-  referralPathwayAvailable: boolean,
-): boolean => {
+const isPenaltyAddressable = (penalty: SurvivabilityPenalty): boolean => {
   if (penalty.lever === "none" || penalty.lever === "portfolio" || penalty.lever === "upskill") {
     return false;
   }
-  if (penalty.lever === "referral") return referralPathwayAvailable;
   return penalty.lever === "resume" || penalty.lever === "cover_letter";
 };
 
-/** True when every firing survivability penalty can be routed around. */
+/** True when every firing survivability penalty can be routed via resume/cover letter. */
 export const allSurvivabilityPenaltiesAddressable = (
   penalties: SurvivabilityPenalty[],
-  referralPathwayAvailable: boolean,
 ): boolean => {
   if (penalties.length === 0) return false;
-  return penalties.every((p) => isPenaltyAddressable(p, referralPathwayAvailable));
+  return penalties.every((p) => isPenaltyAddressable(p));
 };
 
 export const hasNonAddressableSkipBlocker = (params: {
   rules: RuleEvaluation;
   survivabilityPenalties: SurvivabilityPenalty[];
-  referralPathwayAvailable: boolean;
 }): boolean => {
   if (params.rules.specializationGap && specializationGapIsNonAddressable(params.rules.specializationGap)) {
     return true;
   }
   if (params.rules.capabilityGap) return true;
-  return params.survivabilityPenalties.some(
-    (p) => !isPenaltyAddressable(p, params.referralPathwayAvailable),
-  );
+  return params.survivabilityPenalties.some((p) => !isPenaltyAddressable(p));
 };
 
 /**
  * Skip requires a non-addressable blocker. Upgrade skip when every penalty is
- * addressable and no capability gap exists.
+ * addressable via resume/cover letter and no capability gap exists.
  */
 export const guardCompositeRecommendation = (params: {
   recommendation: Recommendation;
@@ -46,10 +38,8 @@ export const guardCompositeRecommendation = (params: {
   survivability: number;
   rules: RuleEvaluation;
   survivabilityPenalties: SurvivabilityPenalty[];
-  referralPathwayAvailable?: boolean;
 }): Recommendation => {
   const { recommendation, capability, rules, survivabilityPenalties } = params;
-  const referralPathwayAvailable = Boolean(params.referralPathwayAvailable);
 
   if (recommendation !== "skip") return recommendation;
 
@@ -59,14 +49,12 @@ export const guardCompositeRecommendation = (params: {
 
   if (rules.capabilityGap) return "skip";
 
-  if (
-    allSurvivabilityPenaltiesAddressable(survivabilityPenalties, referralPathwayAvailable)
-  ) {
+  if (allSurvivabilityPenaltiesAddressable(survivabilityPenalties)) {
     const strongCap = capability >= SURVIVABILITY_TUNING.strongCapabilityThreshold;
     return strongCap ? "referral_gated" : "stretch_signal";
   }
 
-  if (!hasNonAddressableSkipBlocker({ rules, survivabilityPenalties, referralPathwayAvailable })) {
+  if (!hasNonAddressableSkipBlocker({ rules, survivabilityPenalties })) {
     const strongCap = capability >= SURVIVABILITY_TUNING.strongCapabilityThreshold;
     return strongCap ? "referral_gated" : "stretch_signal";
   }
@@ -74,13 +62,12 @@ export const guardCompositeRecommendation = (params: {
   return "skip";
 };
 
-/** Skip action-line targets must not name addressable penalties when pathway exists. */
+/** Skip action-line targets must name a non-addressable blocker. */
 export const skipReasonIsValid = (params: {
   recommendation: Recommendation;
   statedReason: string;
   rules: RuleEvaluation;
   survivabilityPenalties: SurvivabilityPenalty[];
-  referralPathwayAvailable?: boolean;
 }): boolean => {
   if (params.recommendation !== "skip") return true;
 
@@ -96,14 +83,10 @@ export const skipReasonIsValid = (params: {
       .includes(params.rules.capabilityGap.reason.toLowerCase());
   }
 
-  const referralPathwayAvailable = Boolean(params.referralPathwayAvailable);
   const reason = params.statedReason.toLowerCase();
 
   for (const penalty of params.survivabilityPenalties) {
-    if (!isPenaltyAddressable(penalty, referralPathwayAvailable)) continue;
-    if (penalty.lever === "referral" && referralPathwayAvailable) {
-      if (reason.includes("degree") || reason.includes("credential")) return false;
-    }
+    if (!isPenaltyAddressable(penalty)) continue;
     if (
       (penalty.lever === "resume" || penalty.lever === "cover_letter") &&
       reason.includes(penalty.leverLabel.toLowerCase().slice(0, 12))
@@ -115,6 +98,5 @@ export const skipReasonIsValid = (params: {
   return hasNonAddressableSkipBlocker({
     rules: params.rules,
     survivabilityPenalties: params.survivabilityPenalties,
-    referralPathwayAvailable,
   });
 };

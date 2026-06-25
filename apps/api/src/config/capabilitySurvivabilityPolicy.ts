@@ -114,14 +114,14 @@ export const SURVIVABILITY_SUB_FACTOR_META: Record<
 > = {
   employerRecognizability: {
     label: "Employer recognizability",
-    lever: "referral",
-    leverLabel: "resume framing / referral",
+    lever: "resume",
+    leverLabel: "resume framing",
     baseBindingness: "material",
   },
   credentialSignal: {
     label: "Credential signal",
-    lever: "referral",
-    leverLabel: "REFERRAL routes around this",
+    lever: "none",
+    leverLabel: "NONE — structural, can't fix in-loop",
     baseBindingness: "binding",
   },
   impactMetricQuality: {

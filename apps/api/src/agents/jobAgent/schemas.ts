@@ -246,7 +246,8 @@ export const ScoreDisplaySchema = z.object({
   ),
   dominantLever: StrategicLeverSelectionSchema.optional(),
   actionLine: z.string(),
-  referralSubtext: z.string().optional(),
+  referralAdvice: z.string(),
+  referralUrgency: z.enum(["strongly_advised", "advised", "optional"]),
   eligibilityAdvisory: z
     .object({
       reason: z.string(),

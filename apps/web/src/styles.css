@@ -670,6 +670,26 @@ tbody .tracker-sticky-left {
   padding-left: 0.65rem;
 }
 
+.referralAdvice {
+  font-size: 0.92rem;
+  line-height: 1.45;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.referralAdvice--strongly_advised {
+  font-weight: 600;
+  color: #e6a847;
+}
+
+.referralAdvice--advised {
+  color: #c9d1d9;
+}
+
+.referralAdvice--optional {
+  color: #8b949e;
+  font-size: 0.88rem;
+}
+
 .scoreSection {
   margin-top: 1rem;
 }

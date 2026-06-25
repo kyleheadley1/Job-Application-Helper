@@ -104,6 +104,8 @@ export type EligibilityFlag = {
   severity: "check";
 };
 
+export type ReferralUrgency = "strongly_advised" | "advised" | "optional";
+
 export type ScoreBand = "strong_apply" | "apply" | "skip" | "no";
 
 export type BandHeadline = "Strong yes" | "Yes" | "If quick" | "Skip";
@@ -124,7 +126,9 @@ export type ScoreDisplay = {
   survivabilityPenalties: SurvivabilityPenalty[];
   dominantLever?: StrategicLeverSelection;
   actionLine: string;
-  referralSubtext?: string;
+  /** Always present — derived from score after composite; never affects scoring. */
+  referralAdvice: string;
+  referralUrgency: ReferralUrgency;
   eligibilityAdvisory?: EligibilityFlag;
 };
 

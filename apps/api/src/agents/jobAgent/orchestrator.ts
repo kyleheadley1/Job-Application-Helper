@@ -121,7 +121,6 @@ export const triageJob = async (input: {
     survivability: scored.score.survivability ?? 0,
     rules: scoredRules,
     survivabilityPenalties: scoreDisplay?.survivabilityPenalties ?? [],
-    referralPathwayAvailable: referralPathway.referralPathwayAvailable,
   });
 
   const scoreDisplayFinal = buildScoreDisplay({

@@ -162,7 +162,6 @@ describe("Optimizely calibration anchor", () => {
       survivability: composite.score.survivability ?? 0,
       rules: rulesWithGap,
       survivabilityPenalties: display?.survivabilityPenalties ?? [],
-      referralPathwayAvailable: false,
     });
 
     if (finalRec === "skip") {
@@ -174,7 +173,6 @@ describe("Optimizely calibration anchor", () => {
           statedReason: display?.actionLine ?? "",
           rules: rulesWithGap,
           survivabilityPenalties: display?.survivabilityPenalties ?? [],
-          referralPathwayAvailable: false,
         }),
       ).toBe(true);
     } else {
@@ -185,23 +183,12 @@ describe("Optimizely calibration anchor", () => {
 });
 
 describe("skip recommendation invariants", () => {
-  it("never blames skip on referral-addressable penalty when pathway exists", () => {
+  it("referral pathway does not change guard outcome for non-addressable blockers", () => {
     const rules = evaluateRules(OPTIMIZELY_JOB, userProfile, { activeResumeType: "SWE" });
     const clamped = applyScoringClampLayer({
       score: OPTIMIZELY_RAW_SCORE,
       extracted: OPTIMIZELY_JOB,
       rules,
-    });
-    const capabilityGap = detectCapabilityGap(OPTIMIZELY_JOB, OPTIMIZELY_RAW_SCORE, SWE_RESUME);
-    const specializationGap = detectSpecializationGap(OPTIMIZELY_JOB, OPTIMIZELY_RAW_SCORE, SWE_RESUME);
-    const rulesWithGap = { ...clamped.rules, capabilityGap, specializationGap };
-
-    const composite = computeCompositeScore({
-      rawScore: clamped.score,
-      rules: rulesWithGap,
-      extracted: OPTIMIZELY_JOB,
-      profile: userProfile,
-      resumeText: SWE_RESUME,
     });
 
     const compositeNoGap = computeCompositeScore({
@@ -212,39 +199,29 @@ describe("skip recommendation invariants", () => {
       resumeText: SWE_RESUME,
     });
 
-    const displayNoGap = buildScoreDisplay({
+    const penalties = buildScoreDisplay({
       score: compositeNoGap.score,
       rules: { ...clamped.rules, specializationGap: undefined, capabilityGap: undefined },
       extracted: OPTIMIZELY_JOB,
       recommendation: "skip",
       referralPathwayAvailable: true,
       referralPathwayNotes: "Connection via Etana Kopin",
-    });
+    })?.survivabilityPenalties ?? [];
 
-    const upgraded = guardCompositeRecommendation({
+    const withPathway = guardCompositeRecommendation({
       recommendation: "skip",
       capability: compositeNoGap.score.capability ?? 0,
       survivability: compositeNoGap.score.survivability ?? 0,
       rules: { ...clamped.rules, specializationGap: undefined, capabilityGap: undefined },
-      survivabilityPenalties: displayNoGap?.survivabilityPenalties ?? [],
-      referralPathwayAvailable: true,
+      survivabilityPenalties: penalties,
     });
-    expect(upgraded).not.toBe("skip");
-
-    const skipWithGap = guardCompositeRecommendation({
+    const withoutPathway = guardCompositeRecommendation({
       recommendation: "skip",
-      capability: composite.score.capability ?? 0,
-      survivability: composite.score.survivability ?? 0,
-      rules: rulesWithGap,
-      survivabilityPenalties: buildScoreDisplay({
-        score: composite.score,
-        rules: rulesWithGap,
-        extracted: OPTIMIZELY_JOB,
-        recommendation: "skip",
-        referralPathwayAvailable: false,
-      })?.survivabilityPenalties ?? [],
-      referralPathwayAvailable: false,
+      capability: compositeNoGap.score.capability ?? 0,
+      survivability: compositeNoGap.score.survivability ?? 0,
+      rules: { ...clamped.rules, specializationGap: undefined, capabilityGap: undefined },
+      survivabilityPenalties: penalties,
     });
-    expect(skipWithGap).toBe("skip");
+    expect(withPathway).toBe(withoutPathway);
   });
 });

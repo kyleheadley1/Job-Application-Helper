@@ -113,7 +113,8 @@ describe("Palantir Web Design Engineer calibration", () => {
     expect(display?.actionLine).toMatch(/portfolio/i);
     expect(display?.actionLine).not.toMatch(/credential signal/i);
     expect(display?.actionLine).not.toMatch(/referral routes around/i);
-    expect(display?.referralSubtext).toBeUndefined();
+    expect(display?.referralAdvice).toMatch(/substantially help|would help here/i);
+    expect(display?.referralUrgency).toMatch(/strongly_advised|advised/);
     expect(display?.bandHeadline).not.toBe("Strong yes");
     expect(["Skip", "Yes", "If quick"]).toContain(display?.bandHeadline);
     expect(display?.scoreDerivation).toMatch(/− \d+/);
@@ -124,7 +125,6 @@ describe("Palantir Web Design Engineer calibration", () => {
       survivability: composite.score.survivability ?? 0,
       rules: rulesWithGap,
       survivabilityPenalties: display?.survivabilityPenalties ?? [],
-      referralPathwayAvailable: false,
     });
     expect(guarded).toBe("stretch_signal");
   });

@@ -239,16 +239,15 @@ export const JobResultPage = () => {
           {scoreDisplay?.actionLine ? (
             <p className="actionLine">{scoreDisplay.actionLine}</p>
           ) : null}
-          {scoreDisplay?.referralSubtext ? (
-            <p className="muted referralSubtext">↳ {scoreDisplay.referralSubtext}</p>
+          {scoreDisplay?.referralAdvice ? (
+            <p className={`referralAdvice referralAdvice--${scoreDisplay.referralUrgency}`}>
+              ↳ {scoreDisplay.referralAdvice}
+            </p>
           ) : null}
           {scoreDisplay?.eligibilityAdvisory ? (
             <p className="eligibilityAdvisory">
               ⚠ Verify eligibility — {scoreDisplay.eligibilityAdvisory.reason}
             </p>
-          ) : null}
-          {!scoreDisplay?.referralSubtext && job.referralPathwayAvailable ? (
-            <p className="muted referralSubtext">↳ Referral pathway available</p>
           ) : null}
           {hasJdSource(job) ? (
             <button onClick={() => void rerunTriage()} disabled={retriageBusy || busyConfirm}>

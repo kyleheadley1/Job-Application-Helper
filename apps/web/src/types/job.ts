@@ -141,6 +141,8 @@ export type StrategicLeverSelection = {
   isCollapsedReferral: boolean;
 };
 
+export type ReferralUrgency = "strongly_advised" | "advised" | "optional";
+
 export type EligibilityFlag = {
   reason: string;
   evidence: string;
@@ -168,7 +170,8 @@ export type ScoreDisplay = {
   survivabilityPenalties: SurvivabilityPenalty[];
   dominantLever?: StrategicLeverSelection;
   actionLine: string;
-  referralSubtext?: string;
+  referralAdvice: string;
+  referralUrgency: ReferralUrgency;
   eligibilityAdvisory?: EligibilityFlag;
 };
 
