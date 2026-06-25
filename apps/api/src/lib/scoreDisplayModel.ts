@@ -27,11 +27,11 @@ import type {
 import { evaluateHardGates } from "./hardGates.js";
 import { applySpecializationGapToBreakdown, specializationGapHeadlineWorthy } from "./capabilityGap.js";
 import {
-  computeCompetitivePoolDock,
   computeFinalComposite,
   computeGapDock,
   computeWorthTailoring,
   formatScoreDerivation,
+  resolveBandHeadline,
   resolveScoreBand,
 } from "./compositeScoring.js";
 import {
@@ -388,16 +388,15 @@ export const buildScoreDisplay = (params: {
   }
 
   const gapDock = computeGapDock(params.rules.specializationGap);
-  const poolDock = computeCompetitivePoolDock(params.rules, survivability);
   const composite = computeFinalComposite({
     capability,
     survivability,
     gapDock,
-    poolDock,
   });
   const scoreBand = resolveScoreBand(composite.final, params.recommendation === "no");
   const scoreDerivation = formatScoreDerivation(composite);
   const worthTailoring = computeWorthTailoring(capability, scoreBand);
+  const bandHeadline = resolveBandHeadline(scoreBand, worthTailoring);
 
   const dominantLever = selectDominantLever(
     survivabilityRows,
@@ -430,9 +429,9 @@ export const buildScoreDisplay = (params: {
     final: composite.final,
     survAdjustment: composite.survAdjustment,
     gapDock: composite.gapDock,
-    poolDock: composite.poolDock,
     scoreDerivation,
     scoreBand,
+    bandHeadline,
     worthTailoring,
     survivabilityRows,
     hardGates,

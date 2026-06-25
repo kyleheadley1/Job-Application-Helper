@@ -80,7 +80,7 @@ describe("scoring caps and composite model", () => {
     expect(composite.score.total).toBe(25);
   });
 
-  it("additive final = capability + survAdjustment − gapDock − poolDock", () => {
+  it("additive final = capability + survAdjustment − gapDock only", () => {
     const composite = computeCompositeScore({
       rawScore: highScore(),
       rules: cleanRules(),

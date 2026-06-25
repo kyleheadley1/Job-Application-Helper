@@ -1,6 +1,5 @@
 import {
   RECOMMENDATION_LABELS,
-  SCORE_BAND_LABELS,
   SURVIVABILITY_TUNING,
 } from "../config/capabilitySurvivabilityPolicy.js";
 import type { ExtractedJobData } from "../types/job.js";
@@ -17,9 +16,10 @@ import {
   specializationGapIsNonAddressable,
 } from "./capabilityGap.js";
 import {
-  computeCompetitivePoolDock,
   computeFinalComposite,
   computeGapDock,
+  computeWorthTailoring,
+  resolveBandHeadline,
   resolveScoreBand,
 } from "./compositeScoring.js";
 import { evaluateHardGates } from "./hardGates.js";
@@ -169,14 +169,14 @@ export const computeCompositeScore = (params: {
     resumeText: params.resumeText,
   });
   const gapDock = computeGapDock(params.rules.specializationGap);
-  const poolDock = computeCompetitivePoolDock(params.rules, survivabilityResult.multiplier);
   const composite = computeFinalComposite({
     capability,
     survivability: survivabilityResult.multiplier,
     gapDock,
-    poolDock,
   });
   const scoreBand = resolveScoreBand(composite.final);
+  const worthTailoring = computeWorthTailoring(capability, scoreBand);
+  const bandHeadline = resolveBandHeadline(scoreBand, worthTailoring);
   const recommendation = adjustRecommendationForSpecializationGap(
     resolveBandRecommendation(
       scoreBand,
@@ -195,10 +195,10 @@ export const computeCompositeScore = (params: {
       survivability: survivabilityResult.multiplier,
       survivabilityBreakdown: survivabilityResult,
       total: composite.final,
-      recommendationLabel: SCORE_BAND_LABELS[scoreBand],
+      recommendationLabel: bandHeadline,
     },
     recommendation,
-    recommendationLabel: SCORE_BAND_LABELS[scoreBand],
+    recommendationLabel: bandHeadline,
     scoreBand,
     hardGateFired: false,
     hardGateReasons: [],

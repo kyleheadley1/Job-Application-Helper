@@ -234,7 +234,7 @@ export const JobResultPage = () => {
         <article className="card">
           <h3>Decision</h3>
           <p className="decisionRecommendation">
-            Apply: {scoreDisplay?.scoreBand ?? "—"}
+            Apply: {scoreDisplay?.bandHeadline ?? "—"}
           </p>
           {scoreDisplay?.actionLine ? (
             <p className="actionLine">{scoreDisplay.actionLine}</p>

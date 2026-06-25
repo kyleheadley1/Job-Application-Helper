@@ -35,12 +35,6 @@ export const COMPOSITE_SCORING = {
   APPLY_LOW: 58,
   /** Capability ≥ this → worth tailoring (independent of band). */
   TAILOR_CAPABILITY: 70,
-  /**
-   * Extra dock when JD implies a hot competitive pool and survivability is weak.
-   * Keeps high-capability / low-odds roles (e.g. DeepScribe) from reading as slam dunks.
-   */
-  COMPETITIVE_POOL_DOCK_SCALE: 350,
-  COMPETITIVE_POOL_SURV_CEILING: 0.52,
 } as const;
 
 export const SCORE_BAND_LABELS: Record<"strong_apply" | "apply" | "skip" | "no", string> = {

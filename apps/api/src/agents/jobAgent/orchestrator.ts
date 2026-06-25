@@ -9,7 +9,7 @@ import { buildTrackerSpreadsheetFromJob } from '../../tracker/canonicalSpreadshe
 import { detectReferralPathway } from '../../lib/referralPathway.js';
 import { buildScoreDisplay } from '../../lib/scoreDisplayModel.js';
 import { guardCompositeRecommendation } from '../../lib/recommendationGuard.js';
-import { RECOMMENDATION_LABELS, SCORE_BAND_LABELS } from '../../config/capabilitySurvivabilityPolicy.js';
+import { RECOMMENDATION_LABELS } from '../../config/capabilitySurvivabilityPolicy.js';
 import { evaluateRules } from './rules.js';
 import { scoreJob } from './scoring.js';
 import { computeSalaryAsk } from './salaryAsk.js';
@@ -137,7 +137,7 @@ export const triageJob = async (input: {
     ? {
         ...scored.score,
         scoreDisplay: scoreDisplayFinal,
-        recommendationLabel: SCORE_BAND_LABELS[scoreDisplayFinal.scoreBand],
+        recommendationLabel: scoreDisplayFinal.bandHeadline,
       }
     : {
         ...scored.score,

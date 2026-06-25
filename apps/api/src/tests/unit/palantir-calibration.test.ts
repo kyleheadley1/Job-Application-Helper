@@ -114,6 +114,8 @@ describe("Palantir Web Design Engineer calibration", () => {
     expect(display?.actionLine).not.toMatch(/credential signal/i);
     expect(display?.actionLine).not.toMatch(/referral routes around/i);
     expect(display?.referralSubtext).toBeUndefined();
+    expect(display?.bandHeadline).not.toBe("Strong yes");
+    expect(["Skip", "Yes", "If quick"]).toContain(display?.bandHeadline);
     expect(display?.scoreDerivation).toMatch(/− \d+/);
 
     const guarded = guardCompositeRecommendation({

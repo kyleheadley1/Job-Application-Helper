@@ -1,12 +1,11 @@
 import { COMPOSITE_SCORING } from "../config/capabilitySurvivabilityPolicy.js";
-import type { RuleEvaluation, ScoreBand, SpecializationGap } from "../types/scoring.js";
+import type { BandHeadline, ScoreBand, SpecializationGap } from "../types/scoring.js";
 
 export type CompositeParts = {
   capability: number;
   survivability: number;
   survAdjustment: number;
   gapDock: number;
-  poolDock: number;
   final: number;
 };
 
@@ -21,21 +20,6 @@ export const computeSurvivabilityAdjustment = (survivability: number): number =>
   return clamped === 0 ? 0 : clamped;
 };
 
-export const computeCompetitivePoolDock = (
-  rules: RuleEvaluation,
-  survivability: number,
-): number => {
-  if (!rules.productionBarCompetitivePool) return 0;
-  if (survivability >= COMPOSITE_SCORING.COMPETITIVE_POOL_SURV_CEILING) return 0;
-  return Math.round(
-    Math.max(
-      0,
-      (COMPOSITE_SCORING.COMPETITIVE_POOL_SURV_CEILING - survivability) *
-        COMPOSITE_SCORING.COMPETITIVE_POOL_DOCK_SCALE,
-    ),
-  );
-};
-
 export const computeGapDock = (gap: SpecializationGap | undefined): number =>
   gap?.dock ?? 0;
 
@@ -43,24 +27,22 @@ export const computeFinalComposite = (params: {
   capability: number;
   survivability: number;
   gapDock: number;
-  poolDock?: number;
 }): CompositeParts => {
   const survAdjustment = computeSurvivabilityAdjustment(params.survivability);
-  const poolDock = params.poolDock ?? 0;
   const final = Math.min(
     100,
-    Math.max(0, params.capability + survAdjustment - params.gapDock - poolDock),
+    Math.max(0, params.capability + survAdjustment - params.gapDock),
   );
   return {
     capability: params.capability,
     survivability: params.survivability,
     survAdjustment,
     gapDock: params.gapDock,
-    poolDock,
     final,
   };
 };
 
+/** Derivation uses exactly capability + survAdjustment − gapDock — no other deductions. */
 export const formatScoreDerivation = (parts: CompositeParts): string => {
   const adj =
     parts.survAdjustment === 0
@@ -68,12 +50,16 @@ export const formatScoreDerivation = (parts: CompositeParts): string => {
       : parts.survAdjustment > 0
         ? `(+${parts.survAdjustment})`
         : `(${parts.survAdjustment})`;
-  const dockTerms = [
-    parts.gapDock > 0 ? `− ${parts.gapDock}` : null,
-    parts.poolDock > 0 ? `− ${parts.poolDock} (pool)` : null,
-  ].filter(Boolean);
-  const dockLabel = dockTerms.length ? ` ${dockTerms.join(" ")}` : "";
+  const dockLabel = parts.gapDock > 0 ? ` − ${parts.gapDock}` : "";
   return `${parts.capability} + ${adj}${dockLabel} = ${parts.final}`;
+};
+
+const LEGITIMATE_DERIVATION_RE = /^\d+ \+ \([+-]?\d+\)( − \d+)? = \d+$/;
+
+export const derivationHasOnlyLegitimateTerms = (derivation: string): boolean => {
+  if (!LEGITIMATE_DERIVATION_RE.test(derivation)) return false;
+  if (/pool|domain|credential|recognizability/i.test(derivation)) return false;
+  return true;
 };
 
 export const computeWorthTailoring = (
@@ -89,4 +75,14 @@ export const resolveScoreBand = (final: number, hardGate = false): ScoreBand => 
   if (final >= COMPOSITE_SCORING.STRONG_APPLY) return "strong_apply";
   if (final >= COMPOSITE_SCORING.APPLY_LOW) return "apply";
   return "skip";
+};
+
+export const resolveBandHeadline = (
+  scoreBand: ScoreBand,
+  worthTailoring: boolean,
+): BandHeadline => {
+  if (scoreBand === "no" || scoreBand === "skip") return "Skip";
+  if (scoreBand === "strong_apply") return "Strong yes";
+  if (worthTailoring) return "Yes";
+  return "If quick";
 };
