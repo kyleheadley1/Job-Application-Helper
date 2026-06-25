@@ -2,8 +2,11 @@ import { SCORING_CLAMP_POLICY } from "../config/scoringClampPolicy.js";
 import { STACK_MISMATCH_CAPS } from "../config/scoringPolicy.js";
 import type { ExtractedJobData } from "../types/job.js";
 import type { HardRuleFlag, RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
-import { filterOutOfLaneAfterDisjunctiveMatch } from "./disjunctiveLanguageRequirement.js";
-import { filterLanguagesToJdPresence } from "./jdLanguagePresence.js";
+import {
+  applyJdLanguageOutputBoundary,
+  coreLanguageMismatchMessage,
+  jdGroundedCoreLanguageGaps,
+} from "./jdLanguageOutputBoundary.js";
 import { normalizeText } from "./text.js";
 
 const jobBlob = (job: ExtractedJobData): string =>
@@ -44,57 +47,17 @@ const INFRA_PLATFORM_SHAPE_RE =
 const ML_RESEARCH_SHAPE_RE =
   /\b(pytorch|tensorflow|modeling|machine\s+learning\s+research|research\s+scientist|ml\s+research|deep\s+learning\s+research|training\s+models|neural\s+network\s+research)\b/i;
 
-const OUT_OF_LANE_CORE_LANG: Array<{ re: RegExp; label: string }> = [
-  { re: /\bocaml\b/i, label: "OCaml" },
-  { re: /\bgolang\b|\bgo\b/i, label: "Go" },
-  { re: /\bjava\b(?!script)/i, label: "Java" },
-  { re: /\bruby\b|\brails\b/i, label: "Ruby" },
-  { re: /\bc\+\+\b|\bc\/c\+\+\b/i, label: "C++" },
-  { re: /\bdjango\b/i, label: "Django/Python" },
-  { re: /\bscala\b/i, label: "Scala" },
-  { re: /\bhaskell\b/i, label: "Haskell" },
-  { re: /\berlang\b/i, label: "Erlang" },
-];
-
 const hasCoreLanguageClamp = (rules: RuleEvaluation): boolean =>
   Boolean(
     !rules.disjunctiveLanguageRequirementSatisfied &&
       (rules.stackMismatch ||
         rules.explicitCoreLanguageMismatch ||
-        (rules.coreLanguageGap?.length ?? 0) > 0 ||
-        rules.hardRuleFlags?.some((f) => f.id === "coreLanguageMismatch")),
+        (rules.coreLanguageGap?.length ?? 0) > 0),
   );
 
 export const detectRoleShapeOutsideLane = (job: ExtractedJobData): boolean => {
   const blob = jobBlob(job);
   return INFRA_PLATFORM_SHAPE_RE.test(blob) || ML_RESEARCH_SHAPE_RE.test(blob);
-};
-
-const structuredJdBlob = (job: ExtractedJobData): string =>
-  normalizeText(
-    [
-      ...(job.stack ?? []),
-      ...(job.requiredSkills ?? []),
-      ...(job.preferredSkills ?? []),
-      ...(job.requirements ?? []),
-      ...(job.responsibilities ?? []),
-    ].join("\n"),
-  );
-
-export const detectOutOfLaneCoreLanguage = (job: ExtractedJobData, rules?: RuleEvaluation): string[] => {
-  const blob = structuredJdBlob(job);
-  const found: string[] = [];
-  for (const { re, label } of OUT_OF_LANE_CORE_LANG) {
-    if (re.test(blob) && !found.includes(label)) found.push(label);
-  }
-  const filtered = filterLanguagesToJdPresence(found, job);
-  if (rules?.disjunctiveLanguageRequirementSatisfied) {
-    return filterOutOfLaneAfterDisjunctiveMatch(filtered, {
-      satisfied: true,
-      acceptedLabels: rules.disjunctiveAcceptedLanguages ?? [],
-    });
-  }
-  return filtered;
 };
 
 export const detectFinanceClampContext = (
@@ -162,30 +125,20 @@ export const buildHardRuleFlags = (
     });
   }
 
-  const outOfLane = filterLanguagesToJdPresence(
-    [
-      ...(rules.coreLanguageGap ?? []),
-      ...detectOutOfLaneCoreLanguage(job, rules).filter(
-        (l) => !(rules.coreLanguageGap ?? []).includes(l),
-      ),
-    ],
-    job,
-  );
+  const langs = jdGroundedCoreLanguageGaps(rules, job);
   const coreLanguageMismatch =
     !rules.disjunctiveLanguageRequirementSatisfied &&
+    langs.length > 0 &&
     (rules.stackMismatch ||
       rules.explicitCoreLanguageMismatch ||
-      outOfLane.length > 0);
+      (rules.coreLanguageGap?.length ?? 0) > 0);
 
-  if (coreLanguageMismatch) {
-    const langs = [...new Set(outOfLane)];
-    if (langs.length > 0) {
-      push({
-        id: "coreLanguageMismatch",
-        citedLanguages: langs,
-        message: `Core language mismatch — role backend (${langs.join(", ")}) is outside TS/Node claimable lane.`,
-      });
-    }
+  if (coreLanguageMismatch && langs.length > 0) {
+    push({
+      id: "coreLanguageMismatch",
+      citedLanguages: langs,
+      message: coreLanguageMismatchMessage(langs),
+    });
   }
 
   if (rules.explicitDegreeRisk && rules.matureStructuredEmployer) {
@@ -294,7 +247,8 @@ export const applyScoringClampLayer = (params: {
     score.careerValue = Math.min(score.careerValue, SCORING_CLAMP_POLICY.staffAugContract.careerValueMax);
   }
 
-  return { score, rules };
+  const boundedRules = applyJdLanguageOutputBoundary(params.extracted, rules);
+  return { score, rules: boundedRules };
 };
 
 export const hardFlagTotalCeiling = (rules: RuleEvaluation): number | null => {
