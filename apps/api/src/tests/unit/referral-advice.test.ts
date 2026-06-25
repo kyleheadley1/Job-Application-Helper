@@ -85,9 +85,6 @@ describe("IBM calibration — referral-blind scoring", () => {
       resumeText: SWE_RESUME,
     });
 
-    expect(composite.score.capability).toBeGreaterThanOrEqual(78);
-    expect(composite.score.survivability).toBeLessThan(0.55);
-
     const pathway = detectReferralPathway({
       profile: userProfile,
       extracted: IBM_JOB,
@@ -104,6 +101,9 @@ describe("IBM calibration — referral-blind scoring", () => {
       referralPathwayNotes: pathway.referralPathwayNotes,
     });
 
+    expect(display?.gapDock).toBeGreaterThanOrEqual(14);
+    expect(display?.final).toBeLessThan(73);
+
     expect(display?.referralUrgency).toBe("strongly_advised");
     expect(display?.referralAdvice).toMatch(/substantially help/i);
     expect(display?.referralAdvice).toMatch(/Alex Chen/i);
@@ -112,6 +112,12 @@ describe("IBM calibration — referral-blind scoring", () => {
     const penalties = buildSurvivabilityPenalties(clamped.rules, IBM_JOB);
     expect(penalties.every((p) => p.lever !== "referral")).toBe(true);
     expect(penalties.every((p) => !p.leverLabel.toLowerCase().includes("referral"))).toBe(true);
+
+    const credentialRow = display!.survivabilityRows.find((r) => r.key === "credentialSignal");
+    const degreePenalty = penalties.find((p) => p.message.match(/degree gate/i));
+    expect(credentialRow?.lever).toBe("none_in_loop");
+    expect(degreePenalty?.lever).toBe("none_in_loop");
+    expect(credentialRow?.lever).toBe(degreePenalty?.lever);
   });
 });
 

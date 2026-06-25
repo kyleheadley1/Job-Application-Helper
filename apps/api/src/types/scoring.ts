@@ -58,6 +58,7 @@ export type SurvivabilityLever =
   | "resume"
   | "cover_letter"
   | "none"
+  | "none_in_loop"
   | "portfolio"
   | "upskill";
 

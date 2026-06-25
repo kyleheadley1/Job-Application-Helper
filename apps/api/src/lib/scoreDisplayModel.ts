@@ -23,6 +23,13 @@ import type {
   SurvivabilityLever,
   SurvivabilityPenalty,
 } from "../types/scoring.js";
+import type { UserProfile } from "../types/userProfile.js";
+import { userProfile as defaultUserProfile } from "../config/userProfile.js";
+import {
+  NONE_IN_LOOP_LEVER_LABEL,
+  resolveDegreeGapLever,
+  STRUCTURAL_LEVER_LABEL,
+} from "./degreeGap.js";
 import { evaluateHardGates } from "./hardGates.js";
 import { applySpecializationGapToBreakdown, specializationGapHeadlineWorthy } from "./capabilityGap.js";
 import { composeSpecializationGapActionLine } from "./gapActionLine.js";
@@ -93,20 +100,26 @@ export const assertCapabilityBreakdownMatchesHeadline = (
 export const buildSurvivabilityRows = (
   breakdown: SurvivabilityBreakdown,
   rules: RuleEvaluation,
+  profile: UserProfile = defaultUserProfile,
 ): SurvivabilityDisplayRow[] => {
   const rows = (Object.keys(SURVIVABILITY_WEIGHTS) as SurvivabilitySubFactorKey[]).map(
     (key) => {
       const score = breakdown[key];
       const weight = SURVIVABILITY_WEIGHTS[key];
       const meta = SURVIVABILITY_SUB_FACTOR_META[key];
+      const degreeLever = key === "credentialSignal" ? resolveDegreeGapLever(rules, profile) : null;
+      const lever = degreeLever?.lever ?? (key === "poolFriendliness" ? "none" : meta.lever);
+      const leverLabel =
+        degreeLever?.leverLabel ??
+        (key === "poolFriendliness" ? STRUCTURAL_LEVER_LABEL : meta.leverLabel);
       return {
         key: key as string,
         label: meta.label,
         score,
         weight,
         contribution: score * weight,
-        lever: meta.lever,
-        leverLabel: meta.leverLabel,
+        lever,
+        leverLabel,
         bindingness: resolveSubFactorBindingness(key, rules),
         penaltyName: resolveSubFactorPenaltyName(key, rules),
       };
@@ -151,32 +164,46 @@ const flagIsHardGate = (
   return false;
 };
 
-const flagPenaltyLever = (flagId: string): SurvivabilityLever => {
-  if (flagId === "degreePreferenceWithEquivalency") return "resume";
+const flagPenaltyLever = (
+  flagId: string,
+  rules: RuleEvaluation,
+  profile: UserProfile,
+): SurvivabilityLever => {
+  if (flagId === "degreeGateStructuredEmployer" || flagId === "degreePreferenceWithEquivalency") {
+    return resolveDegreeGapLever(rules, profile)?.lever ?? "none";
+  }
   if (flagId === "coreLanguageMismatch") return "resume";
   return "none";
 };
 
-const flagPenaltyLeverLabel = (flagId: string): string => {
-  const lever = flagPenaltyLever(flagId);
-  if (flagId === "degreePreferenceWithEquivalency") {
-    return "tailor resume to emphasize related experience";
-  }
+const flagPenaltyLeverLabel = (
+  flagId: string,
+  rules: RuleEvaluation,
+  profile: UserProfile,
+): string => {
+  const degreePair =
+    flagId === "degreeGateStructuredEmployer" || flagId === "degreePreferenceWithEquivalency"
+      ? resolveDegreeGapLever(rules, profile)
+      : null;
+  if (degreePair) return degreePair.leverLabel;
+  const lever = flagPenaltyLever(flagId, rules, profile);
   if (lever === "resume") return "resume framing";
   if (lever === "cover_letter") return "tailored resume / cover letter";
-  return "NONE — structural, can't fix";
+  return STRUCTURAL_LEVER_LABEL;
 };
 
 const specializationPenaltyLeverLabel = (lever: SurvivabilityLever): string => {
   if (lever === "portfolio") return "build portfolio evidence";
   if (lever === "upskill") return "upskill with real project work";
   if (lever === "resume") return "resume framing";
-  return "NONE — structural, can't fix in-loop";
+  if (lever === "none_in_loop") return NONE_IN_LOOP_LEVER_LABEL;
+  return STRUCTURAL_LEVER_LABEL;
 };
 
 export const buildSurvivabilityPenalties = (
   rules: RuleEvaluation,
   extracted: ExtractedJobData,
+  profile: UserProfile = defaultUserProfile,
 ): SurvivabilityPenalty[] => {
   const penalties: SurvivabilityPenalty[] = [];
   const seen = new Set<string>();
@@ -205,8 +232,8 @@ export const buildSurvivabilityPenalties = (
     seen.add(flag.id);
     penalties.push({
       message: flag.message,
-      lever: flagPenaltyLever(flag.id),
-      leverLabel: flagPenaltyLeverLabel(flag.id),
+      lever: flagPenaltyLever(flag.id, rules, profile),
+      leverLabel: flagPenaltyLeverLabel(flag.id, rules, profile),
     });
   }
 
@@ -295,11 +322,13 @@ export const buildScoreDisplay = (params: {
   score: ScoreBreakdown;
   rules: RuleEvaluation;
   extracted: ExtractedJobData;
+  profile?: UserProfile;
   recommendation: Recommendation;
   referralPathwayAvailable?: boolean;
   referralPathwayNotes?: string;
   hardGateReasons?: string[];
 }): ScoreDisplay | undefined => {
+  const profile = params.profile ?? defaultUserProfile;
   const headlineCapability = params.score.capability;
   if (headlineCapability == null && params.rules.specializationGap == null) return undefined;
 
@@ -317,18 +346,22 @@ export const buildScoreDisplay = (params: {
     params.recommendation,
     params.hardGateReasons,
   );
-  const survivabilityPenalties = buildSurvivabilityPenalties(params.rules, params.extracted);
+  const survivabilityPenalties = buildSurvivabilityPenalties(
+    params.rules,
+    params.extracted,
+    profile,
+  );
 
   const breakdown = params.score.survivabilityBreakdown as SurvivabilityBreakdown | undefined;
   const survivability = params.score.survivability ?? 0;
 
   let survivabilityRows: SurvivabilityDisplayRow[] = [];
   if (breakdown && typeof breakdown.weightedAverage === "number") {
-    survivabilityRows = buildSurvivabilityRows(breakdown, params.rules);
+    survivabilityRows = buildSurvivabilityRows(breakdown, params.rules, profile);
     assertSurvivabilityRowsMatchMultiplier(breakdown, survivabilityRows);
   }
 
-  const gapDock = computeGapDock(params.rules.specializationGap);
+  const gapDock = computeGapDock(params.rules, profile);
   const composite = computeFinalComposite({
     capability,
     survivability,

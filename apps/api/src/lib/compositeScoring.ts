@@ -1,5 +1,7 @@
 import { COMPOSITE_SCORING } from "../config/capabilitySurvivabilityPolicy.js";
-import type { BandHeadline, ScoreBand, SpecializationGap } from "../types/scoring.js";
+import type { BandHeadline, RuleEvaluation, ScoreBand } from "../types/scoring.js";
+import type { UserProfile } from "../types/userProfile.js";
+import { computeDegreeGapDock } from "./degreeGap.js";
 
 export type CompositeParts = {
   capability: number;
@@ -20,8 +22,10 @@ export const computeSurvivabilityAdjustment = (survivability: number): number =>
   return clamped === 0 ? 0 : clamped;
 };
 
-export const computeGapDock = (gap: SpecializationGap | undefined): number =>
-  gap?.dock ?? 0;
+export const computeGapDock = (
+  rules: RuleEvaluation,
+  profile: UserProfile,
+): number => (rules.specializationGap?.dock ?? 0) + computeDegreeGapDock(rules, profile);
 
 export const computeFinalComposite = (params: {
   capability: number;

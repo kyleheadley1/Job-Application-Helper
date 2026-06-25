@@ -168,7 +168,7 @@ export const computeCompositeScore = (params: {
     rawScore: clamped,
     resumeText: params.resumeText,
   });
-  const gapDock = computeGapDock(params.rules.specializationGap);
+  const gapDock = computeGapDock(params.rules, params.profile);
   const composite = computeFinalComposite({
     capability,
     survivability: survivabilityResult.multiplier,
