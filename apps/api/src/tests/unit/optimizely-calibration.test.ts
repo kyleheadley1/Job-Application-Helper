@@ -9,13 +9,11 @@ import { detectCapabilityGap } from "../../lib/capabilityGap.js";
 import {
   extractJdLanguageLabels,
   filterLanguagesToJdPresence,
-  suppressAbsentLanguageClaims,
 } from "../../lib/jdLanguagePresence.js";
-import { buildHardRuleFlags } from "../../lib/scoringClampLayer.js";
+import { outputCitesAbsentLanguage } from "../../lib/jdLanguageOutputBoundary.js";
 import { applyScoringClampLayer } from "../../lib/scoringClampLayer.js";
 import { buildScoreDisplay } from "../../lib/scoreDisplayModel.js";
 import { guardCompositeRecommendation, skipReasonIsValid } from "../../lib/recommendationGuard.js";
-import { sanitizeVisibleRiskLine } from "../../lib/riskDisplaySanitizer.js";
 import type { ExtractedJobData } from "../../types/job.js";
 import type { ScoreBreakdown } from "../../types/scoring.js";
 
@@ -97,25 +95,13 @@ describe("Optimizely calibration anchor", () => {
       extracted: OPTIMIZELY_JOB,
       rules,
     });
-    const flags = buildHardRuleFlags(OPTIMIZELY_JOB, clamped.rules);
-    for (const flag of flags) {
+    expect(outputCitesAbsentLanguage(OPTIMIZELY_JOB, clamped.rules)).toBe(false);
+    for (const flag of clamped.rules.hardRuleFlags ?? []) {
       expect(flag.citedLanguages ?? []).not.toContain("Go");
       expect(flag.message).not.toMatch(GO_ABSENT_RE);
     }
-
-    const riskLines = [
-      "Missing Go production experience is a major stack gap.",
-      rules.notes.join(" "),
-      "Required core stack gap (Go) — major recruiter-screen risk.",
-    ];
-    for (const line of riskLines) {
-      const sanitized = sanitizeVisibleRiskLine(line, {
-        extracted: OPTIMIZELY_JOB,
-        userProfile,
-        rules: clamped.rules,
-      });
-      expect(sanitized).not.toMatch(GO_ABSENT_RE);
-      expect(suppressAbsentLanguageClaims(line, OPTIMIZELY_JOB)).not.toMatch(GO_ABSENT_RE);
+    for (const note of [...clamped.rules.notes, ...(clamped.rules.hardRuleNotes ?? [])]) {
+      expect(note).not.toMatch(GO_ABSENT_RE);
     }
   });
 
@@ -129,10 +115,11 @@ describe("Optimizely calibration anchor", () => {
       extracted: OPTIMIZELY_JOB,
       rules,
     });
-    const flags = buildHardRuleFlags(OPTIMIZELY_JOB, clamped.rules);
-    expect(flags.some((f) => f.id === "degreeGateStructuredEmployer")).toBe(false);
     expect(
-      flags.some((f) => f.id === "degreePreferenceWithEquivalency"),
+      clamped.rules.hardRuleFlags?.some((f) => f.id === "degreeGateStructuredEmployer"),
+    ).toBe(false);
+    expect(
+      clamped.rules.hardRuleFlags?.some((f) => f.id === "degreePreferenceWithEquivalency"),
     ).toBe(true);
 
     const capabilityGap = detectCapabilityGap(OPTIMIZELY_JOB, OPTIMIZELY_RAW_SCORE);

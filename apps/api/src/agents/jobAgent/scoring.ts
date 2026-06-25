@@ -15,6 +15,7 @@ import { responsesClient } from '../../services/llm/responsesClient.js';
 import type { StructuredCallDiagnostics } from '../../services/llm/responsesClient.js';
 import { polishScoringNarrative } from '../../lib/scoringOutputPolish.js';
 import { applyScoringClampLayer } from '../../lib/scoringClampLayer.js';
+import { applyJdLanguageOutputBoundary } from '../../lib/jdLanguageOutputBoundary.js';
 import { detectCapabilityGap } from '../../lib/capabilityGap.js';
 import { computeCompositeScore } from '../../lib/compositeScoreModel.js';
 import { userProfile as defaultUserProfile } from '../../config/userProfile.js';
@@ -300,7 +301,7 @@ export const scoreJob = async (params: {
       rationale: polished.rationale,
       recommendation: composite.recommendation,
     },
-    rules: rulesWithGap,
+    rules: applyJdLanguageOutputBoundary(params.extracted, rulesWithGap),
     scoringDiagnostics: scoredRun.diagnostics,
     scoringLlmSucceeded: scoredRun.success,
   };

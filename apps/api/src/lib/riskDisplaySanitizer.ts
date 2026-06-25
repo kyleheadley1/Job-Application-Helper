@@ -1,4 +1,8 @@
-import { languagePresentInJd, suppressAbsentLanguageClaims } from "./jdLanguagePresence.js";
+import { applyJdLanguageOutputBoundary } from "./jdLanguageOutputBoundary.js";
+import {
+  languagePresentInJd,
+  suppressAbsentLanguageClaims,
+} from "./jdLanguagePresence.js";
 import type { ExtractedJobData } from "../types/job.js";
 import type { RuleEvaluation } from "../types/scoring.js";
 import type { UserProfile } from "../types/userProfile.js";
@@ -332,8 +336,9 @@ export function withSanitizedRuleNotes(
   extracted: ExtractedJobData,
   userProfile?: UserProfile,
 ): RuleEvaluation {
+  const bounded = applyJdLanguageOutputBoundary(extracted, rules);
   return {
-    ...rules,
-    notes: sanitizeRuleNotesForDisplay(rules.notes, extracted, userProfile, rules),
+    ...bounded,
+    notes: sanitizeRuleNotesForDisplay(bounded.notes, extracted, userProfile, bounded),
   };
 }

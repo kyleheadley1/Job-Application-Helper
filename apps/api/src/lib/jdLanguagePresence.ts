@@ -44,7 +44,7 @@ export const extractJdLanguageLabels = (job: ExtractedJobData): Set<string> => {
   return labels;
 };
 
-const normalizeGapLabel = (label: string): string => {
+export const normalizeGapLabel = (label: string): string => {
   const t = label.trim();
   if (/^go(lang)?$/i.test(t)) return "Go";
   if (/^c\+\+$|^c\/c\+\+$/i.test(t)) return "C/C++";
