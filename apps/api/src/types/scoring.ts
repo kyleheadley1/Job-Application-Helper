@@ -22,18 +22,25 @@ export type CapabilityGap = {
   reason: string;
 };
 
-export type SpecializationGapLever = "none" | "portfolio" | "upskill";
+export type SpecializationGapLever = "none" | "portfolio" | "upskill" | "resume";
+
+export type SpecializationGapKind = "backend_stack" | "design_portfolio" | "enterprise_iam";
 
 export type SpecializationGapSeverity = "central" | "moderate" | "minor";
 
 /** Structured missing-pillar gap — visible to lever logic and recommendation guards. */
 export type SpecializationGap = {
+  kind: SpecializationGapKind;
   name: string;
   evidence: string;
   severity: SpecializationGapSeverity;
   lever: SpecializationGapLever;
   /** Points docked from the additive final composite. */
   dock: number;
+  /** JD-derived pillar label (e.g. Python/Django). */
+  jdSide?: string;
+  /** Candidate resume primary label (e.g. Node). */
+  resumeSide?: string;
 };
 
 /** LLM-scored transparency dimensions (not composite axes). */
@@ -90,6 +97,13 @@ export type StrategicLeverSelection = {
   isCollapsedReferral: boolean;
 };
 
+export type EligibilityFlag = {
+  reason: string;
+  evidence: string;
+  lever: "verify";
+  severity: "check";
+};
+
 export type ScoreBand = "strong_apply" | "apply" | "skip" | "no";
 
 export type BandHeadline = "Strong yes" | "Yes" | "If quick" | "Skip";
@@ -111,6 +125,7 @@ export type ScoreDisplay = {
   dominantLever?: StrategicLeverSelection;
   actionLine: string;
   referralSubtext?: string;
+  eligibilityAdvisory?: EligibilityFlag;
 };
 
 export type ScoreBreakdown = {
@@ -211,6 +226,11 @@ export type RuleEvaluation = {
   capabilityGap?: CapabilityGap;
   /** Structured specialization pillar gap (design/Figma, enterprise IAM, etc.). */
   specializationGap?: SpecializationGap;
+  /** Soft geo/work-location advisory — does not affect score or band. */
+  eligibilityFlag?: EligibilityFlag;
+  /** Explicit unambiguous geographic exclusion (hard gate). */
+  geoExclusionHardGate?: boolean;
+  geoExclusionReason?: string;
   /**
    * True first-pass gates only (UI "Hard-rule flags"): commutable location, degree, explicit core language.
    * Visa/citizenship/clearance and other notes stay in `notes` / key risks.

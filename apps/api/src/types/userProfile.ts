@@ -26,4 +26,10 @@ export type UserProfile = {
   hardConstraints: string[];
   /** When false, JD "no sponsorship" / work-auth language is not treated as a gate for this candidate. */
   requiresSponsorship: boolean;
+  /** Structured home base for geo eligibility checks. */
+  candidateLocation?: {
+    label: string;
+    basedInUS?: boolean;
+    regions?: string[];
+  };
 };

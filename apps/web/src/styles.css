@@ -661,6 +661,15 @@ tbody .tracker-sticky-left {
   color: #e6edf3;
 }
 
+.eligibilityAdvisory {
+  font-size: 0.92rem;
+  line-height: 1.45;
+  margin: 0.25rem 0 0.75rem;
+  color: #d4a72c;
+  border-left: 3px solid #d4a72c;
+  padding-left: 0.65rem;
+}
+
 .scoreSection {
   margin-top: 1rem;
 }

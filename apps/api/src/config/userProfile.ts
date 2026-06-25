@@ -67,4 +67,9 @@ export const userProfile: UserProfile = {
     "Bias toward landability realism over theoretical capability",
   ],
   requiresSponsorship: false,
+  candidateLocation: {
+    label: "Brooklyn, NY / US-authorized",
+    basedInUS: true,
+    regions: ["United States", "US", "NYC"],
+  },
 };

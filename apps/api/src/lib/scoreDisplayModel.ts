@@ -18,7 +18,6 @@ import type {
   ScoreBand,
   ScoreBreakdown,
   ScoreDisplay,
-  SpecializationGap,
   StrategicLeverSelection,
   SurvivabilityDisplayRow,
   SurvivabilityLever,
@@ -26,6 +25,7 @@ import type {
 } from "../types/scoring.js";
 import { evaluateHardGates } from "./hardGates.js";
 import { applySpecializationGapToBreakdown, specializationGapHeadlineWorthy } from "./capabilityGap.js";
+import { composeSpecializationGapActionLine } from "./gapActionLine.js";
 import {
   computeFinalComposite,
   computeGapDock,
@@ -172,6 +172,7 @@ const flagPenaltyLeverLabel = (flagId: string): string => {
 const specializationPenaltyLeverLabel = (lever: SurvivabilityLever): string => {
   if (lever === "portfolio") return "build portfolio evidence";
   if (lever === "upskill") return "upskill with real project work";
+  if (lever === "resume") return "resume framing";
   return "NONE — structural, can't fix in-loop";
 };
 
@@ -185,7 +186,13 @@ export const buildSurvivabilityPenalties = (
   if (rules.specializationGap) {
     const gap = rules.specializationGap;
     const lever: SurvivabilityLever =
-      gap.lever === "portfolio" ? "portfolio" : gap.lever === "upskill" ? "upskill" : "none";
+      gap.lever === "portfolio"
+        ? "portfolio"
+        : gap.lever === "upskill"
+          ? "upskill"
+          : gap.lever === "resume"
+            ? "resume"
+            : "none";
     penalties.push({
       message: `${gap.name} — ${gap.evidence}`,
       lever,
@@ -247,32 +254,6 @@ const structuralReason = (rows: SurvivabilityDisplayRow[]): string => {
   return "competitive applicant pool";
 };
 
-const gapLeverPhrase = (gap: SpecializationGap): string => {
-  if (gap.lever === "resume") return "reframe via resume";
-  if (gap.lever === "portfolio") return "build portfolio evidence first";
-  if (gap.lever === "upskill") return "close the gap with real project work";
-  return "not addressable in-loop";
-};
-
-const TAILOR_CTA = "worth a tailored resume + cover letter";
-
-const formatGapHeadline = (
-  prefix: string,
-  gap: SpecializationGap,
-  worthTailoring: boolean,
-): string => {
-  const evidence = gap.evidence.endsWith(".") ? gap.evidence : `${gap.evidence}.`;
-  const leverPhrase = gapLeverPhrase(gap);
-  const tailor =
-    worthTailoring && gap.severity !== "central"
-      ? ` Worth ${TAILOR_CTA} to convert it.`
-      : "";
-  if (gap.severity === "central" && gap.lever !== "resume") {
-    return `${prefix} — ${gap.name} is central and your evidence is engineering-side; a referral won't close it. ${leverPhrase.charAt(0).toUpperCase()}${leverPhrase.slice(1)}.`;
-  }
-  return `${prefix} — but ${evidence.charAt(0).toLowerCase()}${evidence.slice(1)} ${leverPhrase}.${tailor}`;
-};
-
 export const deriveReferralSubtext = (params: {
   recommendation: Recommendation;
   referralPathwayAvailable?: boolean;
@@ -314,10 +295,10 @@ export const deriveActionLine = (params: {
 
   if (scoreBand === "strong_apply") {
     if (gapWorthy && gap) {
-      return formatGapHeadline("Clearly in the ballpark", gap, worthTailoring);
+      return composeSpecializationGapActionLine("Clearly in the ballpark", gap, worthTailoring);
     }
     if (worthTailoring) {
-      return `Clearly in the ballpark — ${TAILOR_CTA} to convert it.`;
+      return "Clearly in the ballpark — worth a tailored resume + cover letter.";
     }
     return "Clearly in the ballpark — slam-dunk fit.";
   }
@@ -325,17 +306,17 @@ export const deriveActionLine = (params: {
   if (scoreBand === "apply") {
     if (gapWorthy && gap) {
       const prefix = worthTailoring ? "Strong shot" : "Worth applying";
-      return formatGapHeadline(prefix, gap, worthTailoring);
+      return composeSpecializationGapActionLine(prefix, gap, worthTailoring);
     }
     if (worthTailoring) {
-      return `Worth applying — ${TAILOR_CTA}.`;
+      return "Worth applying — a tailored resume + cover letter.";
     }
     return SCORE_BAND_LABELS.apply;
   }
 
   if (scoreBand === "skip") {
     if (gapWorthy && gap) {
-      return formatGapHeadline("Stretch", gap, false);
+      return composeSpecializationGapActionLine("Stretch", gap, false);
     }
     if (rules.capabilityGap) {
       return `Not worth the effort — ${rules.capabilityGap.reason}.`;
@@ -439,6 +420,7 @@ export const buildScoreDisplay = (params: {
     dominantLever,
     actionLine,
     referralSubtext,
+    eligibilityAdvisory: params.rules.eligibilityFlag,
   };
 };
 

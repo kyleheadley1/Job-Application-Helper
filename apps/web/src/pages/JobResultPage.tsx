@@ -242,6 +242,11 @@ export const JobResultPage = () => {
           {scoreDisplay?.referralSubtext ? (
             <p className="muted referralSubtext">↳ {scoreDisplay.referralSubtext}</p>
           ) : null}
+          {scoreDisplay?.eligibilityAdvisory ? (
+            <p className="eligibilityAdvisory">
+              ⚠ Verify eligibility — {scoreDisplay.eligibilityAdvisory.reason}
+            </p>
+          ) : null}
           {!scoreDisplay?.referralSubtext && job.referralPathwayAvailable ? (
             <p className="muted referralSubtext">↳ Referral pathway available</p>
           ) : null}

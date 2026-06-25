@@ -79,6 +79,14 @@ export const ExtractedJobDataSchema = z.object({
   companyDisplayName: z.string().optional(),
   companyConfidence: z.enum(["direct_or_unclear", "agency_only", "explicit_employer"]).optional(),
   companyExtractionNotes: z.array(z.string()).optional(),
+  geoScope: z
+    .object({
+      titleRegion: z.string().nullable(),
+      postingLocation: z.string().nullable(),
+      cardLocation: z.string().nullable(),
+      remoteType: z.enum(['remote', 'hybrid', 'onsite', 'unknown']).optional(),
+    })
+    .optional(),
 });
 
 /** Live extraction JSON normalized then validated (safer URL/location/array coercion). */
@@ -141,13 +149,26 @@ export const RuleEvaluationSchema = z.object({
     .optional(),
   specializationGap: z
     .object({
+      kind: z.enum(["backend_stack", "design_portfolio", "enterprise_iam"]),
       name: z.string(),
       evidence: z.string(),
       severity: z.enum(["central", "moderate", "minor"]),
       lever: z.enum(["none", "portfolio", "upskill", "resume"]),
       dock: z.number().min(0).max(20),
+      jdSide: z.string().optional(),
+      resumeSide: z.string().optional(),
     })
     .optional(),
+  eligibilityFlag: z
+    .object({
+      reason: z.string(),
+      evidence: z.string(),
+      lever: z.literal("verify"),
+      severity: z.literal("check"),
+    })
+    .optional(),
+  geoExclusionHardGate: z.boolean().optional().default(false),
+  geoExclusionReason: z.string().optional(),
   hardRuleNotes: z.array(z.string()).optional().default([]),
   hardRuleFlags: z
     .array(
@@ -226,6 +247,14 @@ export const ScoreDisplaySchema = z.object({
   dominantLever: StrategicLeverSelectionSchema.optional(),
   actionLine: z.string(),
   referralSubtext: z.string().optional(),
+  eligibilityAdvisory: z
+    .object({
+      reason: z.string(),
+      evidence: z.string(),
+      lever: z.literal("verify"),
+      severity: z.literal("check"),
+    })
+    .optional(),
 });
 
 export const ScoreBreakdownSchema = z

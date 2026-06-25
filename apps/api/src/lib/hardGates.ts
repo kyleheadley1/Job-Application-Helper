@@ -33,5 +33,12 @@ export const evaluateHardGates = (
     reasons.push("Role seniority/staff bar exceeds early-career profile.");
   }
 
+  if (rules.geoExclusionHardGate) {
+    reasons.push(
+      rules.geoExclusionReason ??
+        "Explicit geographic location requirement excludes this candidate.",
+    );
+  }
+
   return { fired: reasons.length > 0, reasons };
 };

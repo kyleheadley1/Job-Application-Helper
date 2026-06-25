@@ -17,6 +17,13 @@ export type JobStatus =
   | 'closed'
   | 'offer';
 
+export type GeoScope = {
+  titleRegion: string | null;
+  postingLocation: string | null;
+  cardLocation: string | null;
+  remoteType?: 'remote' | 'hybrid' | 'onsite' | 'unknown';
+};
+
 export type ExtractedJobData = {
   company: string;
   title: string;
@@ -25,6 +32,8 @@ export type ExtractedJobData = {
   location?: string;
   remoteType?: 'remote' | 'hybrid' | 'onsite' | 'unknown';
   locationIsCommutable?: boolean;
+  /** Geographic scope from title, card, and posting body. */
+  geoScope?: GeoScope;
   salary?: {
     min?: number;
     max?: number;
