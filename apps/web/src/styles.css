@@ -724,6 +724,16 @@ tbody .tracker-sticky-left {
   color: #f2cc60;
 }
 
+.scoreLever.portfolio {
+  background: #2a1f3d;
+  color: #d2a8ff;
+}
+
+.scoreLever.upskill {
+  background: #1f2d2a;
+  color: #7ee787;
+}
+
 .scoreLever.structural {
   background: #3d1f1f;
   color: #ffa198;
