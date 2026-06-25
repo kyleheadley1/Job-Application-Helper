@@ -6,6 +6,8 @@ import { evaluateRules } from "../../agents/jobAgent/rules.js";
 import { userProfile } from "../../config/userProfile.js";
 import { computeCompositeScore } from "../../lib/compositeScoreModel.js";
 import { applyScoringClampLayer } from "../../lib/scoringClampLayer.js";
+import { buildScoreDisplay } from "../../lib/scoreDisplayModel.js";
+import { derivationHasOnlyLegitimateTerms } from "../../lib/compositeScoring.js";
 import type { ExtractedJobData } from "../../types/job.js";
 import type { ScoreBreakdown } from "../../types/scoring.js";
 
@@ -15,7 +17,7 @@ const SWE_RESUME = fs.readFileSync(
   "utf8",
 );
 
-/** Ground truth: applied and rejected — must NOT score apply_cold or final > ~50. */
+/** Ground truth: applied and rejected — high capability, weak cold-apply odds. */
 const DEEPSCRIBE_JOB: ExtractedJobData = {
   company: "DeepScribe",
   title: "Software Engineer, Product",
@@ -47,7 +49,6 @@ Software Engineer, Product — broad product engineering role on a remote nation
   `.trim(),
 };
 
-/** Inflated LLM raw scores reflecting real stack/functional overlap (before survivability). */
 const DEEPSCRIBE_RAW_SCORE: ScoreBreakdown = {
   stackFit: 17,
   levelFit: 15,
@@ -60,7 +61,7 @@ const DEEPSCRIBE_RAW_SCORE: ScoreBreakdown = {
 };
 
 describe("DeepScribe calibration anchor", () => {
-  it("capability high, survivability low → skip band, final stays low via pool dock", () => {
+  it("pool hurt flows only through survivability — no double dock; apply band, not slam-dunk", () => {
     const rules = evaluateRules(DEEPSCRIBE_JOB, userProfile);
     expect(rules.productionBarCompetitivePool).toBe(true);
     expect(rules.matureStructuredEmployer).not.toBe(true);
@@ -78,13 +79,24 @@ describe("DeepScribe calibration anchor", () => {
       resumeText: SWE_RESUME,
     });
 
-    expect(composite.scoreBand).toBe("skip");
+    const display = buildScoreDisplay({
+      score: composite.score,
+      rules: clamped.rules,
+      extracted: DEEPSCRIBE_JOB,
+      recommendation: composite.recommendation,
+    });
+
     expect(composite.recommendation).not.toBe("apply_cold");
     expect(composite.score.capability).toBeGreaterThanOrEqual(75);
     expect(composite.score.capability).toBeLessThanOrEqual(84);
     expect(composite.score.survivability).toBeGreaterThanOrEqual(0.35);
     expect(composite.score.survivability).toBeLessThanOrEqual(0.45);
-    expect(composite.score.total).toBeGreaterThanOrEqual(15);
-    expect(composite.score.total).toBeLessThan(52);
+    expect(composite.score.total).toBeGreaterThanOrEqual(65);
+    expect(composite.score.total).toBeLessThan(80);
+    expect(composite.scoreBand).toBe("apply");
+    expect(composite.scoreBand).not.toBe("strong_apply");
+    expect(display?.bandHeadline).toBe("Yes");
+    expect(display?.scoreDerivation).not.toMatch(/pool/i);
+    expect(derivationHasOnlyLegitimateTerms(display!.scoreDerivation)).toBe(true);
   });
 });

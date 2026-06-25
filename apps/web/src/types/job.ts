@@ -152,9 +152,9 @@ export type ScoreDisplay = {
   final: number;
   survAdjustment: number;
   gapDock: number;
-  poolDock: number;
   scoreDerivation: string;
   scoreBand: "strong_apply" | "apply" | "skip" | "no";
+  bandHeadline: "Strong yes" | "Yes" | "If quick" | "Skip";
   worthTailoring: boolean;
   survivabilityRows: SurvivabilityDisplayRow[];
   hardGates: string[];

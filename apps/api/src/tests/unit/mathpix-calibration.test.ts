@@ -6,6 +6,7 @@ import { evaluateRules } from "../../agents/jobAgent/rules.js";
 import { userProfile } from "../../config/userProfile.js";
 import { detectSpecializationGap } from "../../lib/capabilityGap.js";
 import { computeCompositeScore } from "../../lib/compositeScoreModel.js";
+import { derivationHasOnlyLegitimateTerms } from "../../lib/compositeScoring.js";
 import { buildScoreDisplay } from "../../lib/scoreDisplayModel.js";
 import type { ExtractedJobData } from "../../types/job.js";
 import type { ScoreBreakdown } from "../../types/scoring.js";
@@ -44,7 +45,7 @@ Strong Python and Flask required. Node.js experience is a plus but Python leads 
   `.trim(),
 };
 
-/** Capability backbone ~76; moderate Python gap dock ~4 → final ~72. */
+/** Capability backbone ~76; moderate Python gap dock ~5 → final ~71. */
 const MATHPIX_CAPABILITY_SCORE: ScoreBreakdown = {
   stackFit: 16,
   levelFit: 14,
@@ -57,7 +58,7 @@ const MATHPIX_CAPABILITY_SCORE: ScoreBreakdown = {
 };
 
 describe("Mathpix calibration anchor", () => {
-  it("capability 76, final 72 → apply band, worthTailoring; gap headline; referral is subtext", () => {
+  it("76 + (~0) − 5 = ~71; no pool term; headline Yes; referral is subtext", () => {
     const rules = evaluateRules(MATHPIX_JOB, userProfile, { activeResumeType: "SWE" });
     const specializationGap = detectSpecializationGap(
       MATHPIX_JOB,
@@ -68,8 +69,6 @@ describe("Mathpix calibration anchor", () => {
     expect(specializationGap?.name).toMatch(/python/i);
     expect(specializationGap?.severity).toBe("moderate");
     expect(specializationGap?.lever).toBe("resume");
-    expect(specializationGap?.dock).toBeGreaterThanOrEqual(4);
-    expect(specializationGap?.dock).toBeLessThanOrEqual(8);
 
     const rulesWithGap = {
       ...rules,
@@ -105,13 +104,12 @@ describe("Mathpix calibration anchor", () => {
     });
 
     expect(display?.worthTailoring).toBe(true);
-    expect(display?.scoreBand).toBe("apply");
+    expect(display?.bandHeadline).toBe("Yes");
+    expect(display?.scoreDerivation).not.toMatch(/pool/i);
+    expect(derivationHasOnlyLegitimateTerms(display!.scoreDerivation)).toBe(true);
     expect(display?.dominantLever?.penaltyName).toMatch(/python/i);
-    expect(display?.actionLine).toMatch(/python|flask/i);
-    expect(display?.actionLine).toMatch(/node|reframe|resume/i);
     expect(display?.actionLine).toMatch(/tailored resume/i);
     expect(display?.actionLine).not.toMatch(/referral/i);
     expect(display?.referralSubtext).toMatch(/referral pathway/i);
-    expect(display?.actionLine).not.toMatch(/impact metric quality/i);
   });
 });

@@ -92,6 +92,8 @@ export type StrategicLeverSelection = {
 
 export type ScoreBand = "strong_apply" | "apply" | "skip" | "no";
 
+export type BandHeadline = "Strong yes" | "Yes" | "If quick" | "Skip";
+
 export type ScoreDisplay = {
   capability: number;
   capabilityBreakdown: CapabilityBreakdown;
@@ -99,9 +101,9 @@ export type ScoreDisplay = {
   final: number;
   survAdjustment: number;
   gapDock: number;
-  poolDock: number;
   scoreDerivation: string;
   scoreBand: ScoreBand;
+  bandHeadline: BandHeadline;
   worthTailoring: boolean;
   survivabilityRows: SurvivabilityDisplayRow[];
   hardGates: string[];

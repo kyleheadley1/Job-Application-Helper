@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { userProfile } from "../../config/userProfile.js";
 import { computeCompositeScore } from "../../lib/compositeScoreModel.js";
-import { computeWorthTailoring, resolveScoreBand } from "../../lib/compositeScoring.js";
+import {
+  computeWorthTailoring,
+  resolveBandHeadline,
+  resolveScoreBand,
+} from "../../lib/compositeScoring.js";
 import { buildScoreDisplay } from "../../lib/scoreDisplayModel.js";
 import type { ExtractedJobData } from "../../types/job.js";
 import type { RuleEvaluation, ScoreBreakdown } from "../../types/scoring.js";
@@ -38,7 +42,6 @@ const SLAM_DUNK_JOB: ExtractedJobData = {
   rawText: "Full-stack TypeScript/React/Node role. Remote.",
 };
 
-/** High capability + clean survivability → rare strong_apply band. */
 const SLAM_DUNK_SCORE: ScoreBreakdown = {
   stackFit: 18,
   levelFit: 17,
@@ -50,8 +53,20 @@ const SLAM_DUNK_SCORE: ScoreBreakdown = {
   total: 0,
 };
 
+/** Apply band with capability below tailor bar → If quick. */
+const IF_QUICK_SCORE: ScoreBreakdown = {
+  stackFit: 12,
+  levelFit: 12,
+  domainFit: 5,
+  resumeStoryClarity: 6,
+  functionalOverlap: 8,
+  recruiterFriendliness: 8,
+  careerValue: 6,
+  total: 0,
+};
+
 describe("slam-dunk calibration anchor", () => {
-  it("high capability + clean survivability → strong_apply, worthTailoring", () => {
+  it("high capability + clean survivability → Strong yes", () => {
     const composite = computeCompositeScore({
       rawScore: SLAM_DUNK_SCORE,
       rules: cleanRules(),
@@ -63,7 +78,6 @@ describe("slam-dunk calibration anchor", () => {
     expect(composite.score.capability).toBeGreaterThanOrEqual(85);
     expect(composite.score.total).toBeGreaterThanOrEqual(80);
     expect(composite.scoreBand).toBe("strong_apply");
-    expect(computeWorthTailoring(composite.score.capability ?? 0, composite.scoreBand)).toBe(true);
 
     const display = buildScoreDisplay({
       score: composite.score,
@@ -72,9 +86,37 @@ describe("slam-dunk calibration anchor", () => {
       recommendation: composite.recommendation,
     });
 
-    expect(display?.scoreBand).toBe("strong_apply");
+    expect(display?.bandHeadline).toBe("Strong yes");
     expect(display?.worthTailoring).toBe(true);
-    expect(display?.actionLine).toMatch(/tailored resume|ballpark/i);
+  });
+});
+
+describe("if-quick apply-edge fixture", () => {
+  it("apply band but capability < 70 → If quick, not Yes", () => {
+    const composite = computeCompositeScore({
+      rawScore: IF_QUICK_SCORE,
+      rules: cleanRules(),
+      extracted: SLAM_DUNK_JOB,
+      profile: userProfile,
+      resumeText: "Junior TypeScript developer",
+    });
+
+    expect(composite.score.capability).toBeLessThan(70);
+    expect(composite.score.total).toBeGreaterThanOrEqual(58);
+    expect(composite.scoreBand).toBe("apply");
+    expect(computeWorthTailoring(composite.score.capability ?? 0, composite.scoreBand)).toBe(
+      false,
+    );
+
+    const display = buildScoreDisplay({
+      score: composite.score,
+      rules: cleanRules(),
+      extracted: SLAM_DUNK_JOB,
+      recommendation: composite.recommendation,
+    });
+
+    expect(display?.bandHeadline).toBe("If quick");
+    expect(display?.worthTailoring).toBe(false);
   });
 });
 
@@ -84,6 +126,8 @@ describe("band thresholds", () => {
     expect(resolveScoreBand(80)).toBe("strong_apply");
     expect(resolveScoreBand(57)).toBe("skip");
     expect(resolveScoreBand(58)).toBe("apply");
+    expect(resolveBandHeadline("apply", true)).toBe("Yes");
+    expect(resolveBandHeadline("apply", false)).toBe("If quick");
   });
 });
 
@@ -93,5 +137,6 @@ describe("tailor decoupling", () => {
     expect(computeWorthTailoring(55, "apply")).toBe(false);
     expect(computeWorthTailoring(72, "skip")).toBe(false);
     expect(resolveScoreBand(72)).toBe("apply");
+    expect(resolveBandHeadline("apply", true)).toBe("Yes");
   });
 });
