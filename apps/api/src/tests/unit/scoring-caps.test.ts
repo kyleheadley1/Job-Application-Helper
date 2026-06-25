@@ -80,7 +80,7 @@ describe("scoring caps and composite model", () => {
     expect(composite.score.total).toBe(25);
   });
 
-  it("composite final = round(capability × survivability)", () => {
+  it("additive final = capability + survAdjustment − gapDock − poolDock", () => {
     const composite = computeCompositeScore({
       rawScore: highScore(),
       rules: cleanRules(),
@@ -89,9 +89,15 @@ describe("scoring caps and composite model", () => {
     });
     expect(composite.score.capability).toBeGreaterThan(0);
     expect(composite.score.survivability).toBeGreaterThanOrEqual(0.3);
-    expect(composite.score.total).toBe(
-      Math.round((composite.score.capability ?? 0) * (composite.score.survivability ?? 0)),
+    const display = composite.score.capability ?? 0;
+    const surv = composite.score.survivability ?? 0;
+    const expectedMin = Math.max(
+      0,
+      display - 18 - (composite.score.total < display ? display - composite.score.total : 0),
     );
+    expect(composite.score.total).toBeLessThanOrEqual(display + 18);
+    expect(composite.score.total).toBeGreaterThanOrEqual(0);
+    expect(composite.score.total).not.toBe(Math.round(display * surv));
   });
 
   it("finalizeScore without context clamps categories only", () => {

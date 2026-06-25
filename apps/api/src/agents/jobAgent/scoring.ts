@@ -184,7 +184,7 @@ const deterministicFallback = (
       rules.notes[0] ??
       'Recruiter screen realism risk.',
     rationale: [
-      `Capability ${composite.score.capability ?? 0} × survivability ${(composite.score.survivability ?? 0).toFixed(2)} → final ${composite.score.total}.`,
+      `Final ${composite.score.total} (capability ${composite.score.capability ?? 0} ± survivability adj − gap dock).`,
       composite.recommendationLabel,
     ],
     risks: [...(rules.hardRuleNotes ?? []), ...rules.notes].slice(0, 2),

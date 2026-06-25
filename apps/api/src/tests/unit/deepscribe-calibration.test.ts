@@ -60,7 +60,7 @@ const DEEPSCRIBE_RAW_SCORE: ScoreBreakdown = {
 };
 
 describe("DeepScribe calibration anchor", () => {
-  it("capability high, survivability low → referral_gated, final 28–37", () => {
+  it("capability high, survivability low → skip band, final stays low via pool dock", () => {
     const rules = evaluateRules(DEEPSCRIBE_JOB, userProfile);
     expect(rules.productionBarCompetitivePool).toBe(true);
     expect(rules.matureStructuredEmployer).not.toBe(true);
@@ -78,14 +78,13 @@ describe("DeepScribe calibration anchor", () => {
       resumeText: SWE_RESUME,
     });
 
-    expect(composite.recommendation).toBe("referral_gated");
+    expect(composite.scoreBand).toBe("skip");
     expect(composite.recommendation).not.toBe("apply_cold");
     expect(composite.score.capability).toBeGreaterThanOrEqual(75);
     expect(composite.score.capability).toBeLessThanOrEqual(84);
     expect(composite.score.survivability).toBeGreaterThanOrEqual(0.35);
     expect(composite.score.survivability).toBeLessThanOrEqual(0.45);
-    expect(composite.score.total).toBeGreaterThanOrEqual(28);
-    expect(composite.score.total).toBeLessThanOrEqual(50);
-    expect(composite.score.total).toBeLessThanOrEqual(37 + 3);
+    expect(composite.score.total).toBeGreaterThanOrEqual(15);
+    expect(composite.score.total).toBeLessThan(52);
   });
 });

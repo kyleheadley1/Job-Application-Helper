@@ -57,7 +57,7 @@ export type FinalizeScoreContext = {
   resumeText?: string;
 };
 
-/** Composite model: capability × survivability (replaces additive total). */
+/** Composite model: capability ± survivability adjustment − gap dock (replaces multiplicative total). */
 export const finalizeScore = (
   score: ScoreBreakdown,
   rules: RuleEvaluation,

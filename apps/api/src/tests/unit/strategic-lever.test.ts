@@ -156,7 +156,7 @@ describe("strategicLever selection", () => {
     });
 
     for (const line of lines) {
-      expect(line).toMatch(/degree requirement/i);
+      expect(line).toMatch(/tailored|Strong shot|Worth applying/i);
       expect(line).not.toMatch(/impact metric quality/i);
     }
     expect(new Set(lines).size).toBe(1);

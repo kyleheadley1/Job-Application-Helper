@@ -24,7 +24,7 @@ export type CapabilityGap = {
 
 export type SpecializationGapLever = "none" | "portfolio" | "upskill";
 
-export type SpecializationGapSeverity = "high" | "medium" | "low";
+export type SpecializationGapSeverity = "central" | "moderate" | "minor";
 
 /** Structured missing-pillar gap — visible to lever logic and recommendation guards. */
 export type SpecializationGap = {
@@ -32,6 +32,8 @@ export type SpecializationGap = {
   evidence: string;
   severity: SpecializationGapSeverity;
   lever: SpecializationGapLever;
+  /** Points docked from the additive final composite. */
+  dock: number;
 };
 
 /** LLM-scored transparency dimensions (not composite axes). */
@@ -88,11 +90,18 @@ export type StrategicLeverSelection = {
   isCollapsedReferral: boolean;
 };
 
+export type ScoreBand = "apply_tailor" | "apply" | "skip" | "no";
+
 export type ScoreDisplay = {
   capability: number;
   capabilityBreakdown: CapabilityBreakdown;
   survivability: number;
   final: number;
+  survAdjustment: number;
+  gapDock: number;
+  poolDock: number;
+  scoreDerivation: string;
+  scoreBand: ScoreBand;
   survivabilityRows: SurvivabilityDisplayRow[];
   hardGates: string[];
   survivabilityPenalties: SurvivabilityPenalty[];
@@ -114,11 +123,11 @@ export type ScoreBreakdown = {
   /** Survivability multiplier, 0.30–1.00. */
   survivability?: number;
   survivabilityBreakdown?: Record<string, number>;
-  /** UI-ready decomposition derived from capability × survivability model. */
+  /** UI-ready decomposition derived from capability + survivability composite model. */
   scoreDisplay?: ScoreDisplay;
-  /** Human-readable 2x2 quadrant label. */
+  /** Human-readable band label (apply_tailor / apply / skip). */
   recommendationLabel?: string;
-  /** Final score = round(capability × survivability), or hard-gate floor. */
+  /** Final composite score (capability ± survivability adj − gap dock), 0–100. */
   total: number;
 };
 

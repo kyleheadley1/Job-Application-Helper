@@ -1,7 +1,3 @@
-import {
-  CAPABILITY_MAXES,
-  LEGACY_CAPABILITY_SOURCE_MAXES,
-} from "../config/capabilitySurvivabilityPolicy.js";
 import type { ExtractedJobData } from "../types/job.js";
 import type {
   CapabilityBreakdown,
@@ -11,20 +7,6 @@ import type {
   SpecializationGapSeverity,
 } from "../types/scoring.js";
 import { normalizeText } from "./text.js";
-
-export const CAPABILITY_GAP_THRESHOLDS = {
-  functionalOverlap: 20,
-  stackFit: 18,
-} as const;
-
-const FUNCTIONAL_DISCOUNT_BY_SEVERITY: Record<SpecializationGapSeverity, number> = {
-  high: 0.45,
-  medium: 0.6,
-  low: 0.75,
-};
-
-const scaleAxis = (raw: number, legacyMax: number, capabilityMax: number): number =>
-  Math.round((raw / legacyMax) * capabilityMax);
 
 const structuredBlob = (job: ExtractedJobData): string =>
   normalizeText(
@@ -48,6 +30,9 @@ const requiredBlob = (job: ExtractedJobData): string =>
     ].join("\n"),
   );
 
+const preferredBlob = (job: ExtractedJobData): string =>
+  normalizeText([...(job.preferredSkills ?? []), ...(job.preferredSkills ?? [])].join("\n"));
+
 const DESIGN_JD_SIGNALS =
   /\b(figma|design\s+system|visual\s+design|ui\/ux|ux\s+design|design\s+portfolio|wireframe|prototyp|pixel[-\s]?perfect|interaction\s+design)\b/i;
 
@@ -56,6 +41,9 @@ const DESIGN_TITLE_RE =
 
 const DESIGN_RESUME_EVIDENCE =
   /\b(figma|sketch|adobe\s*xd|design\s+system|ui\/ux|ux\s+design|wireframe|prototyp|visual\s+design|design\s+portfolio|interaction\s+design)\b/i;
+
+const PYTHON_BACKEND_RE = /\b(python|flask|django)\b/i;
+const NODE_LEAD_RE = /\bnode(?:\.js)?\b/i;
 
 export const detectEnterpriseIamSpecialization = (job: ExtractedJobData): boolean => {
   const blob = structuredBlob(job);
@@ -91,15 +79,46 @@ const countDesignSignals = (blob: string): number => {
   return patterns.filter((re) => re.test(blob)).length;
 };
 
+/** Derive severity from JD placement + how much evidence the candidate lacks. */
 const resolveSeverity = (params: {
   inTitle: boolean;
   inRequired: boolean;
+  inPreferred: boolean;
+  candidateHasAdjacent: boolean;
   signalCount: number;
 }): SpecializationGapSeverity => {
-  if (params.inTitle && params.inRequired && params.signalCount >= 2) return "high";
-  if (params.inTitle || (params.inRequired && params.signalCount >= 2)) return "high";
-  if (params.inRequired || params.signalCount >= 2) return "medium";
-  return "low";
+  if (params.inTitle && params.inRequired && !params.candidateHasAdjacent) return "central";
+  if (params.inRequired && !params.candidateHasAdjacent) return "central";
+  if (params.inTitle || (params.inRequired && params.candidateHasAdjacent)) return "moderate";
+  if (params.inPreferred || params.candidateHasAdjacent) return "moderate";
+  if (params.signalCount >= 2) return "moderate";
+  return "minor";
+};
+
+export const computeSpecializationDock = (
+  severity: SpecializationGapSeverity,
+  signalCount: number,
+): number => {
+  switch (severity) {
+    case "central":
+      return Math.min(20, 12 + Math.min(8, signalCount));
+    case "moderate":
+      return Math.min(8, 4 + Math.min(4, Math.floor(signalCount / 2)));
+    case "minor":
+      return Math.min(3, signalCount > 0 ? 2 : 1);
+    default:
+      return 0;
+  }
+};
+
+const finalizeGap = (
+  gap: Omit<SpecializationGap, "dock"> & { signalCount: number },
+): SpecializationGap => {
+  const { signalCount, ...rest } = gap;
+  return {
+    ...rest,
+    dock: computeSpecializationDock(gap.severity, signalCount),
+  };
 };
 
 export const detectDesignFigmaSpecializationGap = (
@@ -117,20 +136,65 @@ export const detectDesignFigmaSpecializationGap = (
   const resume = normalizeText(resumeText ?? "");
   if (DESIGN_RESUME_EVIDENCE.test(resume)) return undefined;
 
-  const severity = resolveSeverity({ inTitle, inRequired, signalCount });
-  return {
+  const severity = resolveSeverity({
+    inTitle,
+    inRequired,
+    inPreferred: DESIGN_JD_SIGNALS.test(preferredBlob(job)),
+    candidateHasAdjacent: false,
+    signalCount,
+  });
+
+  return finalizeGap({
     name: "design/Figma",
     evidence: inTitle
       ? "Design/Figma pillar named in title and required qualifications"
       : "Figma and design-craft requirements in JD; no design portfolio evidence on resume",
     severity,
     lever: "portfolio",
-  };
+    signalCount,
+  });
+};
+
+export const detectPythonBackendSpecializationGap = (
+  job: ExtractedJobData,
+  resumeText?: string,
+): SpecializationGap | undefined => {
+  const required = requiredBlob(job);
+  const blob = structuredBlob(job);
+  const inRequired = PYTHON_BACKEND_RE.test(required);
+  const inTitle = PYTHON_BACKEND_RE.test(job.title ?? "");
+  const inStack = PYTHON_BACKEND_RE.test((job.stack ?? []).join(" "));
+  if (!inRequired && !inTitle && !inStack) return undefined;
+
+  const resume = normalizeText(resumeText ?? "");
+  const hasPython = PYTHON_BACKEND_RE.test(resume);
+  const leadsNode = NODE_LEAD_RE.test(resume);
+  if (!leadsNode) return undefined;
+
+  const severity = resolveSeverity({
+    inTitle,
+    inRequired,
+    inPreferred: PYTHON_BACKEND_RE.test(preferredBlob(job)),
+    candidateHasAdjacent: hasPython,
+    signalCount: [inRequired, inTitle, inStack].filter(Boolean).length,
+  });
+
+  if (severity === "minor" && hasPython) return undefined;
+
+  return finalizeGap({
+    name: "Python/Flask backend",
+    evidence: hasPython
+      ? "Role leads with Python/Flask on the backend; resume leads with Node — reframe backend experience"
+      : "Python/Flask backend required; resume is Node-primary without production Python depth",
+    severity,
+    lever: severity === "central" ? "upskill" : "resume",
+    signalCount: [inRequired, inTitle].filter(Boolean).length + (hasPython ? 1 : 0),
+  });
 };
 
 export const detectEnterpriseIamSpecializationGap = (
   job: ExtractedJobData,
-  rawScore: ScoreBreakdown,
+  _rawScore?: ScoreBreakdown,
 ): SpecializationGap | undefined => {
   if (!detectEnterpriseIamSpecialization(job)) return undefined;
 
@@ -143,58 +207,45 @@ export const detectEnterpriseIamSpecializationGap = (
     /\bldap\b/i.test(structuredBlob(job)),
   ].filter(Boolean).length;
 
-  const functionalScaled = scaleAxis(
-    rawScore.functionalOverlap,
-    LEGACY_CAPABILITY_SOURCE_MAXES.functionalOverlap,
-    CAPABILITY_MAXES.functionalOverlap,
-  );
-
-  const titleGrounded = inTitle || inRequired;
-  const moderateOverlap = functionalScaled < CAPABILITY_GAP_THRESHOLDS.functionalOverlap;
-
-  if (!titleGrounded && !moderateOverlap) return undefined;
+  if (!inTitle && !inRequired && signalCount < 3) return undefined;
 
   const severity = resolveSeverity({
     inTitle,
     inRequired,
-    signalCount: Math.max(signalCount, detectEnterpriseIamSpecialization(job) ? 3 : 0),
+    inPreferred: false,
+    candidateHasAdjacent: false,
+    signalCount: Math.max(signalCount, 3),
   });
 
-  return {
+  return finalizeGap({
     name: "enterprise IAM / SAML-OIDC",
-    evidence: titleGrounded
+    evidence: inTitle
       ? "IAM/SAML-OIDC specialization central in title or required section"
       : "Enterprise IAM integration depth beyond OAuth-only resume evidence",
     severity,
     lever: "none",
-  };
+    signalCount: Math.max(signalCount, 3),
+  });
 };
 
 export const detectSpecializationGap = (
   job: ExtractedJobData,
-  rawScore: ScoreBreakdown,
+  rawScore?: ScoreBreakdown,
   resumeText?: string,
 ): SpecializationGap | undefined =>
   detectDesignFigmaSpecializationGap(job, resumeText) ??
+  detectPythonBackendSpecializationGap(job, resumeText) ??
   detectEnterpriseIamSpecializationGap(job, rawScore);
 
-/** Apply material functional-overlap discount when a load-bearing pillar is missing. */
+/** Capability backbone is no longer discounted — gap docks the final composite instead. */
 export const applySpecializationGapToBreakdown = (
   breakdown: CapabilityBreakdown,
-  gap: SpecializationGap | undefined,
-): CapabilityBreakdown => {
-  if (!gap) return breakdown;
-  const factor = FUNCTIONAL_DISCOUNT_BY_SEVERITY[gap.severity];
-  return {
-    ...breakdown,
-    functionalOverlap: Math.max(0, Math.round(breakdown.functionalOverlap * factor)),
-  };
-};
+  _gap: SpecializationGap | undefined,
+): CapabilityBreakdown => breakdown;
 
-/** Legacy bridge — prefer rules.specializationGap for new code. */
 export const detectCapabilityGap = (
   job: ExtractedJobData,
-  rawScore: ScoreBreakdown,
+  rawScore?: ScoreBreakdown,
   resumeText?: string,
 ): CapabilityGap | undefined => {
   const gap = detectSpecializationGap(job, rawScore, resumeText);
@@ -204,3 +255,6 @@ export const detectCapabilityGap = (
 
 export const specializationGapIsNonAddressable = (gap: SpecializationGap | undefined): boolean =>
   Boolean(gap && (gap.lever === "none" || gap.lever === "portfolio" || gap.lever === "upskill"));
+
+export const specializationGapHeadlineWorthy = (gap: SpecializationGap | undefined): boolean =>
+  Boolean(gap && (gap.severity === "central" || gap.severity === "moderate"));

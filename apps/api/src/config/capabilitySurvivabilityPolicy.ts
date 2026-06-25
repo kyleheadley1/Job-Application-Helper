@@ -23,6 +23,31 @@ export const SURVIVABILITY_TUNING = {
   hardGateScoreFloor: 25,
 } as const;
 
+/** Additive composite: capability backbone + bounded survivability adjustment − gap dock. */
+export const COMPOSITE_SCORING = {
+  /** Survivability at/above this boosts final; below docks. */
+  SURV_NEUTRAL: 0.5,
+  /** Max points survivability can move final either direction. */
+  SURV_SWING: 18,
+  /** Final ≥ this → apply_tailor band (strong shot + tailoring). */
+  APPLY_HIGH: 72,
+  /** Final ≥ this → apply band; below → skip. */
+  APPLY_LOW: 52,
+  /**
+   * Extra dock when JD implies a hot competitive pool and survivability is weak.
+   * Keeps high-capability / low-odds roles (e.g. DeepScribe) from reading as slam dunks.
+   */
+  COMPETITIVE_POOL_DOCK_SCALE: 350,
+  COMPETITIVE_POOL_SURV_CEILING: 0.52,
+} as const;
+
+export const SCORE_BAND_LABELS: Record<"apply_tailor" | "apply" | "skip" | "no", string> = {
+  apply_tailor: "Strong shot — worth tailored resume + cover letter",
+  apply: "Worth applying — light touch or as-is",
+  skip: "Not worth the effort",
+  no: "Hard gate — do not apply",
+};
+
 export const SURVIVABILITY_WEIGHTS = {
   employerRecognizability: 0.22,
   credentialSignal: 0.15,

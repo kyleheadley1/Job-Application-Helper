@@ -14,7 +14,7 @@ import type {
   SurvivabilityDisplayRow,
   SurvivabilityLever,
 } from "../types/scoring.js";
-import { specializationGapIsNonAddressable } from "./capabilityGap.js";
+import { specializationGapHeadlineWorthy, specializationGapIsNonAddressable } from "./capabilityGap.js";
 
 export type StrategicLeverSelection = {
   key: string;
@@ -43,9 +43,18 @@ export const computeLeverFeasibility = (
 export const specializationGapLeverSelection = (
   gap: SpecializationGap | undefined,
 ): StrategicLeverSelection | undefined => {
-  if (!gap || !specializationGapIsNonAddressable(gap)) return undefined;
+  if (!gap) return undefined;
+  if (!specializationGapHeadlineWorthy(gap) && !specializationGapIsNonAddressable(gap)) {
+    return undefined;
+  }
   const lever: SurvivabilityLever =
-    gap.lever === "portfolio" ? "portfolio" : gap.lever === "upskill" ? "upskill" : "none";
+    gap.lever === "portfolio"
+      ? "portfolio"
+      : gap.lever === "upskill"
+        ? "upskill"
+        : gap.lever === "resume"
+          ? "resume"
+          : "none";
   return {
     key: "specializationGap",
     lever,
@@ -54,9 +63,11 @@ export const specializationGapLeverSelection = (
         ? "build portfolio evidence"
         : lever === "upskill"
           ? "upskill with real project work"
-          : "NONE — structural, can't fix in-loop",
+          : lever === "resume"
+            ? "resume framing"
+            : "NONE — structural, can't fix in-loop",
     penaltyName: gap.name,
-    bindingness: gap.severity === "high" ? "binding" : "material",
+    bindingness: gap.severity === "central" ? "binding" : "material",
     strategicValue: BINDINGNESS_TIER_WEIGHT.binding * SURVIVABILITY_TARGET_NEUTRAL,
     isCollapsedReferral: false,
   };

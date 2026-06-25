@@ -1,14 +1,27 @@
 import {
   RECOMMENDATION_LABELS,
+  SCORE_BAND_LABELS,
   SURVIVABILITY_TUNING,
 } from "../config/capabilitySurvivabilityPolicy.js";
 import type { ExtractedJobData } from "../types/job.js";
-import type { Recommendation, RuleEvaluation, ScoreBreakdown, SpecializationGap } from "../types/scoring.js";
+import type {
+  Recommendation,
+  RuleEvaluation,
+  ScoreBand,
+  ScoreBreakdown,
+  SpecializationGap,
+} from "../types/scoring.js";
 import type { UserProfile } from "../types/userProfile.js";
 import {
   applySpecializationGapToBreakdown,
   specializationGapIsNonAddressable,
 } from "./capabilityGap.js";
+import {
+  computeCompetitivePoolDock,
+  computeFinalComposite,
+  computeGapDock,
+  resolveScoreBand,
+} from "./compositeScoring.js";
 import { evaluateHardGates } from "./hardGates.js";
 import {
   computeCapabilityBreakdown,
@@ -45,6 +58,7 @@ export const computeCapability = (rawScore: ScoreBreakdown): number => {
 export type { CapabilityBreakdown };
 export { computeCapabilityBreakdown };
 
+/** Legacy 2×2 matrix — retained for guards and calibration helpers. */
 export const resolveCompositeRecommendation = (
   capability: number,
   survivability: number,
@@ -57,6 +71,30 @@ export const resolveCompositeRecommendation = (
   return "skip";
 };
 
+export const resolveBandRecommendation = (
+  band: ScoreBand,
+  capability: number,
+  survivability: number,
+  gap: SpecializationGap | undefined,
+): Recommendation => {
+  if (band === "no") return "no";
+  if (gap?.severity === "central" && gap.lever !== "resume") {
+    return band === "skip" ? "skip" : "stretch_signal";
+  }
+  if (band === "apply_tailor") {
+    return survivability >= SURVIVABILITY_TUNING.goodOddsThreshold
+      ? "apply_cold"
+      : "referral_gated";
+  }
+  if (band === "apply") {
+    if (capability >= SURVIVABILITY_TUNING.strongCapabilityThreshold) {
+      return "referral_gated";
+    }
+    return "stretch_signal";
+  }
+  return "skip";
+};
+
 export const adjustRecommendationForSpecializationGap = (
   recommendation: Recommendation,
   gap: SpecializationGap | undefined,
@@ -65,7 +103,7 @@ export const adjustRecommendationForSpecializationGap = (
   if (recommendation === "referral_gated" || recommendation === "apply_cold") {
     return "stretch_signal";
   }
-  if (recommendation === "skip" && gap.severity === "high") return "skip";
+  if (recommendation === "skip" && gap.severity === "central") return "skip";
   return recommendation;
 };
 
@@ -73,6 +111,7 @@ export type CompositeScoreResult = {
   score: ScoreBreakdown;
   recommendation: Recommendation;
   recommendationLabel: string;
+  scoreBand: ScoreBand;
   hardGateFired: boolean;
   hardGateReasons: string[];
 };
@@ -106,6 +145,7 @@ export const computeCompositeScore = (params: {
       },
       recommendation: "no",
       recommendationLabel: RECOMMENDATION_LABELS.no,
+      scoreBand: "no",
       hardGateFired: true,
       hardGateReasons: gate.reasons,
     };
@@ -128,9 +168,22 @@ export const computeCompositeScore = (params: {
     rawScore: clamped,
     resumeText: params.resumeText,
   });
-  const finalScore = Math.round(capability * survivabilityResult.multiplier);
+  const gapDock = computeGapDock(params.rules.specializationGap);
+  const poolDock = computeCompetitivePoolDock(params.rules, survivabilityResult.multiplier);
+  const composite = computeFinalComposite({
+    capability,
+    survivability: survivabilityResult.multiplier,
+    gapDock,
+    poolDock,
+  });
+  const scoreBand = resolveScoreBand(composite.final);
   const recommendation = adjustRecommendationForSpecializationGap(
-    resolveCompositeRecommendation(capability, survivabilityResult.multiplier),
+    resolveBandRecommendation(
+      scoreBand,
+      capability,
+      survivabilityResult.multiplier,
+      params.rules.specializationGap,
+    ),
     params.rules.specializationGap,
   );
 
@@ -141,11 +194,12 @@ export const computeCompositeScore = (params: {
       capabilityBreakdown,
       survivability: survivabilityResult.multiplier,
       survivabilityBreakdown: survivabilityResult,
-      total: finalScore,
-      recommendationLabel: RECOMMENDATION_LABELS[recommendation],
+      total: composite.final,
+      recommendationLabel: SCORE_BAND_LABELS[scoreBand],
     },
     recommendation,
-    recommendationLabel: RECOMMENDATION_LABELS[recommendation],
+    recommendationLabel: SCORE_BAND_LABELS[scoreBand],
+    scoreBand,
     hardGateFired: false,
     hardGateReasons: [],
   };
