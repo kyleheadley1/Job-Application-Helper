@@ -233,20 +233,17 @@ export const JobResultPage = () => {
       <div className="grid cols2">
         <article className="card">
           <h3>Decision</h3>
-          <p className="decisionRecommendation">Apply: {job.recommendation}</p>
+          <p className="decisionRecommendation">
+            Apply: {scoreDisplay?.scoreBand ?? "—"}
+          </p>
           {scoreDisplay?.actionLine ? (
             <p className="actionLine">{scoreDisplay.actionLine}</p>
           ) : null}
-          {job.referralPathwayAvailable ? (
-            <p className="pill neutral" title={job.referralPathwayNotes ?? undefined}>
-              Referral pathway available
-            </p>
+          {scoreDisplay?.referralSubtext ? (
+            <p className="muted referralSubtext">↳ {scoreDisplay.referralSubtext}</p>
           ) : null}
-          {job.referralPathwayNotes ? (
-            <p className="muted">{job.referralPathwayNotes}</p>
-          ) : null}
-          {job.score.recommendationLabel ? (
-            <p className="muted">{job.score.recommendationLabel}</p>
+          {!scoreDisplay?.referralSubtext && job.referralPathwayAvailable ? (
+            <p className="muted referralSubtext">↳ Referral pathway available</p>
           ) : null}
           {hasJdSource(job) ? (
             <button onClick={() => void rerunTriage()} disabled={retriageBusy || busyConfirm}>

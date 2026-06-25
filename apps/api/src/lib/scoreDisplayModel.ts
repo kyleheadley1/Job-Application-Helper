@@ -1,6 +1,5 @@
 import {
   CAPABILITY_MAXES,
-  COMPOSITE_SCORING,
   LEGACY_CAPABILITY_SOURCE_MAXES,
   resolveSubFactorBindingness,
   resolveSubFactorPenaltyName,
@@ -31,6 +30,7 @@ import {
   computeCompetitivePoolDock,
   computeFinalComposite,
   computeGapDock,
+  computeWorthTailoring,
   formatScoreDerivation,
   resolveScoreBand,
 } from "./compositeScoring.js";
@@ -254,18 +254,18 @@ const gapLeverPhrase = (gap: SpecializationGap): string => {
   return "not addressable in-loop";
 };
 
+const TAILOR_CTA = "worth a tailored resume + cover letter";
+
 const formatGapHeadline = (
   prefix: string,
   gap: SpecializationGap,
-  tailorCta: boolean,
+  worthTailoring: boolean,
 ): string => {
   const evidence = gap.evidence.endsWith(".") ? gap.evidence : `${gap.evidence}.`;
   const leverPhrase = gapLeverPhrase(gap);
   const tailor =
-    tailorCta || gap.lever === "resume"
-      ? gap.severity === "central"
-        ? ""
-        : " Worth tailoring."
+    worthTailoring && gap.severity !== "central"
+      ? ` Worth ${TAILOR_CTA} to convert it.`
       : "";
   if (gap.severity === "central" && gap.lever !== "resume") {
     return `${prefix} — ${gap.name} is central and your evidence is engineering-side; a referral won't close it. ${leverPhrase.charAt(0).toUpperCase()}${leverPhrase.slice(1)}.`;
@@ -273,57 +273,64 @@ const formatGapHeadline = (
   return `${prefix} — but ${evidence.charAt(0).toLowerCase()}${evidence.slice(1)} ${leverPhrase}.${tailor}`;
 };
 
-const pathwaySuffix = (
-  referralPathwayAvailable: boolean | undefined,
-  referralPathwayNotes: string | undefined,
-): string => {
-  if (!referralPathwayAvailable || !referralPathwayNotes?.trim()) return "";
-  const source = pathwaySource(referralPathwayNotes);
-  return ` (${source} referral available as a secondary route.)`;
+export const deriveReferralSubtext = (params: {
+  recommendation: Recommendation;
+  referralPathwayAvailable?: boolean;
+  referralPathwayNotes?: string;
+}): string | undefined => {
+  const { recommendation, referralPathwayAvailable, referralPathwayNotes } = params;
+  if (referralPathwayAvailable && referralPathwayNotes?.trim()) {
+    const source = pathwaySource(referralPathwayNotes);
+    return `Referral pathway available (via ${source})`;
+  }
+  if (referralPathwayAvailable) {
+    return "Referral pathway available";
+  }
+  if (recommendation === "referral_gated") {
+    return "Cold-apply odds are low — referral helps";
+  }
+  return undefined;
 };
 
 export const deriveActionLine = (params: {
   scoreBand: ScoreBand;
-  final: number;
+  capability: number;
+  worthTailoring: boolean;
   recommendation: Recommendation;
   survivabilityRows: SurvivabilityDisplayRow[];
   rules: RuleEvaluation;
-  referralPathwayAvailable?: boolean;
-  referralPathwayNotes?: string;
   hardGates?: string[];
   dominantLever?: StrategicLeverSelection;
+  referralPathwayAvailable?: boolean;
 }): string => {
-  const {
-    scoreBand,
-    rules,
-    referralPathwayAvailable,
-    referralPathwayNotes,
-  } = params;
+  const { scoreBand, worthTailoring, rules, referralPathwayAvailable } = params;
   const gap = rules.specializationGap;
   const gapWorthy = specializationGapHeadlineWorthy(gap);
-  const pathwayNote = pathwaySuffix(referralPathwayAvailable, referralPathwayNotes);
 
   if (scoreBand === "no") {
     const reason = params.hardGates?.[0] ?? "hard gate fired";
     return `Do not apply — ${reason.charAt(0).toLowerCase()}${reason.slice(1)}`;
   }
 
-  if (scoreBand === "apply_tailor") {
+  if (scoreBand === "strong_apply") {
     if (gapWorthy && gap) {
-      return formatGapHeadline("Strong shot", gap, true) + pathwayNote;
+      return formatGapHeadline("Clearly in the ballpark", gap, worthTailoring);
     }
-    return (
-      "Strong shot — worth a tailored resume + cover letter to convert it." + pathwayNote
-    );
+    if (worthTailoring) {
+      return `Clearly in the ballpark — ${TAILOR_CTA} to convert it.`;
+    }
+    return "Clearly in the ballpark — slam-dunk fit.";
   }
 
   if (scoreBand === "apply") {
     if (gapWorthy && gap) {
-      const prefix =
-        params.final >= COMPOSITE_SCORING.APPLY_HIGH - 8 ? "Strong shot" : "Worth applying";
-      return formatGapHeadline(prefix, gap, params.final >= COMPOSITE_SCORING.APPLY_HIGH - 8) + pathwayNote;
+      const prefix = worthTailoring ? "Strong shot" : "Worth applying";
+      return formatGapHeadline(prefix, gap, worthTailoring);
     }
-    return SCORE_BAND_LABELS.apply + pathwayNote;
+    if (worthTailoring) {
+      return `Worth applying — ${TAILOR_CTA}.`;
+    }
+    return SCORE_BAND_LABELS.apply;
   }
 
   if (scoreBand === "skip") {
@@ -390,6 +397,7 @@ export const buildScoreDisplay = (params: {
   });
   const scoreBand = resolveScoreBand(composite.final, params.recommendation === "no");
   const scoreDerivation = formatScoreDerivation(composite);
+  const worthTailoring = computeWorthTailoring(capability, scoreBand);
 
   const dominantLever = selectDominantLever(
     survivabilityRows,
@@ -399,14 +407,20 @@ export const buildScoreDisplay = (params: {
 
   const actionLine = deriveActionLine({
     scoreBand,
-    final: composite.final,
+    capability,
+    worthTailoring,
     recommendation: params.recommendation,
     survivabilityRows,
     rules: params.rules,
-    referralPathwayAvailable: params.referralPathwayAvailable,
-    referralPathwayNotes: params.referralPathwayNotes,
     hardGates,
     dominantLever,
+    referralPathwayAvailable: params.referralPathwayAvailable,
+  });
+
+  const referralSubtext = deriveReferralSubtext({
+    recommendation: params.recommendation,
+    referralPathwayAvailable: params.referralPathwayAvailable,
+    referralPathwayNotes: params.referralPathwayNotes,
   });
 
   return {
@@ -419,11 +433,13 @@ export const buildScoreDisplay = (params: {
     poolDock: composite.poolDock,
     scoreDerivation,
     scoreBand,
+    worthTailoring,
     survivabilityRows,
     hardGates,
     survivabilityPenalties,
     dominantLever,
     actionLine,
+    referralSubtext,
   };
 };
 

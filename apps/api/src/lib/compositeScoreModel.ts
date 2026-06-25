@@ -81,7 +81,7 @@ export const resolveBandRecommendation = (
   if (gap?.severity === "central" && gap.lever !== "resume") {
     return band === "skip" ? "skip" : "stretch_signal";
   }
-  if (band === "apply_tailor") {
+  if (band === "strong_apply") {
     return survivability >= SURVIVABILITY_TUNING.goodOddsThreshold
       ? "apply_cold"
       : "referral_gated";

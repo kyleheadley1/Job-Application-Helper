@@ -90,7 +90,7 @@ export type StrategicLeverSelection = {
   isCollapsedReferral: boolean;
 };
 
-export type ScoreBand = "apply_tailor" | "apply" | "skip" | "no";
+export type ScoreBand = "strong_apply" | "apply" | "skip" | "no";
 
 export type ScoreDisplay = {
   capability: number;
@@ -102,11 +102,13 @@ export type ScoreDisplay = {
   poolDock: number;
   scoreDerivation: string;
   scoreBand: ScoreBand;
+  worthTailoring: boolean;
   survivabilityRows: SurvivabilityDisplayRow[];
   hardGates: string[];
   survivabilityPenalties: SurvivabilityPenalty[];
   dominantLever?: StrategicLeverSelection;
   actionLine: string;
+  referralSubtext?: string;
 };
 
 export type ScoreBreakdown = {
@@ -125,7 +127,7 @@ export type ScoreBreakdown = {
   survivabilityBreakdown?: Record<string, number>;
   /** UI-ready decomposition derived from capability + survivability composite model. */
   scoreDisplay?: ScoreDisplay;
-  /** Human-readable band label (apply_tailor / apply / skip). */
+  /** Human-readable band label (strong_apply / apply / skip). */
   recommendationLabel?: string;
   /** Final composite score (capability ± survivability adj − gap dock), 0–100. */
   total: number;

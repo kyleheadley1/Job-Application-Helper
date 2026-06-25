@@ -62,7 +62,7 @@ const PALANTIR_RAW_SCORE: ScoreBreakdown = {
 };
 
 describe("Palantir Web Design Engineer calibration", () => {
-  it("central design/Figma gap docks final below Mathpix-class fits; not apply_tailor", () => {
+  it("central design/Figma gap docks final below Mathpix-class fits; not strong_apply", () => {
     const rules = evaluateRules(PALANTIR_JOB, userProfile, { activeResumeType: "SWE" });
     const clamped = applyScoringClampLayer({
       score: PALANTIR_RAW_SCORE,
@@ -91,7 +91,7 @@ describe("Palantir Web Design Engineer calibration", () => {
 
     expect(composite.score.capability).toBeGreaterThanOrEqual(68);
     expect(composite.score.total).toBeLessThan(65);
-    expect(composite.scoreBand).not.toBe("apply_tailor");
+    expect(composite.scoreBand).not.toBe("strong_apply");
     expect(["apply", "skip"]).toContain(composite.scoreBand);
     expect(composite.recommendation).toBe("stretch_signal");
 
@@ -113,6 +113,7 @@ describe("Palantir Web Design Engineer calibration", () => {
     expect(display?.actionLine).toMatch(/portfolio/i);
     expect(display?.actionLine).not.toMatch(/credential signal/i);
     expect(display?.actionLine).not.toMatch(/referral routes around/i);
+    expect(display?.referralSubtext).toBeUndefined();
     expect(display?.scoreDerivation).toMatch(/− \d+/);
 
     const guarded = guardCompositeRecommendation({
