@@ -171,13 +171,22 @@ export const CapabilityBreakdownSchema = z.object({
   functionalOverlap: z.number(),
 });
 
+const survivabilityLeverSchema = z.enum([
+  "referral",
+  "resume",
+  "cover_letter",
+  "none",
+  "portfolio",
+  "upskill",
+]);
+
 export const SurvivabilityDisplayRowSchema = z.object({
   key: z.string(),
   label: z.string(),
   score: z.number(),
   weight: z.number(),
   contribution: z.number(),
-  lever: z.enum(["referral", "resume", "cover_letter", "none"]),
+  lever: survivabilityLeverSchema,
   leverLabel: z.string(),
   bindingness: z.enum(["binding", "material", "cosmetic", "structural"]),
   penaltyName: z.string(),
@@ -185,7 +194,7 @@ export const SurvivabilityDisplayRowSchema = z.object({
 
 export const StrategicLeverSelectionSchema = z.object({
   key: z.string(),
-  lever: z.enum(["referral", "resume", "cover_letter", "none"]),
+  lever: survivabilityLeverSchema,
   leverLabel: z.string(),
   penaltyName: z.string(),
   bindingness: z.enum(["binding", "material", "cosmetic", "structural"]),
@@ -203,7 +212,7 @@ export const ScoreDisplaySchema = z.object({
   survivabilityPenalties: z.array(
     z.object({
       message: z.string(),
-      lever: z.enum(["referral", "resume", "cover_letter", "none"]),
+      lever: survivabilityLeverSchema,
       leverLabel: z.string(),
     }),
   ),
