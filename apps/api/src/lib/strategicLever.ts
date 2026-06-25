@@ -32,7 +32,14 @@ export const computeHeadroom = (subScore: number): number => {
 };
 
 export const computeLeverFeasibility = (lever: SurvivabilityLever): number => {
-  if (lever === "none" || lever === "portfolio" || lever === "upskill") return 0;
+  if (
+    lever === "none" ||
+    lever === "none_in_loop" ||
+    lever === "portfolio" ||
+    lever === "upskill"
+  ) {
+    return 0;
+  }
   return 1;
 };
 

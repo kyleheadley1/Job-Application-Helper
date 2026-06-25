@@ -3,7 +3,12 @@ import type { Recommendation, RuleEvaluation, SurvivabilityPenalty } from "../ty
 import { specializationGapIsNonAddressable } from "./capabilityGap.js";
 
 const isPenaltyAddressable = (penalty: SurvivabilityPenalty): boolean => {
-  if (penalty.lever === "none" || penalty.lever === "portfolio" || penalty.lever === "upskill") {
+  if (
+    penalty.lever === "none" ||
+    penalty.lever === "none_in_loop" ||
+    penalty.lever === "portfolio" ||
+    penalty.lever === "upskill"
+  ) {
     return false;
   }
   return penalty.lever === "resume" || penalty.lever === "cover_letter";

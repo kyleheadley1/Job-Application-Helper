@@ -198,6 +198,7 @@ const survivabilityLeverSchema = z.enum([
   "resume",
   "cover_letter",
   "none",
+  "none_in_loop",
   "portfolio",
   "upskill",
 ]);

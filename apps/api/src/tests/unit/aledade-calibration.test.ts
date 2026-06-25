@@ -166,6 +166,11 @@ describe("Aledade calibration anchor", () => {
     expect(display?.actionLine).toMatch(/tailored|Strong shot|Worth applying/i);
     expect(display?.referralAdvice).toMatch(/Etana Kopin/i);
     expect(display?.referralUrgency).toMatch(/strongly_advised|advised/);
+
+    const credentialRow = display?.survivabilityRows.find((r) => r.key === "credentialSignal");
+    expect(credentialRow?.lever).toBe("none_in_loop");
+    expect(credentialRow?.leverLabel).toMatch(/external route only/i);
+    expect(display?.gapDock).toBeGreaterThanOrEqual(10);
     expect(display?.actionLine).not.toMatch(/Etana Kopin/i);
     expect(display?.actionLine).not.toMatch(/impact metric quality/i);
 

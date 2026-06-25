@@ -73,7 +73,7 @@ export const BINDINGNESS_TIER_RANK: Record<BindingnessTier, number> = {
 };
 
 export const LEVER_TYPE_RANK: Record<
-  "referral" | "cover_letter" | "resume" | "portfolio" | "upskill" | "none",
+  "referral" | "cover_letter" | "resume" | "portfolio" | "upskill" | "none" | "none_in_loop",
   number
 > = {
   referral: 3,
@@ -82,6 +82,7 @@ export const LEVER_TYPE_RANK: Record<
   portfolio: 0,
   upskill: 0,
   none: 0,
+  none_in_loop: 0,
 };
 
 /** Target sub-factor score for headroom calculation. */
@@ -102,7 +103,7 @@ export const SURVIVABILITY_SUB_FACTOR_PRIORITY: SurvivabilitySubFactorKey[] = [
 
 export type SurvivabilitySubFactorMeta = {
   label: string;
-  lever: "referral" | "resume" | "cover_letter" | "none";
+  lever: "referral" | "resume" | "cover_letter" | "none" | "none_in_loop";
   leverLabel: string;
   baseBindingness: BindingnessTier;
 };
@@ -121,7 +122,7 @@ export const SURVIVABILITY_SUB_FACTOR_META: Record<
   credentialSignal: {
     label: "Credential signal",
     lever: "none",
-    leverLabel: "NONE — structural, can't fix in-loop",
+    leverLabel: "NONE — no in-loop credential fix",
     baseBindingness: "binding",
   },
   impactMetricQuality: {
