@@ -143,8 +143,9 @@ export const RuleEvaluationSchema = z.object({
     .object({
       name: z.string(),
       evidence: z.string(),
-      severity: z.enum(["high", "medium", "low"]),
-      lever: z.enum(["none", "portfolio", "upskill"]),
+      severity: z.enum(["central", "moderate", "minor"]),
+      lever: z.enum(["none", "portfolio", "upskill", "resume"]),
+      dock: z.number().min(0).max(20),
     })
     .optional(),
   hardRuleNotes: z.array(z.string()).optional().default([]),
@@ -207,6 +208,11 @@ export const ScoreDisplaySchema = z.object({
   capabilityBreakdown: CapabilityBreakdownSchema,
   survivability: z.number(),
   final: z.number(),
+  survAdjustment: z.number(),
+  gapDock: z.number(),
+  poolDock: z.number(),
+  scoreDerivation: z.string(),
+  scoreBand: z.enum(["apply_tailor", "apply", "skip", "no"]),
   survivabilityRows: z.array(SurvivabilityDisplayRowSchema),
   hardGates: z.array(z.string()),
   survivabilityPenalties: z.array(

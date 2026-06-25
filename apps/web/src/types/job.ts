@@ -150,6 +150,11 @@ export type ScoreDisplay = {
   };
   survivability: number;
   final: number;
+  survAdjustment: number;
+  gapDock: number;
+  poolDock: number;
+  scoreDerivation: string;
+  scoreBand: "apply_tailor" | "apply" | "skip" | "no";
   survivabilityRows: SurvivabilityDisplayRow[];
   hardGates: string[];
   survivabilityPenalties: SurvivabilityPenalty[];

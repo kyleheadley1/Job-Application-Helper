@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 import { evaluateRules } from "../../agents/jobAgent/rules.js";
 import { userProfile } from "../../config/userProfile.js";
 import {
-  applySpecializationGapToBreakdown,
   detectSpecializationGap,
 } from "../../lib/capabilityGap.js";
 import { computeCompositeScore, computeCapabilityBreakdown } from "../../lib/compositeScoreModel.js";
@@ -51,7 +50,6 @@ TypeScript, React, design systems, visual design.
   `.trim(),
 };
 
-/** LLM-shaped score: strong engineering overlap, inflated functional (~26/35 scaled). */
 const PALANTIR_RAW_SCORE: ScoreBreakdown = {
   stackFit: 17,
   levelFit: 12,
@@ -64,7 +62,7 @@ const PALANTIR_RAW_SCORE: ScoreBreakdown = {
 };
 
 describe("Palantir Web Design Engineer calibration", () => {
-  it("structured design/Figma specialization gap drives stretch_signal, not referral_gated", () => {
+  it("central design/Figma gap docks final below Mathpix-class fits; not apply_tailor", () => {
     const rules = evaluateRules(PALANTIR_JOB, userProfile, { activeResumeType: "SWE" });
     const clamped = applyScoringClampLayer({
       score: PALANTIR_RAW_SCORE,
@@ -76,13 +74,11 @@ describe("Palantir Web Design Engineer calibration", () => {
     expect(specializationGap).toBeDefined();
     expect(specializationGap?.name).toMatch(/design\/figma/i);
     expect(specializationGap?.lever).toBe("portfolio");
-    expect(specializationGap?.severity).toBe("high");
+    expect(specializationGap?.severity).toBe("central");
+    expect(specializationGap?.dock).toBeGreaterThanOrEqual(12);
 
     const rawBreakdown = computeCapabilityBreakdown(clamped.score);
     expect(rawBreakdown.functionalOverlap).toBeGreaterThanOrEqual(24);
-    const discounted = applySpecializationGapToBreakdown(rawBreakdown, specializationGap);
-    expect(discounted.functionalOverlap).toBeLessThan(rawBreakdown.functionalOverlap);
-    expect(discounted.functionalOverlap).toBeLessThanOrEqual(14);
 
     const rulesWithGap = { ...clamped.rules, specializationGap, capabilityGap: undefined };
     const composite = computeCompositeScore({
@@ -93,9 +89,11 @@ describe("Palantir Web Design Engineer calibration", () => {
       resumeText: SWE_RESUME,
     });
 
-    expect(composite.score.capability).toBeLessThan(70);
+    expect(composite.score.capability).toBeGreaterThanOrEqual(68);
+    expect(composite.score.total).toBeLessThan(65);
+    expect(composite.scoreBand).not.toBe("apply_tailor");
+    expect(["apply", "skip"]).toContain(composite.scoreBand);
     expect(composite.recommendation).toBe("stretch_signal");
-    expect(composite.recommendation).not.toBe("referral_gated");
 
     const display = buildScoreDisplay({
       score: composite.score,
@@ -105,15 +103,17 @@ describe("Palantir Web Design Engineer calibration", () => {
       referralPathwayAvailable: false,
     });
 
+    expect(display?.gapDock).toBeGreaterThanOrEqual(12);
     expect(display?.survivabilityPenalties.some((p) => p.message.match(/design\/figma/i))).toBe(
       true,
     );
     expect(display?.dominantLever?.penaltyName).toMatch(/design\/figma/i);
     expect(display?.dominantLever?.lever).toBe("portfolio");
     expect(display?.actionLine).toMatch(/design\/figma/i);
-    expect(display?.actionLine).toMatch(/evidence/i);
+    expect(display?.actionLine).toMatch(/portfolio/i);
     expect(display?.actionLine).not.toMatch(/credential signal/i);
     expect(display?.actionLine).not.toMatch(/referral routes around/i);
+    expect(display?.scoreDerivation).toMatch(/− \d+/);
 
     const guarded = guardCompositeRecommendation({
       recommendation: composite.recommendation,

@@ -1,8 +1,10 @@
 import {
   CAPABILITY_MAXES,
+  COMPOSITE_SCORING,
   LEGACY_CAPABILITY_SOURCE_MAXES,
   resolveSubFactorBindingness,
   resolveSubFactorPenaltyName,
+  SCORE_BAND_LABELS,
   SURVIVABILITY_SUB_FACTOR_META,
   SURVIVABILITY_TUNING,
   SURVIVABILITY_WEIGHTS,
@@ -14,15 +16,24 @@ import type {
   HardRuleFlag,
   Recommendation,
   RuleEvaluation,
+  ScoreBand,
   ScoreBreakdown,
   ScoreDisplay,
+  SpecializationGap,
   StrategicLeverSelection,
   SurvivabilityDisplayRow,
   SurvivabilityLever,
   SurvivabilityPenalty,
 } from "../types/scoring.js";
 import { evaluateHardGates } from "./hardGates.js";
-import { applySpecializationGapToBreakdown } from "./capabilityGap.js";
+import { applySpecializationGapToBreakdown, specializationGapHeadlineWorthy } from "./capabilityGap.js";
+import {
+  computeCompetitivePoolDock,
+  computeFinalComposite,
+  computeGapDock,
+  formatScoreDerivation,
+  resolveScoreBand,
+} from "./compositeScoring.js";
 import {
   isStructuralOnly,
   selectDominantLever,
@@ -236,7 +247,44 @@ const structuralReason = (rows: SurvivabilityDisplayRow[]): string => {
   return "competitive applicant pool";
 };
 
+const gapLeverPhrase = (gap: SpecializationGap): string => {
+  if (gap.lever === "resume") return "reframe via resume";
+  if (gap.lever === "portfolio") return "build portfolio evidence first";
+  if (gap.lever === "upskill") return "close the gap with real project work";
+  return "not addressable in-loop";
+};
+
+const formatGapHeadline = (
+  prefix: string,
+  gap: SpecializationGap,
+  tailorCta: boolean,
+): string => {
+  const evidence = gap.evidence.endsWith(".") ? gap.evidence : `${gap.evidence}.`;
+  const leverPhrase = gapLeverPhrase(gap);
+  const tailor =
+    tailorCta || gap.lever === "resume"
+      ? gap.severity === "central"
+        ? ""
+        : " Worth tailoring."
+      : "";
+  if (gap.severity === "central" && gap.lever !== "resume") {
+    return `${prefix} — ${gap.name} is central and your evidence is engineering-side; a referral won't close it. ${leverPhrase.charAt(0).toUpperCase()}${leverPhrase.slice(1)}.`;
+  }
+  return `${prefix} — but ${evidence.charAt(0).toLowerCase()}${evidence.slice(1)} ${leverPhrase}.${tailor}`;
+};
+
+const pathwaySuffix = (
+  referralPathwayAvailable: boolean | undefined,
+  referralPathwayNotes: string | undefined,
+): string => {
+  if (!referralPathwayAvailable || !referralPathwayNotes?.trim()) return "";
+  const source = pathwaySource(referralPathwayNotes);
+  return ` (${source} referral available as a secondary route.)`;
+};
+
 export const deriveActionLine = (params: {
+  scoreBand: ScoreBand;
+  final: number;
   recommendation: Recommendation;
   survivabilityRows: SurvivabilityDisplayRow[];
   rules: RuleEvaluation;
@@ -246,84 +294,50 @@ export const deriveActionLine = (params: {
   dominantLever?: StrategicLeverSelection;
 }): string => {
   const {
-    recommendation,
-    survivabilityRows,
+    scoreBand,
+    rules,
     referralPathwayAvailable,
     referralPathwayNotes,
   } = params;
+  const gap = rules.specializationGap;
+  const gapWorthy = specializationGapHeadlineWorthy(gap);
+  const pathwayNote = pathwaySuffix(referralPathwayAvailable, referralPathwayNotes);
 
-  const dominant =
-    params.dominantLever ??
-    selectDominantLever(survivabilityRows, params.rules, referralPathwayAvailable);
-
-  if (recommendation === "no") {
+  if (scoreBand === "no") {
     const reason = params.hardGates?.[0] ?? "hard gate fired";
     return `Do not apply — ${reason.charAt(0).toLowerCase()}${reason.slice(1)}`;
   }
 
-  if (recommendation === "apply_cold" || recommendation === "yes") {
-    return "Strong odds — apply directly.";
+  if (scoreBand === "apply_tailor") {
+    if (gapWorthy && gap) {
+      return formatGapHeadline("Strong shot", gap, true) + pathwayNote;
+    }
+    return (
+      "Strong shot — worth a tailored resume + cover letter to convert it." + pathwayNote
+    );
   }
 
-  if (isStructuralOnly(survivabilityRows, Boolean(referralPathwayAvailable))) {
-    const reason = structuralReason(survivabilityRows);
-    if (recommendation === "skip") {
-      return `Weak fit and weak odds — odds are structural — ${reason}; effort won't move them much.`;
+  if (scoreBand === "apply") {
+    if (gapWorthy && gap) {
+      const prefix =
+        params.final >= COMPOSITE_SCORING.APPLY_HIGH - 8 ? "Strong shot" : "Worth applying";
+      return formatGapHeadline(prefix, gap, params.final >= COMPOSITE_SCORING.APPLY_HIGH - 8) + pathwayNote;
     }
-    return `Odds are structural — ${reason}; effort won't move them much.`;
+    return SCORE_BAND_LABELS.apply + pathwayNote;
   }
 
-  if (
-    recommendation === "referral_gated" &&
-    referralPathwayAvailable &&
-    dominant?.lever === "referral" &&
-    !params.rules.specializationGap
-  ) {
-    const source = pathwaySource(referralPathwayNotes);
-    return `Use the ${source} connection — a referral routes around the ${dominant.penaltyName}.`;
-  }
-
-  if (
-    recommendation === "referral_gated" ||
-    recommendation === "selective_yes" ||
-    recommendation === "stretch_signal"
-  ) {
-    if (params.rules.specializationGap && recommendation === "stretch_signal") {
-      const gap = params.rules.specializationGap;
-      const pillar = gap.name.toLowerCase();
-      if (gap.lever === "portfolio") {
-        return `Stretch — strong on one pillar; the ${pillar} pillar is central and a referral won't close it in the loop. Best move: build ${pillar} evidence.`;
-      }
-      if (gap.lever === "upskill") {
-        return `Stretch — ${pillar} is load-bearing; close the gap with real project work, not application tactics.`;
-      }
-      return `Stretch — ${pillar} specialization gap is structural for this role.`;
+  if (scoreBand === "skip") {
+    if (gapWorthy && gap) {
+      return formatGapHeadline("Stretch", gap, false);
     }
-    const prefix =
-      recommendation === "stretch_signal"
-        ? "Stretch fit — signal may carry you."
-        : "Worth a tailored application; cold odds are low.";
-    if (!dominant) {
-      return prefix;
+    if (rules.capabilityGap) {
+      return `Not worth the effort — ${rules.capabilityGap.reason}.`;
     }
-    const leverName =
-      dominant.lever === "cover_letter"
-        ? "tailored cover letter"
-        : dominant.lever === "resume"
-          ? "resume polish"
-          : dominant.leverLabel.toLowerCase();
-    return `${prefix} Best lever: ${leverName} to address ${dominant.penaltyName}.`;
-  }
-
-  if (recommendation === "skip") {
-    if (params.rules.specializationGap) {
-      return `Weak fit and weak odds — ${params.rules.specializationGap.name}.`;
-    }
-    if (params.rules.capabilityGap) {
-      return `Weak fit and weak odds — ${params.rules.capabilityGap.reason}.`;
-    }
-    const reason = dominant?.penaltyName ?? structuralReason(survivabilityRows);
-    return `Weak fit and weak odds — ${reason}.`;
+    const dominant =
+      params.dominantLever ??
+      selectDominantLever(params.survivabilityRows, params.rules, referralPathwayAvailable);
+    const reason = dominant?.penaltyName ?? structuralReason(params.survivabilityRows);
+    return `Not worth the effort — ${reason}.`;
   }
 
   return "";
@@ -346,8 +360,7 @@ export const buildScoreDisplay = (params: {
     params.rules.specializationGap,
   );
   const capabilityFromBreakdown = sumCapabilityBreakdown(capabilityBreakdown);
-  const capability =
-    params.rules.specializationGap != null ? capabilityFromBreakdown : (params.score.capability ?? capabilityFromBreakdown);
+  const capability = params.score.capability ?? capabilityFromBreakdown;
   assertCapabilityBreakdownMatchesHeadline(capability, capabilityBreakdown);
 
   const hardGates = buildHardGatesList(
@@ -367,6 +380,17 @@ export const buildScoreDisplay = (params: {
     assertSurvivabilityRowsMatchMultiplier(breakdown, survivabilityRows);
   }
 
+  const gapDock = computeGapDock(params.rules.specializationGap);
+  const poolDock = computeCompetitivePoolDock(params.rules, survivability);
+  const composite = computeFinalComposite({
+    capability,
+    survivability,
+    gapDock,
+    poolDock,
+  });
+  const scoreBand = resolveScoreBand(composite.final, params.recommendation === "no");
+  const scoreDerivation = formatScoreDerivation(composite);
+
   const dominantLever = selectDominantLever(
     survivabilityRows,
     params.rules,
@@ -374,6 +398,8 @@ export const buildScoreDisplay = (params: {
   );
 
   const actionLine = deriveActionLine({
+    scoreBand,
+    final: composite.final,
     recommendation: params.recommendation,
     survivabilityRows,
     rules: params.rules,
@@ -387,7 +413,12 @@ export const buildScoreDisplay = (params: {
     capability,
     capabilityBreakdown,
     survivability,
-    final: params.score.total,
+    final: composite.final,
+    survAdjustment: composite.survAdjustment,
+    gapDock: composite.gapDock,
+    poolDock: composite.poolDock,
+    scoreDerivation,
+    scoreBand,
     survivabilityRows,
     hardGates,
     survivabilityPenalties,

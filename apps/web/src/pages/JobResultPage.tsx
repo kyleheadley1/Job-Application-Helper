@@ -308,7 +308,7 @@ export const JobResultPage = () => {
               <div className="scoreSection">
                 <h4>
                   Survivability: {scoreDisplay.survivability.toFixed(2)}{" "}
-                  <span className="muted">(multiplier on capability)</span>
+                  <span className="muted">(adjustment input, not a multiplier)</span>
                 </h4>
                 <ul className="scoreDecomp">
                   {scoreDisplay.survivabilityRows.map((row) => (
@@ -325,9 +325,7 @@ export const JobResultPage = () => {
 
               <p className="scoreFinal">
                 Final: {scoreDisplay.final}/100{" "}
-                <span className="muted">
-                  (round({scoreDisplay.capability} × {scoreDisplay.survivability.toFixed(2)}))
-                </span>
+                <span className="muted">({scoreDisplay.scoreDerivation})</span>
               </p>
 
               <div className="scoreSection">
@@ -359,8 +357,8 @@ export const JobResultPage = () => {
             </>
           ) : (
             <p className="muted">
-              Full breakdown unavailable for this score. Re-run triage to refresh with the capability ×
-              survivability model.
+              Full breakdown unavailable for this score. Re-run triage to refresh with the capability +
+              survivability composite model.
             </p>
           )}
         </article>

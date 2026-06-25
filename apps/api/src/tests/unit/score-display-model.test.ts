@@ -147,7 +147,7 @@ describe("scoreDisplayModel", () => {
     ).toBe(false);
   });
 
-  it("buildScoreDisplay sets action line for referral_gated", () => {
+  it("buildScoreDisplay surfaces referral as secondary under band headline", () => {
     const { composite, rules } = compositeFixture();
     const display = buildScoreDisplay({
       score: composite.score,
@@ -157,7 +157,8 @@ describe("scoreDisplayModel", () => {
       referralPathwayAvailable: true,
       referralPathwayNotes: "Connection via Codesmith",
     });
+    expect(display!.actionLine).toMatch(/tailored|Strong shot|Worth applying/i);
     expect(display!.actionLine).toMatch(/Codesmith/);
-    expect(display!.actionLine).toMatch(/referral routes around/i);
+    expect(display!.scoreDerivation).toBeTruthy();
   });
 });

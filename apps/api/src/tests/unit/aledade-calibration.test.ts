@@ -165,8 +165,8 @@ describe("Aledade calibration anchor", () => {
     expect(display?.dominantLever?.lever).toBe("referral");
     expect(display?.dominantLever?.penaltyName).toBe("degree requirement");
     expect(display?.dominantLever?.isCollapsedReferral).toBe(true);
+    expect(display?.actionLine).toMatch(/tailored|Strong shot|Worth applying/i);
     expect(display?.actionLine).toMatch(/Etana Kopin/i);
-    expect(display?.actionLine).toMatch(/degree requirement/i);
     expect(display?.actionLine).not.toMatch(/impact metric quality/i);
 
     const jitteredLines = [0.28, 0.32, 0.35].map((impactMetricQuality) => {
@@ -206,7 +206,8 @@ describe("Aledade calibration anchor", () => {
 
     for (const jittered of jitteredLines) {
       expect(jittered?.dominantLever?.penaltyName).toBe("degree requirement");
-      expect(jittered?.actionLine).toMatch(/degree requirement/i);
+      expect(jittered?.actionLine).toMatch(/tailored|Strong shot|Worth applying/i);
+      expect(jittered?.actionLine).not.toMatch(/impact metric quality/i);
     }
   });
 });
