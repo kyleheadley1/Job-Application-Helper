@@ -154,12 +154,14 @@ export type ScoreDisplay = {
   gapDock: number;
   poolDock: number;
   scoreDerivation: string;
-  scoreBand: "apply_tailor" | "apply" | "skip" | "no";
+  scoreBand: "strong_apply" | "apply" | "skip" | "no";
+  worthTailoring: boolean;
   survivabilityRows: SurvivabilityDisplayRow[];
   hardGates: string[];
   survivabilityPenalties: SurvivabilityPenalty[];
   dominantLever?: StrategicLeverSelection;
   actionLine: string;
+  referralSubtext?: string;
 };
 
 export type GeneratedAssets = {

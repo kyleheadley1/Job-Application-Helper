@@ -29,10 +29,12 @@ export const COMPOSITE_SCORING = {
   SURV_NEUTRAL: 0.5,
   /** Max points survivability can move final either direction. */
   SURV_SWING: 18,
-  /** Final ≥ this → apply_tailor band (strong shot + tailoring). */
-  APPLY_HIGH: 72,
+  /** Final ≥ this → strong_apply band (slam-dunk confidence). */
+  STRONG_APPLY: 80,
   /** Final ≥ this → apply band; below → skip. */
-  APPLY_LOW: 52,
+  APPLY_LOW: 58,
+  /** Capability ≥ this → worth tailoring (independent of band). */
+  TAILOR_CAPABILITY: 70,
   /**
    * Extra dock when JD implies a hot competitive pool and survivability is weak.
    * Keeps high-capability / low-odds roles (e.g. DeepScribe) from reading as slam dunks.
@@ -41,8 +43,8 @@ export const COMPOSITE_SCORING = {
   COMPETITIVE_POOL_SURV_CEILING: 0.52,
 } as const;
 
-export const SCORE_BAND_LABELS: Record<"apply_tailor" | "apply" | "skip" | "no", string> = {
-  apply_tailor: "Strong shot — worth tailored resume + cover letter",
+export const SCORE_BAND_LABELS: Record<"strong_apply" | "apply" | "skip" | "no", string> = {
+  strong_apply: "Clearly in the ballpark — slam-dunk fit",
   apply: "Worth applying — light touch or as-is",
   skip: "Not worth the effort",
   no: "Hard gate — do not apply",

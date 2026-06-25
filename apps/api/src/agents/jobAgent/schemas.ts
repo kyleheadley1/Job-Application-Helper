@@ -212,7 +212,8 @@ export const ScoreDisplaySchema = z.object({
   gapDock: z.number(),
   poolDock: z.number(),
   scoreDerivation: z.string(),
-  scoreBand: z.enum(["apply_tailor", "apply", "skip", "no"]),
+  scoreBand: z.enum(["strong_apply", "apply", "skip", "no"]),
+  worthTailoring: z.boolean(),
   survivabilityRows: z.array(SurvivabilityDisplayRowSchema),
   hardGates: z.array(z.string()),
   survivabilityPenalties: z.array(
@@ -224,6 +225,7 @@ export const ScoreDisplaySchema = z.object({
   ),
   dominantLever: StrategicLeverSelectionSchema.optional(),
   actionLine: z.string(),
+  referralSubtext: z.string().optional(),
 });
 
 export const ScoreBreakdownSchema = z

@@ -158,7 +158,8 @@ describe("scoreDisplayModel", () => {
       referralPathwayNotes: "Connection via Codesmith",
     });
     expect(display!.actionLine).toMatch(/tailored|Strong shot|Worth applying/i);
-    expect(display!.actionLine).toMatch(/Codesmith/);
+    expect(display!.referralSubtext).toMatch(/Codesmith/i);
+    expect(display!.actionLine).not.toMatch(/Codesmith/i);
     expect(display!.scoreDerivation).toBeTruthy();
   });
 });

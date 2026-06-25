@@ -76,9 +76,17 @@ export const formatScoreDerivation = (parts: CompositeParts): string => {
   return `${parts.capability} + ${adj}${dockLabel} = ${parts.final}`;
 };
 
+export const computeWorthTailoring = (
+  capability: number,
+  scoreBand: ScoreBand = "apply",
+): boolean => {
+  if (scoreBand === "skip" || scoreBand === "no") return false;
+  return capability >= COMPOSITE_SCORING.TAILOR_CAPABILITY;
+};
+
 export const resolveScoreBand = (final: number, hardGate = false): ScoreBand => {
   if (hardGate) return "no";
-  if (final >= COMPOSITE_SCORING.APPLY_HIGH) return "apply_tailor";
+  if (final >= COMPOSITE_SCORING.STRONG_APPLY) return "strong_apply";
   if (final >= COMPOSITE_SCORING.APPLY_LOW) return "apply";
   return "skip";
 };
