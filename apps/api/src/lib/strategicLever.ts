@@ -31,12 +31,8 @@ export const computeHeadroom = (subScore: number): number => {
   return Math.min(SURVIVABILITY_TARGET_NEUTRAL, Math.max(0, raw));
 };
 
-export const computeLeverFeasibility = (
-  lever: SurvivabilityLever,
-  referralPathwayAvailable: boolean,
-): number => {
+export const computeLeverFeasibility = (lever: SurvivabilityLever): number => {
   if (lever === "none" || lever === "portfolio" || lever === "upskill") return 0;
-  if (lever === "referral") return referralPathwayAvailable ? 1 : 0;
   return 1;
 };
 
@@ -77,11 +73,10 @@ export const computeStrategicValue = (
   bindingness: BindingnessTier,
   subScore: number,
   lever: SurvivabilityLever,
-  referralPathwayAvailable: boolean,
 ): number => {
   const tierWeight = BINDINGNESS_TIER_WEIGHT[bindingness];
   if (tierWeight === 0) return 0;
-  return tierWeight * computeHeadroom(subScore) * computeLeverFeasibility(lever, referralPathwayAvailable);
+  return tierWeight * computeHeadroom(subScore) * computeLeverFeasibility(lever);
 };
 
 const subFactorPriorityIndex = (key: string): number => {
@@ -115,77 +110,39 @@ export const compareStrategicLevers = (
   return compareBindingnessPriority(a, b);
 };
 
-const pickHighestTierInCluster = (
-  cluster: StrategicLeverSelection[],
-): StrategicLeverSelection => {
-  return cluster.reduce((best, curr) =>
-    compareBindingnessPriority(curr, best) > 0 ? curr : best,
-  );
-};
-
-const rowToCandidate = (
-  row: SurvivabilityDisplayRow,
-  referralPathwayAvailable: boolean,
-): StrategicLeverSelection => ({
+const rowToCandidate = (row: SurvivabilityDisplayRow): StrategicLeverSelection => ({
   key: row.key,
   lever: row.lever,
   leverLabel: row.leverLabel,
   penaltyName: row.penaltyName,
   bindingness: row.bindingness,
-  strategicValue: computeStrategicValue(
-    row.bindingness,
-    row.score,
-    row.lever,
-    referralPathwayAvailable,
-  ),
+  strategicValue: computeStrategicValue(row.bindingness, row.score, row.lever),
   isCollapsedReferral: false,
 });
 
 export const selectDominantLever = (
   rows: SurvivabilityDisplayRow[],
   rules: RuleEvaluation,
-  referralPathwayAvailable = false,
 ): StrategicLeverSelection | undefined => {
   const gapSelection = specializationGapLeverSelection(rules.specializationGap);
   if (gapSelection) return gapSelection;
 
-  const individuals = rows
-    .filter((row) => row.bindingness !== "structural")
-    .map((row) => rowToCandidate(row, referralPathwayAvailable));
+  const candidates = rows
+    .filter((row) => row.bindingness !== "structural" && row.lever !== "referral")
+    .map(rowToCandidate)
+    .filter((item) => item.strategicValue > 0);
 
-  const referralItems = individuals.filter((item) => item.lever === "referral");
-  const nonReferralItems = individuals.filter((item) => item.lever !== "referral");
+  if (!candidates.length) return undefined;
 
-  let candidates: StrategicLeverSelection[] = [...nonReferralItems];
-
-  if (referralPathwayAvailable && referralItems.length > 0) {
-    const topInCluster = pickHighestTierInCluster(referralItems);
-    const maxReferralValue = Math.max(...referralItems.map((item) => item.strategicValue));
-    candidates.push({
-      ...topInCluster,
-      strategicValue: maxReferralValue,
-      isCollapsedReferral: true,
-    });
-  } else {
-    candidates.push(...referralItems.filter((item) => item.strategicValue > 0));
-  }
-
-  const viable = candidates.filter((item) => item.strategicValue > 0);
-  if (!viable.length) return undefined;
-
-  return viable.reduce((best, curr) =>
+  return candidates.reduce((best, curr) =>
     compareStrategicLevers(curr, best) > 0 ? curr : best,
   );
 };
 
-export const isStructuralOnly = (
-  rows: SurvivabilityDisplayRow[],
-  referralPathwayAvailable: boolean,
-): boolean => {
+export const isStructuralOnly = (rows: SurvivabilityDisplayRow[]): boolean => {
   const nonStructural = rows.filter((row) => row.bindingness !== "structural");
   if (!nonStructural.length) return true;
   return nonStructural.every(
-    (row) =>
-      computeStrategicValue(row.bindingness, row.score, row.lever, referralPathwayAvailable) === 0,
+    (row) => computeStrategicValue(row.bindingness, row.score, row.lever) === 0,
   );
 };

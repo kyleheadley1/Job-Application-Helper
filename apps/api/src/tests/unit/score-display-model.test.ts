@@ -158,7 +158,8 @@ describe("scoreDisplayModel", () => {
       referralPathwayNotes: "Connection via bootcamp",
     });
     expect(display!.actionLine).toMatch(/tailored|Strong shot|Worth applying/i);
-    expect(display!.referralSubtext).toMatch(/bootcamp/i);
+    expect(display!.referralAdvice).toMatch(/bootcamp/i);
+    expect(display!.referralUrgency).toMatch(/strongly_advised|advised|optional/);
     expect(display!.actionLine).not.toMatch(/bootcamp/i);
     expect(display!.scoreDerivation).toBeTruthy();
   });

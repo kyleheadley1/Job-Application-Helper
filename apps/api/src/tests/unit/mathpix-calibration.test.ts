@@ -112,6 +112,6 @@ describe("Mathpix calibration anchor", () => {
     expect(display?.actionLine).not.toMatch(/django/i);
     expect(display?.actionLine).toMatch(/tailored resume/i);
     expect(display?.actionLine).not.toMatch(/referral/i);
-    expect(display?.referralSubtext).toMatch(/referral pathway/i);
+    expect(display?.referralAdvice).toMatch(/former colleague/i);
   });
 });

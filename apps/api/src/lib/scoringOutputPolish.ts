@@ -1059,8 +1059,7 @@ export function applyVagueEarlyStageAiCalibration(params: {
   const blob = jobTextBlob(params.extracted);
   const strongCompany = KNOWN_STRONG_EMPLOYER_RE.test(normalizeText(params.extracted.company ?? ""));
   const stackStrong = !params.rules.stackMismatch && params.score.stackFit >= 19;
-  const referralSignal = /\b(referral|employee referral|internal referral)\b/i.test(blob);
-  const escapeRecruiterCap = strongCompany || stackStrong || referralSignal;
+  const escapeRecruiterCap = strongCompany || stackStrong;
 
   let next = { ...params.score };
   if (!escapeRecruiterCap) {

@@ -38,6 +38,7 @@ import {
   isStructuralOnly,
   selectDominantLever,
 } from "./strategicLever.js";
+import { deriveReferralAdvice } from "./referralAdvice.js";
 import type { SurvivabilityBreakdown } from "./survivabilityScore.js";
 
 export type {
@@ -151,9 +152,7 @@ const flagIsHardGate = (
 };
 
 const flagPenaltyLever = (flagId: string): SurvivabilityLever => {
-  if (flagId === "degreeGateStructuredEmployer") return "referral";
   if (flagId === "degreePreferenceWithEquivalency") return "resume";
-  if (flagId === "financePenalty" || flagId === "quantTradingMismatch") return "referral";
   if (flagId === "coreLanguageMismatch") return "resume";
   return "none";
 };
@@ -163,7 +162,6 @@ const flagPenaltyLeverLabel = (flagId: string): string => {
   if (flagId === "degreePreferenceWithEquivalency") {
     return "tailor resume to emphasize related experience";
   }
-  if (lever === "referral") return "REFERRAL routes around this";
   if (lever === "resume") return "resume framing";
   if (lever === "cover_letter") return "tailored resume / cover letter";
   return "NONE — structural, can't fix";
@@ -228,49 +226,12 @@ export const buildHardGatesList = (
   return gate.fired ? gate.reasons : [];
 };
 
-const pathwaySource = (notes?: string): string => {
-  if (!notes?.trim()) return "referral";
-  const first = notes.split(";")[0]?.trim();
-  if (!first) return "referral";
-  if (first.startsWith("Connection via ")) {
-    return first.replace(/^Connection via /i, "");
-  }
-  if (first.startsWith("Shared program connection (")) {
-    const match = first.match(/\(([^)]+)\)/);
-    return match?.[1] ?? first;
-  }
-  if (first.startsWith("Connection from previous company (")) {
-    const match = first.match(/\(([^)]+)\)/);
-    return match?.[1] ?? first;
-  }
-  return first;
-};
-
 const structuralReason = (rows: SurvivabilityDisplayRow[]): string => {
   const structural = rows.filter((row) => row.bindingness === "structural");
   if (structural.length) {
     return structural.sort((a, b) => a.score - b.score)[0]!.label.toLowerCase();
   }
   return "competitive applicant pool";
-};
-
-export const deriveReferralSubtext = (params: {
-  recommendation: Recommendation;
-  referralPathwayAvailable?: boolean;
-  referralPathwayNotes?: string;
-}): string | undefined => {
-  const { recommendation, referralPathwayAvailable, referralPathwayNotes } = params;
-  if (referralPathwayAvailable && referralPathwayNotes?.trim()) {
-    const source = pathwaySource(referralPathwayNotes);
-    return `Referral pathway available (via ${source})`;
-  }
-  if (referralPathwayAvailable) {
-    return "Referral pathway available";
-  }
-  if (recommendation === "referral_gated") {
-    return "Cold-apply odds are low — referral helps";
-  }
-  return undefined;
 };
 
 export const deriveActionLine = (params: {
@@ -282,9 +243,8 @@ export const deriveActionLine = (params: {
   rules: RuleEvaluation;
   hardGates?: string[];
   dominantLever?: StrategicLeverSelection;
-  referralPathwayAvailable?: boolean;
 }): string => {
-  const { scoreBand, worthTailoring, rules, referralPathwayAvailable } = params;
+  const { scoreBand, worthTailoring, rules } = params;
   const gap = rules.specializationGap;
   const gapWorthy = specializationGapHeadlineWorthy(gap);
 
@@ -323,7 +283,7 @@ export const deriveActionLine = (params: {
     }
     const dominant =
       params.dominantLever ??
-      selectDominantLever(params.survivabilityRows, params.rules, referralPathwayAvailable);
+      selectDominantLever(params.survivabilityRows, params.rules);
     const reason = dominant?.penaltyName ?? structuralReason(params.survivabilityRows);
     return `Not worth the effort — ${reason}.`;
   }
@@ -379,11 +339,7 @@ export const buildScoreDisplay = (params: {
   const worthTailoring = computeWorthTailoring(capability, scoreBand);
   const bandHeadline = resolveBandHeadline(scoreBand, worthTailoring);
 
-  const dominantLever = selectDominantLever(
-    survivabilityRows,
-    params.rules,
-    params.referralPathwayAvailable,
-  );
+  const dominantLever = selectDominantLever(survivabilityRows, params.rules);
 
   const actionLine = deriveActionLine({
     scoreBand,
@@ -394,11 +350,10 @@ export const buildScoreDisplay = (params: {
     rules: params.rules,
     hardGates,
     dominantLever,
-    referralPathwayAvailable: params.referralPathwayAvailable,
   });
 
-  const referralSubtext = deriveReferralSubtext({
-    recommendation: params.recommendation,
+  const referral = deriveReferralAdvice({
+    survivabilityBreakdown: breakdown,
     referralPathwayAvailable: params.referralPathwayAvailable,
     referralPathwayNotes: params.referralPathwayNotes,
   });
@@ -419,7 +374,8 @@ export const buildScoreDisplay = (params: {
     survivabilityPenalties,
     dominantLever,
     actionLine,
-    referralSubtext,
+    referralAdvice: referral.advice,
+    referralUrgency: referral.urgency,
     eligibilityAdvisory: params.rules.eligibilityFlag,
   };
 };
