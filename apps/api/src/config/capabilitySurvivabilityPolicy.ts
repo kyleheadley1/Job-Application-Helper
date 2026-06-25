@@ -51,10 +51,15 @@ export const BINDINGNESS_TIER_RANK: Record<BindingnessTier, number> = {
   structural: 0,
 };
 
-export const LEVER_TYPE_RANK: Record<"referral" | "cover_letter" | "resume" | "none", number> = {
+export const LEVER_TYPE_RANK: Record<
+  "referral" | "cover_letter" | "resume" | "portfolio" | "upskill" | "none",
+  number
+> = {
   referral: 3,
   cover_letter: 2,
   resume: 1,
+  portfolio: 0,
+  upskill: 0,
   none: 0,
 };
 

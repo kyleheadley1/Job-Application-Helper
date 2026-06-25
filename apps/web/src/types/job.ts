@@ -82,7 +82,13 @@ export type RuleEvaluation = {
   notes: string[];
 };
 
-export type SurvivabilityLever = "referral" | "resume" | "cover_letter" | "none";
+export type SurvivabilityLever =
+  | "referral"
+  | "resume"
+  | "cover_letter"
+  | "none"
+  | "portfolio"
+  | "upskill";
 
 export type BindingnessTier = "binding" | "material" | "cosmetic" | "structural";
 

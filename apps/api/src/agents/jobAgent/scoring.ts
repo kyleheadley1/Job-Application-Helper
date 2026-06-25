@@ -16,7 +16,7 @@ import type { StructuredCallDiagnostics } from '../../services/llm/responsesClie
 import { polishScoringNarrative } from '../../lib/scoringOutputPolish.js';
 import { applyScoringClampLayer } from '../../lib/scoringClampLayer.js';
 import { applyJdLanguageOutputBoundary } from '../../lib/jdLanguageOutputBoundary.js';
-import { detectCapabilityGap } from '../../lib/capabilityGap.js';
+import { detectCapabilityGap, detectSpecializationGap } from '../../lib/capabilityGap.js';
 import { computeCompositeScore } from '../../lib/compositeScoreModel.js';
 import { userProfile as defaultUserProfile } from '../../config/userProfile.js';
 
@@ -159,8 +159,13 @@ const deterministicFallback = (
     extracted: job,
     rules,
   });
-  const capabilityGap = detectCapabilityGap(job, clamped.score);
-  const rulesWithGap = { ...clamped.rules, capabilityGap };
+  const capabilityGap = detectCapabilityGap(job, clamped.score, resumeText);
+  const specializationGap = detectSpecializationGap(job, clamped.score, resumeText);
+  const rulesWithGap: RuleEvaluation = {
+    ...clamped.rules,
+    capabilityGap,
+    specializationGap,
+  };
   const composite = compositeFromCategories({
     score: clamped.score,
     extracted: job,
@@ -265,10 +270,16 @@ export const scoreJob = async (params: {
     extracted: params.extracted,
     rules: params.rules,
   });
-  const capabilityGap = detectCapabilityGap(params.extracted, clamped.score);
+  const capabilityGap = detectCapabilityGap(params.extracted, clamped.score, params.resumeContexts?.SWE?.rawText);
+  const specializationGap = detectSpecializationGap(
+    params.extracted,
+    clamped.score,
+    params.resumeContexts?.SWE?.rawText,
+  );
   const rulesWithGap: RuleEvaluation = {
     ...clamped.rules,
     capabilityGap,
+    specializationGap,
   };
   const composite = compositeFromCategories({
     score: clamped.score,

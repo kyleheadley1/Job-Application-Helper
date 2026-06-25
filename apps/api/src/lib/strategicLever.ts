@@ -8,7 +8,13 @@ import {
   type BindingnessTier,
   type SurvivabilitySubFactorKey,
 } from "../config/capabilitySurvivabilityPolicy.js";
-import type { RuleEvaluation, SurvivabilityDisplayRow, SurvivabilityLever } from "../types/scoring.js";
+import type {
+  RuleEvaluation,
+  SpecializationGap,
+  SurvivabilityDisplayRow,
+  SurvivabilityLever,
+} from "../types/scoring.js";
+import { specializationGapIsNonAddressable } from "./capabilityGap.js";
 
 export type StrategicLeverSelection = {
   key: string;
@@ -29,9 +35,31 @@ export const computeLeverFeasibility = (
   lever: SurvivabilityLever,
   referralPathwayAvailable: boolean,
 ): number => {
-  if (lever === "none") return 0;
+  if (lever === "none" || lever === "portfolio" || lever === "upskill") return 0;
   if (lever === "referral") return referralPathwayAvailable ? 1 : 0;
   return 1;
+};
+
+export const specializationGapLeverSelection = (
+  gap: SpecializationGap | undefined,
+): StrategicLeverSelection | undefined => {
+  if (!gap || !specializationGapIsNonAddressable(gap)) return undefined;
+  const lever: SurvivabilityLever =
+    gap.lever === "portfolio" ? "portfolio" : gap.lever === "upskill" ? "upskill" : "none";
+  return {
+    key: "specializationGap",
+    lever,
+    leverLabel:
+      lever === "portfolio"
+        ? "build portfolio evidence"
+        : lever === "upskill"
+          ? "upskill with real project work"
+          : "NONE — structural, can't fix in-loop",
+    penaltyName: gap.name,
+    bindingness: gap.severity === "high" ? "binding" : "material",
+    strategicValue: BINDINGNESS_TIER_WEIGHT.binding * SURVIVABILITY_TARGET_NEUTRAL,
+    isCollapsedReferral: false,
+  };
 };
 
 export const computeStrategicValue = (
@@ -61,7 +89,8 @@ export const compareBindingnessPriority = (
   const priorityDelta =
     subFactorPriorityIndex(b.key) - subFactorPriorityIndex(a.key);
   if (priorityDelta !== 0) return priorityDelta;
-  return LEVER_TYPE_RANK[a.lever] - LEVER_TYPE_RANK[b.lever];
+  return LEVER_TYPE_RANK[a.lever as keyof typeof LEVER_TYPE_RANK] -
+    LEVER_TYPE_RANK[b.lever as keyof typeof LEVER_TYPE_RANK];
 };
 
 /** Positive when `a` is preferred over `b`. Never uses raw sub-scores. */
@@ -103,9 +132,12 @@ const rowToCandidate = (
 
 export const selectDominantLever = (
   rows: SurvivabilityDisplayRow[],
-  _rules: RuleEvaluation,
+  rules: RuleEvaluation,
   referralPathwayAvailable = false,
 ): StrategicLeverSelection | undefined => {
+  const gapSelection = specializationGapLeverSelection(rules.specializationGap);
+  if (gapSelection) return gapSelection;
+
   const individuals = rows
     .filter((row) => row.bindingness !== "structural")
     .map((row) => rowToCandidate(row, referralPathwayAvailable));

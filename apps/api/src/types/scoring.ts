@@ -22,6 +22,18 @@ export type CapabilityGap = {
   reason: string;
 };
 
+export type SpecializationGapLever = "none" | "portfolio" | "upskill";
+
+export type SpecializationGapSeverity = "high" | "medium" | "low";
+
+/** Structured missing-pillar gap — visible to lever logic and recommendation guards. */
+export type SpecializationGap = {
+  name: string;
+  evidence: string;
+  severity: SpecializationGapSeverity;
+  lever: SpecializationGapLever;
+};
+
 /** LLM-scored transparency dimensions (not composite axes). */
 export type LegacyScoreDimension =
   | "stackFit"
@@ -32,7 +44,13 @@ export type LegacyScoreDimension =
   | "recruiterFriendliness"
   | "careerValue";
 
-export type SurvivabilityLever = "referral" | "resume" | "cover_letter" | "none";
+export type SurvivabilityLever =
+  | "referral"
+  | "resume"
+  | "cover_letter"
+  | "none"
+  | "portfolio"
+  | "upskill";
 
 export type BindingnessTier = "binding" | "material" | "cosmetic" | "structural";
 
@@ -178,6 +196,8 @@ export type RuleEvaluation = {
   degreeHasEquivalencyClause?: boolean;
   /** Non-addressable capability/specialization gap (valid skip driver). */
   capabilityGap?: CapabilityGap;
+  /** Structured specialization pillar gap (design/Figma, enterprise IAM, etc.). */
+  specializationGap?: SpecializationGap;
   /**
    * True first-pass gates only (UI "Hard-rule flags"): commutable location, degree, explicit core language.
    * Visa/citizenship/clearance and other notes stay in `notes` / key risks.
