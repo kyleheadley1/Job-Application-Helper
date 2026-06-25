@@ -141,6 +141,13 @@ export type StrategicLeverSelection = {
   isCollapsedReferral: boolean;
 };
 
+export type EligibilityFlag = {
+  reason: string;
+  evidence: string;
+  lever: "verify";
+  severity: "check";
+};
+
 export type ScoreDisplay = {
   capability: number;
   capabilityBreakdown: {
@@ -162,6 +169,7 @@ export type ScoreDisplay = {
   dominantLever?: StrategicLeverSelection;
   actionLine: string;
   referralSubtext?: string;
+  eligibilityAdvisory?: EligibilityFlag;
 };
 
 export type GeneratedAssets = {

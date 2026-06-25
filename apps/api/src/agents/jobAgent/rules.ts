@@ -26,6 +26,7 @@ import {
   profileHasGoDataInfraProductionEvidence,
 } from '../../lib/scoringOutputPolish.js';
 import { filterLanguagesToJdPresence } from '../../lib/jdLanguagePresence.js';
+import { evaluateGeoEligibility } from '../../lib/geoEligibility.js';
 import {
   detectCompetitivePoolSignals,
   isVentureFundedStartupShape,
@@ -667,6 +668,11 @@ export const evaluateRules = (
     );
   }
 
+  const geoEligibility = evaluateGeoEligibility(job, profile);
+  if (geoEligibility.eligibilityFlag) {
+    notes.push(geoEligibility.eligibilityFlag.reason);
+  }
+
   return {
     explicitDegreeRisk,
     degreeHasEquivalencyClause,
@@ -704,6 +710,9 @@ export const evaluateRules = (
     goDistributedDataInfraCandidateGap,
     disjunctiveLanguageRequirementSatisfied: disjunctiveLanguage.satisfied,
     disjunctiveAcceptedLanguages: disjunctiveLanguage.acceptedLabels,
+    eligibilityFlag: geoEligibility.eligibilityFlag,
+    geoExclusionHardGate: geoEligibility.geoExclusionHardGate,
+    geoExclusionReason: geoEligibility.geoExclusionReason,
     hardRuleNotes,
     notes: [...new Set(notes)],
     penaltyVector,

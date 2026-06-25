@@ -108,6 +108,8 @@ describe("Mathpix calibration anchor", () => {
     expect(display?.scoreDerivation).not.toMatch(/pool/i);
     expect(derivationHasOnlyLegitimateTerms(display!.scoreDerivation)).toBe(true);
     expect(display?.dominantLever?.penaltyName).toMatch(/python/i);
+    expect(display?.actionLine).toMatch(/flask/i);
+    expect(display?.actionLine).not.toMatch(/django/i);
     expect(display?.actionLine).toMatch(/tailored resume/i);
     expect(display?.actionLine).not.toMatch(/referral/i);
     expect(display?.referralSubtext).toMatch(/referral pathway/i);

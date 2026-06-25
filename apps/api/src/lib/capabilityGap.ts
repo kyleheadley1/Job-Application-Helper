@@ -45,6 +45,45 @@ const DESIGN_RESUME_EVIDENCE =
 const PYTHON_BACKEND_RE = /\b(python|flask|django)\b/i;
 const NODE_LEAD_RE = /\bnode(?:\.js)?\b/i;
 
+/** Derive backend pillar label from JD text — never hardcode Flask when JD says Django. */
+export const extractJdBackendLabel = (job: ExtractedJobData): string | undefined => {
+  const blob = normalizeText(
+    [
+      job.title ?? "",
+      ...(job.stack ?? []),
+      ...(job.requiredSkills ?? []),
+      ...(job.requirements ?? []),
+    ].join("\n"),
+  );
+  if (!PYTHON_BACKEND_RE.test(blob)) return undefined;
+  const hasDjango = /\bdjango\b/i.test(blob);
+  const hasFlask = /\bflask\b/i.test(blob);
+  const hasPython = /\bpython\b/i.test(blob);
+  if (hasDjango && hasPython) return "Python/Django";
+  if (hasFlask && hasPython) return "Python/Flask";
+  if (hasDjango) return "Django";
+  if (hasFlask) return "Flask";
+  if (hasPython) return "Python";
+  return undefined;
+};
+
+export const extractResumeBackendLabel = (resumeText: string): string | undefined => {
+  const resume = normalizeText(resumeText);
+  if (NODE_LEAD_RE.test(resume)) return "Node";
+  if (/\bpython\b/i.test(resume) && /\b(django|flask)\b/i.test(resume)) {
+    if (/\bdjango\b/i.test(resume)) return "Python/Django";
+    if (/\bflask\b/i.test(resume)) return "Python/Flask";
+    return "Python";
+  }
+  if (/\bpython\b/i.test(resume)) return "Python";
+  return undefined;
+};
+
+const backendGapEvidence = (jdSide: string, resumeSide: string, hasAdjacentPython: boolean): string =>
+  hasAdjacentPython
+    ? `Role leads with ${jdSide} on the backend; resume leads with ${resumeSide}`
+    : `${jdSide} backend required; resume is ${resumeSide}-primary without production depth on the JD stack`;
+
 export const detectEnterpriseIamSpecialization = (job: ExtractedJobData): boolean => {
   const blob = structuredBlob(job);
   const signals = [
@@ -145,32 +184,37 @@ export const detectDesignFigmaSpecializationGap = (
   });
 
   return finalizeGap({
+    kind: "design_portfolio",
     name: "design/Figma",
     evidence: inTitle
       ? "Design/Figma pillar named in title and required qualifications"
       : "Figma and design-craft requirements in JD; no design portfolio evidence on resume",
     severity,
     lever: "portfolio",
+    jdSide: "design/Figma",
+    resumeSide: "engineering-side",
     signalCount,
   });
 };
 
-export const detectPythonBackendSpecializationGap = (
+export const detectBackendStackSpecializationGap = (
   job: ExtractedJobData,
   resumeText?: string,
 ): SpecializationGap | undefined => {
+  const jdSide = extractJdBackendLabel(job);
+  if (!jdSide) return undefined;
+
   const required = requiredBlob(job);
-  const blob = structuredBlob(job);
   const inRequired = PYTHON_BACKEND_RE.test(required);
   const inTitle = PYTHON_BACKEND_RE.test(job.title ?? "");
   const inStack = PYTHON_BACKEND_RE.test((job.stack ?? []).join(" "));
   if (!inRequired && !inTitle && !inStack) return undefined;
 
   const resume = normalizeText(resumeText ?? "");
-  const hasPython = PYTHON_BACKEND_RE.test(resume);
-  const leadsNode = NODE_LEAD_RE.test(resume);
-  if (!leadsNode) return undefined;
+  const resumeSide = extractResumeBackendLabel(resume);
+  if (!resumeSide || !NODE_LEAD_RE.test(resume)) return undefined;
 
+  const hasPython = PYTHON_BACKEND_RE.test(resume);
   const severity = resolveSeverity({
     inTitle,
     inRequired,
@@ -182,15 +226,19 @@ export const detectPythonBackendSpecializationGap = (
   if (severity === "minor" && hasPython) return undefined;
 
   return finalizeGap({
-    name: "Python/Flask backend",
-    evidence: hasPython
-      ? "Role leads with Python/Flask on the backend; resume leads with Node — reframe backend experience"
-      : "Python/Flask backend required; resume is Node-primary without production Python depth",
+    kind: "backend_stack",
+    name: `${jdSide} backend`,
+    evidence: backendGapEvidence(jdSide, resumeSide, hasPython),
     severity,
     lever: severity === "central" ? "upskill" : "resume",
+    jdSide,
+    resumeSide,
     signalCount: [inRequired, inTitle].filter(Boolean).length + (hasPython ? 1 : 0),
   });
 };
+
+/** @deprecated alias */
+export const detectPythonBackendSpecializationGap = detectBackendStackSpecializationGap;
 
 export const detectEnterpriseIamSpecializationGap = (
   job: ExtractedJobData,
@@ -218,12 +266,15 @@ export const detectEnterpriseIamSpecializationGap = (
   });
 
   return finalizeGap({
+    kind: "enterprise_iam",
     name: "enterprise IAM / SAML-OIDC",
     evidence: inTitle
       ? "IAM/SAML-OIDC specialization central in title or required section"
       : "Enterprise IAM integration depth beyond OAuth-only resume evidence",
     severity,
     lever: "none",
+    jdSide: "enterprise IAM / SAML-OIDC",
+    resumeSide: "OAuth-only",
     signalCount: Math.max(signalCount, 3),
   });
 };
@@ -234,7 +285,7 @@ export const detectSpecializationGap = (
   resumeText?: string,
 ): SpecializationGap | undefined =>
   detectDesignFigmaSpecializationGap(job, resumeText) ??
-  detectPythonBackendSpecializationGap(job, resumeText) ??
+  detectBackendStackSpecializationGap(job, resumeText) ??
   detectEnterpriseIamSpecializationGap(job, rawScore);
 
 /** Capability backbone is no longer discounted — gap docks the final composite instead. */
