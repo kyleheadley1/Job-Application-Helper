@@ -26,6 +26,11 @@ export type UserProfile = {
   hardConstraints: string[];
   /** When false, JD "no sponsorship" / work-auth language is not treated as a gate for this candidate. */
   requiresSponsorship: boolean;
+  citizenshipStatus?: {
+    isUSCitizen: boolean;
+  };
+  /** True only when the candidate currently holds an active clearance. */
+  holdsActiveClearance?: boolean;
   /** Structured home base for geo eligibility checks. */
   candidateLocation?: {
     label: string;

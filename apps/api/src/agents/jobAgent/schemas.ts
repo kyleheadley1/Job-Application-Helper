@@ -69,7 +69,16 @@ export const ExtractedJobDataSchema = z.object({
     .optional(),
   visaRequirement: z.string().optional(),
   citizenshipRequirement: z.string().optional(),
-  clearanceRequirement: z.string().optional(),
+  clearanceRequirement: z
+    .union([
+      z.string(),
+      z.object({
+        required: z.boolean(),
+        timing: z.enum(["active_upfront", "sponsorable", "unspecified"]),
+        raw: z.string().optional(),
+      }),
+    ])
+    .optional(),
   relocationRequired: z.boolean().optional(),
   responsibilities: z.array(z.string()).default([]),
   requirements: z.array(z.string()).default([]),
@@ -167,6 +176,14 @@ export const RuleEvaluationSchema = z.object({
       severity: z.literal("check"),
     })
     .optional(),
+  clearanceEligibilityFlag: z
+    .object({
+      reason: z.string(),
+      evidence: z.string(),
+      lever: z.literal("verify"),
+      severity: z.literal("check"),
+    })
+    .optional(),
   geoExclusionHardGate: z.boolean().optional().default(false),
   geoExclusionReason: z.string().optional(),
   hardRuleNotes: z.array(z.string()).optional().default([]),
@@ -256,6 +273,16 @@ export const ScoreDisplaySchema = z.object({
       lever: z.literal("verify"),
       severity: z.literal("check"),
     })
+    .optional(),
+  eligibilityAdvisories: z
+    .array(
+      z.object({
+        reason: z.string(),
+        evidence: z.string(),
+        lever: z.literal("verify"),
+        severity: z.literal("check"),
+      }),
+    )
     .optional(),
 });
 

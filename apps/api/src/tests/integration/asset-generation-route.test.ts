@@ -111,12 +111,14 @@ describe("asset generation routes", () => {
 
   it("returns 400 when recommendation is no without force", async () => {
     const triage = await request(app).post("/api/jobs/triage").send({
-      rawText: `Heritage Bank — Role
-      Onsite Dallas not commutable from NYC
-      Bachelor's required
-      New graduate rotational program
-      US citizenship required
-      No visa sponsorship`,
+      rawText: `Heritage Bank — Associate Software Engineer (New Graduate Program)
+Location: Onsite, Dallas, TX (not commutable from NYC)
+Requirements:
+Bachelor's degree in Computer Science or related field required.
+This is a new graduate rotational program targeting traditional campus hires.
+5+ years of enterprise Java experience preferred.
+US citizenship required.
+No visa sponsorship.`,
       companyHint: "Heritage Bank",
       fullPrep: false,
     });

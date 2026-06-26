@@ -131,6 +131,7 @@ export type ScoreDisplay = {
   referralAdvice: string;
   referralUrgency: ReferralUrgency;
   eligibilityAdvisory?: EligibilityFlag;
+  eligibilityAdvisories?: EligibilityFlag[];
 };
 
 export type ScoreBreakdown = {
@@ -233,6 +234,8 @@ export type RuleEvaluation = {
   specializationGap?: SpecializationGap;
   /** Soft geo/work-location advisory — does not affect score or band. */
   eligibilityFlag?: EligibilityFlag;
+  /** Soft clearance sponsorship advisory — does not affect score or band. */
+  clearanceEligibilityFlag?: EligibilityFlag;
   /** Explicit unambiguous geographic exclusion (hard gate). */
   geoExclusionHardGate?: boolean;
   geoExclusionReason?: string;

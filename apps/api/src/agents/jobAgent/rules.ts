@@ -27,6 +27,7 @@ import {
 } from '../../lib/scoringOutputPolish.js';
 import { filterLanguagesToJdPresence } from '../../lib/jdLanguagePresence.js';
 import { evaluateGeoEligibility } from '../../lib/geoEligibility.js';
+import { evaluateClearanceCitizenship } from '../../lib/clearanceCitizenship.js';
 import {
   detectCompetitivePoolSignals,
   isVentureFundedStartupShape,
@@ -35,12 +36,8 @@ import {
 const includesAny = (haystack: string, needles: string[]): boolean =>
   needles.some((needle) => haystack.includes(needle));
 
-const RAW_CITIZENSHIP =
-  /\b(us\s+)?citizenship\s+(is\s+)?required\b|\bcitizenship\s+required\b|\bonly\s+u\.?s\.?\s+citizens\b/i;
 const RAW_VISA =
   /\bno\s+(visa\s+)?sponsorship\b|\bunable\s+to\s+sponsor\b|\bmust\s+be\s+authorized\s+to\s+work\s+in\s+the\s+u\.?s\.?\b|\bauthorized\s+to\s+work\s+in\s+the\s+u\.?s\.?\b/i;
-const RAW_CLEARANCE =
-  /\b(security\s+clearance|ts\/sci|top\s+secret|clearance\s+required|dod\s+clearance)\b/i;
 const RAW_DEGREE =
   /\b(bachelor'?s?\s+degree|bachelors\s+degree|bs\s+in|b\.s\.|ba\s+in)[^.\n]{0,160}\brequired\b|\bdegree\s+in\s+(computer science|cs|engineering)\s+required\b/i;
 
@@ -273,12 +270,9 @@ export const evaluateRules = (
 
   const visaMismatch = profile.requiresSponsorship && jdSignalsVisaSponsorshipConstraint;
 
-  const citizenshipMismatch =
-    Boolean(job.citizenshipRequirement) ||
-    RAW_CITIZENSHIP.test(job.rawText ?? '');
-
-  const clearanceMismatch =
-    Boolean(job.clearanceRequirement) || RAW_CLEARANCE.test(job.rawText ?? '');
+  const clearanceCitizenship = evaluateClearanceCitizenship(job, profile);
+  const citizenshipMismatch = clearanceCitizenship.citizenshipMismatch;
+  const clearanceMismatch = clearanceCitizenship.clearanceMismatch;
 
   const backendProductApiRole =
     /\b(backend|api|full[-\s]?stack|product engineer|product engineering|customer problems?|feature development|features|reliable systems?|testing|debugging|production systems?)\b/i.test(
@@ -672,6 +666,9 @@ export const evaluateRules = (
   if (geoEligibility.eligibilityFlag) {
     notes.push(geoEligibility.eligibilityFlag.reason);
   }
+  if (clearanceCitizenship.clearanceEligibilityFlag) {
+    notes.push(clearanceCitizenship.clearanceEligibilityFlag.reason);
+  }
 
   return {
     explicitDegreeRisk,
@@ -711,6 +708,7 @@ export const evaluateRules = (
     disjunctiveLanguageRequirementSatisfied: disjunctiveLanguage.satisfied,
     disjunctiveAcceptedLanguages: disjunctiveLanguage.acceptedLabels,
     eligibilityFlag: geoEligibility.eligibilityFlag,
+    clearanceEligibilityFlag: clearanceCitizenship.clearanceEligibilityFlag,
     geoExclusionHardGate: geoEligibility.geoExclusionHardGate,
     geoExclusionReason: geoEligibility.geoExclusionReason,
     hardRuleNotes,
