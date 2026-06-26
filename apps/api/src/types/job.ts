@@ -17,6 +17,14 @@ export type JobStatus =
   | 'closed'
   | 'offer';
 
+export type ClearanceTiming = 'active_upfront' | 'sponsorable' | 'unspecified';
+
+export type ClearanceRequirement = {
+  required: boolean;
+  timing: ClearanceTiming;
+  raw?: string;
+};
+
 export type GeoScope = {
   titleRegion: string | null;
   postingLocation: string | null;
@@ -61,7 +69,7 @@ export type ExtractedJobData = {
   };
   visaRequirement?: string;
   citizenshipRequirement?: string;
-  clearanceRequirement?: string;
+  clearanceRequirement?: ClearanceRequirement | string;
   relocationRequired?: boolean;
   responsibilities: string[];
   requirements: string[];

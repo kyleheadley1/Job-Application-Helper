@@ -28,6 +28,7 @@ import { resolveCompanyFromText, sanitizeCompanyName } from "./companyCandidateR
 import { normalizeLocationPrefixedTitle } from "./preScoringMetadataExtract.js";
 import { applyCompanyPresentation } from "./companyExtraction.js";
 import { attachGeoScope } from "../lib/geoEligibility.js";
+import { attachClearanceCitizenshipFields } from "../lib/clearanceCitizenship.js";
 import { reconcileSeniority } from "../lib/seniorityReconciliation.js";
 
 const fallbackExtraction = (input: { url?: string; rawText?: string; companyHint?: string }): ExtractedJobData => ({
@@ -117,7 +118,7 @@ const finalizeExtracted = (extracted: ExtractedJobData, normalizedText: string, 
     company: resolveFinalCompany(out.company, normalizedText, companyHint),
   };
   out = applyCompanyPresentation(out, companyHint);
-  return attachGeoScope(out);
+  return attachClearanceCitizenshipFields(attachGeoScope(out));
 };
 
 export type ExtractJobDataResult = {

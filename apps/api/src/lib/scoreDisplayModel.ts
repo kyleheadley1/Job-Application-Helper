@@ -391,6 +391,11 @@ export const buildScoreDisplay = (params: {
     referralPathwayNotes: params.referralPathwayNotes,
   });
 
+  const eligibilityAdvisories = [
+    params.rules.eligibilityFlag,
+    params.rules.clearanceEligibilityFlag,
+  ].filter((flag): flag is NonNullable<typeof flag> => Boolean(flag));
+
   return {
     capability,
     capabilityBreakdown,
@@ -409,7 +414,8 @@ export const buildScoreDisplay = (params: {
     actionLine,
     referralAdvice: referral.advice,
     referralUrgency: referral.urgency,
-    eligibilityAdvisory: params.rules.eligibilityFlag,
+    eligibilityAdvisory: eligibilityAdvisories[0],
+    eligibilityAdvisories,
   };
 };
 

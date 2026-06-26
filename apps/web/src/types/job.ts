@@ -174,6 +174,7 @@ export type ScoreDisplay = {
   referralAdvice: string;
   referralUrgency: ReferralUrgency;
   eligibilityAdvisory?: EligibilityFlag;
+  eligibilityAdvisories?: EligibilityFlag[];
 };
 
 export type GeneratedAssets = {

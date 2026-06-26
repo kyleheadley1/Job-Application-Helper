@@ -14,6 +14,10 @@ import {
 } from "./jobPostingMetadataExtract.js";
 import { resolveCompanyFromText } from "./companyCandidateRules.js";
 import {
+  parseCitizenshipRequirementText,
+  parseClearanceRequirement,
+} from "../lib/clearanceCitizenship.js";
+import {
   detectStrictFinanceEmployerContext,
   textImpliesNycMetroOrCommutableNj,
 } from "../lib/employerLocationSignals.js";
@@ -36,7 +40,7 @@ const DEGREE_PREFERRED = /\b(degree|bachelor|bs|ba)\b.*\b(preferred|a plus|nice 
 const NEW_GRAD = /\b(new\s+grad|new\s+graduate|graduate\s+program|campus\s+hire|campus\s+recruiting|rotational\s+program|rotation\s+program|early\s+career\s+program|university\s+graduate\s+program)\b/i;
 const ASSOCIATE_JUNIOR = /\b(associate\s+software|entry[\s-]level|intern\s+conversion|0\s*-\s*2\s+years)\b/i;
 
-const CITIZENSHIP = /\b(us\s+)?citizenship\s+(is\s+)?required\b|\bcitizenship\s+required\b|\bonly\s+u\.?s\.?\s+citizens\b/i;
+const CITIZENSHIP = /\b(us\s+)?citizenship\s+(is\s+)?required\b|\bcitizenship\s+required\b|\bonly\s+u\.?s\.?\s+citizens\b|\bmust\s+be\s+(?:a\s+)?u\.?s\.?\s+citizen\b/i;
 const VISA_NO_SPONSOR = /\bno\s+(visa\s+)?sponsorship\b|\bunable\s+to\s+sponsor\b|\bmust\s+be\s+authorized\s+to\s+work\s+in\s+the\s+u\.?s\.?\b|\bauthorized\s+to\s+work\s+in\s+the\s+u\.?s\.?\s+without\s+sponsorship\b/i;
 const CLEARANCE = /\b(security\s+clearance|ts\/sci|top\s+secret|clearance\s+required|dod\s+clearance)\b/i;
 
@@ -288,13 +292,16 @@ export const extractFromRawText = (normalizedText: string, companyHint?: string)
     inferredFields.push("visaRequirement");
   }
   if (CITIZENSHIP.test(text)) {
-    const m = text.match(CITIZENSHIP);
-    partial.citizenshipRequirement = m?.[0] ?? "Citizenship required";
+    partial.citizenshipRequirement = parseCitizenshipRequirementText(text) ?? "Citizenship required";
     inferredFields.push("citizenshipRequirement");
   }
   if (CLEARANCE.test(text)) {
-    const m = text.match(CLEARANCE);
-    partial.clearanceRequirement = m?.[0] ?? "Clearance required";
+    partial.clearanceRequirement =
+      parseClearanceRequirement(text, partial.citizenshipRequirement) ?? {
+        required: true,
+        timing: "unspecified",
+        raw: "Clearance required",
+      };
     inferredFields.push("clearanceRequirement");
   }
 

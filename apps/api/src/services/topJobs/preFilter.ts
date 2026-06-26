@@ -1,4 +1,5 @@
 import { userProfile } from "../../config/userProfile.js";
+import { classifyClearanceTiming } from "../../lib/clearanceCitizenship.js";
 import { normalizeText } from "../../lib/text.js";
 import type { DiscoveredListing } from "../../types/topJob.js";
 
@@ -24,7 +25,7 @@ const STACK_KEYWORDS = [
   "api",
 ];
 
-const RAW_CLEARANCE =
+const CLEARANCE_MENTION_RE =
   /\b(security clearance|ts\/sci|top secret|clearance required|dod clearance)\b/i;
 const RAW_VISA = /\bno\s+(visa\s+)?sponsorship\b|\bunable\s+to\s+sponsor\b/i;
 const RAW_DEGREE_HARD =
@@ -61,8 +62,14 @@ export const preFilterListing = (listing: DiscoveredListing): PreFilterResult =>
   if (!STACK_KEYWORDS.some((k) => blob.includes(k))) {
     return { pass: false, reason: "no_stack_overlap" };
   }
-  if (RAW_CLEARANCE.test(blob)) {
-    return { pass: false, reason: "clearance_required" };
+  if (CLEARANCE_MENTION_RE.test(blob)) {
+    const timing = classifyClearanceTiming(blob);
+    if (
+      timing === "active_upfront" &&
+      !(userProfile.holdsActiveClearance ?? false)
+    ) {
+      return { pass: false, reason: "clearance_required" };
+    }
   }
   if (userProfile.requiresSponsorship && RAW_VISA.test(blob)) {
     return { pass: false, reason: "no_sponsorship" };

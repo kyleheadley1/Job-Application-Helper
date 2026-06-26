@@ -244,11 +244,17 @@ export const JobResultPage = () => {
               ↳ {scoreDisplay.referralAdvice}
             </p>
           ) : null}
-          {scoreDisplay?.eligibilityAdvisory ? (
-            <p className="eligibilityAdvisory">
-              ⚠ Verify eligibility — {scoreDisplay.eligibilityAdvisory.reason}
-            </p>
-          ) : null}
+          {scoreDisplay?.eligibilityAdvisories?.length
+            ? scoreDisplay.eligibilityAdvisories.map((advisory) => (
+                <p key={advisory.reason} className="eligibilityAdvisory">
+                  ⚠ Verify eligibility — {advisory.reason}
+                </p>
+              ))
+            : scoreDisplay?.eligibilityAdvisory ? (
+                <p className="eligibilityAdvisory">
+                  ⚠ Verify eligibility — {scoreDisplay.eligibilityAdvisory.reason}
+                </p>
+              ) : null}
           {hasJdSource(job) ? (
             <button onClick={() => void rerunTriage()} disabled={retriageBusy || busyConfirm}>
               {retriageBusy ? "Re-scoring..." : "Re-run triage"}
