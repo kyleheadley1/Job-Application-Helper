@@ -32,6 +32,21 @@ describe("rule engine", () => {
     expect(rules.seniorityOverreach).toBe(true);
   });
 
+  it("does not flag seniority overreach when rawText describes team seniors on an early-career role", () => {
+    const rules = evaluateRules(
+      makeJob({
+        company: "Ro",
+        title: "AI Engineer",
+        seniority: "Junior, Mid",
+        yearsExperience: { min: 1, max: 4, raw: "1-4 years" },
+        rawText:
+          "Work alongside Senior AI Lead, senior engineers, and an Engineering Manager. Learn from technical leaders.",
+      }),
+      userProfile,
+    );
+    expect(rules.seniorityOverreach).toBe(false);
+  });
+
   it("does not flag seniority overreach for 4y mid-level without senior/staff/5y-hard signals", () => {
     const rules = evaluateRules(
       makeJob({

@@ -20,6 +20,7 @@ import {
 } from '../../lib/coreLanguageRequirements.js';
 import { evaluateDisjunctiveLanguageRequirement, filterGapsAfterDisjunctiveMatch } from '../../lib/disjunctiveLanguageRequirement.js';
 import { isFdeBuilderSoftwarePrimaryShape } from '../../lib/fdeBuilderRole.js';
+import { detectRoleSeniorityOverreach } from '../../lib/seniorityGate.js';
 import {
   jdHasAppliedAiSystemsOverlap,
   jdIsStructurallyVague,
@@ -227,28 +228,7 @@ export const evaluateRules = (
 
   const earlyCareerFriendlyRole = earlyCareerShape && !strictNewGradPipeline;
 
-  const explicitSeniorStaffInJd =
-    /\b(senior|staff|principal|sr\.)\b/i.test(combinedText) ||
-    /\b(lead\s+engineer|engineering\s+manager|director\s+of\s+engineering)\b/i.test(combinedText);
-  const fivePlusYearsSoftPreferred =
-    /\b(5\+|6\+|7\+|8\+|10\+)\s*years?\b[^.\n]{0,160}\b(preferred|nice to have|a plus|bonus|plus)\b/i.test(
-      combinedText,
-    ) || /\b(preferred|nice to have)[^.\n]{0,160}\b(5\+|6\+|7\+)\s*years?\b/i.test(combinedText);
-  const yearsFivePlusHardRequired =
-    ((job.yearsExperience?.min ?? 0) >= 5 && !fivePlusYearsSoftPreferred) ||
-    /\b(5\+|6\+|7\+|8\+|10\+)\s*years?[^.\n]{0,40}\b(required|must)\b/i.test(combinedText) ||
-    /\b(at\s+least|minimum)[^.\n]{0,24}(5|6|7|8|10)\s*\+?\s*years?[^.\n]{0,30}\b(required|must)\b/i.test(
-      combinedText,
-    );
-  const leadingTeamsHard =
-    /\b(people\s+manager|manage\s+engineers|managing\s+engineers|leading\s+a\s+team\s+of\s+engineers)\b/i.test(
-      combinedText,
-    );
-  const contradictorySeniorSignals =
-    explicitSeniorStaffInJd || yearsFivePlusHardRequired || leadingTeamsHard;
-  // Associate/entry roles should not get "overreach" unless the JD also carries explicit senior markers.
-  const seniorityOverreach =
-    contradictorySeniorSignals && !earlyCareerFriendlyRole;
+  const seniorityOverreach = detectRoleSeniorityOverreach(job);
 
   const primaryNonNycMetroInLocationLine =
     /\b(location|based|office)\s*:\s*[^.\n]{0,100}\b(dallas|austin|seattle|san francisco|sf\b|los angeles|chicago|denver|atlanta|boston|miami|philadelphia|phoenix|detroit|houston|portland)\b/i.test(

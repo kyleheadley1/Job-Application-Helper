@@ -419,10 +419,14 @@ export const buildScoreDisplay = (params: {
     survivability,
     gapDock,
   });
-  const scoreBand = resolveScoreBand(composite.final, params.recommendation === "no");
-  const scoreDerivation = formatScoreDerivation(composite);
-  const worthTailoring = computeWorthTailoring(composite.final, scoreBand);
-  const bandHeadline = resolveBandHeadline(scoreBand, composite.final);
+  const final = params.score.total ?? composite.final;
+  const scoreBand = resolveScoreBand(final, hardGates.length > 0);
+  const scoreDerivation =
+    hardGates.length > 0 && final !== composite.final
+      ? `${formatScoreDerivation(composite)} → capped at ${final} (hard gate)`
+      : formatScoreDerivation({ ...composite, final });
+  const worthTailoring = computeWorthTailoring(final, scoreBand);
+  const bandHeadline = resolveBandHeadline(scoreBand, final);
 
   const dominantLever = selectDominantLever(survivabilityRows, params.rules);
 
@@ -454,7 +458,7 @@ export const buildScoreDisplay = (params: {
     differentiatorCoverageNote:
       params.score.differentiatorCoverageNote ?? differentiatorCoverage.note,
     survivability,
-    final: composite.final,
+    final,
     survAdjustment: composite.survAdjustment,
     gapDock: composite.gapDock,
     scoreDerivation,
