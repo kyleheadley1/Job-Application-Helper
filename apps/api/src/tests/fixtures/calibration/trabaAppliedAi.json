@@ -1,0 +1,60 @@
+{
+  "id": "traba-applied-ai-calibration",
+  "anchorNote": "Traba Applied AI — mid level 1+ years; architect verb + founding context must not gate",
+  "extracted": {
+    "company": "Traba",
+    "companyDisplayName": "Traba",
+    "title": "Software Engineer (Applied AI)",
+    "location": "New York, NY",
+    "remoteType": "hybrid",
+    "seniority": "Mid Level",
+    "yearsExperience": {
+      "min": 1,
+      "raw": "1+ years"
+    },
+    "stack": [
+      "Python",
+      "TypeScript",
+      "React Native",
+      "LLM",
+      "RAG",
+      "OpenAI",
+      "REST APIs"
+    ],
+    "requiredSkills": [
+      "Python",
+      "TypeScript",
+      "React Native",
+      "LLMs"
+    ],
+    "preferredSkills": [
+      "OpenAI API",
+      "embeddings"
+    ],
+    "domainTags": [
+      "AI",
+      "startup",
+      "workforce"
+    ],
+    "responsibilities": [
+      "Architect core systems and AI pipelines for production LLM features",
+      "Build on our founding team with comfort in an early-stage environment",
+      "You will architect scalable agent workflows and ship React Native surfaces"
+    ],
+    "requirements": [
+      "1+ years of software engineering experience",
+      "LLM experience or a clear drive to learn",
+      "Comfort working on an early-stage founding team"
+    ],
+    "rawText": "Traba\nSoftware Engineer (Applied AI)\nMid Level\n1+ years exp\nNew York, NY · Hybrid\nArchitect core systems and AI pipelines. Join our founding team as a founding engineer.\nYou will architect scalable solutions. React Native mobile surfaces. LLM experience or a clear drive to learn.\nearly-stage team comfort required."
+  },
+  "storedCategoryScores": {
+    "stackFit": 16,
+    "levelFit": 15,
+    "functionalOverlap": 15,
+    "domainFit": 8,
+    "resumeStoryClarity": 9,
+    "recruiterFriendliness": 12,
+    "careerValue": 9
+  }
+}
