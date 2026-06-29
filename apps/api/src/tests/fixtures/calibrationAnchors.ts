@@ -29,6 +29,7 @@ export const CALIBRATION_FIXTURES = {
   civisCattleCall: "civisCattleCall.json",
   metaBrand: "metaBrand.json",
   ibmDegreeGate: "ibmDegreeGate.json",
+  roAiEngineer: "roAiEngineer.json",
 } as const;
 
 export type CalibrationFixtureKey = keyof typeof CALIBRATION_FIXTURES;

@@ -1,0 +1,61 @@
+{
+  "id": "ro-ai-engineer-calibration",
+  "anchorNote": "Ro AI Engineer — early-career role; team senior mentions in body must not gate",
+  "extracted": {
+    "company": "Ro",
+    "companyDisplayName": "Ro",
+    "title": "AI Engineer",
+    "location": "New York, NY",
+    "remoteType": "hybrid",
+    "seniority": "Junior, Mid",
+    "yearsExperience": {
+      "min": 1,
+      "max": 4,
+      "raw": "1-4 years"
+    },
+    "stack": [
+      "Python",
+      "LLM",
+      "RAG",
+      "OpenAI",
+      "REST APIs",
+      "TypeScript",
+      "vector search"
+    ],
+    "requiredSkills": [
+      "Python",
+      "LLMs",
+      "RAG",
+      "REST APIs"
+    ],
+    "preferredSkills": [
+      "OpenAI API",
+      "embeddings",
+      "agents"
+    ],
+    "domainTags": [
+      "healthcare",
+      "AI"
+    ],
+    "responsibilities": [
+      "Build production LLM and RAG features for patient-facing healthcare products",
+      "Collaborate with product and design on AI-enabled workflows",
+      "Learn from experienced AI engineers on the team"
+    ],
+    "requirements": [
+      "1-4 years of software engineering experience",
+      "Strong Python and experience shipping LLM/RAG systems",
+      "Comfort with REST APIs and production AI evaluation"
+    ],
+    "rawText": "Ro — AI Engineer\nNew York, NY (Hybrid) · Junior, Mid · 1-4 years\nBuild LLM, RAG, and agent workflows in Python for healthcare products.\nYou'll work alongside our Senior AI Lead and senior engineers, reporting into an Engineering Manager\nand learning from technical leaders on the team — not managing them.\nOpenAI, embeddings, vector search, REST APIs. TypeScript a plus."
+  },
+  "storedCategoryScores": {
+    "stackFit": 16,
+    "levelFit": 15,
+    "functionalOverlap": 15,
+    "domainFit": 8,
+    "resumeStoryClarity": 9,
+    "recruiterFriendliness": 12,
+    "careerValue": 9
+  }
+}

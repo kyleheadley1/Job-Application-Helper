@@ -138,12 +138,22 @@ export const computeCompositeScore = (params: {
         capabilityBreakdown.levelFit +
         capabilityBreakdown.functionalOverlap,
     );
+    const survivabilityResult = computeSurvivability({
+      extracted: params.extracted,
+      rules: params.rules,
+      profile: params.profile,
+      rawScore: clamped,
+      resumeText: params.resumeText,
+    });
+    const gapDock = computeGapDock(params.rules, params.profile);
     return {
       score: {
         ...clamped,
         capability,
         capabilityBreakdown,
-        survivability: 0,
+        survivability: survivabilityResult.multiplier,
+        survivabilityBreakdown: toPersistedSurvivabilityBreakdown(survivabilityResult),
+        certificationBoost: survivabilityResult.certificationBoost,
         total: SURVIVABILITY_TUNING.hardGateScoreFloor,
         recommendationLabel: RECOMMENDATION_LABELS.no,
       },
