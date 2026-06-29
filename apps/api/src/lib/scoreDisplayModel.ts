@@ -31,6 +31,7 @@ import {
   STRUCTURAL_LEVER_LABEL,
 } from "./degreeGap.js";
 import { evaluateHardGates } from "./hardGates.js";
+import { earlyCareerLevelVetoesSeniorityGate } from "./seniorityGate.js";
 import { applySpecializationGapToBreakdown, specializationGapHeadlineWorthy } from "./capabilityGap.js";
 import {
   applyDifferentiatorCoverageCap,
@@ -193,7 +194,9 @@ const flagIsHardGate = (
   const gate = evaluateHardGates(rules, extracted);
   if (!gate.fired) return false;
 
-  if (flag.id === "seniorityOverreach") return rules.seniorityOverreach;
+  if (flag.id === "seniorityOverreach") {
+    return rules.seniorityOverreach && !earlyCareerLevelVetoesSeniorityGate(extracted);
+  }
   if (flag.id === "coreLanguageMismatch") return Boolean(rules.explicitCoreLanguageMismatch);
   return false;
 };

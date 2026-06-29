@@ -6,6 +6,7 @@ import { computePoolFriendliness } from "../../lib/poolFriendliness.js";
 import {
   detectRoleSeniorityOverreach,
   earlyCareerLevelVetoesSeniorityGate,
+  explainSeniorityGateTrigger,
 } from "../../lib/seniorityGate.js";
 import {
   calibrationSweResumeContexts,
@@ -42,11 +43,28 @@ describe("Traba Applied AI calibration", () => {
 
     const display = scored.score.scoreDisplay!;
     expect(display.final).toBe(scored.score.total);
+    expect(display.final).toBeGreaterThanOrEqual(74);
     expect(display.scoreBand).not.toBe("no");
     expect(display.scoreBand).not.toBe("skip");
     expect(display.bandHeadline).not.toBe("Skip");
     expect(display.actionLine.toLowerCase()).not.toMatch(/^do not apply|^not worth the effort/);
     expect(display.referralUrgency).toMatch(/strongly_advised|advised|optional/);
+  });
+
+  it("vetoes gate when body polluted seniority=senior but rawText header has Mid Level", () => {
+    const polluted = { ...TRABA_JOB, seniority: "senior" as const };
+    expect(earlyCareerLevelVetoesSeniorityGate(polluted)).toBe(true);
+    expect(detectRoleSeniorityOverreach(polluted)).toBe(false);
+
+    const rules = evaluateRules(polluted, userProfile, { activeResumeType: "SWE" });
+    expect(rules.seniorityOverreach).toBe(false);
+    expect(evaluateHardGates(rules, polluted).fired).toBe(false);
+    expect(evaluateHardGates(rules, polluted).reasons).toEqual([]);
+
+    const trigger = explainSeniorityGateTrigger(polluted, { seniorityOverreach: true });
+    expect(trigger.vetoed).toBe(true);
+    expect(trigger.resolvedLevel).toMatch(/mid level/i);
+    expect(trigger.parsedSeniorityField).toBe("senior");
   });
 });
 
@@ -67,5 +85,29 @@ describe("seniority gate guard — junior/mid + years ≤4", () => {
     const rules = evaluateRules(polluted, userProfile, { activeResumeType: "SWE" });
     expect(rules.seniorityOverreach).toBe(false);
     expect(evaluateHardGates(rules, polluted).fired).toBe(false);
+  });
+});
+
+describe("Speechify-style Tech Lead — veto must not leak to genuine senior roles", () => {
+  it("still hard-gates Tech Lead title without junior/mid structured level", () => {
+    const speechifyLead = {
+      company: "Speechify",
+      title: "Tech Lead",
+      yearsExperience: { min: 5, raw: "5+ years" },
+      rawText: "Speechify\nTech Lead\n5+ years exp\nRemote\nBuild voice AI platform.",
+    };
+    expect(earlyCareerLevelVetoesSeniorityGate(speechifyLead)).toBe(false);
+    expect(detectRoleSeniorityOverreach(speechifyLead)).toBe(true);
+
+    const rules = evaluateRules(speechifyLead, userProfile, { activeResumeType: "SWE" });
+    expect(rules.seniorityOverreach).toBe(true);
+    const gate = evaluateHardGates(rules, speechifyLead);
+    expect(gate.fired).toBe(true);
+    expect(gate.reasons).toContain("Role seniority/staff bar exceeds early-career profile.");
+
+    const trigger = explainSeniorityGateTrigger(speechifyLead, rules);
+    expect(trigger.vetoed).toBe(false);
+    expect(trigger.triggerSource).toBe("title");
+    expect(trigger.triggerDetail).toBe("Tech Lead");
   });
 });

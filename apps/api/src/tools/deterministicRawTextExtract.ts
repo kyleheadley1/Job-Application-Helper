@@ -44,7 +44,7 @@ const CITIZENSHIP = /\b(us\s+)?citizenship\s+(is\s+)?required\b|\bcitizenship\s+
 const VISA_NO_SPONSOR = /\bno\s+(visa\s+)?sponsorship\b|\bunable\s+to\s+sponsor\b|\bmust\s+be\s+authorized\s+to\s+work\s+in\s+the\s+u\.?s\.?\b|\bauthorized\s+to\s+work\s+in\s+the\s+u\.?s\.?\s+without\s+sponsorship\b/i;
 const CLEARANCE = /\b(security\s+clearance|ts\/sci|top\s+secret|clearance\s+required|dod\s+clearance)\b/i;
 
-const SENIOR = /\b(senior|sr\.|staff|principal|lead\s+engineer|architect)\b/i;
+const SENIOR = /\b(senior|sr\.|staff|principal|lead\s+engineer)\b/i;
 
 /** Deterministic hints that a role is implementation / integration shaped (helps resume + rules when stack is thin). */
 const SIE_IMPLEMENTATION_HINTS = [
@@ -269,12 +269,14 @@ export const extractFromRawText = (normalizedText: string, companyHint?: string)
     inferredFields.push("yearsExperience");
   }
 
-  if (SENIOR.test(text) || (yMin !== undefined && yMin >= 4)) {
-    partial.seniority = "senior";
-    inferredFields.push("seniority");
-  } else if (NEW_GRAD.test(lower) || ASSOCIATE_JUNIOR.test(lower)) {
-    partial.seniority = "junior";
-    inferredFields.push("seniority");
+  if (!partial.seniority) {
+    if (SENIOR.test(text) || (yMin !== undefined && yMin >= 4)) {
+      partial.seniority = "senior";
+      inferredFields.push("seniority");
+    } else if (NEW_GRAD.test(lower) || ASSOCIATE_JUNIOR.test(lower)) {
+      partial.seniority = "junior";
+      inferredFields.push("seniority");
+    }
   }
 
   if (DEGREE_REQUIRED.test(text)) {

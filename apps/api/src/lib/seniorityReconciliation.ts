@@ -1,5 +1,9 @@
 import type { ExtractedJobData } from "../types/job.js";
 import { logger } from "./logger.js";
+import {
+  isEarlyCareerStructuredLevel,
+  resolveStructuredSeniorityLevel,
+} from "./seniorityGate.js";
 import { normalizeText } from "./text.js";
 
 const ENTRY_SENIORITY_RE =
@@ -30,6 +34,24 @@ export type SeniorityReconciliationResult = {
 
 /** Prefer title/raw-text junior signals when parsed seniority conflicts (e.g. junior title → senior). */
 export const reconcileSeniority = (job: ExtractedJobData): SeniorityReconciliationResult => {
+  const structuredLevel = resolveStructuredSeniorityLevel(job);
+  if (
+    structuredLevel &&
+    isEarlyCareerStructuredLevel(structuredLevel) &&
+    job.seniority &&
+    normalizeSeniorityBucket(job.seniority) === "senior"
+  ) {
+    logger.warn("Seniority reconciliation: structured mid/junior label overrides body-inferred senior", {
+      title: job.title,
+      parsedSeniority: job.seniority,
+      reconciledSeniority: structuredLevel,
+    });
+    return {
+      job: { ...job, seniority: structuredLevel.toLowerCase() },
+      conflictLogged: true,
+    };
+  }
+
   const derived = deriveSeniorityFromTitleAndText(job);
   if (!derived || !job.seniority) return { job, conflictLogged: false };
 
