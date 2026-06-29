@@ -1,5 +1,7 @@
 import type { ExtractedJobData } from "../types/job.js";
+import type { RuleEvaluation } from "../types/scoring.js";
 import { normalizeText } from "./text.js";
+import { logger } from "./logger.js";
 
 const TITLE_SENIOR_STAFF_RE = /\b(senior|staff|principal|sr\.?)\b/i;
 const TITLE_LEAD_ROLE_RE =
@@ -12,6 +14,32 @@ const TITLE_ARCHITECT_ROLE_RE =
 
 const VERB_ARCHITECT_TITLE_RE =
   /^architect\s+(?:core|the|our|a|an|and|to|scalable|robust|high|new|ml|ai|data|backend|frontend|distributed|key|major|production|cloud|mobile|agent|llm|rag|api|platform|pipeline|system|systems|solution|solutions|features|services|infrastructure|components|workflows|integrations|products|experiences|capabilities)\b/i;
+
+const METADATA_SENIORITY_LABEL_RE =
+  /^(entry|junior|mid level|mid-level|junior, mid|associate|new grad|intern)$/i;
+
+/** Structured seniority from posting chrome (Simplify/Jobright labels) — wins over body-inferred senior. */
+export const resolveStructuredSeniorityLevel = (job: ExtractedJobData): string => {
+  const lines = (job.rawText ?? "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const seniorityLabelIdx = lines.findIndex((l) => /^seniority$/i.test(l));
+  if (seniorityLabelIdx >= 0) {
+    const next = lines[seniorityLabelIdx + 1];
+    if (next && METADATA_SENIORITY_LABEL_RE.test(next)) return next;
+  }
+
+  for (const line of lines.slice(0, 30)) {
+    if (METADATA_SENIORITY_LABEL_RE.test(line)) return line;
+  }
+
+  return job.seniority ?? "";
+};
+
+export const isEarlyCareerStructuredLevel = (level: string): boolean =>
+  /\b(junior|mid|entry|early career|associate|new grad|intern)\b/i.test(normalizeText(level));
 
 /**
  * Whether the structured seniority field describes a senior/staff/principal role level.
@@ -33,11 +61,98 @@ export const yearsExperienceSignalsOverreach = (min?: number | null): boolean =>
  * Body prose (architect verb, founding team, etc.) cannot override this.
  */
 export const earlyCareerLevelVetoesSeniorityGate = (job: ExtractedJobData): boolean => {
-  const level = normalizeText(job.seniority ?? "");
+  const level = normalizeText(resolveStructuredSeniorityLevel(job));
   const yearsMin = job.yearsExperience?.min;
-  const hasEarlyBand = /\b(junior|mid|entry|early career|associate|new grad|intern)\b/i.test(level);
+  const hasEarlyBand = isEarlyCareerStructuredLevel(level);
   const yearsWithinEarlyBand = yearsMin == null || yearsMin <= 4;
   return hasEarlyBand && yearsWithinEarlyBand;
+};
+
+export type SeniorityGateTriggerExplanation = {
+  wouldFire: boolean;
+  vetoed: boolean;
+  vetoReason?: string;
+  triggerSource?: "title" | "yearsExperience" | "seniorityField" | "rulesFlagOnly";
+  triggerDetail?: string;
+  resolvedLevel?: string;
+  parsedSeniorityField?: string | null;
+};
+
+/** Trace which signal would add the seniority hard gate (for calibration/debug). */
+export const explainSeniorityGateTrigger = (
+  job: ExtractedJobData,
+  rules?: Pick<RuleEvaluation, "seniorityOverreach">,
+): SeniorityGateTriggerExplanation => {
+  const resolvedLevel = resolveStructuredSeniorityLevel(job);
+  const parsedSeniorityField = job.seniority ?? null;
+  const base = { resolvedLevel, parsedSeniorityField };
+
+  if (earlyCareerLevelVetoesSeniorityGate(job)) {
+    return {
+      ...base,
+      wouldFire: false,
+      vetoed: true,
+      vetoReason: `early-career structured level (${resolvedLevel || parsedSeniorityField}) with years min ${job.yearsExperience?.min ?? "unset"} ≤ 4`,
+    };
+  }
+
+  if (roleTitleSignalsSeniority(job.title)) {
+    return {
+      ...base,
+      wouldFire: true,
+      vetoed: false,
+      triggerSource: "title",
+      triggerDetail: job.title ?? "",
+    };
+  }
+
+  if (yearsExperienceSignalsOverreach(job.yearsExperience?.min)) {
+    return {
+      ...base,
+      wouldFire: true,
+      vetoed: false,
+      triggerSource: "yearsExperience",
+      triggerDetail: String(job.yearsExperience?.min),
+    };
+  }
+
+  const seniorityField = effectiveSeniorityFieldForGate(job);
+  if (seniorityFieldSignalsOverreach(seniorityField)) {
+    return {
+      ...base,
+      wouldFire: true,
+      vetoed: false,
+      triggerSource: "seniorityField",
+      triggerDetail: seniorityField ?? "",
+    };
+  }
+
+  if (rules?.seniorityOverreach) {
+    return {
+      ...base,
+      wouldFire: true,
+      vetoed: false,
+      triggerSource: "rulesFlagOnly",
+      triggerDetail: "rules.seniorityOverreach=true without detectable trigger",
+    };
+  }
+
+  return { ...base, wouldFire: false, vetoed: false };
+};
+
+export const logSeniorityGateEvaluation = (
+  job: ExtractedJobData,
+  rules: Pick<RuleEvaluation, "seniorityOverreach">,
+  vetoed: boolean,
+): void => {
+  const explanation = explainSeniorityGateTrigger(job, rules);
+  if (vetoed) {
+    logger.info("Seniority hard gate vetoed at evaluation", explanation);
+    return;
+  }
+  if (explanation.wouldFire || rules.seniorityOverreach) {
+    logger.info("Seniority hard gate firing", explanation);
+  }
 };
 
 export const titleArchitectIsRoleNoun = (title?: string | null): boolean => {
@@ -60,15 +175,22 @@ export const roleTitleSignalsSeniority = (title?: string | null): boolean => {
   return titleArchitectIsRoleNoun(t);
 };
 
+export const effectiveSeniorityFieldForGate = (job: ExtractedJobData): string | null => {
+  const resolved = resolveStructuredSeniorityLevel(job);
+  if (resolved && isEarlyCareerStructuredLevel(resolved)) return resolved;
+  return job.seniority ?? (resolved || null);
+};
+
 /**
  * Hard seniority gate — PRIMARY evidence: title (noun), structured level, yearsExperience.min.
  * Early-career junior/mid + years ≤4 vetoes the gate regardless of polluted title text.
  */
 export const detectRoleSeniorityOverreach = (job: ExtractedJobData): boolean => {
   if (earlyCareerLevelVetoesSeniorityGate(job)) return false;
+  const seniorityField = effectiveSeniorityFieldForGate(job);
   return (
     roleTitleSignalsSeniority(job.title) ||
     yearsExperienceSignalsOverreach(job.yearsExperience?.min) ||
-    seniorityFieldSignalsOverreach(job.seniority)
+    seniorityFieldSignalsOverreach(seniorityField)
   );
 };

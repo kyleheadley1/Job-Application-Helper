@@ -1,6 +1,7 @@
 import { SCORING_CLAMP_POLICY } from "../config/scoringClampPolicy.js";
 import { STACK_MISMATCH_CAPS } from "../config/scoringPolicy.js";
 import type { ExtractedJobData } from "../types/job.js";
+import { earlyCareerLevelVetoesSeniorityGate } from "./seniorityGate.js";
 import type { HardRuleFlag, RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
 import {
   applyJdLanguageOutputBoundary,
@@ -117,7 +118,7 @@ export const buildHardRuleFlags = (
     flags.push(flag);
   };
 
-  if (rules.seniorityOverreach) {
+  if (rules.seniorityOverreach && !earlyCareerLevelVetoesSeniorityGate(job)) {
     push({
       id: "seniorityOverreach",
       message:

@@ -1,5 +1,9 @@
 import type { ExtractedJobData } from "../types/job.js";
 import type { RuleEvaluation } from "../types/scoring.js";
+import {
+  earlyCareerLevelVetoesSeniorityGate,
+  logSeniorityGateEvaluation,
+} from "./seniorityGate.js";
 
 export type HardGateResult = {
   fired: boolean;
@@ -30,7 +34,11 @@ export const evaluateHardGates = (
   }
 
   if (rules.seniorityOverreach) {
-    reasons.push("Role seniority/staff bar exceeds early-career profile.");
+    const vetoed = earlyCareerLevelVetoesSeniorityGate(extracted);
+    logSeniorityGateEvaluation(extracted, rules, vetoed);
+    if (!vetoed) {
+      reasons.push("Role seniority/staff bar exceeds early-career profile.");
+    }
   }
 
   if (rules.geoExclusionHardGate) {

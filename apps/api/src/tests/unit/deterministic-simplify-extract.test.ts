@@ -26,6 +26,20 @@ describe("deterministic extractFromRawText (Simplify paste)", () => {
     expect(partial.employmentType).toBe("Contract");
   });
 
+  it("does not overwrite Mid Level seniority when body uses architect as a verb", () => {
+    const trabaPaste = `
+Traba
+Software Engineer
+Mid Level
+1+ years exp
+New York, NY · Hybrid
+Architect core systems and AI pipelines. Join our founding team.
+`.trim();
+    const { partial } = extractFromRawText(trabaPaste);
+    expect(partial.seniority).toMatch(/mid level/i);
+    expect(partial.yearsExperience?.min).toBe(1);
+  });
+
   it("merge prefers heuristic company over LLM Unknown Company", () => {
     const llm: ExtractedJobData = {
       company: "Unknown Company",
