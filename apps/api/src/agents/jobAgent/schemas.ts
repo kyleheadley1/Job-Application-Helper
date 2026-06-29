@@ -86,7 +86,7 @@ export const ExtractedJobDataSchema = z.object({
   employerCompanyName: z.string().nullable().optional(),
   agencyCompanyName: z.string().nullable().optional(),
   companyDisplayName: z.string().optional(),
-  companyConfidence: z.enum(["direct_or_unclear", "agency_only", "explicit_employer"]).optional(),
+  companyConfidence: z.enum(["direct_or_unclear", "agency_only", "explicit_employer", "low"]).optional(),
   companyExtractionNotes: z.array(z.string()).optional(),
   geoScope: z
     .object({

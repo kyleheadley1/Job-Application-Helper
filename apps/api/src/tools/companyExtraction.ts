@@ -1,11 +1,12 @@
 import { normalizeText } from "../lib/text.js";
 import {
   extractCompanyFromPostedHeader,
+  isCompanyNameStopword,
   isValidCompanyCandidate,
   resolveCompanyFromText,
 } from "./companyCandidateRules.js";
 
-export type CompanyConfidence = "direct_or_unclear" | "agency_only" | "explicit_employer";
+export type CompanyConfidence = "direct_or_unclear" | "agency_only" | "explicit_employer" | "low";
 
 export type CompanyPresentation = {
   listingCompanyName: string | null;
@@ -60,6 +61,7 @@ function cleanEmployerCandidate(raw: string): string | null {
   if (!t || t.length < 2 || t.length > 48) return null;
   if (VAGUE_EMPLOYER_RE.test(t)) return null;
   if (/^(the|a|an|our|their|this|that)\b/i.test(t)) return null;
+  if (isCompanyNameStopword(t)) return null;
   if (AGENCY_NAME_RE.test(t) && !/\b(ai|labs|tech)\b/i.test(t)) return null;
   if (/^(company|client|employer|organization|firm|team)$/i.test(t)) return null;
   if (!isValidCompanyCandidate(t)) return null;
@@ -108,8 +110,12 @@ export function resolveCompanyPresentation(params: {
     params.listingCompanyName?.trim() ||
     params.companyHint?.trim() ||
     null;
-  if (listing && !isValidCompanyCandidate(listing)) {
-    notes.push(`Rejected prose-like listing company "${listing}".`);
+  if (listing && (isCompanyNameStopword(listing) || !isValidCompanyCandidate(listing))) {
+    notes.push(
+      isCompanyNameStopword(listing)
+        ? `Rejected sentence-starter false positive "${listing}".`
+        : `Rejected prose-like listing company "${listing}".`,
+    );
     listing = null;
   }
   const rawText = params.rawText ?? "";
@@ -117,9 +123,16 @@ export function resolveCompanyPresentation(params: {
   if (!listing && rawText.trim()) {
     listing =
       resolveCompanyFromText(rawText, { companyHint: params.companyHint }) ??
-      (params.companyHint?.trim() && isValidCompanyCandidate(params.companyHint)
+      (params.companyHint?.trim() &&
+      isValidCompanyCandidate(params.companyHint) &&
+      !isCompanyNameStopword(params.companyHint)
         ? params.companyHint.trim()
         : null);
+  }
+
+  if (listing && isCompanyNameStopword(listing)) {
+    notes.push(`Rejected sentence-starter false positive "${listing}".`);
+    listing = null;
   }
 
   if (!listing && !rawText.trim()) {
@@ -207,8 +220,10 @@ export function resolveCompanyPresentation(params: {
     employerCompanyName: null,
     agencyCompanyName: null,
     companyDisplayName: "Unknown Company",
-    companyConfidence: "direct_or_unclear",
-    companyExtractionNotes: notes.length ? notes : ["Employer not identified from JD."],
+    companyConfidence: "low",
+    companyExtractionNotes: notes.length
+      ? [...notes, "company name uncertain — verify"]
+      : ["company name uncertain — verify"],
   };
 }
 
@@ -226,8 +241,16 @@ export function applyCompanyPresentation<T extends {
   extracted: T,
   companyHint?: string,
 ): T {
+  const rejectedCompanyNotes: string[] = [];
+  if (extracted.company?.trim() && isCompanyNameStopword(extracted.company)) {
+    rejectedCompanyNotes.push(
+      `Rejected sentence-starter false positive "${extracted.company.trim()}".`,
+    );
+  }
   const sanitizedCompany =
-    extracted.company && isValidCompanyCandidate(extracted.company)
+    extracted.company &&
+    isValidCompanyCandidate(extracted.company) &&
+    !isCompanyNameStopword(extracted.company)
       ? extracted.company
       : undefined;
   const resolvedListing =
@@ -246,6 +269,6 @@ export function applyCompanyPresentation<T extends {
     agencyCompanyName: presentation.agencyCompanyName,
     companyDisplayName: presentation.companyDisplayName,
     companyConfidence: presentation.companyConfidence,
-    companyExtractionNotes: presentation.companyExtractionNotes,
+    companyExtractionNotes: [...rejectedCompanyNotes, ...presentation.companyExtractionNotes],
   };
 }

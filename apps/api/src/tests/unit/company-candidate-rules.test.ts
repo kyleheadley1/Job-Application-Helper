@@ -43,4 +43,9 @@ describe("companyCandidateRules", () => {
     const text = "Battelle is a research and development organization committed to science.";
     expect(extractCompanyFromSelfDescription(text)).toBe("Battelle");
   });
+
+  it("rejects self-description sentence starters", () => {
+    expect(extractCompanyFromSelfDescription("This is a key role on our platform team.")).toBeNull();
+    expect(isValidCompanyCandidate("This")).toBe(false);
+  });
 });

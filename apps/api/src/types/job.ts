@@ -81,7 +81,7 @@ export type ExtractedJobData = {
   agencyCompanyName?: string | null;
   /** User-facing company label (employer, agency client, or listing company). */
   companyDisplayName?: string;
-  companyConfidence?: "direct_or_unclear" | "agency_only" | "explicit_employer";
+  companyConfidence?: "direct_or_unclear" | "agency_only" | "explicit_employer" | "low";
   companyExtractionNotes?: string[];
 };
 
