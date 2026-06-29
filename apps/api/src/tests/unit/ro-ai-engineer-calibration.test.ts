@@ -41,9 +41,17 @@ describe("seniority gate — role level only", () => {
     expect(evaluateHardGates(rules, RO_AI_ENGINEER_JOB).fired).toBe(false);
   });
 
-  it("still fires for senior title or 5+ structured years", () => {
+  it("still fires for senior title when early-career veto does not apply", () => {
     expect(
       detectRoleSeniorityOverreach({ ...RO_AI_ENGINEER_JOB, title: "Senior AI Engineer" }),
+    ).toBe(false);
+    expect(
+      detectRoleSeniorityOverreach({
+        ...RO_AI_ENGINEER_JOB,
+        title: "Senior AI Engineer",
+        seniority: "Senior Level",
+        yearsExperience: { min: 6, raw: "6+ years" },
+      }),
     ).toBe(true);
     expect(
       detectRoleSeniorityOverreach({

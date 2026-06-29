@@ -30,6 +30,7 @@ export const CALIBRATION_FIXTURES = {
   metaBrand: "metaBrand.json",
   ibmDegreeGate: "ibmDegreeGate.json",
   roAiEngineer: "roAiEngineer.json",
+  trabaAppliedAi: "trabaAppliedAi.json",
 } as const;
 
 export type CalibrationFixtureKey = keyof typeof CALIBRATION_FIXTURES;
