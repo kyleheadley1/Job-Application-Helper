@@ -213,6 +213,7 @@ export const TrackerPage = () => {
   const navigate = useNavigate();
   const [jobs, setJobs] = useState<JobRecord[]>([]);
   const [totalAll, setTotalAll] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [status, setStatus] = useState("");
   const [company, setCompany] = useState("");
   const [resume, setResume] = useState("");
@@ -264,9 +265,16 @@ export const TrackerPage = () => {
   );
 
   const loadJobs = useCallback(async () => {
-    const res = await api.listJobs(query);
-    setJobs(res.items);
-    setTotalAll(typeof res.totalAll === "number" ? res.totalAll : res.total);
+    try {
+      setLoadError(null);
+      const res = await api.listJobs(query);
+      setJobs(res.items);
+      setTotalAll(typeof res.totalAll === "number" ? res.totalAll : res.total);
+    } catch (err) {
+      setJobs([]);
+      setTotalAll(0);
+      setLoadError(err instanceof Error ? err.message : "Failed to load tracker jobs.");
+    }
   }, [query]);
 
   useEffect(() => {
@@ -646,7 +654,12 @@ export const TrackerPage = () => {
           <span>Applied this month: {appliedCounters.month}</span>
         </div>
         <p className="tracker-meta-summary muted">{metaLine()}</p>
-        {sortedJobs.length === 0 ? (
+        {loadError ? (
+          <div className="tracker-empty">
+            <p className="tracker-empty-title">Could not load tracker jobs.</p>
+            <p className="muted">{loadError}</p>
+          </div>
+        ) : sortedJobs.length === 0 ? (
           <div className="tracker-empty">
             <p className="tracker-empty-title">No roles match these filters.</p>
             <p className="muted">Try clearing filters or widening your search.</p>

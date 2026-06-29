@@ -12,14 +12,17 @@ export type CompositeParts = {
 };
 
 export const computeSurvivabilityAdjustment = (survivability: number): number => {
-  const raw = Math.round(
-    (survivability - COMPOSITE_SCORING.SURV_NEUTRAL) * COMPOSITE_SCORING.SURV_SWING * 2,
+  const delta = survivability - COMPOSITE_SCORING.SURV_NEUTRAL;
+  const raw =
+    delta < 0
+      ? delta * COMPOSITE_SCORING.SURV_PENALTY_SCALE
+      : delta * COMPOSITE_SCORING.SURV_BONUS_SCALE;
+  return Math.round(
+    Math.max(
+      COMPOSITE_SCORING.SURV_ADJ_MIN,
+      Math.min(COMPOSITE_SCORING.SURV_ADJ_MAX, raw),
+    ),
   );
-  const clamped = Math.max(
-    -COMPOSITE_SCORING.SURV_SWING,
-    Math.min(COMPOSITE_SCORING.SURV_SWING, raw),
-  );
-  return clamped === 0 ? 0 : clamped;
 };
 
 export const computeGapDock = (
@@ -67,11 +70,11 @@ export const derivationHasOnlyLegitimateTerms = (derivation: string): boolean =>
 };
 
 export const computeWorthTailoring = (
-  capability: number,
+  final: number,
   scoreBand: ScoreBand = "apply",
 ): boolean => {
   if (scoreBand === "skip" || scoreBand === "no") return false;
-  return capability >= COMPOSITE_SCORING.TAILOR_CAPABILITY;
+  return final >= COMPOSITE_SCORING.TAILOR_CAPABILITY;
 };
 
 export const resolveScoreBand = (final: number, hardGate = false): ScoreBand => {
@@ -81,12 +84,9 @@ export const resolveScoreBand = (final: number, hardGate = false): ScoreBand => 
   return "skip";
 };
 
-export const resolveBandHeadline = (
-  scoreBand: ScoreBand,
-  worthTailoring: boolean,
-): BandHeadline => {
+export const resolveBandHeadline = (scoreBand: ScoreBand, final: number): BandHeadline => {
   if (scoreBand === "no" || scoreBand === "skip") return "Skip";
   if (scoreBand === "strong_apply") return "Strong yes";
-  if (worthTailoring) return "Yes";
+  if (final >= COMPOSITE_SCORING.TAILOR_CAPABILITY) return "Yes";
   return "If quick";
 };

@@ -13,7 +13,8 @@
     "test": "npm run test --workspace api",
     "eval:seed": "tsx scripts/seed-eval.ts",
     "eval:run": "tsx scripts/eval-regression.ts",
-    "rescore:tracker": "npm run rescore:tracker --workspace api"
+    "rescore:tracker": "npm run rescore:tracker --workspace api",
+    "rescore:tracker-all": "npm run rescore:tracker-all --workspace api"
   },
   "keywords": [],
   "author": "",

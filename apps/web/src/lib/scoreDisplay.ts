@@ -1,6 +1,7 @@
 import type { ScoreDisplay, SurvivabilityLever } from "../types/job";
 
-export const leverClassName = (lever: SurvivabilityLever): string => {
+export const leverClassName = (lever: SurvivabilityLever, bindingness?: string): string => {
+  if (bindingness === "favorable") return "scoreLever favorable";
   if (lever === "none" || lever === "none_in_loop") return "scoreLever structural";
   return `scoreLever ${lever}`;
 };

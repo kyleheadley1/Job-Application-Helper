@@ -1,0 +1,43 @@
+{
+  "id": "anchor-ibm-degree-gate",
+  "anchorNote": "Unconditional degree at structured employer — cert must not bypass",
+  "extracted": {
+    "company": "IBM",
+    "companyDisplayName": "IBM",
+    "title": "Software Engineer",
+    "location": "Remote",
+    "remoteType": "remote",
+    "stack": [
+      "Node.js",
+      "TypeScript"
+    ],
+    "requiredSkills": [
+      "Node.js",
+      "TypeScript"
+    ],
+    "preferredSkills": [],
+    "domainTags": [
+      "product"
+    ],
+    "degreeRequirement": {
+      "level": "required",
+      "raw": "Bachelor's degree in Computer Science required"
+    },
+    "requirements": [
+      "Bachelor's degree in Computer Science required"
+    ],
+    "responsibilities": [
+      "Build full-stack product features"
+    ],
+    "rawText": "IBM Software Engineer. Bachelor's degree in Computer Science required. No equivalency clause."
+  },
+  "storedCategoryScores": {
+    "stackFit": 16,
+    "levelFit": 14,
+    "domainFit": 7,
+    "resumeStoryClarity": 8,
+    "functionalOverlap": 12,
+    "recruiterFriendliness": 10,
+    "careerValue": 7
+  }
+}

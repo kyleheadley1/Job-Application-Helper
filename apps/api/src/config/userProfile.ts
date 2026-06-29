@@ -76,4 +76,24 @@ export const userProfile: UserProfile = {
     basedInUS: true,
     regions: ["United States", "US", "NYC"],
   },
+  certifications: [
+    {
+      name: "AWS Developer – Associate",
+      issuer: "AWS",
+      status: "lapsed",
+      relatedSkills: [
+        "AWS",
+        "S3",
+        "DynamoDB",
+        "Lambda",
+        "CloudWatch",
+        "EventBridge",
+        "Amplify",
+        "API Gateway",
+        "IAM",
+        "SQS",
+        "SNS",
+      ],
+    },
+  ],
 };

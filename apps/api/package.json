@@ -11,6 +11,7 @@
     "import:tracker": "tsx scripts/import-tracker-xlsx.mts",
     "verify:tracker": "tsx scripts/verify-tracker-reseed.mts",
     "rescore:tracker": "tsx scripts/rescore-tracker-roles.mts",
+    "rescore:tracker-all": "tsx scripts/rescore-tracker-all.mts",
     "sync:top-jobs": "tsx scripts/sync-top-jobs.mts"
   },
   "keywords": [],

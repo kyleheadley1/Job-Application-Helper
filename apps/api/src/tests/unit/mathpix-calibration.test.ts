@@ -58,7 +58,7 @@ const MATHPIX_CAPABILITY_SCORE: ScoreBreakdown = {
 };
 
 describe("Mathpix calibration anchor", () => {
-  it("76 + (~0) − 5 = ~71; no pool term; headline Yes; referral is subtext", () => {
+  it("76 + (~−4) − 5 = ~67; no pool term; headline If quick; referral is subtext", () => {
     const rules = evaluateRules(MATHPIX_JOB, userProfile, { activeResumeType: "SWE" });
     const specializationGap = detectSpecializationGap(
       MATHPIX_JOB,
@@ -87,10 +87,10 @@ describe("Mathpix calibration anchor", () => {
       resumeText: SWE_RESUME,
     });
 
-    expect(composite.score.capability).toBeGreaterThanOrEqual(74);
+    expect(composite.score.capability).toBeGreaterThanOrEqual(70);
     expect(composite.score.capability).toBeLessThanOrEqual(78);
-    expect(composite.score.total).toBeGreaterThanOrEqual(68);
-    expect(composite.score.total).toBeLessThan(80);
+    expect(composite.score.total).toBeGreaterThanOrEqual(64);
+    expect(composite.score.total).toBeLessThan(75);
     expect(composite.scoreBand).toBe("apply");
     expect(composite.scoreBand).not.toBe("strong_apply");
 
@@ -103,14 +103,14 @@ describe("Mathpix calibration anchor", () => {
       referralPathwayNotes: "Connection via former colleague",
     });
 
-    expect(display?.worthTailoring).toBe(true);
-    expect(display?.bandHeadline).toBe("Yes");
+    expect(display?.worthTailoring).toBe(false);
+    expect(display?.bandHeadline).toBe("If quick");
     expect(display?.scoreDerivation).not.toMatch(/pool/i);
     expect(derivationHasOnlyLegitimateTerms(display!.scoreDerivation)).toBe(true);
     expect(display?.dominantLever?.penaltyName).toMatch(/python/i);
     expect(display?.actionLine).toMatch(/flask/i);
     expect(display?.actionLine).not.toMatch(/django/i);
-    expect(display?.actionLine).toMatch(/tailored resume/i);
+    expect(display?.actionLine).toMatch(/via resume|tailored resume/i);
     expect(display?.actionLine).not.toMatch(/referral/i);
     expect(display?.referralAdvice).toMatch(/former colleague/i);
   });

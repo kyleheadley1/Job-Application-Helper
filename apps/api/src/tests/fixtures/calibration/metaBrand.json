@@ -1,0 +1,23 @@
+{
+  "id": "c0160349-f72d-490a-96cc-7385536fb64d",
+  "extracted": {
+    "company": "Meta",
+    "title": "Software Developer",
+    "rawText": "Screenshot JD",
+    "stack": [],
+    "requiredSkills": [],
+    "preferredSkills": [],
+    "domainTags": [],
+    "responsibilities": [],
+    "requirements": []
+  },
+  "storedCategoryScores": {
+    "stackFit": 17,
+    "levelFit": 17,
+    "domainFit": 7,
+    "resumeStoryClarity": 7,
+    "functionalOverlap": 11,
+    "recruiterFriendliness": 11,
+    "careerValue": 7
+  }
+}

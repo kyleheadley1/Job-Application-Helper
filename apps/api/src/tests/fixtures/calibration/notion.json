@@ -1,0 +1,73 @@
+{
+  "id": "8bda469c-6410-425e-9d98-22e09a575add",
+  "extracted": {
+    "company": "Notion",
+    "title": "Software Engineer, Product Infrastructure",
+    "remoteType": "hybrid",
+    "salary": {
+      "min": 209000,
+      "max": 240000,
+      "currency": "USD"
+    },
+    "stack": [
+      "AWS",
+      "Postgres",
+      "Node.js",
+      "TypeScript",
+      "React",
+      "Flow",
+      "PostgreSQL",
+      "Go"
+    ],
+    "requiredSkills": [
+      "building abstractions and data models",
+      "cross-front-end and backend development",
+      "designing systems for developer productivity, reliability, and performance",
+      "integrating feedback from internal customers",
+      "solving large-scale technical challenges (e.g., content graph traversal, sync, permissions)",
+      "TypeScript",
+      "Node.js",
+      "React",
+      "PostgreSQL",
+      "AWS",
+      "Go"
+    ],
+    "preferredSkills": [
+      "experience leveraging typed languages (TypeScript, Flow) to drive code migrations",
+      "implemented custom data modeling paradigms (ORMs, sync engines, query languages)",
+      "familiarity with large-scale abstractions and systems design"
+    ],
+    "domainTags": [
+      "Internal tools",
+      "Productivity",
+      "SaaS",
+      "Product Management",
+      "B2B"
+    ],
+    "responsibilities": [
+      "Create abstractions and data models that solve enduring problems across the stack",
+      "Shape and build core frameworks that enable reading and writing data in Notion",
+      "Design new systems and abstractions to improve developer productivity, reliability, and performance",
+      "Solve technical challenges such as efficient traversal of the user content graph, syncing user content for offline use, and scaling the permission model"
+    ],
+    "requirements": [
+      "thoughtful problem-solving and ability to decompose complex problems",
+      "pragmatic, business-oriented decision making",
+      "focus on simplicity and well-crafted design",
+      "flexible with technology choices and able to learn new tools",
+      "empathetic communication and collaborative team orientation",
+      "onsite presence 2+ days per week"
+    ],
+    "seniority": "senior",
+    "rawText": "oftware Engineer, Notion\nProduct Infrastructure\n$209-240k\nJunior, Mid and Senior level\nMore information about location\n2+ days a week in office\nNotion\nThe connected workspace for your docs, projects, knowledge, and AI\n1001+ employees\nB2B\nInternal tools\nProductivity\nSaaS\nProduct Management\nOpen for applications\nFollow Notion\nJob\nCompany\nRole\n86%\nResume Match\n6 of 7 keywords\nUses advanced AI matching\nSimplify\nV1\nV2\nWho you are\nThoughtful problem-solving: For you, problem-solving starts with a clear and accurate understanding of the context. You can decompose tricky problems and work towards a clean solution\nPragmatic and business-oriented: You care about business impact and prioritize projects accordingly. You're not just going after cool stuff—you understand the balance between craft, speed, and the bottom line\nStrive for simplicity: You think critically about the implications of what you're building, and aim for the most simple and well-crafted design. You understand the consequence of complexity, and are motivated to eliminate them\nNot ideological about technology: To you, technologies and programming languages are about tradeoffs. You may be opinionated, but you're not ideological and can learn new technologies as you go\nEmpathetic communication: You communicate nuanced ideas clearly, whether you're explaining technical decisions in writing or brainstorming in real time. In disagreements, you engage thoughtfully with other perspectives and compromise when needed\nTeam player: For you, work isn't a solo endeavor. You enjoy collaborating cross-functionally to accomplish shared goals, and you care about learning, growing, and helping others to do the same\nDesirable\nYou have leveraged the features of typed languages (e.g. TypeScript, Flow) to drive code migrations, or have implemented your own data modeling paradigms (e.g. writing your own ORM, sync engine, or query language)\nYou have seen how fundamental abstractions scale within a large codebase, and are curious about how different organizations solve similar problems (e.g. TAO by Meta, Zanzibar by Google)\nYou've heard of computing pioneers like Ada Lovelace, Douglas Engelbart, Alan Kay, and others—and understand why we're big fans of their work\nYou have interests outside of technology, such as in art, history, or social sciences\nWhat the job involves\nThe Product Infrastructure team works on creating abstractions and data models that solve enduring problems across the stack\nWe solve problems that span multiple product surfaces and typically stretch across both front-end and backend and unblock new product avenues that were previously challenging to create\nShape and build the core frameworks that enable reading and writing data in Notion, integrating feedback from internal customers along the way, using whatever tools are required for the job, such as AWS, Postgres, NodeJS, TypeScript, React on the frontend\nDesign new systems and abstractions that improve developer productivity, reliability, and performance by handling entire classes of problems up-front for product engineers\nSolve hard technical challenges such as designing abstractions for efficient traversal of the user content graph, building a system to sync user content for offline use, or scaling our permission model to serve large customers with complex content"
+  },
+  "storedCategoryScores": {
+    "stackFit": 13,
+    "levelFit": 3,
+    "domainFit": 8,
+    "resumeStoryClarity": 10,
+    "functionalOverlap": 8,
+    "recruiterFriendliness": 8,
+    "careerValue": 7
+  }
+}

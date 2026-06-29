@@ -1,0 +1,53 @@
+{
+  "id": "anchor-fubo-frontend",
+  "anchorNote": "Frontend-only streaming JD — capability cap regression guard",
+  "extracted": {
+    "company": "Fubo",
+    "companyDisplayName": "Fubo",
+    "title": "Software Engineer, Frontend",
+    "location": "New York, NY",
+    "remoteType": "hybrid",
+    "seniority": "mid",
+    "stack": [
+      "React",
+      "TypeScript",
+      "JavaScript",
+      "CSS",
+      "HTML5",
+      "Redux"
+    ],
+    "requiredSkills": [
+      "React",
+      "TypeScript",
+      "JavaScript"
+    ],
+    "preferredSkills": [
+      "CSS",
+      "Redux",
+      "Webpack"
+    ],
+    "domainTags": [
+      "streaming",
+      "media"
+    ],
+    "responsibilities": [
+      "Build customer-facing React components and TypeScript UI for live sports streaming",
+      "Collaborate with designers on responsive layouts and polished UX"
+    ],
+    "requirements": [
+      "Strong React and TypeScript experience",
+      "Solid CSS and component architecture skills",
+      "Experience shipping production frontend features"
+    ],
+    "rawText": "Fubo — Software Engineer, Frontend\nNew York, NY (Hybrid)\nBuild polished customer-facing UI with React, TypeScript, and modern CSS.\nStrong React and TypeScript experience required."
+  },
+  "storedCategoryScores": {
+    "stackFit": 19,
+    "levelFit": 19,
+    "domainFit": 8,
+    "resumeStoryClarity": 9,
+    "functionalOverlap": 19,
+    "recruiterFriendliness": 12,
+    "careerValue": 8
+  }
+}

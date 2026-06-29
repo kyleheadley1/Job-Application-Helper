@@ -89,11 +89,12 @@ describe("Palantir Web Design Engineer calibration", () => {
       resumeText: SWE_RESUME,
     });
 
-    expect(composite.score.capability).toBeGreaterThanOrEqual(68);
+    expect(composite.score.capability).toBeGreaterThanOrEqual(58);
+    expect(composite.score.capability).toBeLessThanOrEqual(68);
     expect(composite.score.total).toBeLessThan(65);
     expect(composite.scoreBand).not.toBe("strong_apply");
     expect(["apply", "skip"]).toContain(composite.scoreBand);
-    expect(composite.recommendation).toBe("stretch_signal");
+    expect(composite.recommendation).toBe("skip");
 
     const display = buildScoreDisplay({
       score: composite.score,
@@ -126,6 +127,6 @@ describe("Palantir Web Design Engineer calibration", () => {
       rules: rulesWithGap,
       survivabilityPenalties: display?.survivabilityPenalties ?? [],
     });
-    expect(guarded).toBe("stretch_signal");
+    expect(guarded).toBe("skip");
   });
 });

@@ -12,7 +12,6 @@ import type {
 } from "../types/scoring.js";
 import type { UserProfile } from "../types/userProfile.js";
 import {
-  applySpecializationGapToBreakdown,
   specializationGapIsNonAddressable,
 } from "./capabilityGap.js";
 import {
@@ -24,10 +23,11 @@ import {
 } from "./compositeScoring.js";
 import { evaluateHardGates } from "./hardGates.js";
 import {
+  buildFullCapabilityBreakdown,
   computeCapabilityBreakdown,
   type CapabilityBreakdown,
 } from "./scoreDisplayModel.js";
-import { computeSurvivability, type SurvivabilityBreakdown } from "./survivabilityScore.js";
+import { computeSurvivability, toPersistedSurvivabilityBreakdown, type SurvivabilityBreakdown } from "./survivabilityScore.js";
 import { SCORE_CATEGORY_MAXES } from "../config/scoringPolicy.js";
 
 const clampCategory = (score: ScoreBreakdown): ScoreBreakdown => ({
@@ -56,7 +56,7 @@ export const computeCapability = (rawScore: ScoreBreakdown): number => {
 };
 
 export type { CapabilityBreakdown };
-export { computeCapabilityBreakdown };
+export { computeCapabilityBreakdown, buildFullCapabilityBreakdown };
 
 /** Legacy 2×2 matrix — retained for guards and calibration helpers. */
 export const resolveCompositeRecommendation = (
@@ -127,7 +127,11 @@ export const computeCompositeScore = (params: {
   const gate = evaluateHardGates(params.rules, params.extracted);
 
   if (gate.fired) {
-    const capabilityBreakdown = computeCapabilityBreakdown(clamped);
+    const { breakdown: capabilityBreakdown } = buildFullCapabilityBreakdown(
+      clamped,
+      params.rules,
+      params.extracted,
+    );
     const capability = Math.min(
       100,
       capabilityBreakdown.stackFit +
@@ -151,10 +155,8 @@ export const computeCompositeScore = (params: {
     };
   }
 
-  const capabilityBreakdown = applySpecializationGapToBreakdown(
-    computeCapabilityBreakdown(clamped),
-    params.rules.specializationGap,
-  );
+  const { breakdown: capabilityBreakdown, differentiatorCoverage } =
+    buildFullCapabilityBreakdown(clamped, params.rules, params.extracted);
   const capability = Math.min(
     100,
     capabilityBreakdown.stackFit +
@@ -175,8 +177,8 @@ export const computeCompositeScore = (params: {
     gapDock,
   });
   const scoreBand = resolveScoreBand(composite.final);
-  const worthTailoring = computeWorthTailoring(capability, scoreBand);
-  const bandHeadline = resolveBandHeadline(scoreBand, worthTailoring);
+  const worthTailoring = computeWorthTailoring(composite.final, scoreBand);
+  const bandHeadline = resolveBandHeadline(scoreBand, composite.final);
   const recommendation = adjustRecommendationForSpecializationGap(
     resolveBandRecommendation(
       scoreBand,
@@ -192,8 +194,10 @@ export const computeCompositeScore = (params: {
       ...clamped,
       capability,
       capabilityBreakdown,
+      differentiatorCoverageNote: differentiatorCoverage.note,
       survivability: survivabilityResult.multiplier,
-      survivabilityBreakdown: survivabilityResult,
+      survivabilityBreakdown: toPersistedSurvivabilityBreakdown(survivabilityResult),
+      certificationBoost: survivabilityResult.certificationBoost,
       total: composite.final,
       recommendationLabel: bandHeadline,
     },

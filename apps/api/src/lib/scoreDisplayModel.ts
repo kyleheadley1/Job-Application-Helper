@@ -32,6 +32,10 @@ import {
 } from "./degreeGap.js";
 import { evaluateHardGates } from "./hardGates.js";
 import { applySpecializationGapToBreakdown, specializationGapHeadlineWorthy } from "./capabilityGap.js";
+import {
+  applyDifferentiatorCoverageCap,
+  type DifferentiatorCoverageResult,
+} from "./differentiatorCoverage.js";
 import { composeSpecializationGapActionLine } from "./gapActionLine.js";
 import {
   computeFinalComposite,
@@ -46,7 +50,10 @@ import {
   selectDominantLever,
 } from "./strategicLever.js";
 import { deriveReferralAdvice } from "./referralAdvice.js";
+import { certificationCredentialLeverLabel } from "./certificationBoost.js";
+import { computePoolFriendliness } from "./poolFriendliness.js";
 import type { SurvivabilityBreakdown } from "./survivabilityScore.js";
+import { hydrateSurvivabilityBreakdown } from "./survivabilityScore.js";
 
 export type {
   CapabilityBreakdown,
@@ -84,6 +91,19 @@ export const sumCapabilityBreakdown = (breakdown: CapabilityBreakdown): number =
     breakdown.stackFit + breakdown.levelFit + breakdown.functionalOverlap,
   );
 
+export const buildFullCapabilityBreakdown = (
+  rawScore: ScoreBreakdown,
+  rules: RuleEvaluation,
+  extracted: ExtractedJobData,
+): { breakdown: CapabilityBreakdown; differentiatorCoverage: DifferentiatorCoverageResult } => {
+  const withGap = applySpecializationGapToBreakdown(
+    computeCapabilityBreakdown(rawScore),
+    rules.specializationGap,
+  );
+  const capped = applyDifferentiatorCoverageCap(withGap, extracted);
+  return { breakdown: capped.breakdown, differentiatorCoverage: capped.coverage };
+};
+
 /** Dev/test invariant: capability headline equals sum of displayed components. */
 export const assertCapabilityBreakdownMatchesHeadline = (
   capability: number,
@@ -107,11 +127,25 @@ export const buildSurvivabilityRows = (
       const score = breakdown[key];
       const weight = SURVIVABILITY_WEIGHTS[key];
       const meta = SURVIVABILITY_SUB_FACTOR_META[key];
-      const degreeLever = key === "credentialSignal" ? resolveDegreeGapLever(rules, profile) : null;
-      const lever = degreeLever?.lever ?? (key === "poolFriendliness" ? "none" : meta.lever);
-      const leverLabel =
-        degreeLever?.leverLabel ??
-        (key === "poolFriendliness" ? STRUCTURAL_LEVER_LABEL : meta.leverLabel);
+      const certBoost = key === "credentialSignal" ? breakdown.certificationBoost : undefined;
+      const degreeLever =
+        key === "credentialSignal" && !certBoost
+          ? resolveDegreeGapLever(rules, profile)
+          : null;
+      const poolMeta = key === "poolFriendliness" ? breakdown.poolFriendlinessMeta : undefined;
+      const lever = certBoost
+        ? "credential"
+        : poolMeta?.lever ??
+          degreeLever?.lever ??
+          meta.lever;
+      const leverLabel = certBoost
+        ? certificationCredentialLeverLabel(certBoost.status)
+        : poolMeta?.leverLabel ??
+          degreeLever?.leverLabel ??
+          meta.leverLabel;
+      const bindingness = certBoost
+        ? "material"
+        : poolMeta?.bindingness ?? resolveSubFactorBindingness(key, rules);
       return {
         key: key as string,
         label: meta.label,
@@ -120,7 +154,7 @@ export const buildSurvivabilityRows = (
         contribution: score * weight,
         lever,
         leverLabel,
-        bindingness: resolveSubFactorBindingness(key, rules),
+        bindingness,
         penaltyName: resolveSubFactorPenaltyName(key, rules),
       };
     },
@@ -332,12 +366,9 @@ export const buildScoreDisplay = (params: {
   const headlineCapability = params.score.capability;
   if (headlineCapability == null && params.rules.specializationGap == null) return undefined;
 
-  const capabilityBreakdown = applySpecializationGapToBreakdown(
-    computeCapabilityBreakdown(params.score),
-    params.rules.specializationGap,
-  );
-  const capabilityFromBreakdown = sumCapabilityBreakdown(capabilityBreakdown);
-  const capability = params.score.capability ?? capabilityFromBreakdown;
+  const { breakdown: capabilityBreakdown, differentiatorCoverage } =
+    buildFullCapabilityBreakdown(params.score, params.rules, params.extracted);
+  const capability = sumCapabilityBreakdown(capabilityBreakdown);
   assertCapabilityBreakdownMatchesHeadline(capability, capabilityBreakdown);
 
   const hardGates = buildHardGatesList(
@@ -352,7 +383,28 @@ export const buildScoreDisplay = (params: {
     profile,
   );
 
-  const breakdown = params.score.survivabilityBreakdown as SurvivabilityBreakdown | undefined;
+  const poolMeta = computePoolFriendliness(params.extracted, profile);
+  const breakdownRaw = hydrateSurvivabilityBreakdown(params.score);
+  let breakdown: SurvivabilityBreakdown | undefined;
+  if (breakdownRaw) {
+    let weightedAverage = 0;
+    for (const [key, weight] of Object.entries(SURVIVABILITY_WEIGHTS) as Array<
+      [SurvivabilitySubFactorKey, number]
+    >) {
+      const subScore = key === "poolFriendliness" ? poolMeta.score : breakdownRaw[key];
+      weightedAverage += subScore * weight;
+    }
+    breakdown = {
+      ...breakdownRaw,
+      poolFriendliness: poolMeta.score,
+      weightedAverage,
+      multiplier: Math.min(
+        1,
+        Math.max(SURVIVABILITY_TUNING.floor, weightedAverage),
+      ),
+      poolFriendlinessMeta: poolMeta,
+    };
+  }
   const survivability = params.score.survivability ?? 0;
 
   let survivabilityRows: SurvivabilityDisplayRow[] = [];
@@ -369,8 +421,8 @@ export const buildScoreDisplay = (params: {
   });
   const scoreBand = resolveScoreBand(composite.final, params.recommendation === "no");
   const scoreDerivation = formatScoreDerivation(composite);
-  const worthTailoring = computeWorthTailoring(capability, scoreBand);
-  const bandHeadline = resolveBandHeadline(scoreBand, worthTailoring);
+  const worthTailoring = computeWorthTailoring(composite.final, scoreBand);
+  const bandHeadline = resolveBandHeadline(scoreBand, composite.final);
 
   const dominantLever = selectDominantLever(survivabilityRows, params.rules);
 
@@ -399,6 +451,8 @@ export const buildScoreDisplay = (params: {
   return {
     capability,
     capabilityBreakdown,
+    differentiatorCoverageNote:
+      params.score.differentiatorCoverageNote ?? differentiatorCoverage.note,
     survivability,
     final: composite.final,
     survAdjustment: composite.survAdjustment,
@@ -414,6 +468,8 @@ export const buildScoreDisplay = (params: {
     actionLine,
     referralAdvice: referral.advice,
     referralUrgency: referral.urgency,
+    credentialBoostNote: params.score.certificationBoost?.note ?? breakdown?.certificationBoost?.note,
+    poolFriendlinessNote: breakdown?.poolFriendlinessMeta?.note,
     eligibilityAdvisory: eligibilityAdvisories[0],
     eligibilityAdvisories,
   };

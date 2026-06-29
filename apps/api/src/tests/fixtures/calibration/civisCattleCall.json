@@ -1,0 +1,38 @@
+{
+  "id": "dd042269-65b9-49fb-90b3-2834417e695a",
+  "anchorNote": "Cattle-call shape — generic remote entry-level React (validated control JD)",
+  "extracted": {
+    "company": "Civis Analytics",
+    "companyDisplayName": "Civis Analytics",
+    "title": "Software Engineer",
+    "location": "Remote",
+    "remoteType": "remote",
+    "seniority": "junior",
+    "stack": [
+      "React",
+      "TypeScript",
+      "JavaScript"
+    ],
+    "requiredSkills": [
+      "React",
+      "TypeScript",
+      "JavaScript"
+    ],
+    "preferredSkills": [],
+    "requirements": [
+      "React",
+      "TypeScript",
+      "JavaScript"
+    ],
+    "rawText": "Civis Analytics — Software Engineer\nRemote · Entry Level · Posted 2 days ago\nEntry-level software engineer building React/TypeScript frontends.\nReact, TypeScript, JavaScript required."
+  },
+  "storedCategoryScores": {
+    "stackFit": 16,
+    "levelFit": 18,
+    "domainFit": 8,
+    "resumeStoryClarity": 9,
+    "functionalOverlap": 13,
+    "recruiterFriendliness": 12,
+    "careerValue": 7
+  }
+}

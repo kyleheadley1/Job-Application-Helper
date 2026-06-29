@@ -1,3 +1,5 @@
+import type { CertificationBoostMeta } from "../lib/certificationBoost.js";
+
 export type Recommendation =
   | "apply_cold"
   | "referral_gated"
@@ -57,12 +59,13 @@ export type SurvivabilityLever =
   | "referral"
   | "resume"
   | "cover_letter"
+  | "credential"
   | "none"
   | "none_in_loop"
   | "portfolio"
   | "upskill";
 
-export type BindingnessTier = "binding" | "material" | "cosmetic" | "structural";
+export type BindingnessTier = "binding" | "material" | "cosmetic" | "structural" | "favorable";
 
 export type CapabilityBreakdown = {
   stackFit: number;
@@ -114,6 +117,7 @@ export type BandHeadline = "Strong yes" | "Yes" | "If quick" | "Skip";
 export type ScoreDisplay = {
   capability: number;
   capabilityBreakdown: CapabilityBreakdown;
+  differentiatorCoverageNote?: string;
   survivability: number;
   final: number;
   survAdjustment: number;
@@ -132,6 +136,10 @@ export type ScoreDisplay = {
   referralUrgency: ReferralUrgency;
   eligibilityAdvisory?: EligibilityFlag;
   eligibilityAdvisories?: EligibilityFlag[];
+  /** Set when a listing-relevant cert boosts credentialSignal. */
+  credentialBoostNote?: string;
+  /** Listing-shape pool friendliness breakdown. */
+  poolFriendlinessNote?: string;
 };
 
 export type ScoreBreakdown = {
@@ -148,12 +156,16 @@ export type ScoreBreakdown = {
   /** Survivability multiplier, 0.30–1.00. */
   survivability?: number;
   survivabilityBreakdown?: Record<string, number>;
+  /** Listing-relevant cert metadata — stored separately from numeric breakdown. */
+  certificationBoost?: CertificationBoostMeta;
   /** UI-ready decomposition derived from capability + survivability composite model. */
   scoreDisplay?: ScoreDisplay;
   /** Human-readable band label (strong_apply / apply / skip). */
   recommendationLabel?: string;
   /** Final composite score (capability ± survivability adj − gap dock), 0–100. */
   total: number;
+  /** Short note when differentiator coverage caps stack/functional credit. */
+  differentiatorCoverageNote?: string;
 };
 
 export type RuleEvaluation = {
