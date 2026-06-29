@@ -10,28 +10,40 @@ import {
 } from "../../lib/compositeScoring.js";
 
 describe("additive composite scoring", () => {
-  it("no-halving: capability 80 + average survivability + no gap ≈ 80", () => {
+  it("no penalty at neutral survivability (0.60)", () => {
+    expect(computeSurvivabilityAdjustment(0.6)).toBe(0);
     const parts = computeFinalComposite({
       capability: 80,
-      survivability: 0.5,
+      survivability: 0.6,
       gapDock: 0,
     });
     expect(parts.survAdjustment).toBe(0);
-    expect(parts.final).toBeGreaterThanOrEqual(80 - COMPOSITE_SCORING.SURV_SWING);
-    expect(parts.final).toBeLessThanOrEqual(80 + COMPOSITE_SCORING.SURV_SWING);
-    expect(parts.final).toBeGreaterThan(70);
+    expect(parts.final).toBe(80);
   });
 
-  it("Mathpix worked example: cap 76, surv 0.49, gap dock 5 → final ~71", () => {
+  it("steep penalty below neutral: cap 87 + surv 0.47 → final ~82", () => {
+    const adj = computeSurvivabilityAdjustment(0.47);
+    expect(adj).toBe(-5);
+    const parts = computeFinalComposite({
+      capability: 87,
+      survivability: 0.47,
+      gapDock: 0,
+    });
+    expect(parts.final).toBe(82);
+    expect(`${parts.capability} + (${parts.survAdjustment}) = ${parts.final}`).toBe(
+      "87 + (-5) = 82",
+    );
+  });
+
+  it("Mathpix worked example: cap 76, surv 0.49, gap dock 5 → final ~66", () => {
     const adj = computeSurvivabilityAdjustment(0.49);
-    expect(adj).toBe(0);
+    expect(adj).toBe(-4);
     const parts = computeFinalComposite({
       capability: 76,
       survivability: 0.49,
       gapDock: 5,
     });
-    expect(parts.final).toBeGreaterThanOrEqual(69);
-    expect(parts.final).toBeLessThanOrEqual(72);
+    expect(parts.final).toBe(67);
   });
 
   it("double-count regression: derivation has only capability, survAdjustment, gapDock", () => {
@@ -48,30 +60,31 @@ describe("additive composite scoring", () => {
 
   it("monotonicity: higher survivability never lowers final (fixed capability + gap)", () => {
     const low = computeFinalComposite({ capability: 70, survivability: 0.35, gapDock: 0 }).final;
-    const mid = computeFinalComposite({ capability: 70, survivability: 0.5, gapDock: 0 }).final;
-    const high = computeFinalComposite({ capability: 70, survivability: 0.65, gapDock: 0 }).final;
+    const mid = computeFinalComposite({ capability: 70, survivability: 0.6, gapDock: 0 }).final;
+    const high = computeFinalComposite({ capability: 70, survivability: 0.75, gapDock: 0 }).final;
     expect(mid).toBeGreaterThanOrEqual(low);
     expect(high).toBeGreaterThanOrEqual(mid);
   });
 
   it("monotonicity: larger gapDock never raises final", () => {
-    const none = computeFinalComposite({ capability: 75, survivability: 0.5, gapDock: 0 }).final;
-    const moderate = computeFinalComposite({ capability: 75, survivability: 0.5, gapDock: 6 }).final;
-    const central = computeFinalComposite({ capability: 75, survivability: 0.5, gapDock: 16 }).final;
+    const none = computeFinalComposite({ capability: 75, survivability: 0.6, gapDock: 0 }).final;
+    const moderate = computeFinalComposite({ capability: 75, survivability: 0.6, gapDock: 6 }).final;
+    const central = computeFinalComposite({ capability: 75, survivability: 0.6, gapDock: 16 }).final;
     expect(moderate).toBeLessThan(none);
     expect(central).toBeLessThan(moderate);
   });
 
-  it("survAdjustment is bounded to ±SURV_SWING", () => {
-    expect(computeSurvivabilityAdjustment(0)).toBe(-COMPOSITE_SCORING.SURV_SWING);
-    expect(computeSurvivabilityAdjustment(1)).toBe(COMPOSITE_SCORING.SURV_SWING);
-    expect(computeSurvivabilityAdjustment(0.5)).toBe(0);
+  it("survAdjustment is bounded to ADJ_MIN/ADJ_MAX", () => {
+    expect(computeSurvivabilityAdjustment(0)).toBe(COMPOSITE_SCORING.SURV_ADJ_MIN);
+    expect(computeSurvivabilityAdjustment(1)).toBe(6);
+    expect(computeSurvivabilityAdjustment(0.6)).toBe(0);
+    expect(computeSurvivabilityAdjustment(0.1)).toBe(COMPOSITE_SCORING.SURV_ADJ_MIN);
   });
 
-  it("final clamps at 100 with no artificial 85 cap", () => {
+  it("final clamps at 100", () => {
     const parts = computeFinalComposite({
-      capability: 95,
-      survivability: 0.7,
+      capability: 96,
+      survivability: 0.9,
       gapDock: 0,
     });
     expect(parts.final).toBe(100);
@@ -79,19 +92,19 @@ describe("additive composite scoring", () => {
 });
 
 describe("band headline label mapping", () => {
-  it("80→Strong yes; cap-76/final-71→Yes; cap-65/apply-edge→If quick; 55→Skip", () => {
-    expect(resolveScoreBand(80)).toBe("strong_apply");
-    expect(resolveBandHeadline("strong_apply", true)).toBe("Strong yes");
+  it("85+→Strong yes; 82→Yes; apply-edge→If quick; 55→Skip", () => {
+    expect(resolveScoreBand(85)).toBe("strong_apply");
+    expect(resolveBandHeadline("strong_apply", 87)).toBe("Strong yes");
 
-    expect(resolveScoreBand(71)).toBe("apply");
-    expect(computeWorthTailoring(76, "apply")).toBe(true);
-    expect(resolveBandHeadline("apply", true)).toBe("Yes");
+    expect(resolveScoreBand(82)).toBe("apply");
+    expect(computeWorthTailoring(82, "apply")).toBe(true);
+    expect(resolveBandHeadline("apply", 82)).toBe("Yes");
 
     expect(resolveScoreBand(62)).toBe("apply");
     expect(computeWorthTailoring(65, "apply")).toBe(false);
-    expect(resolveBandHeadline("apply", false)).toBe("If quick");
+    expect(resolveBandHeadline("apply", 65)).toBe("If quick");
 
     expect(resolveScoreBand(55)).toBe("skip");
-    expect(resolveBandHeadline("skip", false)).toBe("Skip");
+    expect(resolveBandHeadline("skip", 55)).toBe("Skip");
   });
 });

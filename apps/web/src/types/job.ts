@@ -86,12 +86,13 @@ export type SurvivabilityLever =
   | "referral"
   | "resume"
   | "cover_letter"
+  | "credential"
   | "none"
   | "none_in_loop"
   | "portfolio"
   | "upskill";
 
-export type BindingnessTier = "binding" | "material" | "cosmetic" | "structural";
+export type BindingnessTier = "binding" | "material" | "cosmetic" | "structural" | "favorable";
 
 export type ScoreBreakdown = {
   stackFit: number;
@@ -158,6 +159,7 @@ export type ScoreDisplay = {
     levelFit: number;
     functionalOverlap: number;
   };
+  differentiatorCoverageNote?: string;
   survivability: number;
   final: number;
   survAdjustment: number;
@@ -173,6 +175,8 @@ export type ScoreDisplay = {
   actionLine: string;
   referralAdvice: string;
   referralUrgency: ReferralUrgency;
+  credentialBoostNote?: string;
+  poolFriendlinessNote?: string;
   eligibilityAdvisory?: EligibilityFlag;
   eligibilityAdvisories?: EligibilityFlag[];
 };

@@ -1,0 +1,83 @@
+{
+  "id": "99b37dc7-cd4d-4ee0-abda-1ecbe5e86828",
+  "extracted": {
+    "company": "Picnic",
+    "title": "Frontend Engineer",
+    "location": "On-site required; role based in NYC office, five days/week",
+    "remoteType": "onsite",
+    "locationIsCommutable": true,
+    "yearsExperience": {
+      "raw": "2+ years",
+      "min": 2
+    },
+    "stack": [
+      "React.js",
+      "TypeScript",
+      "React Native",
+      "GraphQL",
+      "REST APIs",
+      "WebSockets",
+      "SSE",
+      "JavaScript",
+      "React"
+    ],
+    "requiredSkills": [
+      "React.js",
+      "TypeScript",
+      "REST APIs",
+      "GraphQL",
+      "React Native",
+      "client networking",
+      "async programming",
+      "performance optimization",
+      "caching",
+      "client-side state management",
+      "mentoring",
+      "JavaScript",
+      "React"
+    ],
+    "preferredSkills": [
+      "delivery or logistics systems",
+      "real-time systems at scale",
+      "full-stack experience",
+      "developer productivity tooling and processes",
+      "frontend architecture best practices (performance, security, usability)"
+    ],
+    "domainTags": [
+      "online food delivery",
+      "grocery delivery",
+      "logistics",
+      "real-time systems",
+      "mobile apps"
+    ],
+    "responsibilities": [
+      "Design and build high-performance React applications powered by WebSockets, SSE, and GraphQL subscriptions",
+      "Contribute to and shape courier mobile apps built in React Native",
+      "Lead technical design for complex features and systems from architecture through production rollout",
+      "Own projects end-to-end, driving execution, technical decisions, and cross-functional alignment",
+      "Improve frontend reliability, latency, and scalability in a real-time, high-throughput environment",
+      "Lead debugging, incident response, and performance investigations for frontend systems",
+      "Mentor and coach engineers to raise frontend engineering standards"
+    ],
+    "requirements": [
+      "2+ years of experience in software engineering with deep frontend expertise",
+      "Strong experience with TypeScript and modern web application development",
+      "Solid understanding of client networking, async programming, performance optimization, caching, and client-side state management",
+      "Experience integrating with GraphQL and REST APIs",
+      "Proven ability to lead technical initiatives and influence architecture and best practices",
+      "Experience mentoring junior engineers and supporting team growth",
+      "Willingness to adapt as the product and team evolve",
+      "On-site in New York office, five days per week"
+    ],
+    "rawText": "Frontend Engineer\nUpdated on 5/7/2026\nUnlock job analytics with\nSimplify+\nPicnic\n5,001-10,000 employees\nApp-based online grocery delivery service\nCompensation Overview\n$145k - $183.3k/yr\n+ Equity Awards + Annual Bonus\nJunior, Mid\nNew York, NY, USA\nIn Person\nOn-site required; role based in NYC office, five days/week\nCategory\nSoftware Engineering\n(1)\nFrontend Engineering\nRequired Skills\nSkills that you prefer have been highlighted\nReact.js\nTypeScript\nREST APIs\nGraphQL\nReact Native\nConnection\nlogo\nGet referrals →\nYou have ways to get a Picnic referral from your network.\nApplications through a referral are 3x more likely to get an interview!\nHistory\nSummary\nFull Job Posting\nWhy This Job is a Match\nSee more like this?\nYes\nNo\nMatched based on your job preferences\nCategory preferences for Software Engineering, Frontend Engineering\nChange preferences →\nWho we are\nPicnic is reinventing lunch at work. We partner with top local restaurants and batch hundreds of orders at a time to deliver high-quality, individually packaged meals—without fees or tips. The result is a seamless, affordable, and joyful experience for employees, and a more sustainable model for restaurants.\nWe recently launched, and early signals have been exceptionally strong. Picnic has been adopted organically by companies across a wide range of industries, with customers discovering and advocating for the product before any marketing. Since launch, we’ve grown incredibly fast and are now entering the 10 → 100 scale phase as we expand across major North American markets.\nPicnic owns the full stack that powers workplace food delivery: kitchens, courier operations, routing and batching systems, operations tooling, and client applications. This vertical ownership allows us to tightly integrate software, logistics, and operations to deliver reliable, cost-efficient service at scale.\nAbout the role\nWe’re looking for a Frontend Engineer to help build and scale Picnic’s real-time logistics and operations platforms. This role is ideal for someone who thrives in ambiguity, enjoys working on complex, high-performance systems, and wants to shape frontend architecture that directly powers real-world operations.\nYou’ll work across web and mobile surfaces, partner closely with backend and operations teams, and play a key role in defining how we build, ship, and scale frontend systems at Picnic.\nWhat you’ll do\nDesign and build high-performance React applications powered by WebSockets, SSE, and GraphQL subscriptions.\nContribute to and shape our courier mobile apps built in React Native.\nLead technical design for complex features and systems, from initial architecture through production rollout\nOwn projects end-to-end, driving execution, technical decisions, and cross-functional alignment\nImprove frontend reliability, latency, and scalability in a real-time, high-throughput environment\nLead debugging, incident response, and performance investigations for frontend systems\nMentor and coach engineers, raising the bar for frontend engineering across the team\nWhat we’re looking for\n2+ years of experience in software engineering, with deep frontend expertise\nStrong experience with TypeScript and modern web application development\nSolid understanding of client networking, async programming, performance optimization, caching, and client-side state management\nExperience integrating with GraphQL and REST APIs\nProven ability to lead technical initiatives and influence architecture and best practices\nExperience mentoring junior engineers and supporting team growth\nComfort working outside your immediate comfort zone and adapting as the product and team evolve\nPreferred Qualifications\nExperience building or operating delivery, logistics, or real-time systems at scale\nFull-stack experience and an understanding of backend tradeoffs and system design\nTrack record of improving developer productivity through tooling, patterns, or process improvements\nFamiliarity with modern frontend architecture best practices, including performance, security, and usability\nWhy join us\nMassive market opportunity: Online food delivery continues to grow rapidly, creating room for durable, category-defining companies\nReal impact: You’ll help reshape how restaurants succeed in delivery while improving everyday experiences for thousands of workers\nOwnership and influence: Frontend is core to Picnic’s operations—your work directly impacts couriers, operators, and customers\nStrong engineering culture: You’ll collaborate closely with experienced engineers and leaders who care deeply about craft, impact, and growth\nWhat else you need to know\nThis role is based in our New York office. We believe the best ideas emerge from close collaboration, especially when building new products and redefining how an industry works. As a result, Picnic operates in-office five days a week for all non-field roles.\nThe base salary range for this role is $​​145,000 - $183,250 per year.\nActual compensation will be determined on an individual basis and may vary depending on experience, skills, and qualifications.\nBase salary is just one part of your total rewards package. You may also be eligible for equity awards and an annual performance-based bonus.\nBenefits Summary (USA Full-Time Exempt Employees):\nMedical, dental, and vision insurance (multiple plans, incl. HSA options)\nCompany-paid life and disability insurance (short- and long-term)\nVoluntary insurance: accident, critical illness, hospital indemnity\nOptional supplemental life insurance for self, spouse, and children\nPet insurance discount\n401(k)\nHealth Savings Account (HSA)\nFlexible Spending Accounts (Healthcare, Dependent Care, Commuter)\nTime Off policies:\nDiscretionary vacation days\n8 paid holidays per year\nPaid sick time\nPaid Bereavement leave\nPaid Parental Leave\nBenefits are subject to change at the company's discretion.\nAtoms accepts applications on an ongoing basis.\nReady to join us as we serve those who serve others?\n#LI-Onsite"
+  },
+  "storedCategoryScores": {
+    "stackFit": 16,
+    "levelFit": 12,
+    "domainFit": 6,
+    "resumeStoryClarity": 10,
+    "functionalOverlap": 8,
+    "recruiterFriendliness": 9,
+    "careerValue": 8
+  }
+}

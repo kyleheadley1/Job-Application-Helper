@@ -1,4 +1,7 @@
 import {
+  CREDENTIAL_REFERRAL_SOFTEN_THRESHOLD,
+} from "./certificationBoost.js";
+import {
   SURVIVABILITY_TARGET_NEUTRAL,
   SURVIVABILITY_WEIGHTS,
   type SurvivabilitySubFactorKey,
@@ -27,6 +30,12 @@ export const computeReferralAddressableShortfall = (
 export const resolveReferralUrgency = (shortfall: number): ReferralUrgency => {
   if (shortfall >= 0.1) return "strongly_advised";
   if (shortfall >= 0.04) return "advised";
+  return "optional";
+};
+
+export const downgradeReferralUrgency = (urgency: ReferralUrgency): ReferralUrgency => {
+  if (urgency === "strongly_advised") return "advised";
+  if (urgency === "advised") return "optional";
   return "optional";
 };
 
@@ -62,7 +71,14 @@ export const deriveReferralAdvice = (params: {
   const shortfall = params.survivabilityBreakdown
     ? computeReferralAddressableShortfall(params.survivabilityBreakdown)
     : 0;
-  const urgency = resolveReferralUrgency(shortfall);
+  let urgency = resolveReferralUrgency(shortfall);
+
+  if (
+    (params.survivabilityBreakdown?.credentialSignal ?? 0) >=
+    CREDENTIAL_REFERRAL_SOFTEN_THRESHOLD
+  ) {
+    urgency = downgradeReferralUrgency(urgency);
+  }
 
   let advice: string;
   if (urgency === "strongly_advised") {

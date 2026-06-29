@@ -1,3 +1,10 @@
+export type UserCertification = {
+  name: string;
+  issuer: string;
+  status: "active" | "lapsed";
+  relatedSkills: string[];
+};
+
 export type UserProfile = {
   headline: string;
   strengths: string[];
@@ -37,4 +44,5 @@ export type UserProfile = {
     basedInUS?: boolean;
     regions?: string[];
   };
+  certifications?: UserCertification[];
 };

@@ -16,6 +16,8 @@ const FUNDING_RE =
 const FRESH_POST_RE =
   /\b(\d+\s+(minute|hour|hours|day|days)\s+ago|posted\s+(today|yesterday|just now)|newly\s+posted)\b/i;
 
+export { FRESH_POST_RE };
+
 export const isVentureFundedStartupShape = (combinedText: string): boolean =>
   FUNDING_RE.test(combinedText) &&
   !/\b(fortune\s+\d+|10,?000\s*\+?\s*employees|\b\d{5,}\s+employees|global\s+enterprise|publicly\s+traded\s+since\s+19)\b/i.test(

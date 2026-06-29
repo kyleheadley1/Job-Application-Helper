@@ -18,6 +18,30 @@ export const formatDuration = (ms: number): string => {
   return `${minutes}m ${seconds}s`;
 };
 
+/** Relative time since first scored — uses h/d for large values, not raw minutes. */
+export const formatRelativeScoredAt = (iso: string, nowMs = Date.now()): string => {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return "unknown";
+  const deltaMs = Math.max(0, nowMs - then);
+  const totalMinutes = Math.floor(deltaMs / 60_000);
+  const days = Math.floor(totalMinutes / (60 * 24));
+  if (days >= 1) return `${days}d ago`;
+  const hours = Math.floor(totalMinutes / 60);
+  if (hours >= 1) return `${hours}h ago`;
+  if (totalMinutes >= 1) return `${totalMinutes}m ago`;
+  const seconds = Math.floor(deltaMs / 1000);
+  return `${seconds}s ago`;
+};
+
+export const firstScoredAtIso = (job: {
+  createdAt: string;
+  scoreHistory?: Array<{ scoredAt: string }>;
+}): string => job.scoreHistory?.[0]?.scoredAt ?? job.createdAt;
+
+/** True when elapsed ms looks like an in-session triage run, not time-since-first-scored. */
+export const isPlausibleTriageDuration = (ms: number): boolean =>
+  ms >= 0 && ms <= 10 * 60 * 1000;
+
 export type TriageProgressPhase =
   | "idle"
   | "submitted"

@@ -38,8 +38,8 @@ const SLAM_DUNK_JOB: ExtractedJobData = {
   preferredSkills: [],
   domainTags: ["product"],
   responsibilities: ["Ship full-stack TypeScript features"],
-  requirements: ["TypeScript and React experience"],
-  rawText: "Full-stack TypeScript/React/Node role. Remote.",
+  requirements: ["TypeScript and React experience", "Node/Express backend APIs"],
+  rawText: "Full-stack TypeScript/React/Node role with Express backend APIs, RAG/LLM workflows, and webhooks. Remote.",
 };
 
 const SLAM_DUNK_SCORE: ScoreBreakdown = {
@@ -55,11 +55,11 @@ const SLAM_DUNK_SCORE: ScoreBreakdown = {
 
 /** Apply band with capability below tailor bar → If quick. */
 const IF_QUICK_SCORE: ScoreBreakdown = {
-  stackFit: 12,
-  levelFit: 12,
+  stackFit: 13,
+  levelFit: 13,
   domainFit: 5,
   resumeStoryClarity: 6,
-  functionalOverlap: 8,
+  functionalOverlap: 11,
   recruiterFriendliness: 8,
   careerValue: 6,
   total: 0,
@@ -76,7 +76,7 @@ describe("slam-dunk calibration anchor", () => {
     });
 
     expect(composite.score.capability).toBeGreaterThanOrEqual(85);
-    expect(composite.score.total).toBeGreaterThanOrEqual(80);
+    expect(composite.score.total).toBeGreaterThanOrEqual(85);
     expect(composite.scoreBand).toBe("strong_apply");
 
     const display = buildScoreDisplay({
@@ -104,9 +104,7 @@ describe("if-quick apply-edge fixture", () => {
     expect(composite.score.capability).toBeLessThan(70);
     expect(composite.score.total).toBeGreaterThanOrEqual(58);
     expect(composite.scoreBand).toBe("apply");
-    expect(computeWorthTailoring(composite.score.capability ?? 0, composite.scoreBand)).toBe(
-      false,
-    );
+    expect(computeWorthTailoring(composite.score.total, composite.scoreBand)).toBe(false);
 
     const display = buildScoreDisplay({
       score: composite.score,
@@ -121,22 +119,22 @@ describe("if-quick apply-edge fixture", () => {
 });
 
 describe("band thresholds", () => {
-  it("pins cutoffs: 79→apply, 80→strong_apply, 57→skip, 58→apply", () => {
-    expect(resolveScoreBand(79)).toBe("apply");
-    expect(resolveScoreBand(80)).toBe("strong_apply");
+  it("pins cutoffs: 84→apply, 85→strong_apply, 57→skip, 58→apply", () => {
+    expect(resolveScoreBand(84)).toBe("apply");
+    expect(resolveScoreBand(85)).toBe("strong_apply");
     expect(resolveScoreBand(57)).toBe("skip");
     expect(resolveScoreBand(58)).toBe("apply");
-    expect(resolveBandHeadline("apply", true)).toBe("Yes");
-    expect(resolveBandHeadline("apply", false)).toBe("If quick");
+    expect(resolveBandHeadline("apply", 72)).toBe("Yes");
+    expect(resolveBandHeadline("apply", 65)).toBe("If quick");
   });
 });
 
 describe("tailor decoupling", () => {
-  it("capability 72 / apply band → worthTailoring true; capability 55 / skip → false", () => {
+  it("final 72 / apply band → worthTailoring true; final 55 / skip → false", () => {
     expect(computeWorthTailoring(72, "apply")).toBe(true);
     expect(computeWorthTailoring(55, "apply")).toBe(false);
     expect(computeWorthTailoring(72, "skip")).toBe(false);
     expect(resolveScoreBand(72)).toBe("apply");
-    expect(resolveBandHeadline("apply", true)).toBe("Yes");
+    expect(resolveBandHeadline("apply", 72)).toBe("Yes");
   });
 });

@@ -1,0 +1,107 @@
+{
+  "id": "6d03b3bb-8402-4055-b1c8-19d2f794c78f",
+  "extracted": {
+    "company": "AlphaLife Sciences",
+    "title": "AI Software Engineer",
+    "location": "Iselin",
+    "remoteType": "hybrid",
+    "locationIsCommutable": true,
+    "seniority": "junior",
+    "yearsExperience": {
+      "raw": "0+ years",
+      "min": 0
+    },
+    "stack": [
+      "Python",
+      "Java",
+      "C++",
+      "JavaScript",
+      "TypeScript",
+      "Generative AI",
+      "Large Language Models",
+      "AI/LLM frameworks",
+      "Cloud",
+      "Web",
+      "Mobile",
+      "LLM / AI applications"
+    ],
+    "requiredSkills": [
+      "Generative AI",
+      "Large Language Models",
+      "AI/LLM frameworks",
+      "Python",
+      "Java",
+      "C++",
+      "JavaScript",
+      "TypeScript",
+      "Proactive",
+      "Eager to learn",
+      "LLM / AI applications"
+    ],
+    "preferredSkills": [
+      "Data analysis",
+      "Medical or life science applications",
+      "Cloud development",
+      "Web development",
+      "Mobile development",
+      "Visualization",
+      "Statistics"
+    ],
+    "domainTags": [
+      "Artificial Intelligence",
+      "Enterprise Software",
+      "Software",
+      "Document Management",
+      "Life Sciences"
+    ],
+    "degreeRequirement": {
+      "raw": "Bachelor's degree in Computer Science, Computer Engineering, or a related field",
+      "level": "required"
+    },
+    "responsibilities": [
+      "Develop, test, and maintain AI-powered applications",
+      "Apply generative AI and LLMs to real-world workflows",
+      "Collaborate with cross-functional teams to understand requirements and optimize AI solutions",
+      "Analyze data to inform features and improve application performance",
+      "Qualification",
+      "Represents the skills you have",
+      "Find out how your skills align with this job's requirements. If anything seems off, you can easily click on the tags to select or unselect skills to reflect your actual expertise.",
+      "checkGenerative AI",
+      "checkLarge Language Models",
+      "checkJavaScript",
+      "checkTypeScript",
+      "Eager to learn"
+    ],
+    "requirements": [
+      "Bachelor's degree in Computer Science, Computer Engineering, or a related field",
+      "0–2 years of software development experience; recent graduates welcome",
+      "Familiarity with AI/LLM frameworks or strong interest in AI applications",
+      "Experience with one or more programming languages (Python, Java, C/C++, JavaScript/TypeScript)",
+      "Proactive, enthusiastic, and eager to learn in a fast-paced startup environment",
+      "Represents the skills you have",
+      "Find out how your skills align with this job's requirements. If anything seems off, you can easily click on the tags to select or unselect skills to reflect your actual expertise.",
+      "checkGenerative AI",
+      "checkLarge Language Models",
+      "checkJavaScript",
+      "checkTypeScript",
+      "Eager to learn"
+    ],
+    "employmentType": "Full-time",
+    "rawText": "AlphaLife Sciences\n· 1 day ago\nAI Software Engineer\nposition\nIselin\ntime\nFull-time\nremote\nHybrid\nseniority\nEntry Level\ndate\n0+ years exp\n79%\nGOOD MATCH\nExperience. Level\n100%\nSkill\n65%\nIndustry Exp.\n76%\nAlphaLife Sciences is a pioneer in the fusion of life sciences and AI computer science, focused on enhancing clinical research through their AI-enabled platform, AuroraPrime. They are seeking an AI Software Engineer to develop, test, and maintain AI-powered applications while collaborating with cross-functional teams to optimize AI solutions.\nArtificial Intelligence (AI)\nEnterprise Software\nSoftware\nDocument Management\nbadNo H1Bnote\nInsider Connection @AlphaLife Sciences\n2 email credits available today\nnote\nDiscover valuable connections within the company who might provide insights and potential referrals.\nGet 3x more responses when you reach out via email instead of LinkedIn.\nBeyond your network\nA\nS\nE\nAkul Gokaram & 2 connections\nFrom your previous company\nfrom your School\nFind Any Email\nResponsibilities\nDevelop, test, and maintain AI-powered applications\nApply generative AI and LLMs to real-world workflows\nCollaborate with cross-functional teams to understand requirements and optimize AI solutions\nAnalyze data to inform features and improve application performance\nQualification\ncheck\nRepresents the skills you have\nFind out how your skills align with this job's requirements. If anything seems off, you can easily click on the tags to select or unselect skills to reflect your actual expertise.\ncheckGenerative AI\ncheckLarge Language Models\nPython\nJava\nC++\ncheckJavaScript\ncheckTypeScript\nEager to learn\nRequired\nBachelor's degree in Computer Science, Computer Engineering, or a related field\n0–2 years of software development experience; recent graduates welcome\nFamiliarity with AI/LLM frameworks or strong interest in AI applications\nExperience with one or more programming languages (Python, Java, C/C++, JavaScript/TypeScript)\nProactive, enthusiastic, and eager to learn in a fast-paced startup environment\nPreferred\nData analysis skills (structured/unstructured data, visualization, statistics)\nExperience in medical or life science applications\nCloud, web, or mobile development experience",
+    "listingCompanyName": "AlphaLife Sciences",
+    "employerCompanyName": null,
+    "agencyCompanyName": null,
+    "companyDisplayName": "AlphaLife Sciences",
+    "companyConfidence": "direct_or_unclear",
+    "companyExtractionNotes": []
+  },
+  "storedCategoryScores": {
+    "stackFit": 10,
+    "levelFit": 18,
+    "domainFit": 7,
+    "resumeStoryClarity": 5,
+    "functionalOverlap": 7,
+    "recruiterFriendliness": 8,
+    "careerValue": 7
+  }
+}

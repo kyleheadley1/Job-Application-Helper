@@ -25,16 +25,96 @@ export const SURVIVABILITY_TUNING = {
 
 /** Additive composite: capability backbone + bounded survivability adjustment − gap dock. */
 export const COMPOSITE_SCORING = {
-  /** Survivability at/above this boosts final; below docks. */
-  SURV_NEUTRAL: 0.5,
-  /** Max points survivability can move final either direction. */
-  SURV_SWING: 18,
+  /** Survivability at/above this = no penalty; below = steep dock. */
+  SURV_NEUTRAL: 0.6,
+  /** Points per unit below neutral (asymmetric — penalties are steeper). */
+  SURV_PENALTY_SCALE: 40,
+  /** Points per unit above neutral (modest boost only). */
+  SURV_BONUS_SCALE: 15,
+  /** Floor/ceiling on survivability adjustment applied to final. */
+  SURV_ADJ_MIN: -18,
+  SURV_ADJ_MAX: 8,
   /** Final ≥ this → strong_apply band (slam-dunk confidence). */
-  STRONG_APPLY: 80,
+  STRONG_APPLY: 85,
   /** Final ≥ this → apply band; below → skip. */
   APPLY_LOW: 58,
-  /** Capability ≥ this → worth tailoring (independent of band). */
+  /** Final ≥ this → worth tailoring (Yes vs If quick within apply band). */
   TAILOR_CAPABILITY: 70,
+} as const;
+
+/** Differentiator coverage caps — applied to stackFit + functionalOverlap after normal scoring. */
+export const DIFFERENTIATOR_COVERAGE = {
+  /** Tags that signal backend/API/AI edge vs generic React/TS stack. */
+  TAGS: [
+    "backend",
+    "rest api",
+    "api gateway",
+    "microservice",
+    "graphql",
+    "aws",
+    "lambda",
+    "dynamodb",
+    "s3",
+    "cloudwatch",
+    "eventbridge",
+    "postgres",
+    "postgresql",
+    "docker",
+    "api",
+    "node",
+    "express",
+    "oauth",
+    "github app",
+    "github integration",
+    "rag",
+    "vector",
+    "qdrant",
+    "llm",
+    "embedding",
+    "queue",
+    "bullmq",
+    "background job",
+    "webhook",
+    "sse",
+    "server-side streaming",
+  ] as const,
+  /** Zero differentiator tags — generic stack match only. */
+  NONE_CAP: { stackFit: 22, functionalOverlap: 22 },
+  /** One or two differentiator tags — partial edge. */
+  PARTIAL_CAP: { stackFit: 28, functionalOverlap: 28 },
+  /** Minimum tag count for full capability credit (no cap). */
+  STRONG_MIN_TAGS: 3,
+} as const;
+
+/** Listing-shape pool friendliness — tunable weights for survivability sub-factor. */
+export const POOL_FRIENDLINESS = {
+  NEUTRAL_BASE: 0.5,
+  MIN: 0.15,
+  MAX: 0.9,
+  /** pool ≥ this → favorable lever label */
+  FAVORABLE_MIN: 0.62,
+  /** pool < this → crowded pool / referral lever */
+  CROWDED_MAX: 0.45,
+  NICHE_EMPLOYER_MAX: 0.45,
+  BRAND_EMPLOYER_MIN: 0.7,
+  /** Default recognizability when company is absent from brand/niche lists. */
+  DEFAULT_EMPLOYER_RECOGNIZABILITY: 0.3,
+  SPECIFIC_STACK_MIN_HITS: 4,
+  REAL_SALARY_MIN: 95_000,
+  NICHE_EMPLOYER_BONUS: 0.1,
+  SPECIFIC_STACK_BONUS: 0.08,
+  DIFFERENTIATOR_ROLE_BONUS: 0.1,
+  REAL_SALARY_BONUS: 0.04,
+  GEO_FILTER_BONUS: 0.06,
+  CATTLE_CALL_PENALTY: -0.15,
+  BRAND_EMPLOYER_PENALTY: -0.12,
+  GENERIC_STACK_PENALTY: -0.08,
+  FRESH_REMOTE_JUNIOR_PENALTY: -0.05,
+  LEVER_LABELS: {
+    favorable: "favorable listing shape — works in your favor",
+    neutral: "neutral pool",
+    crowded: "crowded pool — referral is the counter",
+  },
 } as const;
 
 export const SCORE_BAND_LABELS: Record<"strong_apply" | "apply" | "skip" | "no", string> = {
@@ -56,13 +136,14 @@ export const SURVIVABILITY_WEIGHTS = {
 export type SurvivabilitySubFactorKey = keyof typeof SURVIVABILITY_WEIGHTS;
 
 /** How decisively a sub-factor causes first-pass rejection (stable, not score-derived). */
-export type BindingnessTier = "binding" | "material" | "cosmetic" | "structural";
+export type BindingnessTier = "binding" | "material" | "cosmetic" | "structural" | "favorable";
 
 export const BINDINGNESS_TIER_WEIGHT: Record<BindingnessTier, number> = {
   binding: 3,
   material: 2,
   cosmetic: 1,
   structural: 0,
+  favorable: 0,
 };
 
 export const BINDINGNESS_TIER_RANK: Record<BindingnessTier, number> = {
@@ -70,15 +151,17 @@ export const BINDINGNESS_TIER_RANK: Record<BindingnessTier, number> = {
   material: 2,
   cosmetic: 1,
   structural: 0,
+  favorable: -1,
 };
 
 export const LEVER_TYPE_RANK: Record<
-  "referral" | "cover_letter" | "resume" | "portfolio" | "upskill" | "none" | "none_in_loop",
+  "referral" | "cover_letter" | "resume" | "credential" | "portfolio" | "upskill" | "none" | "none_in_loop",
   number
 > = {
   referral: 3,
   cover_letter: 2,
   resume: 1,
+  credential: 1,
   portfolio: 0,
   upskill: 0,
   none: 0,

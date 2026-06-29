@@ -90,7 +90,7 @@ describe("DeepScribe calibration anchor", () => {
     expect(composite.score.capability).toBeGreaterThanOrEqual(75);
     expect(composite.score.capability).toBeLessThanOrEqual(84);
     expect(composite.score.survivability).toBeGreaterThanOrEqual(0.35);
-    expect(composite.score.survivability).toBeLessThanOrEqual(0.45);
+    expect(composite.score.survivability).toBeLessThanOrEqual(0.5);
     expect(composite.score.total).toBeGreaterThanOrEqual(65);
     expect(composite.score.total).toBeLessThan(80);
     expect(composite.scoreBand).toBe("apply");

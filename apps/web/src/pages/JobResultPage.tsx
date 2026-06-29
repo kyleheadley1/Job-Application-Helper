@@ -16,6 +16,9 @@ import {
 import { buildKeyRisks, decisionSummaryLine, selectTopFits } from "../lib/resultSummary";
 import {
   formatDuration,
+  formatRelativeScoredAt,
+  firstScoredAtIso,
+  isPlausibleTriageDuration,
   progressForPhase,
   readStoredTriageTiming,
   writeStoredTriageTiming,
@@ -276,7 +279,11 @@ export const JobResultPage = () => {
           {salaryDisplay.rangeIfNeeded ? (
             <p className="muted">Range if needed: {salaryDisplay.rangeIfNeeded}</p>
           ) : null}
-          {finishedMs !== null ? <p className="muted">Finished in {formatDuration(finishedMs)}</p> : null}
+          {finishedMs !== null && isPlausibleTriageDuration(finishedMs) ? (
+            <p className="muted">Scored in {formatDuration(finishedMs)}</p>
+          ) : job ? (
+            <p className="muted">Last scored {formatRelativeScoredAt(firstScoredAtIso(job))}</p>
+          ) : null}
           <p>Recommended resume: {job.recommendedResume}</p>
           <h4>Why consider</h4>
           <ul>{topFits.map((item) => <li key={item}>{item}</li>)}</ul>
@@ -310,6 +317,9 @@ export const JobResultPage = () => {
                     </span>
                   </li>
                 </ul>
+                {scoreDisplay.differentiatorCoverageNote ? (
+                  <p className="muted">{scoreDisplay.differentiatorCoverageNote}</p>
+                ) : null}
               </div>
 
               <div className="scoreSection">
@@ -322,12 +332,18 @@ export const JobResultPage = () => {
                     <li key={row.key}>
                       <span className="scoreFactor">{row.label}</span>{" "}
                       <span className="scoreValue">{row.score.toFixed(2)}</span>{" "}
-                      <span className={leverClassName(row.lever)}>
+                      <span className={leverClassName(row.lever, row.bindingness)}>
                         {formatLeverTag(row.lever, row.leverLabel)}
                       </span>
                     </li>
                   ))}
                 </ul>
+                {scoreDisplay.poolFriendlinessNote ? (
+                  <p className="muted">{scoreDisplay.poolFriendlinessNote}</p>
+                ) : null}
+                {scoreDisplay.credentialBoostNote ? (
+                  <p className="muted">{scoreDisplay.credentialBoostNote}</p>
+                ) : null}
               </div>
 
               <p className="scoreFinal">

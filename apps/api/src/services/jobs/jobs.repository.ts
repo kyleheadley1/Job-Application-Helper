@@ -14,6 +14,7 @@ import type {
 import type { JobExportRow } from "../../tracker/canonicalSpreadsheet.js";
 import { buildJobExportRow } from "../../tracker/canonicalSpreadsheet.js";
 import { normalizeStoredJobScores } from "../../lib/scoringCaps.js";
+import { sanitizeStoredJobRecord } from "../../lib/sanitizeStoredJob.js";
 import type { Filter, WithId } from "mongodb";
 
 export class JobsRepository {
@@ -24,7 +25,9 @@ export class JobsRepository {
 
   private fromDoc(doc: WithId<JobRecord & { _id: string }>): JobRecord {
     const { _id, ...rest } = doc;
-    return normalizeStoredJobScores({ ...rest, id: rest.id ?? _id });
+    return sanitizeStoredJobRecord(
+      normalizeStoredJobScores({ ...rest, id: rest.id ?? _id }),
+    );
   }
 
   private upsertTrackerFields(prev: JobRecord, nextStatus: JobStatus): JobRecord["tracker"] {
@@ -113,6 +116,8 @@ export class JobsRepository {
     mainRisk: JobRecord["mainRisk"];
     rationale: JobRecord["rationale"];
     risks: JobRecord["risks"];
+    referralPathwayAvailable?: JobRecord["referralPathwayAvailable"];
+    referralPathwayNotes?: JobRecord["referralPathwayNotes"];
   }): Promise<JobRecord | null> {
     const col = await this.collection();
     const prev = await col.findOne({ _id: params.id });
@@ -153,6 +158,12 @@ export class JobsRepository {
           mainRisk: params.mainRisk,
           rationale: params.rationale,
           risks: params.risks,
+          ...(params.referralPathwayAvailable !== undefined
+            ? { referralPathwayAvailable: params.referralPathwayAvailable }
+            : {}),
+          ...(params.referralPathwayNotes !== undefined
+            ? { referralPathwayNotes: params.referralPathwayNotes }
+            : {}),
           tracker: nextTracker,
           trackerSpreadsheet: nextSpreadsheet,
           updatedAt: now,

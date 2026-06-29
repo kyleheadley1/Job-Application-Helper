@@ -214,6 +214,7 @@ const survivabilityLeverSchema = z.enum([
   "referral",
   "resume",
   "cover_letter",
+  "credential",
   "none",
   "none_in_loop",
   "portfolio",
@@ -228,7 +229,7 @@ export const SurvivabilityDisplayRowSchema = z.object({
   contribution: z.number(),
   lever: survivabilityLeverSchema,
   leverLabel: z.string(),
-  bindingness: z.enum(["binding", "material", "cosmetic", "structural"]),
+  bindingness: z.enum(["binding", "material", "cosmetic", "structural", "favorable"]),
   penaltyName: z.string(),
 });
 
@@ -237,7 +238,7 @@ export const StrategicLeverSelectionSchema = z.object({
   lever: survivabilityLeverSchema,
   leverLabel: z.string(),
   penaltyName: z.string(),
-  bindingness: z.enum(["binding", "material", "cosmetic", "structural"]),
+  bindingness: z.enum(["binding", "material", "cosmetic", "structural", "favorable"]),
   strategicValue: z.number(),
   isCollapsedReferral: z.boolean(),
 });
@@ -245,6 +246,7 @@ export const StrategicLeverSelectionSchema = z.object({
 export const ScoreDisplaySchema = z.object({
   capability: z.number(),
   capabilityBreakdown: CapabilityBreakdownSchema,
+  differentiatorCoverageNote: z.string().optional(),
   survivability: z.number(),
   final: z.number(),
   survAdjustment: z.number(),
@@ -266,6 +268,8 @@ export const ScoreDisplaySchema = z.object({
   actionLine: z.string(),
   referralAdvice: z.string(),
   referralUrgency: z.enum(["strongly_advised", "advised", "optional"]),
+  credentialBoostNote: z.string().optional(),
+  poolFriendlinessNote: z.string().optional(),
   eligibilityAdvisory: z
     .object({
       reason: z.string(),
@@ -286,6 +290,15 @@ export const ScoreDisplaySchema = z.object({
     .optional(),
 });
 
+const CertificationBoostSchema = z.object({
+  certName: z.string(),
+  status: z.enum(["active", "lapsed"]),
+  matchedSkills: z.array(z.string()),
+  overlapCount: z.number(),
+  boost: z.number(),
+  note: z.string(),
+});
+
 export const ScoreBreakdownSchema = z
   .object({
     stackFit: z.number().min(0).max(SCORE_CATEGORY_MAXES.stackFit),
@@ -299,6 +312,7 @@ export const ScoreBreakdownSchema = z
     capabilityBreakdown: CapabilityBreakdownSchema.optional(),
     survivability: z.number().min(0).max(1).optional(),
     survivabilityBreakdown: z.record(z.string(), z.number()).optional(),
+    certificationBoost: CertificationBoostSchema.optional(),
     scoreDisplay: ScoreDisplaySchema.optional(),
     recommendationLabel: z.string().optional(),
     total: z.number().min(0).max(100),

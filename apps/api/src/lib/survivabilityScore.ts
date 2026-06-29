@@ -6,12 +6,47 @@ import {
 import type { ExtractedJobData } from "../types/job.js";
 import type { RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
 import type { UserProfile } from "../types/userProfile.js";
-import { detectCompetitivePoolSignals } from "./poolCompetitiveness.js";
+import { applyCertificationBoost, type CertificationBoostMeta } from "./certificationBoost.js";
+import { computePoolFriendliness, type PoolFriendlinessMeta } from "./poolFriendliness.js";
 import { normalizeText } from "./text.js";
 
 export type SurvivabilityBreakdown = Record<SurvivabilitySubFactorKey, number> & {
   weightedAverage: number;
   multiplier: number;
+  certificationBoost?: CertificationBoostMeta;
+  poolFriendlinessMeta?: PoolFriendlinessMeta;
+};
+
+export const toPersistedSurvivabilityBreakdown = (
+  breakdown: SurvivabilityBreakdown,
+): Record<string, number> => ({
+  employerRecognizability: breakdown.employerRecognizability,
+  credentialSignal: breakdown.credentialSignal,
+  impactMetricQuality: breakdown.impactMetricQuality,
+  resumeStoryCoherence: breakdown.resumeStoryCoherence,
+  domainMatchForListing: breakdown.domainMatchForListing,
+  poolFriendliness: breakdown.poolFriendliness,
+  weightedAverage: breakdown.weightedAverage,
+  multiplier: breakdown.multiplier,
+});
+
+export const hydrateSurvivabilityBreakdown = (
+  score: Pick<ScoreBreakdown, "survivabilityBreakdown" | "survivability" | "certificationBoost">,
+): SurvivabilityBreakdown | undefined => {
+  const raw = score.survivabilityBreakdown;
+  if (!raw) return undefined;
+
+  return {
+    employerRecognizability: raw.employerRecognizability ?? 0,
+    credentialSignal: raw.credentialSignal ?? 0,
+    impactMetricQuality: raw.impactMetricQuality ?? 0,
+    resumeStoryCoherence: raw.resumeStoryCoherence ?? 0,
+    domainMatchForListing: raw.domainMatchForListing ?? 0,
+    poolFriendliness: raw.poolFriendliness ?? 0,
+    weightedAverage: raw.weightedAverage ?? score.survivability ?? 0,
+    multiplier: raw.multiplier ?? score.survivability ?? 0,
+    certificationBoost: score.certificationBoost,
+  };
 };
 
 const KNOWN_EMPLOYER_FT =
@@ -120,11 +155,7 @@ export const scoreDomainMatchForListing = (
   return clamp01((rawScore.domainFit / 10) * 0.65 + 0.2);
 };
 
-export const scorePoolFriendliness = (job: ExtractedJobData, combinedText: string): number => {
-  const signals = detectCompetitivePoolSignals(job, combinedText);
-  const competitiveness = signals.signalCount / 5;
-  return clamp01(1 - competitiveness * 0.92);
-};
+export { scorePoolFriendliness } from "./poolFriendliness.js";
 
 export const computeSurvivability = (params: {
   extracted: ExtractedJobData;
@@ -134,11 +165,19 @@ export const computeSurvivability = (params: {
   resumeText?: string;
 }): SurvivabilityBreakdown => {
   const resumeText = params.resumeText ?? "";
-  const combinedText = jobBlob(params.extracted);
+
+  const baseCredentialSignal = scoreCredentialSignal(params.profile, params.rules);
+  const credentialBoost = applyCertificationBoost(
+    baseCredentialSignal,
+    params.profile,
+    params.extracted,
+  );
+
+  const poolMeta = computePoolFriendliness(params.extracted, params.profile);
 
   const subFactors: Record<SurvivabilitySubFactorKey, number> = {
     employerRecognizability: scoreEmployerRecognizability(resumeText),
-    credentialSignal: scoreCredentialSignal(params.profile, params.rules),
+    credentialSignal: credentialBoost.score,
     impactMetricQuality: scoreImpactMetricQuality(resumeText),
     resumeStoryCoherence: scoreResumeStoryCoherence(resumeText, params.rawScore),
     domainMatchForListing: scoreDomainMatchForListing(
@@ -147,7 +186,7 @@ export const computeSurvivability = (params: {
       params.rules,
       params.rawScore,
     ),
-    poolFriendliness: scorePoolFriendliness(params.extracted, combinedText),
+    poolFriendliness: poolMeta.score,
   };
 
   let weightedAverage = 0;
@@ -162,5 +201,11 @@ export const computeSurvivability = (params: {
     Math.max(SURVIVABILITY_TUNING.floor, weightedAverage),
   );
 
-  return { ...subFactors, weightedAverage, multiplier };
+  return {
+    ...subFactors,
+    weightedAverage,
+    multiplier,
+    certificationBoost: credentialBoost.boost,
+    poolFriendlinessMeta: poolMeta,
+  };
 };
