@@ -57,9 +57,21 @@ function isJobTitleLikeLine(line: string): boolean {
   return JOB_TITLE_LIKE_RE.test(line.trim());
 }
 
+const SENTENCE_STARTER_STOPWORDS = new Set(
+  ["this", "the", "we", "our", "you", "their", "as", "at", "join", "work", "build", "apply", "here", "it", "that", "these", "those", "a", "an", "there"].map(
+    (s) => s.toLowerCase(),
+  ),
+);
+
+function isSentenceStarterCompanyName(name: string): boolean {
+  const key = name.trim().toLowerCase();
+  return SENTENCE_STARTER_STOPWORDS.has(key);
+}
+
 export function isProseCompanyName(name: string): boolean {
   const trimmed = name.trim();
   if (!trimmed) return true;
+  if (isSentenceStarterCompanyName(trimmed)) return true;
   if (/^[A-Za-z0-9]{1,4}\.[A-Za-z][A-Za-z0-9'-]{0,24}$/.test(trimmed)) return false;
   if (isJobTitleLikeLine(trimmed)) return true;
   if (isSeniorityLikeCompanyName(trimmed)) return true;
@@ -88,7 +100,7 @@ export function headerCompanyFromRawText(rawText?: string): string | null {
   }
   for (const line of lines.slice(0, 40)) {
     const m = line.match(/^(.{2,48}?)\s+is\s+(?:a|an|the|building)\b/i);
-    if (m?.[1] && !isProseCompanyName(m[1])) return m[1].trim();
+    if (m?.[1] && !isProseCompanyName(m[1]) && !isSentenceStarterCompanyName(m[1])) return m[1].trim();
   }
   for (let i = 0; i < lines.length - 2; i++) {
     if (lines[i + 1] !== lines[i + 2]) continue;

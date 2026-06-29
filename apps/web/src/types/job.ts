@@ -36,7 +36,7 @@ export type ExtractedJobData = {
   employerCompanyName?: string | null;
   agencyCompanyName?: string | null;
   companyDisplayName?: string;
-  companyConfidence?: "direct_or_unclear" | "agency_only" | "explicit_employer";
+  companyConfidence?: "direct_or_unclear" | "agency_only" | "explicit_employer" | "low";
   companyExtractionNotes?: string[];
 };
 

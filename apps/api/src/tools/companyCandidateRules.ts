@@ -9,8 +9,12 @@ export type CompanySource =
   | "posted_header"
   | "duplicate_before_employee_count"
   | "labeled_field"
-  | "about_header"
+  | "view_more_jobs"
   | "self_description"
+  | "at_company"
+  | "domain"
+  | "follow_company"
+  | "about_header"
   | "llm"
   | "fallback_scoring";
 
@@ -18,9 +22,13 @@ export const COMPANY_SOURCE_RANK: Record<CompanySource, number> = {
   user_hint: 100,
   posted_header: 95,
   duplicate_before_employee_count: 90,
-  labeled_field: 85,
+  labeled_field: 88,
+  view_more_jobs: 87,
+  self_description: 86,
+  at_company: 85,
+  domain: 84,
+  follow_company: 83,
   about_header: 80,
-  self_description: 75,
   llm: 60,
   fallback_scoring: 40,
 };
@@ -97,6 +105,71 @@ export const COMPANY_PROSE_REJECTORS: RegExp[] = [
   /\b(communicating|solving|conducting|participating|managing|developing|designing|implementing|maintaining|working|collaborating|debugging|shipping|building|owning|deploying)\b/i,
   /\b(requirements?|responsibilities|qualification|qualifications|preferred|required|skills?|experience|ability|knowledge|benefits|salary|compensation|category|connection|history|summary)\b/i,
 ];
+
+/** Sentence-starters / pronouns — never valid company names when scraped from JD prose. */
+export const COMPANY_NAME_STOPWORDS = new Set(
+  [
+    "this",
+    "the",
+    "we",
+    "our",
+    "you",
+    "their",
+    "as",
+    "at",
+    "join",
+    "work",
+    "build",
+    "apply",
+    "here",
+    "it",
+    "that",
+    "these",
+    "those",
+    "a",
+    "an",
+    "there",
+  ].map((s) => s.toLowerCase()),
+);
+
+const JOB_BOARD_DOMAIN_SLUGS = new Set([
+  "greenhouse",
+  "lever",
+  "ashby",
+  "workday",
+  "linkedin",
+  "indeed",
+  "glassdoor",
+  "jobs",
+  "www",
+  "apply",
+  "careers",
+]);
+
+export function isCompanyNameStopword(name: string): boolean {
+  const trimmed = name.trim();
+  if (!trimmed) return true;
+  const key = normalizeCompanyCandidateKey(trimmed);
+  if (COMPANY_NAME_STOPWORDS.has(key)) return true;
+  if (!trimmed.includes(" ") && COMPANY_NAME_STOPWORDS.has(key)) return true;
+  return false;
+}
+
+export function companyNameFromDomainSlug(slug: string): string | null {
+  const cleaned = slug
+    .trim()
+    .toLowerCase()
+    .replace(/\.(com|io|co|ai|dev|app|org|net)$/i, "")
+    .replace(/[_-]+/g, " ");
+  if (!cleaned || cleaned.length < 2 || cleaned.length > 32) return null;
+  if (JOB_BOARD_DOMAIN_SLUGS.has(cleaned)) return null;
+  if (isCompanyNameStopword(cleaned)) return null;
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  const titled = words
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+  return isValidCompanyCandidate(titled) ? titled : null;
+}
 
 const JOB_TITLE_LIKE_RE =
   /\b((?:full[\s-]?stack|frontend|backend|platform|product|deployment|forward deployed|machine learning|site reliability|ai enablement)\s+)?(?:engineer|developer|software|devops|sre|scientist|architect|analyst|designer|programmer|manager|director|lead|specialist|coordinator)\b|\b(?:product\s*&\s*deployment|forward deployed)\b/i;
@@ -255,6 +328,7 @@ export function isBrandLikeCompany(line: string): boolean {
 export function isValidCompanyCandidate(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed) return false;
+  if (isCompanyNameStopword(trimmed)) return false;
   if (isBoardMatchChromeLine(trimmed)) return false;
   if (/^\d{1,3}%$/.test(trimmed)) return false;
   if (isSeniorityOrLevelCompanyCandidate(trimmed)) return false;
@@ -372,8 +446,62 @@ export function extractCompanyFromSelfDescriptionLines(lines: string[]): string 
     );
     if (!match?.[1]) continue;
     const company = match[1].trim();
+    if (isCompanyNameStopword(company)) continue;
     if (isValidCompanyCandidate(company)) return company;
   }
+  return null;
+}
+
+export function extractCompanyFromViewMoreJobs(rawJobText: string): string | null {
+  const match = rawJobText.match(
+    /\bview\s+\d+\s+more\s+jobs?\s+at\s+([A-Z][A-Za-z0-9&.'\- ]{1,48})\b/i,
+  );
+  if (!match?.[1]) return null;
+  const company = match[1].trim().replace(/[,.;:]+$/, "");
+  return isValidCompanyCandidate(company) ? company : null;
+}
+
+export function extractCompanyFromAtCompany(rawJobText: string): string | null {
+  const match = rawJobText.match(/\bAt\s+([A-Z][A-Za-z0-9&.'\- ]{1,48}),/);
+  if (!match?.[1]) return null;
+  const company = match[1].trim();
+  return isValidCompanyCandidate(company) ? company : null;
+}
+
+export function extractCompanyFromFollowPattern(lines: string[]): string | null {
+  for (const line of lines.slice(0, 40)) {
+    const match = line.trim().match(/^Follow\s+(@?)([A-Z][A-Za-z0-9&.'\- ]{1,48})\s*$/i);
+    if (!match?.[2]) continue;
+    const company = match[2].trim();
+    if (isValidCompanyCandidate(company)) return company;
+  }
+  return null;
+}
+
+export function extractCompanyFromDomain(rawJobText: string): string | null {
+  const blob = rawJobText.slice(0, 12_000);
+  const utm = blob.match(/[?&]utm_source=([a-z0-9][a-z0-9._-]{1,30})/i);
+  if (utm?.[1]) {
+    const fromUtm = companyNameFromDomainSlug(utm[1]);
+    if (fromUtm) return fromUtm;
+  }
+
+  const boardSlug = blob.match(
+    /\b(?:greenhouse|lever|ashby|workday)\.(?:io|com)\/([a-z0-9][a-z0-9_-]{1,30})\b/i,
+  );
+  if (boardSlug?.[1]) {
+    const fromBoard = companyNameFromDomainSlug(boardSlug[1]);
+    if (fromBoard) return fromBoard;
+  }
+
+  const domainMatches = blob.matchAll(
+    /(?:https?:\/\/)?(?:www\.)?([a-z0-9][a-z0-9-]{1,30})\.(com|io|co|ai|dev|app)\b/gi,
+  );
+  for (const domainMatch of domainMatches) {
+    const fromDomain = companyNameFromDomainSlug(domainMatch[1]!);
+    if (fromDomain) return fromDomain;
+  }
+
   return null;
 }
 
@@ -455,9 +583,13 @@ export function resolveCompanyFromText(
 
   candidates.push(...collectLabeledFieldCandidates(lines));
 
-  const about = extractCompanyFromAboutHeader(lines);
-  if (about) {
-    candidates.push({ value: about, source: "about_header", rank: COMPANY_SOURCE_RANK.about_header });
+  const viewMore = extractCompanyFromViewMoreJobs(rawJobText);
+  if (viewMore) {
+    candidates.push({
+      value: viewMore,
+      source: "view_more_jobs",
+      rank: COMPANY_SOURCE_RANK.view_more_jobs,
+    });
   }
 
   const selfDesc = extractCompanyFromSelfDescriptionLines(lines);
@@ -467,6 +599,38 @@ export function resolveCompanyFromText(
       source: "self_description",
       rank: COMPANY_SOURCE_RANK.self_description,
     });
+  }
+
+  const atCompany = extractCompanyFromAtCompany(rawJobText);
+  if (atCompany) {
+    candidates.push({
+      value: atCompany,
+      source: "at_company",
+      rank: COMPANY_SOURCE_RANK.at_company,
+    });
+  }
+
+  const fromDomain = extractCompanyFromDomain(rawJobText);
+  if (fromDomain) {
+    candidates.push({
+      value: fromDomain,
+      source: "domain",
+      rank: COMPANY_SOURCE_RANK.domain,
+    });
+  }
+
+  const follow = extractCompanyFromFollowPattern(lines);
+  if (follow) {
+    candidates.push({
+      value: follow,
+      source: "follow_company",
+      rank: COMPANY_SOURCE_RANK.follow_company,
+    });
+  }
+
+  const about = extractCompanyFromAboutHeader(lines);
+  if (about) {
+    candidates.push({ value: about, source: "about_header", rank: COMPANY_SOURCE_RANK.about_header });
   }
 
   const preScoring = options?.preScoringCompany?.trim();
