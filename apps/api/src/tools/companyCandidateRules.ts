@@ -183,7 +183,11 @@ export const EMPLOYEE_COUNT_RE =
   /^\d{1,3}(?:,\d{3})?(?:\s*-\s*\d{1,3}(?:,\d{3})?|\+)?\s+employees$/i;
 
 export const BODY_SECTION_HEADER_RE =
-  /^(responsibilities|qualification|qualifications|required|preferred|what you.?ll do|what you.?ll be doing|who you are|about the role|about you|this role is for you if|this role is likely not for you if|our tech stack|our benefits|workplace policy|equal opportunity|candidate privacy notice|accommodations|what the job involves)$/i;
+  /^(responsibilities|qualification|qualifications|required|preferred|what you.?ll do|what you.?ll be doing|what we.?re looking for|who we are|who you are|about the role|about the company|about you|overview|company|role|this role is for you if|this role is likely not for you if|our tech stack|our benefits|workplace policy|equal opportunity|candidate privacy notice|accommodations|what the job involves)$/i;
+
+/** Verbs in "{Company} is reinventing/building/..." hiring-entity intros. */
+const HIRING_ENTITY_SELF_DESCRIPTION_RE =
+  /^(.{2,48}?)\s+is\s+(?:a|an|the|building|hiring|looking|seeking|reinventing|transforming|leading|helping|partnering|creating|developing|scaling|growing|expanding|disrupting|delivering|providing|offering|empowering|powering|launching|operating|on a mission)\b/i;
 
 /** @deprecated use POSTED_TIMESTAMP_RE */
 export const ACTIVITY_TIMESTAMP_RE = POSTED_TIMESTAMP_RE;
@@ -205,6 +209,31 @@ export function normalizeCompanyCandidateKey(line: string): string {
     .replace(/['']/g, "'")
     .replace(/\s+/g, " ")
     .replace(/[:;,]+$/g, "");
+}
+
+/** Job-board UI tab/section headers — never valid company names. */
+export const JOB_BOARD_UI_SECTION_HEADERS = new Set(
+  [
+    "why this job",
+    "why this job is a match",
+    "summary",
+    "full job posting",
+    "history",
+    "company",
+    "role",
+    "about the role",
+    "about the company",
+    "what you'll do",
+    "what you'll be doing",
+    "what we're looking for",
+    "overview",
+    "who we are",
+  ].map((s) => normalizeCompanyCandidateKey(s)),
+);
+
+export function isJobBoardUiSectionHeader(line: string): boolean {
+  const key = normalizeCompanyCandidateKey(line);
+  return JOB_BOARD_UI_SECTION_HEADERS.has(key);
 }
 
 export function isLocationOrCountryCompanyCandidate(line: string): boolean {
@@ -304,7 +333,7 @@ export function isBrandLikeCompany(line: string): boolean {
   if (isCompanyProseCandidate(trimmed)) return false;
 
   if (
-    /^(posted|reposted|position|time|remote|seniority|money|category|required|preferred|summary|history|full job posting|why this job is a match|contract|full-time|full time|part-time|part time|internship|temporary|freelance|strong match|experience\. level|industry exp\.?)$/i.test(
+    /^(posted|reposted|position|time|remote|seniority|money|category|required|preferred|summary|history|full job posting|why this job|why this job is a match|contract|full-time|full time|part-time|part time|internship|temporary|freelance|strong match|experience\. level|industry exp\.?)$/i.test(
       trimmed,
     )
   ) {
@@ -332,6 +361,7 @@ export function isBrandLikeCompany(line: string): boolean {
 export function isValidCompanyCandidate(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed) return false;
+  if (isJobBoardUiSectionHeader(trimmed)) return false;
   if (isCompanyNameStopword(trimmed)) return false;
   if (isBoardMatchChromeLine(trimmed)) return false;
   if (/^\d{1,3}%$/.test(trimmed)) return false;
@@ -365,7 +395,8 @@ export function isPostedTimestampLine(line: string): boolean {
 export const isActivityTimestampLine = isPostedTimestampLine;
 
 export function isBodySectionHeaderLine(line: string): boolean {
-  return BODY_SECTION_HEADER_RE.test(line.trim());
+  const trimmed = line.trim();
+  return isJobBoardUiSectionHeader(trimmed) || BODY_SECTION_HEADER_RE.test(trimmed);
 }
 
 export function isAfterBodySection(lines: string[], index: number): boolean {
@@ -443,16 +474,25 @@ export function extractCompanyFromAboutHeader(lines: string[]): string | null {
 }
 
 export function extractCompanyFromSelfDescriptionLines(lines: string[]): string | null {
-  for (const line of lines.slice(0, 60)) {
+  for (const line of lines) {
     const trimmed = line.trim();
-    const match = trimmed.match(
-      /^(.{2,48}?)\s+is\s+(?:a|an|the|building|hiring|looking|seeking)\b/i,
-    );
+    const match = trimmed.match(HIRING_ENTITY_SELF_DESCRIPTION_RE);
     if (!match?.[1]) continue;
     const company = match[1].trim();
     if (isCompanyNameStopword(company)) continue;
+    if (isJobBoardUiSectionHeader(company)) continue;
     if (isValidCompanyCandidate(company)) return company;
   }
+  return null;
+}
+
+/** Prefer in-body hiring entity from "{Company} is reinventing/..." or "About {Company}". */
+export function extractBodyHiringEntityFromJd(rawJobText: string): string | null {
+  const lines = normalizeJobLines(rawJobText);
+  const selfDesc = extractCompanyFromSelfDescriptionLines(lines);
+  if (selfDesc) return selfDesc;
+  const about = extractCompanyFromAboutHeader(lines);
+  if (about) return about;
   return null;
 }
 
@@ -522,6 +562,15 @@ export function extractCompanyFromDomain(rawJobText: string): string | null {
   return null;
 }
 
+export function extractCompanyFromApplicationsFooter(rawJobText: string): string | null {
+  const match = rawJobText.match(
+    /\b([A-Z][A-Za-z0-9&.'-]+(?:\s+[A-Z][A-Za-z0-9&.'-]+){0,3})\s+accepts applications\b/i,
+  );
+  if (!match?.[1]) return null;
+  const company = match[1].trim();
+  return isValidCompanyCandidate(company) ? company : null;
+}
+
 export function extractCompanyFromSelfDescription(rawJobText: string): string | null {
   return extractCompanyFromSelfDescriptionLines(normalizeJobLines(rawJobText));
 }
@@ -554,6 +603,7 @@ export function collectFallbackScoringCandidates(lines: string[]): CompanyCandid
 
   for (let i = 0; i < Math.min(lines.length, 30); i++) {
     const line = lines[i]!;
+    if (isJobBoardUiSectionHeader(line)) continue;
     if (isAfterBodySection(lines, i) && !parseExplicitCompanyLabel(line)) continue;
     if (followsMetadataLabelLine(lines, i)) continue;
     if (isJobTitleLikeLine(line)) continue;
