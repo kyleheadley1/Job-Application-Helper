@@ -215,6 +215,20 @@ export const preprocessExtractionInput = (raw: unknown): unknown => {
 
   if (typeof o.rawText === "string" && o.rawText.trim() === "") delete o.rawText;
 
+  if (typeof o.company === "string") {
+    const t = o.company.trim();
+    o.company = t || "Unknown Company";
+  } else if (o.company == null) {
+    o.company = "Unknown Company";
+  }
+
+  if (typeof o.title === "string") {
+    const t = o.title.trim();
+    o.title = t || "Unknown Title";
+  } else if (o.title == null) {
+    o.title = "Unknown Title";
+  }
+
   if (o.remoteType !== undefined && o.remoteType !== null) {
     const rt = String(o.remoteType).toLowerCase().trim();
     if (["remote", "hybrid", "onsite", "unknown"].includes(rt)) o.remoteType = rt;

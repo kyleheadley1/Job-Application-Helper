@@ -107,7 +107,9 @@ function trackerDateKey(job: JobRecord): string {
 function rowDotTone(job: JobRecord): "green" | "yellow" | "red" | "blue" {
   if (job.tracker.color) return job.tracker.color;
   if (job.status === "offer") return "green";
-  if (job.status === "skip" || job.status === "rejected" || job.status === "closed") return "red";
+  if (job.status === "skip" || job.status === "rejected" || job.status === "closed" || job.status === "lapsed") {
+    return "red";
+  }
   if (job.status === "interviewing" || job.status === "assessment") return "blue";
   return "yellow";
 }
@@ -135,6 +137,7 @@ const STATUS_ORDER: JobStatus[] = [
   "applied",
   "to_review",
   "skip",
+  "lapsed",
   "rejected",
   "closed",
 ];
@@ -222,6 +225,9 @@ export const TrackerPage = () => {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [shortlistOnly, setShortlistOnly] = useState(false);
+  const [shortlistTotal, setShortlistTotal] = useState(0);
+  const [refreshShortlistBusy, setRefreshShortlistBusy] = useState(false);
+  const [refreshShortlistMessage, setRefreshShortlistMessage] = useState<string | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [busyJobId, setBusyJobId] = useState<string>("");
   const [showExtras, setShowExtras] = useState(
@@ -270,6 +276,7 @@ export const TrackerPage = () => {
       const res = await api.listJobs(query);
       setJobs(res.items);
       setTotalAll(typeof res.totalAll === "number" ? res.totalAll : res.total);
+      setShortlistTotal(typeof res.shortlistTotal === "number" ? res.shortlistTotal : 0);
     } catch (err) {
       setJobs([]);
       setTotalAll(0);
@@ -280,6 +287,25 @@ export const TrackerPage = () => {
   useEffect(() => {
     void loadJobs();
   }, [loadJobs]);
+
+  const refreshShortlist = async () => {
+    if (refreshShortlistBusy) return;
+    setRefreshShortlistBusy(true);
+    setRefreshShortlistMessage(null);
+    try {
+      const result = await api.refreshShortlist();
+      setRefreshShortlistMessage(
+        `Shortlist synced: ${result.removed} removed, ${result.added} added, ${result.updated} updated (${result.total} checked).`,
+      );
+      await loadJobs();
+    } catch (err) {
+      setRefreshShortlistMessage(
+        err instanceof Error ? err.message : "Could not refresh shortlist.",
+      );
+    } finally {
+      setRefreshShortlistBusy(false);
+    }
+  };
 
   const markRejectedFromRow = async (jobId: string) => {
     if (busyJobId) return;
@@ -316,10 +342,10 @@ export const TrackerPage = () => {
     return copy;
   }, [dateFilteredJobs, sortKey, sortDir]);
 
-  const shortlistInView = useMemo(
-    () => sortedJobs.filter((j) => j.tracker.shortlist).length,
-    [sortedJobs],
-  );
+  const shortlistInView = useMemo(() => {
+    if (shortlistOnly) return sortedJobs.length;
+    return shortlistTotal;
+  }, [shortlistOnly, sortedJobs.length, shortlistTotal]);
 
   const appliedCounters = useMemo(() => {
     const { todayKey, weekStartKey, monthStartKey } = etRangeKeys(new Date(nowTick));
@@ -451,6 +477,18 @@ export const TrackerPage = () => {
         return (
           <span className="cell-lines-1 cell-lines-action" title={job.tracker.recommendedAction ?? ""}>
             {job.tracker.recommendedAction?.trim() || "—"}
+            {job.tracker.shortlistTag ? (
+              <span className="tracker-shortlist-tag" title={job.tracker.shortlistTag}>
+                {" "}
+                · {job.tracker.shortlistTag}
+              </span>
+            ) : null}
+            {job.tracker.freshnessTier && job.tracker.freshnessTier !== "fresh" ? (
+              <span className="tracker-freshness-tag" title={job.tracker.freshnessTier}>
+                {" "}
+                · {job.tracker.freshnessTier}
+              </span>
+            ) : null}
           </span>
         );
       case "status":
@@ -634,7 +672,12 @@ export const TrackerPage = () => {
           onToDateChange={setToDate}
           shortlistOnly={shortlistOnly}
           onShortlistChange={setShortlistOnly}
+          onRefreshShortlist={() => void refreshShortlist()}
+          refreshShortlistBusy={refreshShortlistBusy}
         />
+        {refreshShortlistMessage ? (
+          <p className="muted tracker-refresh-shortlist-msg">{refreshShortlistMessage}</p>
+        ) : null}
         <div className="tracker-filter-footer">
           <label className="checkboxRow muted tracker-extras-toggle">
             <input

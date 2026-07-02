@@ -23,6 +23,7 @@ export const JobStatusSchema = z.enum([
   'assessment',
   'closed',
   'offer',
+  'lapsed',
 ]);
 
 export const ExtractedJobDataSchema = z.object({
@@ -81,6 +82,8 @@ export const ExtractedJobDataSchema = z.object({
     .optional(),
   relocationRequired: z.boolean().optional(),
   responsibilities: z.array(z.string()).default([]),
+  /** ISO posting date when known from JD chrome or import. */
+  postedAt: z.string().optional(),
   requirements: z.array(z.string()).default([]),
   listingCompanyName: z.string().optional(),
   employerCompanyName: z.string().nullable().optional(),
@@ -150,6 +153,7 @@ export const RuleEvaluationSchema = z.object({
   goDistributedDataInfraRole: z.boolean().optional().default(false),
   goDistributedDataInfraCandidateGap: z.boolean().optional().default(false),
   degreeHasEquivalencyClause: z.boolean().optional().default(false),
+  degreeEquivalencySatisfied: z.boolean().optional().default(false),
   capabilityGap: z
     .object({
       kind: z.enum(["specialization", "stack_depth"]),
@@ -184,6 +188,7 @@ export const RuleEvaluationSchema = z.object({
       severity: z.literal("check"),
     })
     .optional(),
+  clearanceRequiresExistingPenalty: z.boolean().optional(),
   geoExclusionHardGate: z.boolean().optional().default(false),
   geoExclusionReason: z.string().optional(),
   hardRuleNotes: z.array(z.string()).optional().default([]),
@@ -446,6 +451,9 @@ export const JobRecordSchema = z.object({
       statusOutcome: z.string().optional(),
       color: z.enum(['green', 'yellow', 'red', 'blue']).optional(),
       shortlist: z.boolean().optional(),
+      shortlistTag: z.string().optional(),
+      freshnessTier: z.string().optional(),
+      postedAt: z.string().optional(),
       notes: z.string().optional(),
     })
     .default({}),

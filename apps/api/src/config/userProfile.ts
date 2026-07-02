@@ -22,7 +22,7 @@ export const userProfile: UserProfile = {
   ],
   degreeStatus: {
     hasBachelors: false,
-    note: "Nontraditional background with no bachelor's degree.",
+    note: "Associate of Arts; Codesmith graduate; no bachelor's degree.",
   },
   training: {
     program: "Codesmith",

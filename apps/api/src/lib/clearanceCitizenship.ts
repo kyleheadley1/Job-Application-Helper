@@ -5,11 +5,14 @@ import { normalizeText } from "./text.js";
 
 export type ClearanceTiming = ClearanceRequirement["timing"];
 
-const ACTIVE_UPFRONT_RE =
-  /\b(active\s+(?:ts\/sci|secret|clearance|polygraph)|current(?:ly)?\s+(?:cleared|hold(?:s|ing)?\s+(?:an?\s+)?(?:active\s+)?clearance)|existing\s+clearance|must\s+already\s+hold\b|must\s+(?:be|currently)\s+(?:cleared|holding(?:\s+(?:an?\s+)?(?:active\s+)?clearance)?)|day\s*[-\s]?1\s+clearance|active\s+clearance)\b/i;
+export const STRICT_EXISTING_CLEARANCE_RE =
+  /\b(active\s+(?:ts\/sci|secret|clearance|polygraph)|current(?:ly)?\s+(?:cleared|hold(?:s|ing)?\s+(?:an?\s+)?(?:active\s+)?clearance)|existing\s+clearance|must\s+already\s+hold\b|must\s+hold\s+(?:a\s+)?(?:current\s+|active\s+)?(?:security\s+)?clearance|must\s+(?:be|currently)\s+(?:cleared|holding(?:\s+(?:an?\s+)?(?:active\s+)?clearance)?)|day\s*[-\s]?1\s+clearance|active\s+clearance)\b/i;
+
+const BARE_CLEARANCE_REQUIRED_RE =
+  /\b(?:security\s+)?clearance\s+required\b/i;
 
 const SPONSORABLE_RE =
-  /\b(ability\s+to\s+obtain(?:\s+(?:a\s+)?clearance)?|clearance\s+eligible|must\s+be\s+able\s+to\s+obtain(?:\s+(?:a\s+)?clearance)?|will\s+be\s+required\s+to\s+obtain(?:\s+(?:a\s+)?clearance)?|eligible\s+for\s+(?:a\s+)?(?:security\s+)?clearance)\b/i;
+  /\b(ability\s+to\s+obtain(?:\s+and\s+maintain)?(?:\s+(?:a\s+)?clearance)?|clearance\s+eligible|must\s+be\s+able\s+to\s+obtain(?:\s+(?:a\s+)?clearance)?|will\s+be\s+required\s+to\s+obtain(?:\s+(?:a\s+)?clearance)?|eligible\s+for\s+(?:a\s+)?(?:security\s+)?clearance|\bclearable\b)\b/i;
 
 const CLEARANCE_MENTION_RE =
   /\b(security\s+clearance|clearance\s+required|requires?\s+(?:a\s+)?security\s+clearance|dod\s+clearance|ts\/sci|top\s+secret|active\s+clearance|must\s+already\s+hold)\b/i;
@@ -62,20 +65,31 @@ export const classifyClearanceTiming = (
   citizenshipRequirement?: string | null,
 ): ClearanceTiming => {
   const blob = normalizeText(text);
-  if (!CLEARANCE_MENTION_RE.test(blob)) return "unspecified";
+  if (
+    !CLEARANCE_MENTION_RE.test(blob) &&
+    !SPONSORABLE_RE.test(blob) &&
+    !BARE_CLEARANCE_REQUIRED_RE.test(blob)
+  ) {
+    return "unspecified";
+  }
 
-  if (ACTIVE_UPFRONT_RE.test(blob)) return "active_upfront";
   if (SPONSORABLE_RE.test(blob)) return "sponsorable";
 
   const citizenshipAsReason =
     /\b(?:due to|because of|for)\s+(?:the\s+)?(?:security\s+)?clearance\b/i.test(blob) ||
     (Boolean(citizenshipRequirement) &&
-      /\bclearance\s+required\b|\bsecurity\s+clearance\s+required\b/i.test(blob));
+      BARE_CLEARANCE_REQUIRED_RE.test(blob));
 
   if (citizenshipAsReason) return "sponsorable";
 
+  if (STRICT_EXISTING_CLEARANCE_RE.test(blob)) return "active_upfront";
+  if (BARE_CLEARANCE_REQUIRED_RE.test(blob)) return "active_upfront";
+
   return "unspecified";
 };
+
+export const isStrictExistingClearanceRequired = (text: string): boolean =>
+  STRICT_EXISTING_CLEARANCE_RE.test(normalizeText(text));
 
 export const parseClearanceRequirement = (
   text: string,
@@ -119,6 +133,8 @@ export type ClearanceCitizenshipResult = {
   clearanceRequirement: ClearanceRequirement | null;
   citizenshipMismatch: boolean;
   clearanceMismatch: boolean;
+  /** Bare "clearance required" / hire-now clearance without strict hold-active language. */
+  clearanceRequiresExistingPenalty?: boolean;
   clearanceEligibilityFlag?: EligibilityFlag;
 };
 
@@ -146,11 +162,39 @@ export const evaluateClearanceCitizenship = (
 
   if (timing === "active_upfront") {
     const holdsClearance = profile.holdsActiveClearance ?? false;
+    if (holdsClearance) {
+      return {
+        citizenshipRequirement,
+        clearanceRequirement,
+        citizenshipMismatch,
+        clearanceMismatch: false,
+      };
+    }
+
+    const blob = normalizeText(
+      clearanceRequirement.raw ?? jobRequirementBlob(job),
+    );
+    if (isStrictExistingClearanceRequired(blob)) {
+      return {
+        citizenshipRequirement,
+        clearanceRequirement,
+        citizenshipMismatch,
+        clearanceMismatch: true,
+      };
+    }
+
     return {
       citizenshipRequirement,
       clearanceRequirement,
       citizenshipMismatch,
-      clearanceMismatch: !holdsClearance,
+      clearanceMismatch: false,
+      clearanceRequiresExistingPenalty: true,
+      clearanceEligibilityFlag: {
+        reason: "Likely requires existing clearance — verify before applying.",
+        evidence: `clearanceTiming=active_upfront; holdsActiveClearance=false; strictExisting=false`,
+        lever: "verify",
+        severity: "check",
+      },
     };
   }
 

@@ -12,7 +12,7 @@ import {
   logJobPostingMetadataDebug,
   validateExtractedCompany,
 } from "./jobPostingMetadataExtract.js";
-import { resolveCompanyFromText } from "./companyCandidateRules.js";
+import { resolveCompanyFromText, ensureCompanyName } from "./companyCandidateRules.js";
 import {
   parseCitizenshipRequirementText,
   parseClearanceRequirement,
@@ -400,16 +400,15 @@ export const mergeExtractedWithHeuristics = (
     ...base,
     company: (() => {
       const raw = base.rawText ?? "";
-      return (
+      const resolved =
         resolveCompanyFromText(raw, {
           llmCompany: base.company,
           preScoringCompany: h.company,
         }) ??
         validateExtractedCompany(h.company ?? base.company, raw) ??
         h.company ??
-        base.company ??
-        "Unknown Company"
-      );
+        base.company;
+      return ensureCompanyName(resolved);
     })(),
     title:
       h.title && isWeakJobTitle(base.title)

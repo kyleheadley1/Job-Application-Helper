@@ -1,6 +1,7 @@
 import { normalizeText } from "../lib/text.js";
 import {
   extractCompanyFromPostedHeader,
+  ensureCompanyName,
   isCompanyNameStopword,
   isValidCompanyCandidate,
   resolveCompanyFromText,
@@ -263,8 +264,8 @@ export function applyCompanyPresentation<T extends {
   });
   return {
     ...extracted,
-    company: presentation.listingCompanyName ?? extracted.company,
-    listingCompanyName: presentation.listingCompanyName ?? extracted.company,
+    company: ensureCompanyName(presentation.listingCompanyName ?? presentation.companyDisplayName ?? extracted.company),
+    listingCompanyName: presentation.listingCompanyName ?? ensureCompanyName(extracted.company),
     employerCompanyName: presentation.employerCompanyName,
     agencyCompanyName: presentation.agencyCompanyName,
     companyDisplayName: presentation.companyDisplayName,

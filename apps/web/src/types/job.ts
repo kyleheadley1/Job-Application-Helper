@@ -15,7 +15,8 @@ export type JobStatus =
   | "interviewing"
   | "assessment"
   | "closed"
-  | "offer";
+  | "offer"
+  | "lapsed";
 
 export type ExtractedJobData = {
   company: string;
@@ -253,6 +254,9 @@ export type JobRecord = {
     statusOutcome?: string;
     color?: "green" | "yellow" | "red" | "blue";
     shortlist?: boolean;
+    shortlistTag?: string;
+    freshnessTier?: string;
+    postedAt?: string;
     notes?: string;
   };
   status: JobStatus;

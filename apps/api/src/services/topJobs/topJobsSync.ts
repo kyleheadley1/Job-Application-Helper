@@ -4,6 +4,7 @@ import { triageJob } from "../../agents/jobAgent/orchestrator.js";
 import { applyCompanyPresentation } from "../../tools/companyExtraction.js";
 import { env } from "../../config/env.js";
 import { logger } from "../../lib/logger.js";
+import { shortlistTrackerFields } from "../../lib/shortlist.js";
 import type { DiscoveredListing, TopJobRecord, TopJobsSyncStats } from "../../types/topJob.js";
 import { fetchDiscoveredListings } from "./discoveryProvider.js";
 import { preFilterListings, sortListingsByPostedDesc } from "./preFilter.js";
@@ -248,7 +249,6 @@ export const promoteTopJobToTracker = async (topJobId: string): Promise<JobRecor
       priority: topJob.score.total >= env.topJobsMinScore ? "high" : "medium",
       recommendedAction: "Review from Top Jobs",
       statusOutcome: topJob.recommendation,
-      shortlist: topJob.score.total >= 78,
       color: "green",
     },
     status: "to_review",
@@ -261,6 +261,10 @@ export const promoteTopJobToTracker = async (topJobId: string): Promise<JobRecor
         recommendation: topJob.recommendation,
       },
     ],
+  };
+  job.tracker = {
+    ...job.tracker,
+    ...shortlistTrackerFields(job),
   };
   job.trackerSpreadsheet = buildTrackerSpreadsheetFromJob(job);
   await jobsRepository.saveTriage(job);

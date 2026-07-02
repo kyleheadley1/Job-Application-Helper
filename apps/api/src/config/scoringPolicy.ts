@@ -92,16 +92,15 @@ export const scoringPolicy: ScoringPolicy = {
   ],
   shortlist: {
     minScore: 78,
-    blockedStatuses: ["rejected", "closed"],
+    blockedStatuses: ["rejected", "closed", "applied", "lapsed"] as JobStatus[],
   },
 };
 
 export const getTrackerColor = (status: JobStatus, score: number): "green" | "yellow" | "red" | "blue" => {
-  if (status === "rejected" || status === "closed") return "red";
+  if (status === "rejected" || status === "closed" || status === "lapsed") return "red";
   if (status === "interviewing" || status === "assessment" || status === "offer") return "blue";
   if (status === "to_review" && score >= 50) return "green";
   return "yellow";
 };
 
-export const shouldShortlist = (score: number, status: JobStatus): boolean =>
-  score >= 50 && !scoringPolicy.shortlist.blockedStatuses.includes(status);
+export { shouldShortlist } from "../lib/shortlist.js";

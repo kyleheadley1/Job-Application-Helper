@@ -79,6 +79,29 @@ const ACTIVE_CLEARANCE_JOB: ExtractedJobData = {
   },
 };
 
+const NOCTUA_JOB: ExtractedJobData = {
+  company: "Noctua",
+  title: "Software Engineer",
+  location: "Remote",
+  remoteType: "remote",
+  stack: ["TypeScript", "Node.js", "React"],
+  requiredSkills: ["TypeScript", "Node.js"],
+  preferredSkills: ["React"],
+  domainTags: ["federal"],
+  requirements: ["Security Clearance Required"],
+  rawText: `
+Noctua — Software Engineer
+Remote
+Security Clearance Required
+TypeScript and Node.js experience.
+  `.trim(),
+  clearanceRequirement: {
+    required: true,
+    timing: "active_upfront",
+    raw: "Security Clearance Required",
+  },
+};
+
 const compositeFor = (job: ExtractedJobData, rules: ReturnType<typeof evaluateRules>) =>
   computeCompositeScore({
     rawScore: TRIA_RAW,
@@ -101,10 +124,18 @@ describe("clearance timing classification", () => {
   it("classifies active/current language as active_upfront", () => {
     expect(classifyClearanceTiming("Active TS/SCI clearance required")).toBe("active_upfront");
     expect(classifyClearanceTiming("Must already hold an active clearance")).toBe("active_upfront");
+    expect(classifyClearanceTiming("Must hold a current security clearance")).toBe("active_upfront");
   });
 
-  it("defaults bare clearance required to unspecified (treated as sponsorable)", () => {
-    expect(classifyClearanceTiming("Security clearance required")).toBe("unspecified");
+  it("classifies sponsorable obtain/eligible phrasing", () => {
+    expect(classifyClearanceTiming("Eligible for a security clearance")).toBe("sponsorable");
+    expect(classifyClearanceTiming("Ability to obtain and maintain a clearance")).toBe("sponsorable");
+    expect(classifyClearanceTiming("Must be able to obtain clearance")).toBe("sponsorable");
+    expect(classifyClearanceTiming("Candidate must be clearable")).toBe("sponsorable");
+  });
+
+  it("classifies bare Security Clearance Required as active_upfront (hard branch)", () => {
+    expect(classifyClearanceTiming("Security clearance required")).toBe("active_upfront");
     const resolved = resolveClearanceRequirement({
       ...TRIA_JOB,
       rawText: "Security clearance required",
@@ -112,7 +143,7 @@ describe("clearance timing classification", () => {
       clearanceRequirement: undefined,
       requirements: ["Security clearance required"],
     });
-    expect(resolved?.timing).toBe("unspecified");
+    expect(resolved?.timing).toBe("active_upfront");
   });
 });
 
@@ -173,6 +204,41 @@ describe("active clearance hard gate", () => {
     const composite = compositeFor(ACTIVE_CLEARANCE_JOB, rules);
     expect(composite.hardGateFired).toBe(true);
     expect(composite.recommendation).toBe("no");
+  });
+});
+
+describe("bare clearance required — hire-now branch", () => {
+  it("Noctua: verify flag, survivability dock, no hard gate", () => {
+    const rules = evaluateRules(NOCTUA_JOB, userProfile, { activeResumeType: "SWE" });
+    expect(rules.clearanceMismatch).toBe(false);
+    expect(rules.clearanceRequiresExistingPenalty).toBe(true);
+    expect(rules.clearanceEligibilityFlag?.reason).toMatch(/existing clearance/i);
+
+    const composite = compositeFor(NOCTUA_JOB, rules);
+    expect(composite.hardGateFired).toBe(false);
+    expect(composite.recommendation).not.toBe("no");
+
+    const withoutPenalty = compositeFor(NOCTUA_JOB, {
+      ...rules,
+      clearanceRequiresExistingPenalty: undefined,
+      clearanceEligibilityFlag: undefined,
+    });
+    expect(composite.score.survivability!).toBeLessThan(withoutPenalty.score.survivability!);
+    expect(composite.score.total!).toBeLessThan(withoutPenalty.score.total!);
+    expect(composite.score.total! - withoutPenalty.score.total!).toBeLessThanOrEqual(-6);
+
+    const display = buildScoreDisplay({
+      score: composite.score,
+      rules,
+      extracted: NOCTUA_JOB,
+      recommendation: composite.recommendation,
+    });
+    expect(display?.eligibilityAdvisories?.some((a) => /existing clearance/i.test(a.reason))).toBe(
+      true,
+    );
+    expect(display?.survivabilityPenalties?.some((p) => /existing clearance/i.test(p.message))).toBe(
+      true,
+    );
   });
 });
 

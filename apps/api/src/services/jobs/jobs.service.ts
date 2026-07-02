@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { JobListFilters, JobRecord, JobStatus } from "../../types/job.js";
+import type { JobListFilters, JobRecord, JobStatus, RefreshShortlistResult } from "../../types/job.js";
 import type { JobExportRow } from "../../tracker/canonicalSpreadsheet.js";
 import { triageJob } from "../../agents/jobAgent/orchestrator.js";
 import {
@@ -7,8 +7,13 @@ import {
   generateJobAssets,
 } from "../../agents/jobAgent/assetGeneration.js";
 import { userProfile } from "../../config/userProfile.js";
-import { getTrackerColor, shouldShortlist } from "../../config/scoringPolicy.js";
-import { buildTrackerSpreadsheetFromJob } from "../../tracker/canonicalSpreadsheet.js";
+import { getTrackerColor } from "../../config/scoringPolicy.js";
+import { compareShortlistJobs, evaluateShortlist, liveShortlistEligible } from "../../lib/shortlist.js";
+import {
+  autoArchiveNote,
+  shouldAutoArchiveAppliedJob,
+} from "../../lib/trackerAutoArchive.js";
+import { buildJobExportRow, buildTrackerSpreadsheetFromJob } from "../../tracker/canonicalSpreadsheet.js";
 import { jobsRepository } from "./jobs.repository.js";
 import { resumeContextService } from "../resume/resumeContext.js";
 import { companyHintFromExtracted, preserveCompanyOnRetriage } from "../../lib/preserveCompanyOnRetriage.js";
@@ -111,8 +116,21 @@ export class JobsService {
         recommendedAction: fresh.tracker.recommendedAction,
         notes: prev.tracker.notes,
         statusOutcome: tracked ? (prev.tracker.statusOutcome ?? prev.status) : fresh.tracker.statusOutcome,
-        shortlist: shouldShortlist(fresh.score.total, prev.status),
-        color: getTrackerColor(prev.status, fresh.score.total),
+        ...(() => {
+          const mergedForShortlist: JobRecord = {
+            ...prev,
+            score: fresh.score,
+            status: prev.status,
+            referralPathwayAvailable: fresh.referralPathwayAvailable ?? prev.referralPathwayAvailable,
+          };
+          const shortlist = evaluateShortlist(mergedForShortlist);
+          return {
+            shortlist: shortlist.onShortlist,
+            shortlistTag: shortlist.tag,
+            freshnessTier: shortlist.freshnessLabel,
+            color: getTrackerColor(prev.status, fresh.score.total),
+          };
+        })(),
       },
     };
     merged.trackerSpreadsheet = buildTrackerSpreadsheetFromJob(merged);
@@ -143,12 +161,68 @@ export class JobsService {
     return jobsRepository.getById(id);
   }
 
-  async list(filters: JobListFilters): Promise<{ items: JobRecord[]; total: number; totalAll: number }> {
-    return jobsRepository.list(filters);
+  async list(
+    filters: JobListFilters,
+  ): Promise<{ items: JobRecord[]; total: number; totalAll: number; shortlistTotal: number }> {
+    await this.runAutoArchive();
+    const repoFilters = { ...filters };
+    const shortlistRequested = repoFilters.shortlist === true;
+    if (shortlistRequested) delete repoFilters.shortlist;
+
+    const result = await jobsRepository.list(repoFilters);
+    const shortlistTotal = result.items.filter((job) => liveShortlistEligible(job)).length;
+
+    let items = result.items;
+    if (shortlistRequested) {
+      items = items
+        .filter((job) => liveShortlistEligible(job))
+        .map((job) => {
+          const shortlist = evaluateShortlist(job);
+          return {
+            ...job,
+            tracker: {
+              ...job.tracker,
+              shortlist: shortlist.onShortlist,
+              shortlistTag: shortlist.tag,
+              freshnessTier: shortlist.freshnessLabel,
+            },
+          };
+        })
+        .sort(compareShortlistJobs);
+    }
+
+    return { ...result, items, total: items.length, shortlistTotal };
+  }
+
+  /** Recompute scores + sync shortlist flags for every tracked job. */
+  async refreshShortlist(): Promise<RefreshShortlistResult> {
+    await this.runAutoArchive();
+    const resumeContexts = await resumeContextService.getAvailableContexts();
+    const jobs = await jobsRepository.findAll();
+    return jobsRepository.refreshAllShortlists({ jobs, resumeContexts });
+  }
+
+  /** Idempotent sweep: applied + silence threshold + no progress → lapsed. */
+  async runAutoArchive(now: Date = new Date()): Promise<{ archivedIds: string[] }> {
+    const { items } = await jobsRepository.list({});
+    const archivedIds: string[] = [];
+    for (const job of items) {
+      const candidate = shouldAutoArchiveAppliedJob(job, now);
+      if (!candidate) continue;
+      await jobsRepository.updateStatus(
+        candidate.jobId,
+        "lapsed",
+        autoArchiveNote(candidate.daysSinceApplied),
+      );
+      archivedIds.push(candidate.jobId);
+    }
+    return { archivedIds };
   }
 
   async exportRows(filters: JobListFilters): Promise<{ rows: JobExportRow[]; total: number }> {
-    return jobsRepository.exportRows(filters);
+    const { items } = await this.list(filters);
+    const rows: JobExportRow[] = items.map((job) => buildJobExportRow(job));
+    return { rows, total: rows.length };
   }
 
   async generateAssetsForJobId(jobId: string, input?: { force?: boolean }): Promise<JobRecord> {
@@ -242,7 +316,9 @@ export class JobsService {
       tracker: {
         ...draft.tracker,
         statusOutcome: "applied",
-        shortlist: shouldShortlist(draft.score.total, "applied"),
+        shortlist: false,
+        shortlistTag: undefined,
+        freshnessTier: undefined,
         color: getTrackerColor("applied", draft.score.total),
       },
       statusHistory: [

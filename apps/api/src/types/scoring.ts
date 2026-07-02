@@ -240,6 +240,8 @@ export type RuleEvaluation = {
   goDistributedDataInfraCandidateGap?: boolean;
   /** JD allows related/equivalent experience in lieu of a degree — softens credential penalty. */
   degreeHasEquivalencyClause?: boolean;
+  /** Candidate satisfies an accepted alternate credential path when JD allows equivalency. */
+  degreeEquivalencySatisfied?: boolean;
   /** Non-addressable capability/specialization gap (valid skip driver). */
   capabilityGap?: CapabilityGap;
   /** Structured specialization pillar gap (design/Figma, enterprise IAM, etc.). */
@@ -248,6 +250,8 @@ export type RuleEvaluation = {
   eligibilityFlag?: EligibilityFlag;
   /** Soft clearance sponsorship advisory — does not affect score or band. */
   clearanceEligibilityFlag?: EligibilityFlag;
+  /** Hire-now clearance without strict hold-active language — survivability dock. */
+  clearanceRequiresExistingPenalty?: boolean;
   /** Explicit unambiguous geographic exclusion (hard gate). */
   geoExclusionHardGate?: boolean;
   geoExclusionReason?: string;

@@ -24,7 +24,7 @@ import {
   type JobPostingMetadata,
   type PreScoringJobMetadata,
 } from "./jobPostingMetadataExtract.js";
-import { resolveCompanyFromText, sanitizeCompanyName } from "./companyCandidateRules.js";
+import { resolveCompanyFromText, sanitizeCompanyName, ensureCompanyName, ensureJobTitle } from "./companyCandidateRules.js";
 import { normalizeLocationPrefixedTitle } from "./preScoringMetadataExtract.js";
 import { applyCompanyPresentation } from "./companyExtraction.js";
 import { attachGeoScope } from "../lib/geoEligibility.js";
@@ -116,8 +116,14 @@ const finalizeExtracted = (extracted: ExtractedJobData, normalizedText: string, 
   out = {
     ...out,
     company: resolveFinalCompany(out.company, normalizedText, companyHint),
+    title: ensureJobTitle(out.title),
   };
   out = applyCompanyPresentation(out, companyHint);
+  out = {
+    ...out,
+    company: ensureCompanyName(out.companyDisplayName ?? out.company),
+    title: ensureJobTitle(out.title),
+  };
   return attachClearanceCitizenshipFields(attachGeoScope(out));
 };
 
@@ -199,7 +205,11 @@ export const extractJobData = async (input: {
   }
 
   const reconciled = reconcileSeniority(extracted);
-  extracted = reconciled.job;
+  extracted = {
+    ...reconciled.job,
+    company: ensureCompanyName(reconciled.job.company),
+    title: ensureJobTitle(reconciled.job.title),
+  };
 
   return {
     extracted,

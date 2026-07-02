@@ -15,6 +15,7 @@ export type CompanySource =
   | "domain"
   | "follow_company"
   | "about_header"
+  | "recruiter_disclaimer"
   | "llm"
   | "fallback_scoring";
 
@@ -29,6 +30,7 @@ export const COMPANY_SOURCE_RANK: Record<CompanySource, number> = {
   domain: 84,
   follow_company: 83,
   about_header: 80,
+  recruiter_disclaimer: 82,
   llm: 60,
   fallback_scoring: 40,
 };
@@ -254,6 +256,8 @@ export function isLegalEntityCompanyName(line: string): boolean {
 export function isJobTitleLikeLine(line: string): boolean {
   const trimmed = line.trim();
   if (!trimmed) return false;
+  // Employer names like "MNJ SOFTWARE" — not job titles.
+  if (/^[A-Z][A-Za-z0-9&.'-]+\s+Software$/i.test(trimmed)) return false;
   return JOB_TITLE_LIKE_RE.test(trimmed);
 }
 
@@ -452,6 +456,19 @@ export function extractCompanyFromSelfDescriptionLines(lines: string[]): string 
   return null;
 }
 
+export function extractCompanyFromRecruiterDisclaimer(rawJobText: string): string | null {
+  const match = rawJobText.match(
+    /\bno\s+fee\s+(?:the\s+)?([A-Z][A-Za-z0-9&.'\- ]{2,48}?)\s+(?:does\s+not|do\s+not)\s+charge\b/i,
+  );
+  if (!match?.[1]) return null;
+  const company = match[1].trim().replace(/^the\s+/i, "").replace(/[,.;:]+$/, "");
+  if (!company || isCompanyNameStopword(company)) return null;
+  // High-confidence disclaimer wording — accept even when trailing "Software" trips title heuristics.
+  if (isValidCompanyCandidate(company)) return company;
+  if (/^[A-Z][A-Za-z0-9&.'-]+(?:\s+[A-Z][A-Za-z0-9&.'-]+){0,3}$/.test(company)) return company;
+  return null;
+}
+
 export function extractCompanyFromViewMoreJobs(rawJobText: string): string | null {
   const match = rawJobText.match(
     /\bview\s+\d+\s+more\s+jobs?\s+at\s+([A-Z][A-Za-z0-9&.'\- ]{1,48})\b/i,
@@ -628,6 +645,15 @@ export function resolveCompanyFromText(
     });
   }
 
+  const disclaimer = extractCompanyFromRecruiterDisclaimer(rawJobText);
+  if (disclaimer) {
+    candidates.push({
+      value: disclaimer,
+      source: "recruiter_disclaimer",
+      rank: COMPANY_SOURCE_RANK.recruiter_disclaimer,
+    });
+  }
+
   const about = extractCompanyFromAboutHeader(lines);
   if (about) {
     candidates.push({ value: about, source: "about_header", rank: COMPANY_SOURCE_RANK.about_header });
@@ -652,6 +678,17 @@ export function isPlaceholderCompanyName(company: string): boolean {
   const trimmed = company.trim();
   if (!trimmed) return true;
   return /^unknown company$/i.test(trimmed);
+}
+
+/** Never return blank — schema + API responses require a non-empty company string. */
+export function ensureCompanyName(company: string | null | undefined): string {
+  const trimmed = company?.trim();
+  return trimmed || "Unknown Company";
+}
+
+export function ensureJobTitle(title: string | null | undefined): string {
+  const trimmed = title?.trim();
+  return trimmed || "Unknown Title";
 }
 
 export function sanitizeCompanyName(

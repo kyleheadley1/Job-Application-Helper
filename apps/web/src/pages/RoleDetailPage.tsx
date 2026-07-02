@@ -15,6 +15,7 @@ const statuses: JobStatus[] = [
   "assessment",
   "closed",
   "offer",
+  "lapsed",
 ];
 
 export const RoleDetailPage = () => {

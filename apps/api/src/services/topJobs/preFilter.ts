@@ -1,5 +1,5 @@
 import { userProfile } from "../../config/userProfile.js";
-import { classifyClearanceTiming } from "../../lib/clearanceCitizenship.js";
+import { classifyClearanceTiming, isStrictExistingClearanceRequired } from "../../lib/clearanceCitizenship.js";
 import { normalizeText } from "../../lib/text.js";
 import type { DiscoveredListing } from "../../types/topJob.js";
 
@@ -66,6 +66,7 @@ export const preFilterListing = (listing: DiscoveredListing): PreFilterResult =>
     const timing = classifyClearanceTiming(blob);
     if (
       timing === "active_upfront" &&
+      isStrictExistingClearanceRequired(blob) &&
       !(userProfile.holdsActiveClearance ?? false)
     ) {
       return { pass: false, reason: "clearance_required" };

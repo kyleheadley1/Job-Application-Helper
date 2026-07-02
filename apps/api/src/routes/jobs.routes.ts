@@ -88,6 +88,16 @@ jobsRouter.post("/generate-assets", async (req, res, next) => {
   }
 });
 
+jobsRouter.post("/refresh-shortlist", async (_req, res, next) => {
+  try {
+    const result = await jobsService.refreshShortlist();
+    res.setHeader("Cache-Control", "no-store");
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
 jobsRouter.get("/", async (req, res, next) => {
   try {
     const query = JobListQuerySchema.parse(req.query);
@@ -96,6 +106,7 @@ jobsRouter.get("/", async (req, res, next) => {
       items: result.items.map((item) => JobRecordSchema.parse(item)),
       total: result.total,
       totalAll: result.totalAll,
+      shortlistTotal: result.shortlistTotal,
       filtersApplied: query,
     });
   } catch (error) {

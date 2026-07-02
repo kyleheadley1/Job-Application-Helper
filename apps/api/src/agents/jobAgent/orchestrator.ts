@@ -2,8 +2,8 @@ import { randomUUID } from 'crypto';
 import { userProfile } from '../../config/userProfile.js';
 import {
   getTrackerColor,
-  shouldShortlist,
 } from '../../config/scoringPolicy.js';
+import { evaluateShortlist } from '../../lib/shortlist.js';
 import type { JobRecord } from '../../types/job.js';
 import { buildTrackerSpreadsheetFromJob } from '../../tracker/canonicalSpreadsheet.js';
 import { detectReferralPathway } from '../../lib/referralPathway.js';
@@ -205,7 +205,6 @@ export const triageJob = async (input: {
                 ? 'Skip unless special reason'
                 : 'Do not apply — hard gate',
       statusOutcome: finalRecommendation,
-      shortlist: shouldShortlist(scored.score.total, 'to_review'),
       color: getTrackerColor('to_review', scored.score.total),
     },
     status: 'to_review',
@@ -218,6 +217,13 @@ export const triageJob = async (input: {
         recommendation: finalRecommendation,
       },
     ],
+  };
+  const shortlistEval = evaluateShortlist(initialRecord);
+  initialRecord.tracker = {
+    ...initialRecord.tracker,
+    shortlist: shortlistEval.onShortlist,
+    shortlistTag: shortlistEval.tag,
+    freshnessTier: shortlistEval.freshnessLabel,
   };
   logger.info('triage timing', {
     totalMs: Date.now() - t0,

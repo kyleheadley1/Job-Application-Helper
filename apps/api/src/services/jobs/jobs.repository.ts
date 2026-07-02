@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
-import {
-  getTrackerColor,
-  shouldShortlist,
-} from "../../config/scoringPolicy.js";
+import { getTrackerColor } from "../../config/scoringPolicy.js";
+import { recomputeStoredJobScore } from "../../lib/recomputeStoredJobScore.js";
+import { shortlistTrackerFields } from "../../lib/shortlist.js";
 import { getDb } from "../../config/mongo.js";
 import type {
   DebugAssetGeneration,
@@ -10,7 +9,9 @@ import type {
   JobListFilters,
   JobRecord,
   JobStatus,
+  RefreshShortlistResult,
 } from "../../types/job.js";
+import type { ResumeContextSet } from "../../types/resumeContext.js";
 import type { JobExportRow } from "../../tracker/canonicalSpreadsheet.js";
 import { buildJobExportRow } from "../../tracker/canonicalSpreadsheet.js";
 import { normalizeStoredJobScores } from "../../lib/scoringCaps.js";
@@ -31,11 +32,11 @@ export class JobsRepository {
   }
 
   private upsertTrackerFields(prev: JobRecord, nextStatus: JobStatus): JobRecord["tracker"] {
-    const nextShortlist = shouldShortlist(prev.score.total, nextStatus);
+    const asJob: JobRecord = { ...prev, status: nextStatus };
     return {
       ...prev.tracker,
       statusOutcome: nextStatus,
-      shortlist: nextShortlist,
+      ...shortlistTrackerFields(asJob),
       color: getTrackerColor(nextStatus, prev.score.total),
     };
   }
@@ -277,6 +278,92 @@ export class JobsRepository {
     const { items } = await this.list(filters);
     const rows: JobExportRow[] = items.map((job) => buildJobExportRow(job));
     return { rows, total: rows.length };
+  }
+
+  /**
+   * Recompute composite score from stored category scores, then sync shortlist flags.
+   * Does not append scoreHistory — use applyTrackerRescore for audited rescoring.
+   */
+  async syncScoreAndShortlistForJob(
+    job: JobRecord,
+    recomputed: ReturnType<typeof recomputeStoredJobScore>,
+  ): Promise<{ wasShortlist: boolean; nowShortlist: boolean; changed: boolean }> {
+    const col = await this.collection();
+    const wasShortlist = job.tracker.shortlist === true;
+    const merged: JobRecord = {
+      ...job,
+      rules: recomputed.rules,
+      score: recomputed.score,
+      recommendation: recomputed.recommendation,
+      salaryAsk: recomputed.salaryAsk,
+      referralPathwayAvailable: recomputed.referralPathwayAvailable,
+      referralPathwayNotes: recomputed.referralPathwayNotes,
+    };
+    const nextTracker = {
+      ...job.tracker,
+      ...shortlistTrackerFields(merged),
+      color: getTrackerColor(job.status, recomputed.score.total),
+    };
+    const nowShortlist = nextTracker.shortlist === true;
+    const now = new Date().toISOString();
+    await col.updateOne(
+      { _id: job.id },
+      {
+        $set: {
+          rules: recomputed.rules,
+          score: recomputed.score,
+          recommendation: recomputed.recommendation,
+          salaryAsk: recomputed.salaryAsk,
+          ...(recomputed.referralPathwayAvailable !== undefined
+            ? { referralPathwayAvailable: recomputed.referralPathwayAvailable }
+            : {}),
+          ...(recomputed.referralPathwayNotes !== undefined
+            ? { referralPathwayNotes: recomputed.referralPathwayNotes }
+            : {}),
+          tracker: nextTracker,
+          updatedAt: now,
+        },
+      },
+    );
+    const changed =
+      wasShortlist !== nowShortlist ||
+      job.score.total !== recomputed.score.total ||
+      job.tracker.shortlistTag !== nextTracker.shortlistTag ||
+      job.tracker.freshnessTier !== nextTracker.freshnessTier;
+    return { wasShortlist, nowShortlist, changed };
+  }
+
+  async refreshAllShortlists(params: {
+    jobs: JobRecord[];
+    resumeContexts: ResumeContextSet;
+  }): Promise<RefreshShortlistResult> {
+    let updated = 0;
+    let added = 0;
+    let removed = 0;
+    let unchanged = 0;
+
+    for (const job of params.jobs) {
+      const recomputed = recomputeStoredJobScore({
+        job,
+        resumeContexts: params.resumeContexts,
+      });
+      const result = await this.syncScoreAndShortlistForJob(job, recomputed);
+      if (!result.changed) {
+        unchanged++;
+        continue;
+      }
+      updated++;
+      if (!result.wasShortlist && result.nowShortlist) added++;
+      if (result.wasShortlist && !result.nowShortlist) removed++;
+    }
+
+    return {
+      total: params.jobs.length,
+      updated,
+      added,
+      removed,
+      unchanged,
+    };
   }
 
   /** Upsert by content-derived `importKey` (XLSX seed only; not live sync). Preserves `id` / `createdAt` when the key already exists. */

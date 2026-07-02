@@ -23,6 +23,9 @@ export const SURVIVABILITY_TUNING = {
   hardGateScoreFloor: 25,
 } as const;
 
+/** Weighted-average deduction when JD likely requires an existing clearance at hire. */
+export const CLEARANCE_REQUIRES_EXISTING_SURV_PENALTY = 0.17;
+
 /** Additive composite: capability backbone + bounded survivability adjustment − gap dock. */
 export const COMPOSITE_SCORING = {
   /** Survivability at/above this = no penalty; below = steep dock. */
@@ -260,7 +263,7 @@ export const resolveSubFactorPenaltyName = (
   key: SurvivabilitySubFactorKey,
   rules: RuleEvaluation,
 ): string => {
-  if (key === "credentialSignal" && rules.explicitDegreeRisk && !rules.degreeHasEquivalencyClause) {
+  if (key === "credentialSignal" && rules.explicitDegreeRisk && !rules.degreeEquivalencySatisfied) {
     return "degree requirement";
   }
   return SURVIVABILITY_SUB_FACTOR_META[key].label.toLowerCase();

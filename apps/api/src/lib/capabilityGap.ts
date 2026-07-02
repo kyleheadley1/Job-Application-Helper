@@ -6,6 +6,7 @@ import type {
   SpecializationGap,
   SpecializationGapSeverity,
 } from "../types/scoring.js";
+import { analyzeLanguageRequirementStrength } from "./languageRequirementStrength.js";
 import { normalizeText } from "./text.js";
 
 const structuredBlob = (job: ExtractedJobData): string =>
@@ -30,8 +31,11 @@ const requiredBlob = (job: ExtractedJobData): string =>
     ].join("\n"),
   );
 
+const hardRequiredBlob = (job: ExtractedJobData): string =>
+  normalizeText([...(job.requiredSkills ?? []), ...(job.requirements ?? [])].join("\n"));
+
 const preferredBlob = (job: ExtractedJobData): string =>
-  normalizeText([...(job.preferredSkills ?? []), ...(job.preferredSkills ?? [])].join("\n"));
+  normalizeText([...(job.preferredSkills ?? [])].join("\n"));
 
 const DESIGN_JD_SIGNALS =
   /\b(figma|design\s+system|visual\s+design|ui\/ux|ux\s+design|design\s+portfolio|wireframe|prototyp|pixel[-\s]?perfect|interaction\s+design)\b/i;
@@ -204,8 +208,10 @@ export const detectBackendStackSpecializationGap = (
   const jdSide = extractJdBackendLabel(job);
   if (!jdSide) return undefined;
 
-  const required = requiredBlob(job);
-  const inRequired = PYTHON_BACKEND_RE.test(required);
+  const strength = analyzeLanguageRequirementStrength(job, jdSide);
+  if (strength === "soft") return undefined;
+
+  const inRequired = PYTHON_BACKEND_RE.test(hardRequiredBlob(job));
   const inTitle = PYTHON_BACKEND_RE.test(job.title ?? "");
   const inStack = PYTHON_BACKEND_RE.test((job.stack ?? []).join(" "));
   if (!inRequired && !inTitle && !inStack) return undefined;
@@ -215,13 +221,17 @@ export const detectBackendStackSpecializationGap = (
   if (!resumeSide || !NODE_LEAD_RE.test(resume)) return undefined;
 
   const hasPython = PYTHON_BACKEND_RE.test(resume);
-  const severity = resolveSeverity({
+  let severity = resolveSeverity({
     inTitle,
     inRequired,
     inPreferred: PYTHON_BACKEND_RE.test(preferredBlob(job)),
     candidateHasAdjacent: hasPython,
-    signalCount: [inRequired, inTitle, inStack].filter(Boolean).length,
+    signalCount: [inRequired, inTitle, inStack && strength === "hard"].filter(Boolean).length,
   });
+
+  if (strength === "neutral" && inStack && !inRequired && !inTitle) {
+    severity = hasPython ? "minor" : "moderate";
+  }
 
   if (severity === "minor" && hasPython) return undefined;
 
