@@ -1,8 +1,10 @@
 import { normalizeText } from "../lib/text.js";
 import {
-  extractCompanyFromPostedHeader,
+  extractBodyHiringEntityFromJd,
+  extractCompanyFromApplicationsFooter,
   ensureCompanyName,
   isCompanyNameStopword,
+  isJobBoardUiSectionHeader,
   isValidCompanyCandidate,
   resolveCompanyFromText,
 } from "./companyCandidateRules.js";
@@ -60,6 +62,7 @@ function cleanEmployerCandidate(raw: string): string | null {
   let t = raw.trim().replace(/\s+/g, " ");
   t = t.replace(/[,.;:]+$/, "").trim();
   if (!t || t.length < 2 || t.length > 48) return null;
+  if (isJobBoardUiSectionHeader(t)) return null;
   if (VAGUE_EMPLOYER_RE.test(t)) return null;
   if (/^(the|a|an|our|their|this|that)\b/i.test(t)) return null;
   if (isCompanyNameStopword(t)) return null;
@@ -71,6 +74,41 @@ function cleanEmployerCandidate(raw: string): string | null {
 
 export function looksLikeAgencyCompanyName(name: string): boolean {
   return AGENCY_NAME_RE.test(name.trim());
+}
+
+function sanitizeListingCompanyName(
+  name: string | null | undefined,
+  notes: string[],
+): string | null {
+  const trimmed = name?.trim();
+  if (!trimmed) return null;
+  if (isJobBoardUiSectionHeader(trimmed)) {
+    notes.push(`Rejected job-board UI section header "${trimmed}".`);
+    return null;
+  }
+  if (isCompanyNameStopword(trimmed)) {
+    notes.push(`Rejected sentence-starter false positive "${trimmed}".`);
+    return null;
+  }
+  if (!isValidCompanyCandidate(trimmed)) {
+    notes.push(`Rejected prose-like listing company "${trimmed}".`);
+    return null;
+  }
+  return trimmed;
+}
+
+function resolveCardCompanyName(
+  params: { companyHint?: string; rawText: string },
+  notes: string[],
+): string | null {
+  return (
+    sanitizeListingCompanyName(params.companyHint, notes) ??
+    sanitizeListingCompanyName(extractCompanyFromApplicationsFooter(params.rawText), notes)
+  );
+}
+
+function companiesDiffer(a: string, b: string): boolean {
+  return normalizeText(a) !== normalizeText(b);
 }
 
 export function extractExplicitEmployerFromJd(
@@ -107,45 +145,74 @@ export function resolveCompanyPresentation(params: {
   companyHint?: string;
 }): CompanyPresentation {
   const notes: string[] = [];
-  let listing =
-    params.listingCompanyName?.trim() ||
-    params.companyHint?.trim() ||
-    null;
-  if (listing && (isCompanyNameStopword(listing) || !isValidCompanyCandidate(listing))) {
-    notes.push(
-      isCompanyNameStopword(listing)
-        ? `Rejected sentence-starter false positive "${listing}".`
-        : `Rejected prose-like listing company "${listing}".`,
-    );
-    listing = null;
-  }
   const rawText = params.rawText ?? "";
+  const bodyHiringEntity = rawText.trim() ? extractBodyHiringEntityFromJd(rawText) : null;
+  const cardCompany = rawText.trim()
+    ? resolveCardCompanyName({ companyHint: params.companyHint, rawText }, notes)
+    : sanitizeListingCompanyName(params.companyHint, notes);
+
+  let listing = sanitizeListingCompanyName(params.listingCompanyName, notes);
 
   if (!listing && rawText.trim()) {
     listing =
-      resolveCompanyFromText(rawText, { companyHint: params.companyHint }) ??
-      (params.companyHint?.trim() &&
-      isValidCompanyCandidate(params.companyHint) &&
-      !isCompanyNameStopword(params.companyHint)
-        ? params.companyHint.trim()
-        : null);
+      sanitizeListingCompanyName(
+        resolveCompanyFromText(rawText, { companyHint: params.companyHint }),
+        notes,
+      ) ??
+      sanitizeListingCompanyName(params.companyHint, notes);
   }
 
-  if (listing && isCompanyNameStopword(listing)) {
-    notes.push(`Rejected sentence-starter false positive "${listing}".`);
-    listing = null;
+  if (bodyHiringEntity && cardCompany && companiesDiffer(cardCompany, bodyHiringEntity)) {
+    return {
+      listingCompanyName: cardCompany,
+      employerCompanyName: bodyHiringEntity,
+      agencyCompanyName: null,
+      companyDisplayName: bodyHiringEntity,
+      companyConfidence: "low",
+      companyExtractionNotes: [
+        ...notes,
+        `company conflict: card says ${cardCompany}, body says ${bodyHiringEntity} — verify`,
+      ],
+    };
   }
 
   if (!listing && !rawText.trim()) {
     return {
-      listingCompanyName: null,
-      employerCompanyName: null,
+      listingCompanyName: cardCompany,
+      employerCompanyName: bodyHiringEntity,
       agencyCompanyName: null,
-      companyDisplayName: "Unknown Company",
-      companyConfidence: "direct_or_unclear",
+      companyDisplayName: bodyHiringEntity ?? cardCompany ?? "Unknown Company",
+      companyConfidence: bodyHiringEntity || cardCompany ? "low" : "direct_or_unclear",
       companyExtractionNotes: ["No listing company or JD text available."],
     };
   }
+
+  if (bodyHiringEntity && !cardCompany && listing && companiesDiffer(listing, bodyHiringEntity)) {
+    return {
+      listingCompanyName: listing,
+      employerCompanyName: bodyHiringEntity,
+      agencyCompanyName: null,
+      companyDisplayName: bodyHiringEntity,
+      companyConfidence: "low",
+      companyExtractionNotes: [
+        ...notes,
+        `company conflict: card says ${listing}, body says ${bodyHiringEntity} — verify`,
+      ],
+    };
+  }
+
+  if (bodyHiringEntity && !listing && !cardCompany) {
+    return {
+      listingCompanyName: null,
+      employerCompanyName: bodyHiringEntity,
+      agencyCompanyName: null,
+      companyDisplayName: bodyHiringEntity,
+      companyConfidence: "direct_or_unclear",
+      companyExtractionNotes: notes,
+    };
+  }
+
+  listing = listing ?? cardCompany;
 
   const { employer, note: employerNote } = extractExplicitEmployerFromJd(rawText, listing);
   if (employerNote) notes.push(employerNote);
@@ -206,12 +273,26 @@ export function resolveCompanyPresentation(params: {
     if (nameLooksAgency && selfEmployer) {
       notes.push("Agency-like listing name, but JD describes the listing company as the direct employer.");
     }
+    const displayName = bodyHiringEntity ?? listing;
+    const employerName =
+      bodyHiringEntity && companiesDiffer(listing, bodyHiringEntity) ? bodyHiringEntity : null;
     return {
       listingCompanyName: listing,
-      employerCompanyName: null,
+      employerCompanyName: employerName,
       agencyCompanyName: null,
-      companyDisplayName: listing,
+      companyDisplayName: displayName,
       companyConfidence: "direct_or_unclear",
+      companyExtractionNotes: notes,
+    };
+  }
+
+  if (bodyHiringEntity) {
+    return {
+      listingCompanyName: cardCompany,
+      employerCompanyName: bodyHiringEntity,
+      agencyCompanyName: null,
+      companyDisplayName: bodyHiringEntity,
+      companyConfidence: cardCompany ? "low" : "direct_or_unclear",
       companyExtractionNotes: notes,
     };
   }
@@ -248,10 +329,16 @@ export function applyCompanyPresentation<T extends {
       `Rejected sentence-starter false positive "${extracted.company.trim()}".`,
     );
   }
+  if (extracted.company?.trim() && isJobBoardUiSectionHeader(extracted.company)) {
+    rejectedCompanyNotes.push(
+      `Rejected job-board UI section header "${extracted.company.trim()}".`,
+    );
+  }
   const sanitizedCompany =
     extracted.company &&
     isValidCompanyCandidate(extracted.company) &&
-    !isCompanyNameStopword(extracted.company)
+    !isCompanyNameStopword(extracted.company) &&
+    !isJobBoardUiSectionHeader(extracted.company)
       ? extracted.company
       : undefined;
   const resolvedListing =

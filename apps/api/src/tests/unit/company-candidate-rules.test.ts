@@ -44,6 +44,16 @@ describe("companyCandidateRules", () => {
     expect(extractCompanyFromSelfDescription(text)).toBe("Battelle");
   });
 
+  it("extracts reinventing hiring-entity intros", () => {
+    const text = "Picnic is reinventing lunch at work.";
+    expect(extractCompanyFromSelfDescription(text)).toBe("Picnic");
+  });
+
+  it("rejects job-board UI section headers", () => {
+    expect(isValidCompanyCandidate("Why This Job")).toBe(false);
+    expect(isValidCompanyCandidate("Overview")).toBe(false);
+  });
+
   it("rejects self-description sentence starters", () => {
     expect(extractCompanyFromSelfDescription("This is a key role on our platform team.")).toBeNull();
     expect(isValidCompanyCandidate("This")).toBe(false);
