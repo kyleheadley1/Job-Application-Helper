@@ -15,7 +15,8 @@ export type JobStatus =
   | 'interviewing'
   | 'assessment'
   | 'closed'
-  | 'offer';
+  | 'offer'
+  | 'lapsed';
 
 export type ClearanceTiming = 'active_upfront' | 'sponsorable' | 'unspecified';
 
@@ -71,8 +72,8 @@ export type ExtractedJobData = {
   citizenshipRequirement?: string;
   clearanceRequirement?: ClearanceRequirement | string;
   relocationRequired?: boolean;
-  responsibilities: string[];
-  requirements: string[];
+  /** ISO date when the role was posted (from JD chrome or import). */
+  postedAt?: string;
   /** Visible company from job board / source listing. */
   listingCompanyName?: string;
   /** Named end employer when explicitly disclosed in the JD. */
@@ -157,6 +158,12 @@ export type JobRecord = {
     statusOutcome?: string;
     color?: 'green' | 'yellow' | 'red' | 'blue';
     shortlist?: boolean;
+    /** Display tag for shortlist subset (e.g. crowded pool lottery ticket). */
+    shortlistTag?: string;
+    /** Freshness badge label for shortlist ordering. */
+    freshnessTier?: string;
+    /** Best-effort posting date override for freshness rules. */
+    postedAt?: string;
     notes?: string;
   };
   /** Spreadsheet-shaped cells (camelCase); export maps to exact column labels. */
@@ -191,5 +198,13 @@ export type JobListFilters = {
   recommendation?: Recommendation;
   minScore?: number;
   company?: string;
+};
+
+export type RefreshShortlistResult = {
+  total: number;
+  updated: number;
+  added: number;
+  removed: number;
+  unchanged: number;
 };
 

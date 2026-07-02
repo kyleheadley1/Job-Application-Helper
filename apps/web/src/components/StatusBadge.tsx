@@ -9,6 +9,7 @@ const toneByStatus: Record<JobStatus, string> = {
   assessment: "info",
   closed: "bad",
   offer: "good",
+  lapsed: "bad",
 };
 
 export const StatusBadge = ({ status }: { status: JobStatus }) => (

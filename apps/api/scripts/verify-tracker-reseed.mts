@@ -8,7 +8,7 @@ import path from 'node:path';
 import { repoRootDir } from '../src/config/env.js';
 import * as fs from 'node:fs';
 import { closeDb, getDb } from '../src/config/mongo.js';
-import { shouldShortlist } from '../src/config/scoringPolicy.js';
+import { shouldShortlist } from "../src/lib/shortlist.js";
 import { jobsRepository } from '../src/services/jobs/jobs.repository.js';
 import {
   TRACKER_EXPORT_HEADERS,
@@ -54,7 +54,7 @@ function assertExportShape(row: Record<string, string>): string[] {
 function sampleSummary(job: JobRecord, idx: number): string {
   const ts = job.trackerSpreadsheet ?? {};
   const shortlistOk =
-    job.tracker.shortlist === shouldShortlist(job.score.total, job.status);
+    job.tracker.shortlist === shouldShortlist(job);
   return [
     `--- sample #${idx + 1} id=${job.id.slice(0, 8)}… ---`,
     `  company: ${job.extracted.company}`,
@@ -148,12 +148,12 @@ async function main() {
 
   console.log('\n--- shortlist (derived) ---');
   const badShortlist = items.filter(
-    (j) => j.tracker.shortlist !== shouldShortlist(j.score.total, j.status),
+    (j) => j.tracker.shortlist !== shouldShortlist(j),
   );
   if (badShortlist.length) {
     console.log(`FAIL: ${badShortlist.length} job(s) shortlist !== derived policy`);
   } else {
-    console.log(`All ${items.length} job(s) match shouldShortlist(score, status).`);
+    console.log(`All ${items.length} job(s) match shouldShortlist(job).`);
   }
 
   console.log('\n--- export parity ---');

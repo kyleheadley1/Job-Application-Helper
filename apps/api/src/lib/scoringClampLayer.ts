@@ -142,7 +142,7 @@ export const buildHardRuleFlags = (
     });
   }
 
-  if (rules.explicitDegreeRisk && rules.matureStructuredEmployer) {
+  if (rules.explicitDegreeRisk && rules.matureStructuredEmployer && !rules.degreeEquivalencySatisfied) {
     push({
       id: "degreeGateStructuredEmployer",
       message:
@@ -150,6 +150,7 @@ export const buildHardRuleFlags = (
     });
   } else if (
     rules.degreeHasEquivalencyClause &&
+    !rules.degreeEquivalencySatisfied &&
     (job.degreeRequirement?.level === "required" ||
       Boolean(job.degreeRequirement?.raw?.trim()) ||
       RAW_DEGREE.test(job.rawText ?? ""))

@@ -19,6 +19,7 @@ export const resolveDegreeGapTier = (
   profile: UserProfile,
 ): DegreeGapTier => {
   if (profile.degreeStatus.hasBachelors) return "none";
+  if (rules.degreeEquivalencySatisfied) return "none";
 
   if (rules.degreeHasEquivalencyClause && !rules.explicitDegreeRisk) {
     return "soft";

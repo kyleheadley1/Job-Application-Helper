@@ -1,4 +1,5 @@
 import {
+  CLEARANCE_REQUIRES_EXISTING_SURV_PENALTY,
   SURVIVABILITY_TUNING,
   SURVIVABILITY_WEIGHTS,
   type SurvivabilitySubFactorKey,
@@ -7,6 +8,7 @@ import type { ExtractedJobData } from "../types/job.js";
 import type { RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
 import type { UserProfile } from "../types/userProfile.js";
 import { applyCertificationBoost, type CertificationBoostMeta } from "./certificationBoost.js";
+import { profileHasAssociateDegree, profileHasBootcampCert } from "./degreeEquivalency.js";
 import { computePoolFriendliness, type PoolFriendlinessMeta } from "./poolFriendliness.js";
 import { normalizeText } from "./text.js";
 
@@ -89,7 +91,14 @@ export const scoreCredentialSignal = (profile: UserProfile, rules: RuleEvaluatio
   const densePool =
     Boolean(rules.productionBarCompetitivePool) ||
     Boolean(rules.matureStructuredEmployer && !rules.degreeHasEquivalencyClause) ||
-    rules.explicitDegreeRisk;
+    (rules.explicitDegreeRisk && !rules.degreeEquivalencySatisfied);
+  if (rules.degreeEquivalencySatisfied) {
+    if (profileHasCsDegree(profile)) return 0.95;
+    if (profileHasAssociateDegree(profile) || profileHasBootcampCert(profile)) {
+      return densePool ? 0.68 : 0.78;
+    }
+    return densePool ? 0.62 : 0.72;
+  }
   if (profileHasCsDegree(profile)) return 0.95;
   if (profile.degreeStatus.hasBachelors && !densePool) return 0.72;
   if (rules.degreeHasEquivalencyClause) {
@@ -194,6 +203,10 @@ export const computeSurvivability = (params: {
     [SurvivabilitySubFactorKey, number]
   >) {
     weightedAverage += subFactors[key] * weight;
+  }
+
+  if (params.rules.clearanceRequiresExistingPenalty) {
+    weightedAverage -= CLEARANCE_REQUIRES_EXISTING_SURV_PENALTY;
   }
 
   const multiplier = Math.min(

@@ -107,6 +107,36 @@ describe("tracker routes", () => {
     const byShortlist = await request(app).get("/api/jobs").query({ shortlist: true });
     expect(byShortlist.status).toBe(200);
     expect(byShortlist.body.items.every((i: { tracker: { shortlist?: boolean } }) => i.tracker.shortlist)).toBe(true);
+    expect(typeof byShortlist.body.shortlistTotal).toBe("number");
+  });
+
+  it("POST /refresh-shortlist removes legacy shortlist flags when score no longer qualifies", async () => {
+    const { fixtureToJobRecord, loadCalibrationFixture } = await import(
+      "../fixtures/calibrationAnchors.js"
+    );
+    const legacy = fixtureToJobRecord(loadCalibrationFixture("roAiEngineer"));
+    legacy.id = "legacy-shortlist-test";
+    legacy.status = "to_review";
+    legacy.tracker = { ...legacy.tracker, shortlist: true };
+    legacy.score = {
+      ...legacy.score,
+      total: 25,
+      scoreDisplay: {
+        final: 25,
+        hardGates: ["Role seniority/staff bar exceeds early-career profile."],
+      },
+    };
+    await jobsRepository.saveTriage(legacy);
+
+    const refreshed = await request(app).post("/api/jobs/refresh-shortlist");
+    expect(refreshed.status).toBe(200);
+    expect(refreshed.body.removed).toBeGreaterThanOrEqual(1);
+
+    const got = await jobsRepository.getById(legacy.id);
+    expect(got!.tracker.shortlist).toBe(false);
+
+    const byShortlist = await request(app).get("/api/jobs").query({ shortlist: true });
+    expect(byShortlist.body.items.some((i: { id: string }) => i.id === legacy.id)).toBe(false);
   });
 
   it("GET /api/jobs/export returns canonical 15-column tracker shape", async () => {

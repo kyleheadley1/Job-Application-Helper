@@ -15,6 +15,8 @@ type Props = {
   onToDateChange: (value: string) => void;
   shortlistOnly: boolean;
   onShortlistChange: (value: boolean) => void;
+  onRefreshShortlist?: () => void;
+  refreshShortlistBusy?: boolean;
 };
 
 export const FilterBar = ({
@@ -34,6 +36,8 @@ export const FilterBar = ({
   onToDateChange,
   shortlistOnly,
   onShortlistChange,
+  onRefreshShortlist,
+  refreshShortlistBusy = false,
 }: Props) => (
   <div className="tracker-filter-grid">
     <label>
@@ -48,6 +52,7 @@ export const FilterBar = ({
         <option value="assessment">assessment</option>
         <option value="closed">closed</option>
         <option value="offer">offer</option>
+        <option value="lapsed">lapsed</option>
       </select>
     </label>
     <label>
@@ -109,9 +114,22 @@ export const FilterBar = ({
         Clear
       </button>
     </label>
-    <label className="checkboxRow tracker-filter-shortlist">
-      <input type="checkbox" checked={shortlistOnly} onChange={(e) => onShortlistChange(e.target.checked)} />
-      Shortlisted only
-    </label>
+    <div className="tracker-filter-shortlist-row">
+      <label className="checkboxRow tracker-filter-shortlist">
+        <input type="checkbox" checked={shortlistOnly} onChange={(e) => onShortlistChange(e.target.checked)} />
+        Shortlist only (high fit + winnable + fresh)
+      </label>
+      {onRefreshShortlist ? (
+        <button
+          type="button"
+          className="btn-secondary tracker-refresh-shortlist"
+          disabled={refreshShortlistBusy}
+          onClick={onRefreshShortlist}
+          title="Recompute scores and sync shortlist flags for all tracker jobs"
+        >
+          {refreshShortlistBusy ? "Refreshing…" : "Refresh shortlist"}
+        </button>
+      ) : null}
+    </div>
   </div>
 );

@@ -1,5 +1,6 @@
 import {
   CAPABILITY_MAXES,
+  CLEARANCE_REQUIRES_EXISTING_SURV_PENALTY,
   LEGACY_CAPABILITY_SOURCE_MAXES,
   resolveSubFactorBindingness,
   resolveSubFactorPenaltyName,
@@ -160,6 +161,21 @@ export const buildSurvivabilityRows = (
       };
     },
   );
+
+  if (rules.clearanceRequiresExistingPenalty) {
+    rows.push({
+      key: "clearanceRequiresExisting",
+      label: "Security clearance",
+      score: 0,
+      weight: 0,
+      contribution: -CLEARANCE_REQUIRES_EXISTING_SURV_PENALTY,
+      lever: "none",
+      leverLabel: STRUCTURAL_LEVER_LABEL,
+      bindingness: "structural",
+      penaltyName: "existing clearance requirement",
+    });
+  }
+
   return rows.sort((a, b) => a.score - b.score);
 };
 
@@ -261,6 +277,17 @@ export const buildSurvivabilityPenalties = (
       leverLabel: specializationPenaltyLeverLabel(lever),
     });
     seen.add("specializationGap");
+  }
+
+  if (rules.clearanceRequiresExistingPenalty) {
+    penalties.push({
+      message:
+        rules.clearanceEligibilityFlag?.reason ??
+        "Likely requires existing clearance — verify before applying.",
+      lever: "none",
+      leverLabel: STRUCTURAL_LEVER_LABEL,
+    });
+    seen.add("clearanceRequiresExisting");
   }
 
   for (const flag of rules.hardRuleFlags ?? []) {
@@ -396,6 +423,9 @@ export const buildScoreDisplay = (params: {
     >) {
       const subScore = key === "poolFriendliness" ? poolMeta.score : breakdownRaw[key];
       weightedAverage += subScore * weight;
+    }
+    if (params.rules.clearanceRequiresExistingPenalty) {
+      weightedAverage -= CLEARANCE_REQUIRES_EXISTING_SURV_PENALTY;
     }
     breakdown = {
       ...breakdownRaw,

@@ -185,6 +185,7 @@ const STATUS_KEYWORDS: Array<{ re: RegExp; status: JobStatus }> = [
   { re: /\binterview/i, status: 'interviewing' },
   { re: /\bassessment\b|oa\b|take[-\s]?home/i, status: 'assessment' },
   { re: /\bclosed\b|filled\b|cancelled\b|canceled\b/i, status: 'closed' },
+  { re: /\blapsed\b|ghosted\b|no response\b/i, status: 'lapsed' },
   { re: /\boffer\b/i, status: 'offer' },
 ];
 
@@ -200,6 +201,7 @@ export function mapSpreadsheetStatusToJobStatus(text: string): JobStatus {
     'assessment',
     'closed',
     'offer',
+    'lapsed',
   ] as const;
   if ((direct as readonly string[]).includes(t)) return t as JobStatus;
   for (const { re, status } of STATUS_KEYWORDS) {

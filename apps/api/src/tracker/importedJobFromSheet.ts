@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { evaluateRules } from '../agents/jobAgent/rules.js';
 import { withSanitizedRuleNotes } from '../lib/riskDisplaySanitizer.js';
-import { getTrackerColor, shouldShortlist } from '../config/scoringPolicy.js';
+import { getTrackerColor } from '../config/scoringPolicy.js';
+import { evaluateShortlist } from '../lib/shortlist.js';
 import { userProfile } from '../config/userProfile.js';
 import type { ExtractedJobData, JobRecord, JobStatus } from '../types/job.js';
 import type { JobImportSource, TrackerSpreadsheetFields } from '../types/trackerSpreadsheet.js';
@@ -138,7 +139,6 @@ export function jobRecordFromImportedSheetRow(input: {
       priority,
       recommendedAction,
       statusOutcome: status,
-      shortlist: shouldShortlist(score.total, status),
       color: getTrackerColor(status, score.total),
       notes: notesFromSheet === '' ? undefined : notesFromSheet,
     },
@@ -149,6 +149,13 @@ export function jobRecordFromImportedSheetRow(input: {
     createdAt: createdAt ?? now,
     updatedAt: now,
     scoreHistory: [{ scoredAt: now, score, recommendation }],
+  };
+  const shortlistEval = evaluateShortlist(job);
+  job.tracker = {
+    ...job.tracker,
+    shortlist: shortlistEval.onShortlist,
+    shortlistTag: shortlistEval.tag,
+    freshnessTier: shortlistEval.freshnessLabel,
   };
   return job;
 }

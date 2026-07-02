@@ -47,7 +47,14 @@ export const api = {
       body: JSON.stringify({}),
     }),
   listJobs: (query = "") =>
-    request<{ items: JobRecord[]; total: number; totalAll?: number }>(`/jobs${query}`),
+    request<{ items: JobRecord[]; total: number; totalAll?: number; shortlistTotal?: number }>(
+      `/jobs${query}`,
+    ),
+  refreshShortlist: () =>
+    request<{ total: number; updated: number; added: number; removed: number; unchanged: number }>(
+      "/jobs/refresh-shortlist",
+      { method: "POST", cache: "no-store" },
+    ),
   getJob: (id: string) =>
     request<JobRecord & { statusHistory?: unknown[]; tracked?: boolean; canConfirmApplied?: boolean }>(
       `/jobs/${id}`,
