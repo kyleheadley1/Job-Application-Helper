@@ -9,7 +9,10 @@ import {
   jdGroundedCoreLanguageGaps,
 } from "./jdLanguageOutputBoundary.js";
 import { normalizeText } from "./text.js";
-import { classifyRoleFunction } from "./roleFunctionClassifier.js";
+import {
+  classifyFrontendPrimaryRole,
+  classifyRoleFunction,
+} from "./roleFunctionClassifier.js";
 import { isContractEmploymentType } from "./contractEmployment.js";
 
 const jobBlob = (job: ExtractedJobData): string =>
@@ -205,6 +208,7 @@ export const applyScoringClampLayer = (params: {
     hardRuleFlags,
     roleShapeOutsideLane: detectRoleShapeOutsideLane(params.extracted),
     adjacentRoleFunction: classifyRoleFunction(params.extracted).detected,
+    frontendPrimaryRole: classifyFrontendPrimaryRole(params.extracted).detected,
   };
 
   let score = { ...params.score };

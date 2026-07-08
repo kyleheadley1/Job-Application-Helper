@@ -99,6 +99,17 @@ export const ADJACENT_ROLE_FUNCTION = {
   DIFFERENTIATOR_TIER_CEILING: "partial" as const,
 } as const;
 
+/**
+ * Frontend-primary product roles — backend/API edge is benched (role consumes APIs, not builds them).
+ * Milder than adjacent-role caps; still blocks "strong" differentiator from API-consumption tokens.
+ */
+export const FRONTEND_PRIMARY_ROLE = {
+  CAP: { stackFit: 26, functionalOverlap: 26 },
+  FLAG: "role-type: frontend-primary — backend/API edge benched",
+  DIFFERENTIATOR_TIER_CEILING: "partial" as const,
+  NOTE: "frontend-only role, backend/API edge benched (you'd consume APIs, not build them)",
+} as const;
+
 /** Listing-shape pool friendliness — tunable weights for survivability sub-factor. */
 export const POOL_FRIENDLINESS = {
   NEUTRAL_BASE: 0.5,
