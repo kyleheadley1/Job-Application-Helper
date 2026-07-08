@@ -33,6 +33,7 @@ export const CALIBRATION_FIXTURES = {
   trabaAppliedAi: "trabaAppliedAi.json",
   ithosWellness: "ithosWellness.json",
   preciselyAssociateSweFrontend: "preciselyAssociateSweFrontend.json",
+  picnicFrontend: "picnicFrontend.json",
 } as const;
 
 export type CalibrationFixtureKey = keyof typeof CALIBRATION_FIXTURES;

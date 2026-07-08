@@ -1,4 +1,4 @@
-import { ADJACENT_ROLE_FUNCTION } from "../config/capabilitySurvivabilityPolicy.js";
+import { ADJACENT_ROLE_FUNCTION, FRONTEND_PRIMARY_ROLE } from "../config/capabilitySurvivabilityPolicy.js";
 import type { ExtractedJobData } from "../types/job.js";
 import type { CapabilityBreakdown } from "../types/scoring.js";
 import {
@@ -6,7 +6,7 @@ import {
   hasBuilderFirstSoftwareContext,
   isFdeBuilderSoftwarePrimaryShape,
 } from "./fdeBuilderRole.js";
-import { normalizeText } from "./text.js";
+import { normalizeMatcherText, normalizeText } from "./text.js";
 
 export type AdjacentRoleFunctionKind =
   | "implementation_analyst"
@@ -22,6 +22,11 @@ export type RoleFunctionClassification = {
   label: string | null;
   note: string;
   sieResumeSignal: boolean;
+};
+
+export type FrontendPrimaryClassification = {
+  detected: boolean;
+  note: string;
 };
 
 const jobBlob = (job: ExtractedJobData): string =>
@@ -84,6 +89,50 @@ const QA_AS_PRODUCT_RE =
 const CORE_SWE_TITLE_RE =
   /\b(software engineer|backend engineer|full[-\s]?stack engineer|platform engineer|product engineer|machine learning engineer|ai engineer)\b/i;
 
+/** Title is frontend / UI-primary (not full-stack / backend). */
+const FRONTEND_TITLE_RE =
+  /\b(front[\s-]?end(?:\s+engineer|\s+developer)?|frontend(?:\s+engineer|\s+developer)?|ui\s+engineer|ui\s+developer)\b/i;
+
+const FULL_STACK_OR_BACKEND_TITLE_RE =
+  /\b(full[\s-]?stack|back[\s-]?end(?:\s+engineer|\s+developer)?|backend(?:\s+engineer|\s+developer)?)\b/i;
+
+const FRONTEND_WORK_PATTERNS: RegExp[] = [
+  /\bbuild(?:ing)?\s+ui\b/i,
+  /\bui\s+components?\b/i,
+  /\btranslate\s+ux\b/i,
+  /\bux\s+designs?\b/i,
+  /\bresponsive\s+design\b/i,
+  /\baccessibility\b/i,
+  /\bcross[\s-]?browser\b/i,
+  /\bdesign\s+systems?\b/i,
+  /\bcomponent\s+library\b/i,
+  /\b(ui|user)\s+interface\b/i,
+  /\bcustomer[\s-]?facing\s+(?:ui|react|components?)\b/i,
+  /\bfrontend\s+(?:product|features?|systems?|engineering|reliability|architecture)\b/i,
+  /\breact\s+(?:components?|applications?|native)\b/i,
+  /\bpolished\s+(?:ux|ui)\b/i,
+];
+
+/** Role owns / builds backend or APIs — blocks frontend-primary when substantial. */
+const BACKEND_BUILDING_PATTERNS: RegExp[] = [
+  /\b(?:build|design|develop|implement|create|own|ship).{0,48}\b(?:apis?|rest\s+apis?|graphql|microservices?|backend\s+services?)\b/i,
+  /\b(?:apis?|rest\s+apis?|graphql|microservices?).{0,48}\b(?:build|design|develop|implement|own|services?)\b/i,
+  /\bback[\s-]?end\s+development\b/i,
+  /\bserver[\s-]?side\b/i,
+  /\bdata\s+models?\b/i,
+  /\bbackend\s+services?\b/i,
+  /\b(?:node\.?js|express).{0,40}\b(?:backend|apis?|services?)\b/i,
+];
+
+/** API/backend mentions framed as consume / integrate from the client — do not block. */
+const API_CONSUMPTION_PATTERNS: RegExp[] = [
+  /\bintegrat(?:e|ing|ion)\s+with\b[^.\n]{0,40}\b(?:backend\s+)?(?:apis?|rest|graphql|services?)\b/i,
+  /\bconsum(?:e|ing)\s+(?:apis?|rest|graphql)\b/i,
+  /\bconnect(?:ing)?\s+(?:the\s+)?frontend\s+to\s+(?:services?|apis?|backends?)\b/i,
+  /\bwork(?:ing)?\s+with\b[^.\n]{0,40}\b(?:apis?|node\.?js\s+services?)\b/i,
+  /\bpartner\s+closely\s+with\s+backend\b/i,
+];
+
 const countPatternHits = (patterns: RegExp[], blob: string): number =>
   patterns.reduce((count, pattern) => {
     pattern.lastIndex = 0;
@@ -107,6 +156,61 @@ export const hasSiePrimaryResumeSignal = (job: ExtractedJobData): boolean => {
   const strongSie = countStrongSieRoleDescriptorHits(blob) >= 2;
   const builderFirst = hasBuilderFirstSoftwareContext(blob) || isFdeBuilderSoftwarePrimaryShape(job);
   return strongSie && !builderFirst;
+};
+
+/**
+ * Frontend-primary product role: title/work dominated by UI; backend/API only consumed.
+ * Distinct from adjacent analyst/QA (wrong lane) and from full-stack (backend edge in play).
+ */
+export const classifyFrontendPrimaryRole = (
+  job: ExtractedJobData,
+): FrontendPrimaryClassification => {
+  const title = normalizeMatcherText(job.title ?? "");
+  const blob = jobBlob(job);
+  const matcherBlob = normalizeMatcherText(blob);
+
+  if (FULL_STACK_OR_BACKEND_TITLE_RE.test(title)) {
+    return { detected: false, note: "" };
+  }
+
+  const titleIsFrontend =
+    FRONTEND_TITLE_RE.test(title) ||
+    /\bsoftware engineer,\s*frontend\b/i.test(job.title ?? "") ||
+    /\bassociate software engineer,\s*frontend\b/i.test(job.title ?? "");
+
+  if (!titleIsFrontend) {
+    return { detected: false, note: "" };
+  }
+
+  const frontendHits = countPatternHits(FRONTEND_WORK_PATTERNS, blob);
+  const backendBuildHits = countPatternHits(BACKEND_BUILDING_PATTERNS, blob);
+  const consumptionHits = countPatternHits(API_CONSUMPTION_PATTERNS, blob);
+
+  // Prefer full-stack when backend building is core, not just consumption phrasing.
+  const backendBuildingDominant =
+    backendBuildHits >= 2 && backendBuildHits > consumptionHits && frontendHits < 2;
+
+  if (backendBuildingDominant) {
+    return { detected: false, note: "" };
+  }
+
+  // Frontend title + (UI work signals OR no strong backend-building) → frontend-primary.
+  if (frontendHits >= 1 || backendBuildHits === 0 || consumptionHits >= 1) {
+    return {
+      detected: true,
+      note: FRONTEND_PRIMARY_ROLE.FLAG,
+    };
+  }
+
+  // Title alone is enough when backend building isn't the dominant shape.
+  if (titleIsFrontend && !/\bfull[\s-]?stack\b/.test(matcherBlob) && backendBuildHits < 2) {
+    return {
+      detected: true,
+      note: FRONTEND_PRIMARY_ROLE.FLAG,
+    };
+  }
+
+  return { detected: false, note: "" };
 };
 
 export const classifyRoleFunction = (job: ExtractedJobData): RoleFunctionClassification => {
@@ -171,6 +275,26 @@ export const applyAdjacentRoleFunctionCap = (
   }
 
   const cap = ADJACENT_ROLE_FUNCTION.CAP;
+  return {
+    breakdown: {
+      ...breakdown,
+      stackFit: Math.min(breakdown.stackFit, cap.stackFit),
+      functionalOverlap: Math.min(breakdown.functionalOverlap, cap.functionalOverlap),
+    },
+    classification,
+  };
+};
+
+export const applyFrontendPrimaryRoleCap = (
+  breakdown: CapabilityBreakdown,
+  job: ExtractedJobData,
+): { breakdown: CapabilityBreakdown; classification: FrontendPrimaryClassification } => {
+  const classification = classifyFrontendPrimaryRole(job);
+  if (!classification.detected) {
+    return { breakdown, classification };
+  }
+
+  const cap = FRONTEND_PRIMARY_ROLE.CAP;
   return {
     breakdown: {
       ...breakdown,

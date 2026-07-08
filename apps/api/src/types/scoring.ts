@@ -275,6 +275,8 @@ export type RuleEvaluation = {
   roleShapeOutsideLane?: boolean;
   /** Analyst / QA / implementation role outside core product-SWE lane. */
   adjacentRoleFunction?: boolean;
+  /** Frontend-primary role: backend/API differentiator benched (consume, don't build). */
+  frontendPrimaryRole?: boolean;
   /** JD explicitly welcomes portfolio / experience over formal degree credentials. */
   jdDegreePositive?: boolean;
   /** JD accepts any of a listed language set; candidate matches ≥1 — no core-language gate. */
