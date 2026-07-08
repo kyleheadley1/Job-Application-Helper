@@ -1,0 +1,40 @@
+{
+  "id": "precisely-associate-swe-frontend-calibration",
+  "anchorNote": "Precisely Associate SWE Frontend — bachelor's listed with explicit equivalent-work-experience clause",
+  "extracted": {
+    "company": "Precisely",
+    "companyDisplayName": "Precisely",
+    "title": "Associate Software Engineer, Frontend",
+    "location": "Remote",
+    "remoteType": "remote",
+    "seniority": "Associate",
+    "stack": ["React", "TypeScript", "JavaScript", "Node.js", "CSS", "HTML"],
+    "requiredSkills": ["React", "TypeScript", "JavaScript", "frontend"],
+    "preferredSkills": ["Node.js", "CSS", "HTML", "web accessibility"],
+    "domainTags": ["data integrity", "enterprise software"],
+    "degreeRequirement": {
+      "level": "required",
+      "raw": "Bachelor's degree in computer science or related field (Equivalent work experience will be accepted in place of the education requirement)."
+    },
+    "requirements": [
+      "Bachelor's degree in computer science or related field (Equivalent work experience will be accepted in place of the education requirement).",
+      "Strong React and TypeScript fundamentals",
+      "Comfort working with Node.js services",
+      "Comfort building and shipping frontend product features"
+    ],
+    "responsibilities": [
+      "Build and maintain frontend product experiences in React/TypeScript",
+      "Collaborate with product and design on associate-level feature delivery"
+    ],
+    "rawText": "Precisely — Associate Software Engineer, Frontend\nRemote\nAssociate\nRequired: Bachelor's degree in computer science or related field (Equivalent work experience will be accepted in place of the education requirement).\nBuild React/TypeScript frontend product features with Node.js services."
+  },
+  "storedCategoryScores": {
+    "stackFit": 16,
+    "levelFit": 15,
+    "domainFit": 7,
+    "resumeStoryClarity": 9,
+    "functionalOverlap": 13,
+    "recruiterFriendliness": 11,
+    "careerValue": 8
+  }
+}

@@ -43,6 +43,8 @@ export const COMPOSITE_SCORING = {
   APPLY_LOW: 58,
   /** Final ≥ this → worth tailoring (Yes vs If quick within apply band). */
   TAILOR_CAPABILITY: 70,
+  /** Mild final dock for contract roles (stability / career-value). */
+  CONTRACT_FINAL_DOCK: 1,
 } as const;
 
 /** Differentiator coverage caps — applied to stackFit + functionalOverlap after normal scoring. */
@@ -87,6 +89,14 @@ export const DIFFERENTIATOR_COVERAGE = {
   PARTIAL_CAP: { stackFit: 28, functionalOverlap: 28 },
   /** Minimum tag count for full capability credit (no cap). */
   STRONG_MIN_TAGS: 3,
+} as const;
+
+/** Adjacent analyst / implementation / QA roles — outside core product-SWE lane. */
+export const ADJACENT_ROLE_FUNCTION = {
+  CAP: { stackFit: 24, functionalOverlap: 20 },
+  FLAG: "role-type: implementation/analyst — outside core SWE lane, capability capped",
+  /** Never grant strong differentiator tier on adjacent roles. */
+  DIFFERENTIATOR_TIER_CEILING: "partial" as const,
 } as const;
 
 /** Listing-shape pool friendliness — tunable weights for survivability sub-factor. */

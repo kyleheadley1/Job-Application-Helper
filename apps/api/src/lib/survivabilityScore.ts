@@ -8,7 +8,12 @@ import type { ExtractedJobData } from "../types/job.js";
 import type { RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
 import type { UserProfile } from "../types/userProfile.js";
 import { applyCertificationBoost, type CertificationBoostMeta } from "./certificationBoost.js";
-import { profileHasAssociateDegree, profileHasBootcampCert } from "./degreeEquivalency.js";
+import {
+  isHardStructuredDegreeGate,
+  profileHasAssociateDegree,
+  profileHasBootcampCert,
+  profileHasPortfolio,
+} from "./degreeEquivalency.js";
 import { computePoolFriendliness, type PoolFriendlinessMeta } from "./poolFriendliness.js";
 import { normalizeText } from "./text.js";
 
@@ -87,11 +92,36 @@ export const scoreEmployerRecognizability = (resumeText: string): number => {
   return 0.32;
 };
 
-export const scoreCredentialSignal = (profile: UserProfile, rules: RuleEvaluation): number => {
+export const scoreCredentialSignal = (
+  profile: UserProfile,
+  rules: RuleEvaluation,
+  params?: { extracted?: ExtractedJobData; resumeText?: string },
+): number => {
   const densePool =
     Boolean(rules.productionBarCompetitivePool) ||
     Boolean(rules.matureStructuredEmployer && !rules.degreeHasEquivalencyClause) ||
     (rules.explicitDegreeRisk && !rules.degreeEquivalencySatisfied);
+
+  const associateBaseline = (pool: boolean): number => (pool ? 0.38 : 0.52);
+  const bootcampBaseline = (pool: boolean): number => (pool ? 0.4 : 0.58);
+
+  if (
+    params?.extracted &&
+    rules.jdDegreePositive &&
+    profileHasPortfolio(profile, params.resumeText) &&
+    !isHardStructuredDegreeGate(rules)
+  ) {
+    let baseline = densePool ? 0.32 : 0.5;
+    if (profileHasAssociateDegree(profile)) baseline = associateBaseline(densePool);
+    else if (
+      profile.training?.program &&
+      /\b(bootcamp|codesmith|residency|fellowship)\b/i.test(profile.training.program)
+    ) {
+      baseline = bootcampBaseline(densePool);
+    }
+    return Math.min(0.75, baseline + 0.15);
+  }
+
   if (rules.degreeEquivalencySatisfied) {
     if (profileHasCsDegree(profile)) return 0.95;
     if (profileHasAssociateDegree(profile) || profileHasBootcampCert(profile)) {
@@ -175,7 +205,10 @@ export const computeSurvivability = (params: {
 }): SurvivabilityBreakdown => {
   const resumeText = params.resumeText ?? "";
 
-  const baseCredentialSignal = scoreCredentialSignal(params.profile, params.rules);
+  const baseCredentialSignal = scoreCredentialSignal(params.profile, params.rules, {
+    extracted: params.extracted,
+    resumeText,
+  });
   const credentialBoost = applyCertificationBoost(
     baseCredentialSignal,
     params.profile,
@@ -207,6 +240,14 @@ export const computeSurvivability = (params: {
 
   if (params.rules.clearanceRequiresExistingPenalty) {
     weightedAverage -= CLEARANCE_REQUIRES_EXISTING_SURV_PENALTY;
+  }
+
+  if (
+    params.rules.jdDegreePositive &&
+    profileHasPortfolio(params.profile, resumeText) &&
+    !isHardStructuredDegreeGate(params.rules)
+  ) {
+    weightedAverage = Math.min(1, weightedAverage + 0.03);
   }
 
   const multiplier = Math.min(

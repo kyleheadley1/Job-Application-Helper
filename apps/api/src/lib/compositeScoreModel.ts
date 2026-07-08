@@ -21,6 +21,7 @@ import {
   resolveBandHeadline,
   resolveScoreBand,
 } from "./compositeScoring.js";
+import { contractFinalDock } from "./contractEmployment.js";
 import { evaluateHardGates } from "./hardGates.js";
 import {
   buildFullCapabilityBreakdown,
@@ -165,7 +166,7 @@ export const computeCompositeScore = (params: {
     };
   }
 
-  const { breakdown: capabilityBreakdown, differentiatorCoverage } =
+  const { breakdown: capabilityBreakdown, differentiatorCoverage, roleFunctionCapNote } =
     buildFullCapabilityBreakdown(clamped, params.rules, params.extracted);
   const capability = Math.min(
     100,
@@ -181,10 +182,12 @@ export const computeCompositeScore = (params: {
     resumeText: params.resumeText,
   });
   const gapDock = computeGapDock(params.rules, params.profile);
+  const contractDock = contractFinalDock(params.extracted);
   const composite = computeFinalComposite({
     capability,
     survivability: survivabilityResult.multiplier,
     gapDock,
+    contractDock,
   });
   const scoreBand = resolveScoreBand(composite.final);
   const worthTailoring = computeWorthTailoring(composite.final, scoreBand);
@@ -205,6 +208,7 @@ export const computeCompositeScore = (params: {
       capability,
       capabilityBreakdown,
       differentiatorCoverageNote: differentiatorCoverage.note,
+      roleFunctionCapNote,
       survivability: survivabilityResult.multiplier,
       survivabilityBreakdown: toPersistedSurvivabilityBreakdown(survivabilityResult),
       certificationBoost: survivabilityResult.certificationBoost,

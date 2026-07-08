@@ -4,7 +4,7 @@ import type { RuleEvaluation } from '../../types/scoring.js';
 import type { UserProfile } from '../../types/userProfile.js';
 import type { ResumeContextSet } from '../../types/resumeContext.js';
 import type { ResumeType } from '../../types/resume.js';
-import { normalizeText } from '../../lib/text.js';
+import { normalizeMatcherText, normalizeText } from '../../lib/text.js';
 import { claimableStackFromContexts } from '../../lib/claimableStack.js';
 import { analyzeStackMismatch } from '../../lib/stackMismatchAnalysis.js';
 import {
@@ -35,6 +35,7 @@ import {
 } from '../../lib/poolCompetitiveness.js';
 import {
   jdHasDegreeEquivalencyClause,
+  jdIsDegreePositive,
   resolveDegreeEquivalencyRules,
 } from '../../lib/degreeEquivalency.js';
 
@@ -130,6 +131,10 @@ export const evaluateRules = (
   const combinedText = normalizeText(
     [companyNorm, structuredParts, raw].filter(Boolean).join(' '),
   );
+  const matcherText = normalizeMatcherText(
+    [companyNorm, structuredParts, raw].filter(Boolean).join(' '),
+  );
+  const jdDegreePositive = jdIsDegreePositive(job);
 
   const isFinance = detectStrictFinanceEmployerContext(combinedText, companyNorm);
   const traditionalSignal = detectTraditionalEmployerContextStrict(combinedText, companyNorm);
@@ -199,7 +204,7 @@ export const evaluateRules = (
     (harshEmployerContext || explicitDegreeRisk);
 
   const earlyCareerShape =
-    includesAny(combinedText, [
+    includesAny(matcherText, [
       'early career',
       'entry level',
       'entry-level',
@@ -208,8 +213,12 @@ export const evaluateRules = (
       'swe i',
       'associate engineer',
       'associate software',
+      'students welcome',
+      'freelancers welcome',
+      'builders welcome',
+      'show the work',
     ]) ||
-    (hasStrongPipelineMarkers(combinedText) &&
+    (hasStrongPipelineMarkers(matcherText) &&
       !harshEmployerContext &&
       !explicitDegreeRisk);
 
@@ -642,10 +651,17 @@ export const evaluateRules = (
     notes.push(clearanceCitizenship.clearanceEligibilityFlag.reason);
   }
 
+  if (jdDegreePositive) {
+    notes.push(
+      'Degree-positive JD: employer welcomes non-degree / show-the-work candidates — credential drag neutralized.',
+    );
+  }
+
   return {
     explicitDegreeRisk,
     degreeHasEquivalencyClause,
     degreeEquivalencySatisfied,
+    jdDegreePositive,
     traditionalCompanyPenalty: isTraditionalCompany,
     financePenalty: isFinance,
     strictNewGradPipeline,

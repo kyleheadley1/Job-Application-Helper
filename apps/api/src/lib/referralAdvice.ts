@@ -67,6 +67,7 @@ export const deriveReferralAdvice = (params: {
   survivabilityBreakdown?: SurvivabilityBreakdown;
   referralPathwayAvailable?: boolean;
   referralPathwayNotes?: string;
+  jdDegreePositive?: boolean;
 }): ReferralAdviceResult => {
   const shortfall = params.survivabilityBreakdown
     ? computeReferralAddressableShortfall(params.survivabilityBreakdown)
@@ -80,8 +81,15 @@ export const deriveReferralAdvice = (params: {
     urgency = downgradeReferralUrgency(urgency);
   }
 
+  if (params.jdDegreePositive) {
+    urgency = downgradeReferralUrgency(urgency);
+  }
+
   let advice: string;
-  if (urgency === "strongly_advised") {
+  if (params.jdDegreePositive) {
+    advice =
+      "Portfolio-first screen — cold apply has real odds; lead with shipped work (DevAI, GitHub). Referral helpful, not gating.";
+  } else if (urgency === "strongly_advised") {
     advice =
       "Cold-apply odds are low for routable reasons (credential / recognizability) — a referral would substantially help.";
   } else if (urgency === "advised") {

@@ -38,7 +38,8 @@ import {
   applyDifferentiatorCoverageCap,
   type DifferentiatorCoverageResult,
 } from "./differentiatorCoverage.js";
-import { composeSpecializationGapActionLine } from "./gapActionLine.js";
+import { applyAdjacentRoleFunctionCap } from "./roleFunctionClassifier.js";
+import { buildContractCaveat, contractFinalDock } from "./contractEmployment.js";
 import {
   computeFinalComposite,
   computeGapDock,
@@ -51,6 +52,7 @@ import {
   isStructuralOnly,
   selectDominantLever,
 } from "./strategicLever.js";
+import { composeSpecializationGapActionLine } from "./gapActionLine.js";
 import { deriveReferralAdvice } from "./referralAdvice.js";
 import { certificationCredentialLeverLabel } from "./certificationBoost.js";
 import { computePoolFriendliness } from "./poolFriendliness.js";
@@ -97,13 +99,26 @@ export const buildFullCapabilityBreakdown = (
   rawScore: ScoreBreakdown,
   rules: RuleEvaluation,
   extracted: ExtractedJobData,
-): { breakdown: CapabilityBreakdown; differentiatorCoverage: DifferentiatorCoverageResult } => {
+): {
+  breakdown: CapabilityBreakdown;
+  differentiatorCoverage: DifferentiatorCoverageResult;
+  roleFunctionCapNote?: string;
+} => {
   const withGap = applySpecializationGapToBreakdown(
     computeCapabilityBreakdown(rawScore),
     rules.specializationGap,
   );
-  const capped = applyDifferentiatorCoverageCap(withGap, extracted);
-  return { breakdown: capped.breakdown, differentiatorCoverage: capped.coverage };
+  const withRoleCap = applyAdjacentRoleFunctionCap(withGap, extracted);
+  const capped = applyDifferentiatorCoverageCap(withRoleCap.breakdown, extracted, {
+    adjacentRoleFunction: withRoleCap.classification.detected,
+  });
+  return {
+    breakdown: capped.breakdown,
+    differentiatorCoverage: capped.coverage,
+    roleFunctionCapNote: withRoleCap.classification.detected
+      ? withRoleCap.classification.note
+      : undefined,
+  };
 };
 
 /** Dev/test invariant: capability headline equals sum of displayed components. */
@@ -131,22 +146,29 @@ export const buildSurvivabilityRows = (
       const meta = SURVIVABILITY_SUB_FACTOR_META[key];
       const certBoost = key === "credentialSignal" ? breakdown.certificationBoost : undefined;
       const degreeLever =
-        key === "credentialSignal" && !certBoost
+        key === "credentialSignal" && !certBoost && !rules.jdDegreePositive
           ? resolveDegreeGapLever(rules, profile)
           : null;
       const poolMeta = key === "poolFriendliness" ? breakdown.poolFriendlinessMeta : undefined;
+      const degreePositiveCredential = key === "credentialSignal" && rules.jdDegreePositive;
       const lever = certBoost
         ? "credential"
+        : degreePositiveCredential
+          ? "portfolio"
         : poolMeta?.lever ??
           degreeLever?.lever ??
           meta.lever;
       const leverLabel = certBoost
         ? certificationCredentialLeverLabel(certBoost.status)
+        : degreePositiveCredential
+          ? "portfolio-first screen — lead with shipped work"
         : poolMeta?.leverLabel ??
           degreeLever?.leverLabel ??
           meta.leverLabel;
       const bindingness = certBoost
         ? "material"
+        : degreePositiveCredential
+          ? "favorable"
         : poolMeta?.bindingness ?? resolveSubFactorBindingness(key, rules);
       return {
         key: key as string,
@@ -339,6 +361,14 @@ export const deriveActionLine = (params: {
   const gap = rules.specializationGap;
   const gapWorthy = specializationGapHeadlineWorthy(gap);
 
+  if (
+    rules.jdDegreePositive &&
+    scoreBand !== "no" &&
+    scoreBand !== "skip"
+  ) {
+    return "Portfolio-first screen — cold apply has real odds; lead with shipped work (DevAI, GitHub). Referral helpful, not gating.";
+  }
+
   if (scoreBand === "no") {
     const reason = params.hardGates?.[0] ?? "hard gate fired";
     return `Do not apply — ${reason.charAt(0).toLowerCase()}${reason.slice(1)}`;
@@ -396,7 +426,7 @@ export const buildScoreDisplay = (params: {
   const headlineCapability = params.score.capability;
   if (headlineCapability == null && params.rules.specializationGap == null) return undefined;
 
-  const { breakdown: capabilityBreakdown, differentiatorCoverage } =
+  const { breakdown: capabilityBreakdown, differentiatorCoverage, roleFunctionCapNote } =
     buildFullCapabilityBreakdown(params.score, params.rules, params.extracted);
   const capability = sumCapabilityBreakdown(capabilityBreakdown);
   assertCapabilityBreakdownMatchesHeadline(capability, capabilityBreakdown);
@@ -447,10 +477,12 @@ export const buildScoreDisplay = (params: {
   }
 
   const gapDock = computeGapDock(params.rules, profile);
+  const contractDock = contractFinalDock(params.extracted);
   const composite = computeFinalComposite({
     capability,
     survivability,
     gapDock,
+    contractDock,
   });
   const final = params.score.total ?? composite.final;
   const scoreBand = resolveScoreBand(final, hardGates.length > 0);
@@ -478,7 +510,13 @@ export const buildScoreDisplay = (params: {
     survivabilityBreakdown: breakdown,
     referralPathwayAvailable: params.referralPathwayAvailable,
     referralPathwayNotes: params.referralPathwayNotes,
+    jdDegreePositive: params.rules.jdDegreePositive,
   });
+
+  const degreePositiveNote = params.rules.jdDegreePositive
+    ? "Degree-positive JD: employer welcomes non-degree / 'show the work' — credential drag neutralized."
+    : undefined;
+  const contractCaveat = buildContractCaveat(params.extracted);
 
   const eligibilityAdvisories = [
     params.rules.eligibilityFlag,
@@ -490,6 +528,7 @@ export const buildScoreDisplay = (params: {
     capabilityBreakdown,
     differentiatorCoverageNote:
       params.score.differentiatorCoverageNote ?? differentiatorCoverage.note,
+    roleFunctionCapNote: params.score.roleFunctionCapNote ?? roleFunctionCapNote,
     survivability,
     final,
     survAdjustment: composite.survAdjustment,
@@ -505,6 +544,8 @@ export const buildScoreDisplay = (params: {
     actionLine,
     referralAdvice: referral.advice,
     referralUrgency: referral.urgency,
+    degreePositiveNote,
+    contractCaveat,
     credentialBoostNote: params.score.certificationBoost?.note ?? breakdown?.certificationBoost?.note,
     poolFriendlinessNote: breakdown?.poolFriendlinessMeta?.note,
     eligibilityAdvisory: eligibilityAdvisories[0],
