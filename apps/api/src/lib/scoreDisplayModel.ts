@@ -38,7 +38,11 @@ import {
   applyDifferentiatorCoverageCap,
   type DifferentiatorCoverageResult,
 } from "./differentiatorCoverage.js";
-import { applyAdjacentRoleFunctionCap } from "./roleFunctionClassifier.js";
+import {
+  applyAdjacentRoleFunctionCap,
+  applyFrontendPrimaryRoleCap,
+  classifyFrontendPrimaryRole,
+} from "./roleFunctionClassifier.js";
 import { buildContractCaveat, contractFinalDock } from "./contractEmployment.js";
 import {
   computeFinalComposite,
@@ -109,15 +113,22 @@ export const buildFullCapabilityBreakdown = (
     rules.specializationGap,
   );
   const withRoleCap = applyAdjacentRoleFunctionCap(withGap, extracted);
-  const capped = applyDifferentiatorCoverageCap(withRoleCap.breakdown, extracted, {
+  const withFrontendCap = applyFrontendPrimaryRoleCap(withRoleCap.breakdown, extracted);
+  const frontendPrimary =
+    withFrontendCap.classification.detected || classifyFrontendPrimaryRole(extracted).detected;
+  const capped = applyDifferentiatorCoverageCap(withFrontendCap.breakdown, extracted, {
     adjacentRoleFunction: withRoleCap.classification.detected,
+    frontendPrimaryRole: frontendPrimary,
   });
+  const roleFunctionCapNote = withRoleCap.classification.detected
+    ? withRoleCap.classification.note
+    : withFrontendCap.classification.detected
+      ? withFrontendCap.classification.note
+      : undefined;
   return {
     breakdown: capped.breakdown,
     differentiatorCoverage: capped.coverage,
-    roleFunctionCapNote: withRoleCap.classification.detected
-      ? withRoleCap.classification.note
-      : undefined,
+    roleFunctionCapNote,
   };
 };
 

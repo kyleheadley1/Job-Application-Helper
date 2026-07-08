@@ -83,7 +83,7 @@ describe("differentiator coverage detection", () => {
   it("frontend-only JD → none tier", () => {
     const coverage = evaluateDifferentiatorCoverage(FRONTEND_ONLY_JOB);
     expect(coverage.tier).toBe("none");
-    expect(coverage.note).toMatch(/none — generic stack match/i);
+    expect(coverage.note).toMatch(/none — (generic stack match|frontend-only role)/i);
   });
 
   it("backend/AI JD → strong tier", () => {
@@ -116,7 +116,9 @@ describe("differentiator coverage caps", () => {
 
     expect(composite.score.capability).toBeGreaterThanOrEqual(68);
     expect(composite.score.capability).toBeLessThanOrEqual(79);
-    expect(composite.score.differentiatorCoverageNote).toMatch(/none — generic stack match/i);
+    expect(composite.score.differentiatorCoverageNote).toMatch(
+      /none — (generic stack match|frontend-only role)/i,
+    );
 
     const display = buildScoreDisplay({
       score: composite.score,
@@ -124,6 +126,8 @@ describe("differentiator coverage caps", () => {
       extracted: FRONTEND_ONLY_JOB,
       recommendation: composite.recommendation,
     });
-    expect(display?.differentiatorCoverageNote).toMatch(/generic stack match/i);
+    expect(display?.differentiatorCoverageNote).toMatch(
+      /generic stack match|frontend-only role/i,
+    );
   });
 });

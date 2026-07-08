@@ -225,6 +225,27 @@ describe("calibration anchors", () => {
     ).toBeLessThan(73);
   });
 
+  it("ANCHOR 7 (Precisely): frontend-primary + degree equivalency — capability ~76, no degree gate", () => {
+    const scored = scoreCalibrationAnchor("preciselyAssociateSweFrontend");
+
+    expect(
+      scored.rules.frontendPrimaryRole ?? false,
+      "ANCHOR 7 (Precisely): frontendPrimaryRole not set",
+    ).toBe(true);
+    expect(scored.differentiatorCoverage.tier).not.toBe("strong");
+    expect(scored.differentiatorCoverage.note).toMatch(/backend\/API edge benched/i);
+
+    expect(scored.rules.degreeHasEquivalencyClause).toBe(true);
+    expect(scored.rules.degreeEquivalencySatisfied).toBe(true);
+    expect(scored.rules.explicitDegreeRisk).toBe(false);
+
+    expect(scored.score.capability).toBeGreaterThanOrEqual(74);
+    expect(scored.score.capability).toBeLessThanOrEqual(77);
+    expect(scored.score.survivabilityBreakdown?.credentialSignal ?? 0).toBeGreaterThanOrEqual(0.7);
+    expect(scored.score.total).toBeGreaterThanOrEqual(74);
+    expect(scored.score.total).toBeLessThanOrEqual(78);
+  });
+
   it("cross-anchor ordering: Cherry Hill > Fubo > Civis for different reasons", () => {
     const cherry = scoreCalibrationAnchor("cherryHill");
     const fubo = scoreCalibrationAnchor("fuboFrontend");

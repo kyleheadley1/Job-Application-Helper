@@ -1,6 +1,6 @@
 {
   "id": "precisely-associate-swe-frontend-calibration",
-  "anchorNote": "Precisely Associate SWE Frontend — bachelor's listed with explicit equivalent-work-experience clause",
+  "anchorNote": "Precisely Associate SWE Frontend — frontend-primary + degree equivalency; backend/API consumption must not grant strong differentiator",
   "extracted": {
     "company": "Precisely",
     "companyDisplayName": "Precisely",
@@ -8,10 +8,33 @@
     "location": "Remote",
     "remoteType": "remote",
     "seniority": "Associate",
-    "stack": ["React", "TypeScript", "JavaScript", "Node.js", "CSS", "HTML"],
-    "requiredSkills": ["React", "TypeScript", "JavaScript", "frontend"],
-    "preferredSkills": ["Node.js", "CSS", "HTML", "web accessibility"],
-    "domainTags": ["data integrity", "enterprise software"],
+    "stack": [
+      "React",
+      "TypeScript",
+      "JavaScript",
+      "CSS",
+      "HTML",
+      "REST APIs",
+      "AI-assisted UI tooling"
+    ],
+    "requiredSkills": [
+      "React",
+      "TypeScript",
+      "JavaScript",
+      "frontend",
+      "API integration"
+    ],
+    "preferredSkills": [
+      "CSS",
+      "HTML",
+      "web accessibility",
+      "Copilot",
+      "Cursor"
+    ],
+    "domainTags": [
+      "data integrity",
+      "enterprise software"
+    ],
     "degreeRequirement": {
       "level": "required",
       "raw": "Bachelor's degree in computer science or related field (Equivalent work experience will be accepted in place of the education requirement)."
@@ -19,21 +42,24 @@
     "requirements": [
       "Bachelor's degree in computer science or related field (Equivalent work experience will be accepted in place of the education requirement).",
       "Strong React and TypeScript fundamentals",
-      "Comfort working with Node.js services",
-      "Comfort building and shipping frontend product features"
+      "Experience integrating with backend REST APIs",
+      "Comfort building and shipping frontend product features",
+      "Experience with AI tools for UI development (Copilot, Cursor, Claude) a plus"
     ],
     "responsibilities": [
-      "Build and maintain frontend product experiences in React/TypeScript",
+      "Build UI components and translate UX designs into responsive React interfaces",
+      "Integrate with backend REST APIs — connect frontend to services",
+      "Own accessibility and cross-browser frontend delivery",
       "Collaborate with product and design on associate-level feature delivery"
     ],
-    "rawText": "Precisely — Associate Software Engineer, Frontend\nRemote\nAssociate\nRequired: Bachelor's degree in computer science or related field (Equivalent work experience will be accepted in place of the education requirement).\nBuild React/TypeScript frontend product features with Node.js services."
+    "rawText": "Precisely — Associate Software Engineer, Frontend\nRemote\nAssociate\nRequired: Bachelor's degree in computer science or related field (Equivalent work experience will be accepted in place of the education requirement).\nBuild UI components, translate UX designs, responsive design, accessibility.\nAPI integration with backend REST APIs — connect frontend to services.\nAI tools for UI development (Copilot/Cursor/Claude) welcome."
   },
   "storedCategoryScores": {
-    "stackFit": 16,
+    "stackFit": 17,
     "levelFit": 15,
     "domainFit": 7,
     "resumeStoryClarity": 9,
-    "functionalOverlap": 13,
+    "functionalOverlap": 14,
     "recruiterFriendliness": 11,
     "careerValue": 8
   }

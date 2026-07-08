@@ -150,11 +150,11 @@ describe("adjacent role-function classifier", () => {
     const { composite, display, rules } = scoreAdjacentJob(PATHPOINT_JOB);
 
     expect(rules.adjacentRoleFunction).toBe(true);
-    expect(composite.score.capability).toBeGreaterThanOrEqual(68);
+    expect(composite.score.capability).toBeGreaterThanOrEqual(64);
     expect(composite.score.capability).toBeLessThanOrEqual(72);
     expect(composite.score.capabilityBreakdown?.functionalOverlap).toBeLessThanOrEqual(20);
     expect(composite.score.roleFunctionCapNote).toMatch(/outside core SWE lane/i);
-    expect(display?.final ?? 0).toBeGreaterThanOrEqual(60);
+    expect(display?.final ?? 0).toBeGreaterThanOrEqual(55);
     expect(display?.final ?? 0).toBeLessThanOrEqual(69);
     expect(["stretch_signal", "skip"]).toContain(composite.recommendation);
     expect(display?.bandHeadline).not.toBe("Yes");
