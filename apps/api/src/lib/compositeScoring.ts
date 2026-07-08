@@ -8,6 +8,7 @@ export type CompositeParts = {
   survivability: number;
   survAdjustment: number;
   gapDock: number;
+  contractDock: number;
   final: number;
 };
 
@@ -34,22 +35,25 @@ export const computeFinalComposite = (params: {
   capability: number;
   survivability: number;
   gapDock: number;
+  contractDock?: number;
 }): CompositeParts => {
   const survAdjustment = computeSurvivabilityAdjustment(params.survivability);
+  const contractDock = params.contractDock ?? 0;
   const final = Math.min(
     100,
-    Math.max(0, params.capability + survAdjustment - params.gapDock),
+    Math.max(0, params.capability + survAdjustment - params.gapDock - contractDock),
   );
   return {
     capability: params.capability,
     survivability: params.survivability,
     survAdjustment,
     gapDock: params.gapDock,
+    contractDock,
     final,
   };
 };
 
-/** Derivation uses exactly capability + survAdjustment − gapDock — no other deductions. */
+/** Derivation uses capability + survAdjustment − gapDock − contractDock. */
 export const formatScoreDerivation = (parts: CompositeParts): string => {
   const adj =
     parts.survAdjustment === 0
@@ -58,10 +62,11 @@ export const formatScoreDerivation = (parts: CompositeParts): string => {
         ? `(+${parts.survAdjustment})`
         : `(${parts.survAdjustment})`;
   const dockLabel = parts.gapDock > 0 ? ` − ${parts.gapDock}` : "";
-  return `${parts.capability} + ${adj}${dockLabel} = ${parts.final}`;
+  const contractLabel = parts.contractDock > 0 ? ` − ${parts.contractDock}` : "";
+  return `${parts.capability} + ${adj}${dockLabel}${contractLabel} = ${parts.final}`;
 };
 
-const LEGITIMATE_DERIVATION_RE = /^\d+ \+ \([+-]?\d+\)( − \d+)? = \d+$/;
+const LEGITIMATE_DERIVATION_RE = /^\d+ \+ \([+-]?\d+\)( − \d+)* = \d+$/;
 
 export const derivationHasOnlyLegitimateTerms = (derivation: string): boolean => {
   if (!LEGITIMATE_DERIVATION_RE.test(derivation)) return false;

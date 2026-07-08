@@ -344,6 +344,12 @@ export const JobResultPage = () => {
                 {scoreDisplay.credentialBoostNote ? (
                   <p className="muted">{scoreDisplay.credentialBoostNote}</p>
                 ) : null}
+                {scoreDisplay.degreePositiveNote ? (
+                  <p className="muted">{scoreDisplay.degreePositiveNote}</p>
+                ) : null}
+                {scoreDisplay.contractCaveat ? (
+                  <p className="muted">{scoreDisplay.contractCaveat}</p>
+                ) : null}
               </div>
 
               <p className="scoreFinal">

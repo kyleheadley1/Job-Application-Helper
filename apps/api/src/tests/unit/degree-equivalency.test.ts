@@ -60,4 +60,13 @@ describe("degree equivalency detection", () => {
     expect(rules.degreeEquivalencySatisfied).toBe(true);
     expect(rules.explicitDegreeRisk).toBe(false);
   });
+
+  it("detects Precisely equivalent-work-experience-in-place-of phrasing", () => {
+    const preciselyRaw =
+      "Bachelor's degree in computer science or related field (Equivalent work experience will be accepted in place of the education requirement).";
+    expect(jdHasDegreeEquivalencyClause(preciselyRaw, "required", preciselyRaw)).toBe(true);
+    expect(
+      candidateSatisfiesDegreeEquivalency(userProfile, preciselyRaw, "required", preciselyRaw),
+    ).toBe(true);
+  });
 });

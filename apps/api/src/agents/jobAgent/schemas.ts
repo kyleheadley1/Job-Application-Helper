@@ -154,6 +154,7 @@ export const RuleEvaluationSchema = z.object({
   goDistributedDataInfraCandidateGap: z.boolean().optional().default(false),
   degreeHasEquivalencyClause: z.boolean().optional().default(false),
   degreeEquivalencySatisfied: z.boolean().optional().default(false),
+  jdDegreePositive: z.boolean().optional().default(false),
   capabilityGap: z
     .object({
       kind: z.enum(["specialization", "stack_depth"]),
@@ -252,6 +253,9 @@ export const ScoreDisplaySchema = z.object({
   capability: z.number(),
   capabilityBreakdown: CapabilityBreakdownSchema,
   differentiatorCoverageNote: z.string().optional(),
+  roleFunctionCapNote: z.string().optional(),
+  degreePositiveNote: z.string().optional(),
+  contractCaveat: z.string().optional(),
   survivability: z.number(),
   final: z.number(),
   survAdjustment: z.number(),

@@ -9,6 +9,8 @@ import {
   jdGroundedCoreLanguageGaps,
 } from "./jdLanguageOutputBoundary.js";
 import { normalizeText } from "./text.js";
+import { classifyRoleFunction } from "./roleFunctionClassifier.js";
+import { isContractEmploymentType } from "./contractEmployment.js";
 
 const jobBlob = (job: ExtractedJobData): string =>
   normalizeText(
@@ -202,6 +204,7 @@ export const applyScoringClampLayer = (params: {
     financePenalty: financeCtx.financePenalty || params.rules.financePenalty,
     hardRuleFlags,
     roleShapeOutsideLane: detectRoleShapeOutsideLane(params.extracted),
+    adjacentRoleFunction: classifyRoleFunction(params.extracted).detected,
   };
 
   let score = { ...params.score };
@@ -247,6 +250,8 @@ export const applyScoringClampLayer = (params: {
   // Rule 7 — contract / staffing-agency roles
   if (detectStaffAugContractRole(params.extracted)) {
     score.careerValue = Math.min(score.careerValue, SCORING_CLAMP_POLICY.staffAugContract.careerValueMax);
+  } else if (isContractEmploymentType(params.extracted)) {
+    score.careerValue = Math.max(0, score.careerValue - 1);
   }
 
   const boundedRules = applyJdLanguageOutputBoundary(params.extracted, rules);

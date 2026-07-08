@@ -118,6 +118,7 @@ export type ScoreDisplay = {
   capability: number;
   capabilityBreakdown: CapabilityBreakdown;
   differentiatorCoverageNote?: string;
+  roleFunctionCapNote?: string;
   survivability: number;
   final: number;
   survAdjustment: number;
@@ -140,6 +141,8 @@ export type ScoreDisplay = {
   credentialBoostNote?: string;
   /** Listing-shape pool friendliness breakdown. */
   poolFriendlinessNote?: string;
+  degreePositiveNote?: string;
+  contractCaveat?: string;
 };
 
 export type ScoreBreakdown = {
@@ -166,6 +169,12 @@ export type ScoreBreakdown = {
   total: number;
   /** Short note when differentiator coverage caps stack/functional credit. */
   differentiatorCoverageNote?: string;
+  /** Short note when adjacent analyst/implementation role caps capability credit. */
+  roleFunctionCapNote?: string;
+  /** Degree-positive JD breakdown note for survivability display. */
+  degreePositiveNote?: string;
+  /** Contract employment caveat for report display. */
+  contractCaveat?: string;
 };
 
 export type RuleEvaluation = {
@@ -264,6 +273,10 @@ export type RuleEvaluation = {
   hardRuleFlags?: HardRuleFlag[];
   /** Infra/platform or ML-research role shape outside product SWE lane (Rule 2). */
   roleShapeOutsideLane?: boolean;
+  /** Analyst / QA / implementation role outside core product-SWE lane. */
+  adjacentRoleFunction?: boolean;
+  /** JD explicitly welcomes portfolio / experience over formal degree credentials. */
+  jdDegreePositive?: boolean;
   /** JD accepts any of a listed language set; candidate matches ≥1 — no core-language gate. */
   disjunctiveLanguageRequirementSatisfied?: boolean;
   disjunctiveAcceptedLanguages?: string[];

@@ -178,6 +178,8 @@ export type ScoreDisplay = {
   referralUrgency: ReferralUrgency;
   credentialBoostNote?: string;
   poolFriendlinessNote?: string;
+  degreePositiveNote?: string;
+  contractCaveat?: string;
   eligibilityAdvisory?: EligibilityFlag;
   eligibilityAdvisories?: EligibilityFlag[];
 };

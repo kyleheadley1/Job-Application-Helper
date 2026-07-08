@@ -33,10 +33,17 @@ export function agencyDisclosureNote(extracted: CompanyFields): string | null {
 export function jobHeaderLabel(extracted: Pick<ExtractedJobData, "company" | "title" | "employmentType" | "companyDisplayName" | "listingCompanyName">): string {
   const company = companyDisplayLabel(extracted);
   const title = displayRoleTitle(extracted.title?.trim() ?? "");
-  if (company && title) return `${company} - ${title}`;
-  if (title) return title;
-  if (company) return company;
-  return "Untitled role";
+  const employment = extracted.employmentType?.trim();
+  const roleLabel =
+    company && title
+      ? `${company} - ${title}`
+      : title
+        ? title
+        : company
+          ? company
+          : "Untitled role";
+  if (employment) return `${roleLabel} (${employment})`;
+  return roleLabel;
 }
 
 /** Relative posted time for Top Jobs (e.g. "2 hours ago", "3 days ago"). */
