@@ -42,9 +42,16 @@ import {
   applyAdjacentRoleFunctionCap,
   applyFrontendPrimaryRoleCap,
   applyPlatformInfraRoleCap,
-  classifyFrontendPrimaryRole,
-  classifyPlatformInfraRole,
+  classifyRoleLane,
+  roleLaneIsAdjacent,
+  roleLaneIsFrontendPrimary,
+  roleLaneIsPlatformInfra,
 } from "./roleFunctionClassifier.js";
+import {
+  ADJACENT_ROLE_FUNCTION,
+  FRONTEND_PRIMARY_ROLE,
+  PLATFORM_INFRA_ROLE,
+} from "../config/capabilitySurvivabilityPolicy.js";
 import { buildContractCaveat, contractFinalDock } from "./contractEmployment.js";
 import { GENAI_RESTRICTION_WARNING } from "./genAiRestriction.js";
 import {
@@ -119,25 +126,72 @@ export const buildFullCapabilityBreakdown = (
     computeCapabilityBreakdown(rawScore),
     rules.specializationGap,
   );
-  const withRoleCap = applyAdjacentRoleFunctionCap(withGap, extracted);
-  const withFrontendCap = applyFrontendPrimaryRoleCap(withRoleCap.breakdown, extracted);
-  const withPlatformCap = applyPlatformInfraRoleCap(withFrontendCap.breakdown, extracted);
+
+  const lane =
+    rules.roleLane ??
+    classifyRoleLane(extracted).label;
+  const adjacent =
+    rules.adjacentRoleFunction ?? roleLaneIsAdjacent(lane);
   const frontendPrimary =
-    withFrontendCap.classification.detected || classifyFrontendPrimaryRole(extracted).detected;
+    rules.frontendPrimaryRole ?? roleLaneIsFrontendPrimary(lane);
   const platformInfra =
-    withPlatformCap.classification.detected || classifyPlatformInfraRole(extracted).detected;
-  const capped = applyDifferentiatorCoverageCap(withPlatformCap.breakdown, extracted, {
-    adjacentRoleFunction: withRoleCap.classification.detected,
+    rules.platformInfraRole ?? roleLaneIsPlatformInfra(lane);
+
+  // Prefer lane-driven caps when roleLane is already set (avoid triple re-classify).
+  let breakdown = withGap;
+  let roleFunctionCapNote: string | undefined;
+  if (rules.roleLane) {
+    if (adjacent) {
+      breakdown = {
+        ...breakdown,
+        stackFit: Math.min(breakdown.stackFit, ADJACENT_ROLE_FUNCTION.CAP.stackFit),
+        functionalOverlap: Math.min(
+          breakdown.functionalOverlap,
+          ADJACENT_ROLE_FUNCTION.CAP.functionalOverlap,
+        ),
+      };
+      roleFunctionCapNote = ADJACENT_ROLE_FUNCTION.FLAG;
+    } else if (frontendPrimary) {
+      breakdown = {
+        ...breakdown,
+        stackFit: Math.min(breakdown.stackFit, FRONTEND_PRIMARY_ROLE.CAP.stackFit),
+        functionalOverlap: Math.min(
+          breakdown.functionalOverlap,
+          FRONTEND_PRIMARY_ROLE.CAP.functionalOverlap,
+        ),
+      };
+      roleFunctionCapNote = FRONTEND_PRIMARY_ROLE.FLAG;
+    } else if (platformInfra) {
+      breakdown = {
+        ...breakdown,
+        stackFit: Math.min(breakdown.stackFit, PLATFORM_INFRA_ROLE.CAP.stackFit),
+        functionalOverlap: Math.min(
+          breakdown.functionalOverlap,
+          PLATFORM_INFRA_ROLE.CAP.functionalOverlap,
+        ),
+      };
+      roleFunctionCapNote = PLATFORM_INFRA_ROLE.FLAG;
+    }
+  } else {
+    const withRoleCap = applyAdjacentRoleFunctionCap(withGap, extracted);
+    const withFrontendCap = applyFrontendPrimaryRoleCap(withRoleCap.breakdown, extracted);
+    const withPlatformCap = applyPlatformInfraRoleCap(withFrontendCap.breakdown, extracted);
+    breakdown = withPlatformCap.breakdown;
+    roleFunctionCapNote = withRoleCap.classification.detected
+      ? withRoleCap.classification.note
+      : withPlatformCap.classification.detected
+        ? withPlatformCap.classification.note
+        : withFrontendCap.classification.detected
+          ? withFrontendCap.classification.note
+          : undefined;
+  }
+
+  const capped = applyDifferentiatorCoverageCap(breakdown, extracted, {
+    adjacentRoleFunction: adjacent,
     frontendPrimaryRole: frontendPrimary,
     platformInfraRole: platformInfra,
+    roleLane: lane,
   });
-  const roleFunctionCapNote = withRoleCap.classification.detected
-    ? withRoleCap.classification.note
-    : withPlatformCap.classification.detected
-      ? withPlatformCap.classification.note
-      : withFrontendCap.classification.detected
-        ? withFrontendCap.classification.note
-        : undefined;
   return {
     breakdown: capped.breakdown,
     differentiatorCoverage: capped.coverage,
