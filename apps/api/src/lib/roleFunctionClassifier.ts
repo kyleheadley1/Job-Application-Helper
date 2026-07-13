@@ -270,6 +270,12 @@ export const classifyPlatformInfraRole = (job: ExtractedJobData): PlatformInfraC
   return { detected: false, note: "" };
 };
 
+/**
+ * Adjacent non-product-SWE roles (analyst / QA-as-a-service / solutions).
+ * Same shape as frontend-primary / platform-infra: title as core function +
+ * responsibilities language. SIE resume signal is corroborating only.
+ * (Unified taxonomy deferred to Item G / Tier 4.)
+ */
 export const classifyRoleFunction = (job: ExtractedJobData): RoleFunctionClassification => {
   const blob = jobBlob(job);
   const title = job.title?.trim() ?? "";

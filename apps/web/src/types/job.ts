@@ -183,6 +183,8 @@ export type ScoreDisplay = {
   degreePositiveNote?: string;
   contractCaveat?: string;
   genAiRestrictionWarning?: string;
+  applyNowUrgency?: boolean;
+  applyNowUrgencyNote?: string;
   eligibilityAdvisory?: EligibilityFlag;
   eligibilityAdvisories?: EligibilityFlag[];
 };

@@ -145,6 +145,9 @@ export type ScoreDisplay = {
   contractCaveat?: string;
   /** Employer restricts GenAI-generated application materials. */
   genAiRestrictionWarning?: string;
+  /** Fresh niche post — submit default resume immediately. */
+  applyNowUrgency?: boolean;
+  applyNowUrgencyNote?: string;
 };
 
 export type ScoreBreakdown = {

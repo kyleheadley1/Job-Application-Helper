@@ -252,6 +252,11 @@ export const JobResultPage = () => {
           {scoreDisplay?.actionLine ? (
             <p className="actionLine">{scoreDisplay.actionLine}</p>
           ) : null}
+          {scoreDisplay?.applyNowUrgencyNote ? (
+            <p className="applyNowUrgency">
+              Apply now: {scoreDisplay.applyNowUrgencyNote}
+            </p>
+          ) : null}
           {scoreDisplay?.referralAdvice ? (
             <p className={`referralAdvice referralAdvice--${scoreDisplay.referralUrgency}`}>
               ↳ {scoreDisplay.referralAdvice}

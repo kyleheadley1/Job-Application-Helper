@@ -259,6 +259,8 @@ export const ScoreDisplaySchema = z.object({
   degreePositiveNote: z.string().optional(),
   contractCaveat: z.string().optional(),
   genAiRestrictionWarning: z.string().optional(),
+  applyNowUrgency: z.boolean().optional(),
+  applyNowUrgencyNote: z.string().optional(),
   survivability: z.number(),
   final: z.number(),
   survAdjustment: z.number(),
