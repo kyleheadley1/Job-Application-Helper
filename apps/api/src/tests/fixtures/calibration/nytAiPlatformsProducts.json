@@ -1,0 +1,35 @@
+{
+  "id": "nyt-ai-platforms-products-control",
+  "anchorNote": "NYT AI Platforms & Products — product AI language only; must NOT trigger jdProhibitsGenAI",
+  "extracted": {
+    "company": "The New York Times",
+    "companyDisplayName": "The New York Times",
+    "title": "Software Engineer, AI Platforms & Products",
+    "location": "New York, NY",
+    "remoteType": "hybrid",
+    "seniority": "Mid Level",
+    "stack": ["Python", "TypeScript", "LLM", "AWS"],
+    "requiredSkills": ["Python", "LLM integrations", "TypeScript"],
+    "preferredSkills": ["RAG"],
+    "domainTags": ["news", "ai platforms"],
+    "companyEmployeeCount": 10001,
+    "requirements": [
+      "Experience building AI-powered product features",
+      "Comfort with LLMs and retrieval systems"
+    ],
+    "responsibilities": [
+      "Build AI platforms and products that help journalists and readers",
+      "Ship LLM-enabled workflows into production newsroom tools"
+    ],
+    "rawText": "The New York Times — Software Engineer, AI Platforms & Products\n10,001+ employees\nWe use AI in our products to help journalists and readers.\nBuild AI-powered product features with LLMs and retrieval systems.\nNo applicant GenAI restriction in this posting."
+  },
+  "storedCategoryScores": {
+    "stackFit": 15,
+    "levelFit": 15,
+    "domainFit": 7,
+    "resumeStoryClarity": 9,
+    "functionalOverlap": 13,
+    "recruiterFriendliness": 10,
+    "careerValue": 8
+  }
+}

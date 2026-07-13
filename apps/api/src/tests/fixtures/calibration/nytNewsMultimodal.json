@@ -1,0 +1,36 @@
+{
+  "id": "nyt-news-multimodal-genai-restriction",
+  "anchorNote": "NYT News Multimodal — applicant GenAI restriction (positive for jdProhibitsGenAI)",
+  "extracted": {
+    "company": "The New York Times",
+    "companyDisplayName": "The New York Times",
+    "title": "Software Engineer, News Multimodal",
+    "location": "New York, NY",
+    "remoteType": "hybrid",
+    "seniority": "Mid Level",
+    "stack": ["TypeScript", "React", "Node.js", "Python"],
+    "requiredSkills": ["TypeScript", "React", "product engineering"],
+    "preferredSkills": ["media", "multimodal"],
+    "domainTags": ["news", "media", "publishing"],
+    "companyEmployeeCount": 10001,
+    "requirements": [
+      "Strong TypeScript and React experience",
+      "Do not use GenAI tools to generate substantive content in your application materials",
+      "Submit your own work — authentic application materials required"
+    ],
+    "responsibilities": [
+      "Ship user-facing product features for readers across news multimodal surfaces",
+      "Build full-stack TypeScript features with React and Node APIs"
+    ],
+    "rawText": "The New York Times — Software Engineer, News Multimodal\n10,001+ employees\nHybrid — New York, NY\nShip user-facing product features for readers.\nFull-stack TypeScript/React/Node.\nApplication instructions: Do not use GenAI tools to generate substantive content in your application materials. Submit your own work — authentic application materials required."
+  },
+  "storedCategoryScores": {
+    "stackFit": 16,
+    "levelFit": 15,
+    "domainFit": 7,
+    "resumeStoryClarity": 9,
+    "functionalOverlap": 13,
+    "recruiterFriendliness": 10,
+    "careerValue": 8
+  }
+}

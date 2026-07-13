@@ -46,6 +46,7 @@ import {
   classifyPlatformInfraRole,
 } from "./roleFunctionClassifier.js";
 import { buildContractCaveat, contractFinalDock } from "./contractEmployment.js";
+import { GENAI_RESTRICTION_WARNING } from "./genAiRestriction.js";
 import {
   computeFinalComposite,
   computeGapDock,
@@ -536,6 +537,9 @@ export const buildScoreDisplay = (params: {
     ? "Degree-positive JD: employer welcomes non-degree / 'show the work' — credential drag neutralized."
     : undefined;
   const contractCaveat = buildContractCaveat(params.extracted);
+  const genAiRestrictionWarning = params.rules.jdProhibitsGenAI
+    ? GENAI_RESTRICTION_WARNING
+    : undefined;
 
   const eligibilityAdvisories = [
     params.rules.eligibilityFlag,
@@ -565,6 +569,7 @@ export const buildScoreDisplay = (params: {
     referralUrgency: referral.urgency,
     degreePositiveNote,
     contractCaveat,
+    genAiRestrictionWarning,
     credentialBoostNote: params.score.certificationBoost?.note ?? breakdown?.certificationBoost?.note,
     poolFriendlinessNote: breakdown?.poolFriendlinessMeta?.note,
     eligibilityAdvisory: eligibilityAdvisories[0],

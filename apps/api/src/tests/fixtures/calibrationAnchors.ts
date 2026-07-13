@@ -35,6 +35,9 @@ export const CALIBRATION_FIXTURES = {
   preciselyAssociateSweFrontend: "preciselyAssociateSweFrontend.json",
   picnicFrontend: "picnicFrontend.json",
   stubHubCoreCompute: "stubHubCoreCompute.json",
+  nytNewsMultimodal: "nytNewsMultimodal.json",
+  nytContentDataProducts: "nytContentDataProducts.json",
+  nytAiPlatformsProducts: "nytAiPlatformsProducts.json",
 } as const;
 
 export type CalibrationFixtureKey = keyof typeof CALIBRATION_FIXTURES;

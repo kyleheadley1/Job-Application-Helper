@@ -155,6 +155,7 @@ export const RuleEvaluationSchema = z.object({
   degreeHasEquivalencyClause: z.boolean().optional().default(false),
   degreeEquivalencySatisfied: z.boolean().optional().default(false),
   jdDegreePositive: z.boolean().optional().default(false),
+  jdProhibitsGenAI: z.boolean().optional().default(false),
   capabilityGap: z
     .object({
       kind: z.enum(["specialization", "stack_depth"]),
@@ -256,6 +257,7 @@ export const ScoreDisplaySchema = z.object({
   roleFunctionCapNote: z.string().optional(),
   degreePositiveNote: z.string().optional(),
   contractCaveat: z.string().optional(),
+  genAiRestrictionWarning: z.string().optional(),
   survivability: z.number(),
   final: z.number(),
   survAdjustment: z.number(),
