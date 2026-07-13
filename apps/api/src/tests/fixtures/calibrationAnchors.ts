@@ -34,6 +34,7 @@ export const CALIBRATION_FIXTURES = {
   ithosWellness: "ithosWellness.json",
   preciselyAssociateSweFrontend: "preciselyAssociateSweFrontend.json",
   picnicFrontend: "picnicFrontend.json",
+  stubHubCoreCompute: "stubHubCoreCompute.json",
 } as const;
 
 export type CalibrationFixtureKey = keyof typeof CALIBRATION_FIXTURES;

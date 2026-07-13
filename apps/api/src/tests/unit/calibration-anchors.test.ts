@@ -246,15 +246,32 @@ describe("calibration anchors", () => {
     expect(scored.score.total).toBeLessThanOrEqual(78);
   });
 
+  it("ANCHOR 8 (StubHub Core Compute): platform/infra — differentiator not strong; stack/functional high-teens", () => {
+    const scored = scoreCalibrationAnchor("stubHubCoreCompute");
+
+    expect(scored.rules.platformInfraRole ?? false).toBe(true);
+    expect(scored.differentiatorCoverage.tier).not.toBe("strong");
+    expect(scored.differentiatorCoverage.note).toMatch(/platform\/infra/i);
+    expect(scored.score.capabilityBreakdown?.stackFit ?? 99).toBeLessThanOrEqual(18);
+    expect(scored.score.capabilityBreakdown?.functionalOverlap ?? 99).toBeLessThanOrEqual(18);
+    expect(scored.score.capability).toBeLessThanOrEqual(65);
+  });
+
   it("cross-anchor ordering: Cherry Hill > Fubo > Civis for different reasons", () => {
     const cherry = scoreCalibrationAnchor("cherryHill");
     const fubo = scoreCalibrationAnchor("fuboFrontend");
     const civis = scoreCalibrationAnchor("civisCattleCall");
+    const stubHub = scoreCalibrationAnchor("stubHubCoreCompute");
 
     expect(
       cherry.score.total!,
       "cross-anchor: Cherry Hill final not above Fubo — specific-match vs capability-cap ordering regressed",
     ).toBeGreaterThan(fubo.score.total!);
+
+    expect(
+      cherry.score.capability!,
+      "cross-anchor: Cherry Hill capability not above StubHub platform/infra cap",
+    ).toBeGreaterThan(stubHub.score.capability!);
 
     expect(
       cherry.score.total!,

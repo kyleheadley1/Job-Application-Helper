@@ -11,6 +11,7 @@ import {
 import { normalizeText } from "./text.js";
 import {
   classifyFrontendPrimaryRole,
+  classifyPlatformInfraRole,
   classifyRoleFunction,
 } from "./roleFunctionClassifier.js";
 import { isContractEmploymentType } from "./contractEmployment.js";
@@ -209,6 +210,7 @@ export const applyScoringClampLayer = (params: {
     roleShapeOutsideLane: detectRoleShapeOutsideLane(params.extracted),
     adjacentRoleFunction: classifyRoleFunction(params.extracted).detected,
     frontendPrimaryRole: classifyFrontendPrimaryRole(params.extracted).detected,
+    platformInfraRole: classifyPlatformInfraRole(params.extracted).detected,
   };
 
   let score = { ...params.score };
