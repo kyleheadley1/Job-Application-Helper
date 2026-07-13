@@ -40,6 +40,8 @@ export const CALIBRATION_FIXTURES = {
   nytAiPlatformsProducts: "nytAiPlatformsProducts.json",
   saasSellsToFinance: "saasSellsToFinance.json",
   heritageBankInstitution: "heritageBankInstitution.json",
+  clinicalInkHealthcare: "clinicalInkHealthcare.json",
+  leapHealthcareProduct: "leapHealthcareProduct.json",
 } as const;
 
 export type CalibrationFixtureKey = keyof typeof CALIBRATION_FIXTURES;

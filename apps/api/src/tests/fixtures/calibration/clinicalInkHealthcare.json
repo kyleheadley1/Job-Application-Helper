@@ -1,0 +1,34 @@
+{
+  "id": "clinical-ink-healthcare-product-calibration",
+  "anchorNote": "Clinical Ink eClinical product SWE — healthcareProductEngineering; domainMatch must not dock to 0.32",
+  "extracted": {
+    "company": "Clinical Ink",
+    "title": "Software Engineer",
+    "location": "Remote",
+    "remoteType": "remote",
+    "seniority": "entry",
+    "stack": ["TypeScript", "Node.js", "React", "Python"],
+    "requiredSkills": ["TypeScript", "Node.js"],
+    "preferredSkills": ["Python"],
+    "domainTags": ["healthcare", "clinical"],
+    "responsibilities": [
+      "Build clinical trial software features with TypeScript and Node.js",
+      "Collaborate on full-stack product delivery"
+    ],
+    "requirements": [
+      "We value engineering fundamentals and learning speed over expertise in any specific programming language.",
+      "Experience with TypeScript and Node.js in production web applications.",
+      "Python is a plus."
+    ],
+    "rawText": "Clinical Ink — Software Engineer\nRemote\nWe value engineering fundamentals and learning speed over expertise in any specific programming language.\nBuild eClinical software with TypeScript, Node.js, and React. Python is a plus."
+  },
+  "storedCategoryScores": {
+    "stackFit": 16,
+    "levelFit": 15,
+    "domainFit": 6,
+    "resumeStoryClarity": 8,
+    "functionalOverlap": 12,
+    "recruiterFriendliness": 10,
+    "careerValue": 7
+  }
+}
