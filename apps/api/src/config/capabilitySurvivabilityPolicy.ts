@@ -244,7 +244,7 @@ export const SURVIVABILITY_SUB_FACTOR_META: Record<
   credentialSignal: {
     label: "Credential signal",
     lever: "none",
-    leverLabel: "NONE — no in-loop credential fix",
+    leverLabel: "neutral — no explicit degree language",
     baseBindingness: "binding",
   },
   impactMetricQuality: {
