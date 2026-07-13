@@ -1,0 +1,34 @@
+{
+  "id": "leap-healthcare-product-calibration",
+  "anchorNote": "Leap behavioral-health product SWE — HIPAA/EHR language must not force domainMatch 0.32",
+  "extracted": {
+    "company": "Leap",
+    "title": "Software Engineer",
+    "location": "Remote",
+    "remoteType": "remote",
+    "seniority": "mid",
+    "stack": ["TypeScript", "React", "Node.js"],
+    "requiredSkills": ["TypeScript", "React"],
+    "preferredSkills": [],
+    "domainTags": ["healthcare", "behavioral health"],
+    "responsibilities": [
+      "Build patient-facing product features",
+      "Ship full-stack healthcare product work"
+    ],
+    "requirements": [
+      "TypeScript",
+      "React",
+      "HIPAA-aware product engineering"
+    ],
+    "rawText": "Leap Health — Software Engineer\nRemote behavioral health product company.\nBuild patient-facing React/TypeScript product features. EHR integrations and HIPAA compliance matter.\nFull-stack software engineer role on the clinical product team."
+  },
+  "storedCategoryScores": {
+    "stackFit": 16,
+    "levelFit": 15,
+    "domainFit": 7,
+    "resumeStoryClarity": 8,
+    "functionalOverlap": 12,
+    "recruiterFriendliness": 10,
+    "careerValue": 7
+  }
+}
