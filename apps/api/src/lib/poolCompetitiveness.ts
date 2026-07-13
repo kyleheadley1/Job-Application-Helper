@@ -1,4 +1,5 @@
 import type { ExtractedJobData } from "../types/job.js";
+import { isLargeOrEnterpriseEmployerScale } from "./employerScale.js";
 import { normalizeText } from "./text.js";
 
 export type CompetitivePoolSignals = {
@@ -18,11 +19,32 @@ const FRESH_POST_RE =
 
 export { FRESH_POST_RE };
 
-export const isVentureFundedStartupShape = (combinedText: string): boolean =>
-  FUNDING_RE.test(combinedText) &&
-  !/\b(fortune\s+\d+|10,?000\s*\+?\s*employees|\b\d{5,}\s+employees|global\s+enterprise|publicly\s+traded\s+since\s+19)\b/i.test(
-    combinedText,
+export const isVentureFundedStartupShape = (
+  job: ExtractedJobData | string,
+  combinedText?: string,
+): boolean => {
+  if (typeof job === "string") {
+    const blob = job;
+    return (
+      FUNDING_RE.test(blob) &&
+      !/\b(fortune\s+\d+|10,?000\s*\+?\s*employees|\b\d{5,}\s+employees|global\s+enterprise|publicly\s+traded\s+since\s+19)\b/i.test(
+        blob,
+      )
+    );
+  }
+  const blob = normalizeText(
+    combinedText ??
+      [
+        job.company,
+        job.title,
+        job.location,
+        job.seniority,
+        job.rawText ?? "",
+        ...(job.domainTags ?? []),
+      ].join("\n"),
   );
+  return FUNDING_RE.test(blob) && !isLargeOrEnterpriseEmployerScale(job, blob);
+};
 
 export const detectCompetitivePoolSignals = (
   job: ExtractedJobData,

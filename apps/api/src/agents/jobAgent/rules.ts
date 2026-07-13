@@ -21,6 +21,7 @@ import {
 import { evaluateDisjunctiveLanguageRequirement, filterGapsAfterDisjunctiveMatch } from '../../lib/disjunctiveLanguageRequirement.js';
 import { isFdeBuilderSoftwarePrimaryShape } from '../../lib/fdeBuilderRole.js';
 import { classifyRoleLane, detectBackendProductApiShape } from '../../lib/roleFunctionClassifier.js';
+import { isStartupSmallTeamScale } from '../../lib/employerScale.js';
 import { detectRoleSeniorityOverreach } from '../../lib/seniorityGate.js';
 import {
   jdHasAppliedAiSystemsOverlap,
@@ -141,9 +142,7 @@ export const evaluateRules = (
 
   const isFinance = detectStrictFinanceEmployerContext(combinedText, companyNorm);
   const traditionalSignal = detectTraditionalEmployerContextStrict(combinedText, companyNorm);
-  const startupSmallTeam =
-    /\b(1[-\s]?10|11[-\s]?50|51[-\s]?200)\s*(employees|employee|people|person|team)\b/i.test(combinedText) ||
-    /\b(seed|series\s+[ab]|pre-seed|founding team|startup|early[-\s]?stage)\b/i.test(combinedText);
+  const startupSmallTeam = isStartupSmallTeamScale(job, combinedText);
   const isTraditionalCompany = traditionalSignal && !startupSmallTeam;
 
   const harshEmployerContext = isTraditionalCompany || isFinance;
@@ -588,7 +587,7 @@ export const evaluateRules = (
   }
 
   const coreLang = analyzeCoreLanguageRequirement(job, profile, claimable);
-  const ventureFundedStartup = isVentureFundedStartupShape(combinedText);
+  const ventureFundedStartup = isVentureFundedStartupShape(job, combinedText);
   const matureStructuredEmployer =
     !ventureFundedStartup &&
     (isMatureStructuredEmployer(job.company ?? '', combinedText) || harshEmployerContext);
