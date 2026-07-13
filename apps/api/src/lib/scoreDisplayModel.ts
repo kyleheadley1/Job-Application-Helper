@@ -446,6 +446,7 @@ export const buildScoreDisplay = (params: {
   referralPathwayNotes?: string;
   hardGateReasons?: string[];
   trackerPostedAt?: string;
+  jobCreatedAt?: string;
 }): ScoreDisplay | undefined => {
   const profile = params.profile ?? defaultUserProfile;
   const headlineCapability = params.score.capability;
@@ -552,6 +553,7 @@ export const buildScoreDisplay = (params: {
     scoreBand,
     final,
     trackerPostedAt: params.trackerPostedAt,
+    jobCreatedAt: params.jobCreatedAt,
   });
   const applyNowUrgencyNote = applyNowUrgency ? APPLY_NOW_URGENCY_MESSAGE : undefined;
 

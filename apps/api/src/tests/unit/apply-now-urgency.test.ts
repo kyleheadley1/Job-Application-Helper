@@ -63,16 +63,30 @@ const highScore = (): ScoreBreakdown => ({
   survivability: 0.7,
 });
 
+const NOW = Date.parse("2026-07-13T12:00:00.000Z");
+const CREATED_1H_AGO = "2026-07-13T11:00:00.000Z";
+const CREATED_2D_AGO = "2026-07-11T12:00:00.000Z";
+
 describe("parsePostedAtHoursAgo", () => {
-  it("parses relative hours from rawText", () => {
-    expect(parsePostedAtHoursAgo({ rawText: "Posted 2 hours ago" })).toBe(2);
-    expect(parsePostedAtHoursAgo({ rawText: "3 hours ago · Remote" })).toBe(3);
+  it("parses relative hours only when jobCreatedAt is recent", () => {
+    expect(
+      parsePostedAtHoursAgo(
+        { rawText: "Posted 2 hours ago", jobCreatedAt: CREATED_1H_AGO },
+        NOW,
+      ),
+    ).toBe(3);
+    expect(parsePostedAtHoursAgo({ rawText: "Posted 2 hours ago" }, NOW)).toBeUndefined();
+    expect(
+      parsePostedAtHoursAgo(
+        { rawText: "Posted 2 hours ago", jobCreatedAt: CREATED_2D_AGO },
+        NOW,
+      ),
+    ).toBeUndefined();
   });
 
-  it("parses ISO postedAt", () => {
-    const now = Date.parse("2026-07-13T12:00:00.000Z");
+  it("parses ISO postedAt without needing createdAt", () => {
     const postedAt = "2026-07-13T09:00:00.000Z";
-    expect(parsePostedAtHoursAgo({ postedAt }, now)).toBe(3);
+    expect(parsePostedAtHoursAgo({ postedAt }, NOW)).toBe(3);
   });
 
   it("returns undefined when unknown", () => {
@@ -81,7 +95,7 @@ describe("parsePostedAtHoursAgo", () => {
 });
 
 describe("evaluateApplyNowUrgency", () => {
-  it("fires for favorable-shape + small employer + posted <6h", () => {
+  it("fires for favorable-shape + small employer + posted <6h on a fresh record", () => {
     expect(
       evaluateApplyNowUrgency({
         extracted: productSweJob(),
@@ -89,8 +103,23 @@ describe("evaluateApplyNowUrgency", () => {
         recommendation: "apply_cold",
         scoreBand: "apply",
         final: 78,
+        jobCreatedAt: CREATED_1H_AGO,
+        nowMs: NOW,
       }),
     ).toBe(true);
+  });
+
+  it("does not fire on stale relative chrome for old stored jobs", () => {
+    expect(
+      evaluateApplyNowUrgency({
+        extracted: productSweJob(),
+        rules: baseRules(),
+        recommendation: "apply_cold",
+        final: 78,
+        jobCreatedAt: CREATED_2D_AGO,
+        nowMs: NOW,
+      }),
+    ).toBe(false);
   });
 
   it("does not fire when posted >6h", () => {
@@ -100,6 +129,8 @@ describe("evaluateApplyNowUrgency", () => {
         rules: baseRules(),
         recommendation: "apply_cold",
         final: 78,
+        jobCreatedAt: CREATED_1H_AGO,
+        nowMs: NOW,
       }),
     ).toBe(false);
   });
@@ -115,6 +146,8 @@ describe("evaluateApplyNowUrgency", () => {
         rules: baseRules(),
         recommendation: "apply_cold",
         final: 78,
+        jobCreatedAt: CREATED_1H_AGO,
+        nowMs: NOW,
       }),
     ).toBe(false);
   });
@@ -126,6 +159,8 @@ describe("evaluateApplyNowUrgency", () => {
         rules: { ...baseRules(), adjacentRoleFunction: true },
         recommendation: "apply_cold",
         final: 68,
+        jobCreatedAt: CREATED_1H_AGO,
+        nowMs: NOW,
       }),
     ).toBe(false);
   });
@@ -138,9 +173,22 @@ describe("apply-now urgency on score display", () => {
       rules: baseRules(),
       extracted: productSweJob(),
       recommendation: "apply_cold",
+      jobCreatedAt: CREATED_1H_AGO,
     });
-    expect(display?.applyNowUrgency).toBe(true);
-    expect(display?.applyNowUrgencyNote).toBe(APPLY_NOW_URGENCY_MESSAGE);
+    // buildScoreDisplay uses Date.now(); pin via evaluate path already covered —
+    // when createdAt is recent relative to real now this may flake; use ISO postedAt instead.
+    const withIso = buildScoreDisplay({
+      score: highScore(),
+      rules: baseRules(),
+      extracted: productSweJob({
+        postedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+        rawText: "NicheStartup — Software Engineer\n11-50 employees\nTypeScript React",
+      }),
+      recommendation: "apply_cold",
+    });
+    expect(withIso?.applyNowUrgency).toBe(true);
+    expect(withIso?.applyNowUrgencyNote).toBe(APPLY_NOW_URGENCY_MESSAGE);
+    expect(withIso?.final).toBe(highScore().total);
     expect(display?.final).toBe(highScore().total);
   });
 });
