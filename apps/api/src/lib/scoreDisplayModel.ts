@@ -41,7 +41,9 @@ import {
 import {
   applyAdjacentRoleFunctionCap,
   applyFrontendPrimaryRoleCap,
+  applyPlatformInfraRoleCap,
   classifyFrontendPrimaryRole,
+  classifyPlatformInfraRole,
 } from "./roleFunctionClassifier.js";
 import { buildContractCaveat, contractFinalDock } from "./contractEmployment.js";
 import {
@@ -114,17 +116,23 @@ export const buildFullCapabilityBreakdown = (
   );
   const withRoleCap = applyAdjacentRoleFunctionCap(withGap, extracted);
   const withFrontendCap = applyFrontendPrimaryRoleCap(withRoleCap.breakdown, extracted);
+  const withPlatformCap = applyPlatformInfraRoleCap(withFrontendCap.breakdown, extracted);
   const frontendPrimary =
     withFrontendCap.classification.detected || classifyFrontendPrimaryRole(extracted).detected;
-  const capped = applyDifferentiatorCoverageCap(withFrontendCap.breakdown, extracted, {
+  const platformInfra =
+    withPlatformCap.classification.detected || classifyPlatformInfraRole(extracted).detected;
+  const capped = applyDifferentiatorCoverageCap(withPlatformCap.breakdown, extracted, {
     adjacentRoleFunction: withRoleCap.classification.detected,
     frontendPrimaryRole: frontendPrimary,
+    platformInfraRole: platformInfra,
   });
   const roleFunctionCapNote = withRoleCap.classification.detected
     ? withRoleCap.classification.note
-    : withFrontendCap.classification.detected
-      ? withFrontendCap.classification.note
-      : undefined;
+    : withPlatformCap.classification.detected
+      ? withPlatformCap.classification.note
+      : withFrontendCap.classification.detected
+        ? withFrontendCap.classification.note
+        : undefined;
   return {
     breakdown: capped.breakdown,
     differentiatorCoverage: capped.coverage,
