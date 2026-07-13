@@ -109,6 +109,23 @@ describe("degree dock tiers", () => {
     expect(computeDegreeGapDock(rules, userProfile)).toBe(0);
   });
 
+  it("neutral JD (no degree language) uses neutral credential lever label, not NONE", () => {
+    const rules = evaluateRules(NO_DEGREE_JOB, userProfile, { activeResumeType: "SWE" });
+    const composite = computeCompositeScore({
+      rawScore: IBM_RAW,
+      rules,
+      extracted: NO_DEGREE_JOB,
+      profile: userProfile,
+      resumeText: SWE_RESUME,
+    });
+    const credentialRow = buildSurvivabilityRows(
+      composite.score.survivabilityBreakdown!,
+      rules,
+    ).find((r) => r.key === "credentialSignal");
+    expect(credentialRow?.leverLabel).toMatch(/neutral — no explicit degree language/i);
+    expect(credentialRow?.leverLabel).not.toMatch(/NONE/i);
+  });
+
   it("equivalency clause → soft tier only", () => {
     const rules = evaluateRules(OPTIMIZELY_JOB, userProfile, { activeResumeType: "SWE" });
     expect(rules.degreeHasEquivalencyClause).toBe(true);

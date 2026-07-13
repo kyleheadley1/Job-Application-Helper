@@ -10,8 +10,10 @@ export const contractFinalDock = (job: ExtractedJobData): number =>
 
 export const buildContractCaveat = (job: ExtractedJobData): string | undefined => {
   if (!isContractEmploymentType(job)) return undefined;
+  const hasStructuredSalary =
+    typeof job.salary?.min === "number" || typeof job.salary?.max === "number";
   const hasSalary =
-    Boolean(job.salary?.trim()) ||
+    hasStructuredSalary ||
     /\$\d|\bsalary\b|\bcompensation\b|\b\/hr\b|\bper hour\b/i.test(job.rawText ?? "");
   const base = "Contract role — not permanent; weigh stability/career-value.";
   if (!hasSalary) {
