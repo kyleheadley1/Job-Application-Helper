@@ -10,28 +10,15 @@ import {
 } from "./jdLanguageOutputBoundary.js";
 import { normalizeText } from "./text.js";
 import {
-  classifyFrontendPrimaryRole,
-  classifyPlatformInfraRole,
-  classifyRoleFunction,
+  classifyRoleLane,
+  roleLaneIsAdjacent,
+  roleLaneIsFrontendPrimary,
+  roleLaneIsPlatformInfra,
 } from "./roleFunctionClassifier.js";
 import { isContractEmploymentType } from "./contractEmployment.js";
+import { structuredFirstJobBlob } from "./structuredFirstJobBlob.js";
 
-const jobBlob = (job: ExtractedJobData): string =>
-  normalizeText(
-    [
-      job.company,
-      job.title,
-      job.seniority,
-      job.location,
-      job.rawText ?? "",
-      ...(job.stack ?? []),
-      ...(job.requiredSkills ?? []),
-      ...(job.preferredSkills ?? []),
-      ...(job.domainTags ?? []),
-      ...(job.requirements ?? []),
-      ...(job.responsibilities ?? []),
-    ].join("\n"),
-  );
+const jobBlob = (job: ExtractedJobData): string => structuredFirstJobBlob(job);
 
 /** Employer-industry finance signals — not benefits (401k/pension) or bare "insurance" wellness copy. */
 const FINANCE_DOMAIN_RE =
@@ -230,15 +217,19 @@ export const applyScoringClampLayer = (params: {
 }): ScoringClampResult => {
   const hardRuleFlags = buildHardRuleFlags(params.extracted, params.rules);
   const financeCtx = detectFinanceClampContext(params.extracted, params.rules);
+  const roleLane = classifyRoleLane(params.extracted);
 
   const rules: RuleEvaluation = {
     ...params.rules,
     financePenalty: financeCtx.financePenalty || params.rules.financePenalty,
     hardRuleFlags,
-    roleShapeOutsideLane: detectRoleShapeOutsideLane(params.extracted),
-    adjacentRoleFunction: classifyRoleFunction(params.extracted).detected,
-    frontendPrimaryRole: classifyFrontendPrimaryRole(params.extracted).detected,
-    platformInfraRole: classifyPlatformInfraRole(params.extracted).detected,
+    roleShapeOutsideLane:
+      roleLaneIsPlatformInfra(roleLane.label) || detectRoleShapeOutsideLane(params.extracted),
+    roleLane: roleLane.label,
+    roleLaneKind: roleLane.adjacentKind,
+    adjacentRoleFunction: roleLaneIsAdjacent(roleLane.label),
+    frontendPrimaryRole: roleLaneIsFrontendPrimary(roleLane.label),
+    platformInfraRole: roleLaneIsPlatformInfra(roleLane.label),
   };
 
   let score = { ...params.score };

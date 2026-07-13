@@ -1,4 +1,5 @@
 import type { ExtractedJobData } from "../types/job.js";
+import { structuredFirstJobBlob } from "./structuredFirstJobBlob.js";
 import { normalizeText } from "./text.js";
 
 /** High-confidence solutions / external customer delivery phrases (SIE-primary territory). */
@@ -29,14 +30,7 @@ export const STRONG_SIE_DESCRIPTOR_RES: RegExp[] = [
 
 /** Text blob for FDE / growth-engineer heuristics (title + JD body). */
 export const jobBlobForFdeHeuristics = (job: ExtractedJobData): string =>
-  normalizeText(
-    [
-      job.title,
-      job.rawText ?? "",
-      ...(job.requirements ?? []),
-      ...(job.responsibilities ?? []),
-    ].join(" "),
-  );
+  structuredFirstJobBlob(job);
 
 /** Naming suggests Forward Deployed or growth engineering (not generic "engineer"). */
 export const hasFdeOrGrowthEngineerNaming = (blob: string): boolean =>

@@ -114,6 +114,21 @@ export type ScoreBand = "strong_apply" | "apply" | "skip" | "no";
 
 export type BandHeadline = "Strong yes" | "Yes" | "If quick" | "Skip";
 
+export type AdjacentRoleFunctionKind =
+  | "implementation_analyst"
+  | "business_systems_analyst"
+  | "qa_engineer"
+  | "solutions_engineer"
+  | "technical_analyst"
+  | "sales_engineer";
+
+export type RoleLaneLabel =
+  | "product_frontend"
+  | "product_fullstack"
+  | "product_backend"
+  | "platform_infra"
+  | "adjacent_non_engineering";
+
 export type ScoreDisplay = {
   capability: number;
   capabilityBreakdown: CapabilityBreakdown;
@@ -284,6 +299,9 @@ export type RuleEvaluation = {
   frontendPrimaryRole?: boolean;
   /** Platform/infra/SRE role: engineer-facing platform; aws/backend/api edge not load-bearing. */
   platformInfraRole?: boolean;
+  /** Unified Item G primary lane — preferred over re-deriving classifiers. */
+  roleLane?: RoleLaneLabel;
+  roleLaneKind?: AdjacentRoleFunctionKind | null;
   /** JD explicitly welcomes portfolio / experience over formal degree credentials. */
   jdDegreePositive?: boolean;
   /** JD prohibits GenAI-generated substantive application content. */

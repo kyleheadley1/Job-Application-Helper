@@ -9,6 +9,7 @@ import {
   isLargeEmployerByHeadcount,
 } from "./companyEmployeeCount.js";
 import { FRESH_POST_RE } from "./poolCompetitiveness.js";
+import { structuredFirstJobBlob } from "./structuredFirstJobBlob.js";
 import { countTechCanonOverlap } from "./techCanon.js";
 import { normalizeText } from "./text.js";
 
@@ -52,21 +53,7 @@ export const resolveEmployerDisplayName = (job: ExtractedJobData): string =>
     job.companyDisplayName?.trim() || job.company?.trim() || "",
   );
 
-const listingBlob = (job: ExtractedJobData): string =>
-  normalizeText(
-    [
-      job.company,
-      job.title,
-      job.location,
-      job.seniority,
-      job.rawText ?? "",
-      ...(job.stack ?? []),
-      ...(job.requiredSkills ?? []),
-      ...(job.preferredSkills ?? []),
-      ...(job.requirements ?? []),
-      ...(job.responsibilities ?? []),
-    ].join("\n"),
-  );
+const listingBlob = (job: ExtractedJobData): string => structuredFirstJobBlob(job);
 
 const listingStackBlob = (job: ExtractedJobData): string =>
   normalizeText(
