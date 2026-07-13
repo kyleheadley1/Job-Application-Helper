@@ -11,6 +11,7 @@ import {
   classifyPlatformInfraRole,
   classifyRoleFunction,
 } from "./roleFunctionClassifier.js";
+import { structuredFirstJobBlob } from "./structuredFirstJobBlob.js";
 import { normalizeText } from "./text.js";
 
 export type DifferentiatorCoverageTier = "none" | "partial" | "strong";
@@ -94,18 +95,7 @@ const AI_TOOLING_DIFFERENTIATOR_TAGS = new Set([
 export const stripWorkAuthorizationPhrases = (text: string): string =>
   normalizeText(text).replace(WORK_AUTHORIZATION_RE, " ");
 
-export const jobDescriptionBlob = (job: ExtractedJobData): string =>
-  normalizeText(
-    [
-      job.rawText ?? "",
-      job.title ?? "",
-      ...(job.stack ?? []),
-      ...(job.requiredSkills ?? []),
-      ...(job.preferredSkills ?? []),
-      ...(job.requirements ?? []),
-      ...(job.responsibilities ?? []),
-    ].join("\n"),
-  );
+export const jobDescriptionBlob = (job: ExtractedJobData): string => structuredFirstJobBlob(job);
 
 export const countDifferentiatorTags = (
   text: string,

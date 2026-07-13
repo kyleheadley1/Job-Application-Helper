@@ -4,21 +4,26 @@ import {
   PLATFORM_INFRA_ROLE,
 } from "../config/capabilitySurvivabilityPolicy.js";
 import type { ExtractedJobData } from "../types/job.js";
-import type { CapabilityBreakdown } from "../types/scoring.js";
+import type {
+  AdjacentRoleFunctionKind,
+  CapabilityBreakdown,
+  RoleLaneLabel,
+} from "../types/scoring.js";
 import {
   countStrongSieRoleDescriptorHits,
   hasBuilderFirstSoftwareContext,
   isFdeBuilderSoftwarePrimaryShape,
 } from "./fdeBuilderRole.js";
+import { structuredFirstJobBlob } from "./structuredFirstJobBlob.js";
 import { normalizeMatcherText, normalizeText } from "./text.js";
 
-export type AdjacentRoleFunctionKind =
-  | "implementation_analyst"
-  | "business_systems_analyst"
-  | "qa_engineer"
-  | "solutions_engineer"
-  | "technical_analyst"
-  | "sales_engineer";
+export type { AdjacentRoleFunctionKind, RoleLaneLabel };
+
+export type RoleLaneClassification = {
+  label: RoleLaneLabel;
+  adjacentKind: AdjacentRoleFunctionKind | null;
+  note: string;
+};
 
 export type RoleFunctionClassification = {
   detected: boolean;
@@ -38,20 +43,7 @@ export type PlatformInfraClassification = {
   note: string;
 };
 
-const jobBlob = (job: ExtractedJobData): string =>
-  normalizeText(
-    [
-      job.company,
-      job.title,
-      job.rawText ?? "",
-      ...(job.stack ?? []),
-      ...(job.requiredSkills ?? []),
-      ...(job.preferredSkills ?? []),
-      ...(job.domainTags ?? []),
-      ...(job.requirements ?? []),
-      ...(job.responsibilities ?? []),
-    ].join("\n"),
-  );
+const jobBlob = (job: ExtractedJobData): string => structuredFirstJobBlob(job);
 
 const ADJACENT_TITLE_PATTERNS: Array<{ kind: AdjacentRoleFunctionKind; pattern: RegExp }> = [
   { kind: "implementation_analyst", pattern: /\b(?:technical\s+)?implementation\s+analyst\b/i },
@@ -387,3 +379,74 @@ export const applyPlatformInfraRoleCap = (
     classification,
   };
 };
+
+/** Backend/API product SWE (not platform/infra) — structured-first blob. */
+export const detectBackendProductApiShape = (job: ExtractedJobData): boolean => {
+  const blob = jobBlob(job);
+  const productApi =
+    /\b(backend|api|full[-\s]?stack|product engineer|product engineering|customer problems?|feature development|features|reliable systems?|testing|debugging|production systems?)\b/i.test(
+      blob,
+    );
+  const infraCore =
+    /\b(sre|site reliability|platform engineering|devops|terraform|iac|infrastructure tooling|airgapped|linux internals|container runtime|supply chain security|security hardening)\b/i.test(
+      blob,
+    );
+  return productApi && !infraCore;
+};
+
+/**
+ * Single primary role-lane label per JD (Item G). Runs narrow classifiers once.
+ * Priority: adjacent > platform_infra > product_frontend > product_backend > product_fullstack.
+ */
+export const classifyRoleLane = (job: ExtractedJobData): RoleLaneClassification => {
+  const adjacent = classifyRoleFunction(job);
+  if (adjacent.detected) {
+    return {
+      label: "adjacent_non_engineering",
+      adjacentKind: adjacent.kind,
+      note: adjacent.note,
+    };
+  }
+
+  const platform = classifyPlatformInfraRole(job);
+  if (platform.detected) {
+    return {
+      label: "platform_infra",
+      adjacentKind: null,
+      note: platform.note,
+    };
+  }
+
+  const frontend = classifyFrontendPrimaryRole(job);
+  if (frontend.detected) {
+    return {
+      label: "product_frontend",
+      adjacentKind: null,
+      note: frontend.note,
+    };
+  }
+
+  if (detectBackendProductApiShape(job)) {
+    return {
+      label: "product_backend",
+      adjacentKind: null,
+      note: "role-type: backend/API product engineering",
+    };
+  }
+
+  return {
+    label: "product_fullstack",
+    adjacentKind: null,
+    note: "",
+  };
+};
+
+/** Boolean views of classifyRoleLane — keep call sites stable. */
+export const roleLaneIsAdjacent = (lane: RoleLaneLabel): boolean =>
+  lane === "adjacent_non_engineering";
+export const roleLaneIsFrontendPrimary = (lane: RoleLaneLabel): boolean =>
+  lane === "product_frontend";
+export const roleLaneIsPlatformInfra = (lane: RoleLaneLabel): boolean =>
+  lane === "platform_infra";
+export const roleLaneIsBackendProduct = (lane: RoleLaneLabel): boolean =>
+  lane === "product_backend";

@@ -206,6 +206,29 @@ export const RuleEvaluationSchema = z.object({
     .optional()
     .default([]),
   roleShapeOutsideLane: z.boolean().optional().default(false),
+  adjacentRoleFunction: z.boolean().optional().default(false),
+  frontendPrimaryRole: z.boolean().optional().default(false),
+  platformInfraRole: z.boolean().optional().default(false),
+  roleLane: z
+    .enum([
+      "product_frontend",
+      "product_fullstack",
+      "product_backend",
+      "platform_infra",
+      "adjacent_non_engineering",
+    ])
+    .optional(),
+  roleLaneKind: z
+    .enum([
+      "implementation_analyst",
+      "business_systems_analyst",
+      "qa_engineer",
+      "solutions_engineer",
+      "technical_analyst",
+      "sales_engineer",
+    ])
+    .nullable()
+    .optional(),
   disjunctiveLanguageRequirementSatisfied: z.boolean().optional().default(false),
   disjunctiveAcceptedLanguages: z.array(z.string()).optional().default([]),
   notes: z.array(z.string()).default([]),
