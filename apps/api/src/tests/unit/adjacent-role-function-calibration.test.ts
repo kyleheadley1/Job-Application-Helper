@@ -173,17 +173,47 @@ describe("adjacent role-function classifier", () => {
     expect(classifyRoleFunction(solutionsJob).detected).toBe(true);
   });
 
-  it("caps QA Wolf QA-as-product role", () => {
-    const { composite } = scoreAdjacentJob(QA_WOLF_JOB);
+  it("caps QA Wolf QA-as-product role — final lands in the 60s", () => {
+    const { composite, display, rules } = scoreAdjacentJob(QA_WOLF_JOB);
     expect(classifyRoleFunction(QA_WOLF_JOB).detected).toBe(true);
+    expect(classifyRoleFunction(QA_WOLF_JOB).kind).toBe("qa_engineer");
+    expect(rules.adjacentRoleFunction).toBe(true);
+    expect(composite.score.capability).toBeGreaterThanOrEqual(64);
     expect(composite.score.capability).toBeLessThanOrEqual(72);
     expect(composite.score.capabilityBreakdown?.functionalOverlap).toBeLessThanOrEqual(20);
+    expect(display?.final ?? 0).toBeGreaterThanOrEqual(55);
+    expect(display?.final ?? 0).toBeLessThanOrEqual(69);
+    expect(["stretch_signal", "skip"]).toContain(composite.recommendation);
   });
 
-  it("caps Scalence implementation analyst role", () => {
-    const { composite } = scoreAdjacentJob(SCALENCE_JOB);
+  it("caps Scalence implementation analyst role — final lands in the 60s", () => {
+    const { composite, display, rules } = scoreAdjacentJob(SCALENCE_JOB);
     expect(classifyRoleFunction(SCALENCE_JOB).detected).toBe(true);
+    expect(classifyRoleFunction(SCALENCE_JOB).kind).toBe("implementation_analyst");
+    expect(rules.adjacentRoleFunction).toBe(true);
+    expect(composite.score.capability).toBeGreaterThanOrEqual(64);
     expect(composite.score.capability).toBeLessThanOrEqual(72);
     expect(composite.score.capabilityBreakdown?.functionalOverlap).toBeLessThanOrEqual(20);
+    expect(display?.final ?? 0).toBeGreaterThanOrEqual(55);
+    expect(display?.final ?? 0).toBeLessThanOrEqual(69);
+    expect(["stretch_signal", "skip"]).toContain(composite.recommendation);
+  });
+
+  it("guards: product SWE anchors stay uncapped by adjacent-role classifier", async () => {
+    const { loadCalibrationFixture, scoreCalibrationAnchor } = await import(
+      "../fixtures/calibrationAnchors.js"
+    );
+    expect(classifyRoleFunction(loadCalibrationFixture("cherryHill").extracted).detected).toBe(
+      false,
+    );
+    expect(classifyRoleFunction(loadCalibrationFixture("trabaAppliedAi").extracted).detected).toBe(
+      false,
+    );
+    expect(
+      classifyRoleFunction(loadCalibrationFixture("preciselyAssociateSweFrontend").extracted)
+        .detected,
+    ).toBe(false);
+    expect(scoreCalibrationAnchor("cherryHill").score.total).toBeGreaterThanOrEqual(78);
+    expect(scoreCalibrationAnchor("trabaAppliedAi").score.total).toBeGreaterThanOrEqual(75);
   });
 });
