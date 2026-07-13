@@ -185,6 +185,11 @@ export const scoreDomainMatchForListing = (
   const blob = jobBlob(job);
   const resume = normalizeText(resumeText);
   if (rules.domainMismatch) return 0.18;
+  // Healthcare product SWE roles are in-lane for this candidate profile; keyword docks
+  // (ehr/hipaa/clinical without resume domain words) must not flatten domainMatch to 0.32.
+  if (rules.healthcareProductEngineering) {
+    return clamp01((rawScore.domainFit / 10) * 0.65 + 0.2);
+  }
   const domainSpecific =
     /\b(ehr|hipaa|clinical|healthcare compliance|medical records|phi|fda|gaap|asc\s*606|payments compliance)\b/i.test(
       blob,

@@ -294,21 +294,21 @@ export const evaluateRules = (
   if (coreLanguageGap.length === 0) stackMismatch = false;
   const adjacentFrameworkGap = stackAnalysis.adjacentFrameworkGap;
 
+  const hardDomainMismatch = includesAny(combinedText, [
+    'medical billing',
+    'quantitative research',
+    'actuarial',
+    'embedded firmware',
+  ]);
   const healthcareProductEngineering =
+    !hardDomainMismatch &&
     /\b(healthcare|health\s+care|behavioral\s+health|clinical|patient|hospital|therapy|ehr|hipaa)\b/i.test(
       combinedText,
     ) &&
-    /\b(product\s+engineer|full[-\s]?stack|software\s+engineer|typescript|javascript|react|api|revenue|billing|growth|internal\s+tools|crm)\b/i.test(
+    /\b(product\s+engineer|full[-\s]?stack|software\s+engineer|typescript|javascript|react|api|revenue|growth|internal\s+tools|crm)\b/i.test(
       combinedText,
     );
-  const domainMismatch =
-    !healthcareProductEngineering &&
-    includesAny(combinedText, [
-      'medical billing',
-      'quantitative research',
-      'actuarial',
-      'embedded firmware',
-    ]);
+  const domainMismatch = hardDomainMismatch;
 
   const startupFounderMismatch = includesAny(combinedText, [
     'founding engineer',
