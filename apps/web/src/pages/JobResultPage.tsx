@@ -125,6 +125,16 @@ export const JobResultPage = () => {
 
   const ensureAssets = async (nextTab: AssetTab) => {
     if (!job || nextTab === "raw" || tabHasContent(job, nextTab) || assetBusy) return;
+    const genAiBlocked =
+      Boolean(job.scoreDisplay?.genAiRestrictionWarning || job.rules?.jdProhibitsGenAI) &&
+      (nextTab === "cover" || nextTab === "points");
+    if (genAiBlocked) {
+      setAssetMsg(
+        job.scoreDisplay?.genAiRestrictionWarning ??
+          "This employer restricts GenAI-generated content in applications — drafts not auto-generated.",
+      );
+      return;
+    }
     setAssetBusy(true);
     setAssetMsg("Generating assets...");
     try {
@@ -401,11 +411,28 @@ export const JobResultPage = () => {
         <button onClick={() => void openTab("raw")}>Raw Extraction</button>
       </div>
       {assetMsg ? <p className="muted">{assetMsg}</p> : null}
+      {(tab === "cover" || tab === "points") && scoreDisplay?.genAiRestrictionWarning ? (
+        <article className="card" role="alert">
+          <p>
+            <strong>GenAI restriction:</strong> {scoreDisplay.genAiRestrictionWarning}
+          </p>
+        </article>
+      ) : null}
       <article className="card">
-        {tab === "cover" ? renderTextParagraphs(job.generated.coverLetter ?? "", "Not generated") : null}
+        {tab === "cover" ? (
+          scoreDisplay?.genAiRestrictionWarning && !job.generated.coverLetter?.trim() ? (
+            <p className="muted">Auto-generation suppressed for this employer — draft offline from an outline only.</p>
+          ) : (
+            renderTextParagraphs(job.generated.coverLetter ?? "", "Not generated")
+          )
+        ) : null}
         {tab === "why" ? renderTextParagraphs(job.generated.whyCompany ?? "", "Not generated") : null}
         {tab === "points" ? (
-          <ul>{(job.generated.talkingPoints ?? []).map((item) => <li key={item}>{item}</li>)}</ul>
+          scoreDisplay?.genAiRestrictionWarning && !(job.generated.talkingPoints?.length ?? 0) ? (
+            <p className="muted">Auto-generation suppressed for this employer — draft talking points offline.</p>
+          ) : (
+            <ul>{(job.generated.talkingPoints ?? []).map((item) => <li key={item}>{item}</li>)}</ul>
+          )
         ) : null}
         {tab === "bullets" ? (
           <ul>{(job.generated.tailoredBulletCandidates ?? []).map((item) => <li key={item}>{item}</li>)}</ul>

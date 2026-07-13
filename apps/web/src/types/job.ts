@@ -78,6 +78,8 @@ export type RuleEvaluation = {
   hardRuleNotes?: string[];
   hardRuleFlags?: Array<{ id: string; message: string }>;
   roleShapeOutsideLane?: boolean;
+  jdDegreePositive?: boolean;
+  jdProhibitsGenAI?: boolean;
   disjunctiveLanguageRequirementSatisfied?: boolean;
   disjunctiveAcceptedLanguages?: string[];
   notes: string[];
@@ -180,6 +182,7 @@ export type ScoreDisplay = {
   poolFriendlinessNote?: string;
   degreePositiveNote?: string;
   contractCaveat?: string;
+  genAiRestrictionWarning?: string;
   eligibilityAdvisory?: EligibilityFlag;
   eligibilityAdvisories?: EligibilityFlag[];
 };

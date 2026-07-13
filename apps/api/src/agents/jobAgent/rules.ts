@@ -38,6 +38,7 @@ import {
   jdIsDegreePositive,
   resolveDegreeEquivalencyRules,
 } from '../../lib/degreeEquivalency.js';
+import { jdProhibitsGenAI } from '../../lib/genAiRestriction.js';
 
 const includesAny = (haystack: string, needles: string[]): boolean =>
   needles.some((needle) => haystack.includes(needle));
@@ -135,6 +136,7 @@ export const evaluateRules = (
     [companyNorm, structuredParts, raw].filter(Boolean).join(' '),
   );
   const jdDegreePositive = jdIsDegreePositive(job);
+  const jdProhibitsGenAIContent = jdProhibitsGenAI(job);
 
   const isFinance = detectStrictFinanceEmployerContext(combinedText, companyNorm);
   const traditionalSignal = detectTraditionalEmployerContextStrict(combinedText, companyNorm);
@@ -656,12 +658,18 @@ export const evaluateRules = (
       'Degree-positive JD: employer welcomes non-degree / show-the-work candidates — credential drag neutralized.',
     );
   }
+  if (jdProhibitsGenAIContent) {
+    notes.push(
+      'Employer restricts GenAI-generated application content — use drafts as outlines only.',
+    );
+  }
 
   return {
     explicitDegreeRisk,
     degreeHasEquivalencyClause,
     degreeEquivalencySatisfied,
     jdDegreePositive,
+    jdProhibitsGenAI: jdProhibitsGenAIContent,
     traditionalCompanyPenalty: isTraditionalCompany,
     financePenalty: isFinance,
     strictNewGradPipeline,

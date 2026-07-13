@@ -1,0 +1,35 @@
+{
+  "id": "nyt-content-data-products-genai-restriction",
+  "anchorNote": "NYT Content Data Products — applicant GenAI restriction (positive)",
+  "extracted": {
+    "company": "The New York Times",
+    "companyDisplayName": "The New York Times",
+    "title": "Software Engineer, Content Data Products",
+    "location": "New York, NY",
+    "remoteType": "hybrid",
+    "seniority": "Mid Level",
+    "stack": ["Python", "TypeScript", "SQL"],
+    "requiredSkills": ["Python", "data products", "TypeScript"],
+    "preferredSkills": ["Spark"],
+    "domainTags": ["news", "data products"],
+    "companyEmployeeCount": 10001,
+    "requirements": [
+      "Experience building data products",
+      "Applications must not include GenAI-generated cover letters or essays",
+      "Authentic application materials only"
+    ],
+    "responsibilities": [
+      "Build content data products that power newsroom and reader experiences"
+    ],
+    "rawText": "The New York Times — Software Engineer, Content Data Products\n10,001+ employees\nApplications must not include GenAI-generated cover letters or essays. Authentic application materials only.\nBuild content data products with Python and TypeScript."
+  },
+  "storedCategoryScores": {
+    "stackFit": 14,
+    "levelFit": 14,
+    "domainFit": 7,
+    "resumeStoryClarity": 8,
+    "functionalOverlap": 12,
+    "recruiterFriendliness": 10,
+    "careerValue": 8
+  }
+}

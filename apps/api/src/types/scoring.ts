@@ -143,6 +143,8 @@ export type ScoreDisplay = {
   poolFriendlinessNote?: string;
   degreePositiveNote?: string;
   contractCaveat?: string;
+  /** Employer restricts GenAI-generated application materials. */
+  genAiRestrictionWarning?: string;
 };
 
 export type ScoreBreakdown = {
@@ -281,6 +283,8 @@ export type RuleEvaluation = {
   platformInfraRole?: boolean;
   /** JD explicitly welcomes portfolio / experience over formal degree credentials. */
   jdDegreePositive?: boolean;
+  /** JD prohibits GenAI-generated substantive application content. */
+  jdProhibitsGenAI?: boolean;
   /** JD accepts any of a listed language set; candidate matches ≥1 — no core-language gate. */
   disjunctiveLanguageRequirementSatisfied?: boolean;
   disjunctiveAcceptedLanguages?: string[];
