@@ -4,10 +4,11 @@ import { userProfile as defaultUserProfile } from "../config/userProfile.js";
 import type { ExtractedJobData } from "../types/job.js";
 import type { UserProfile } from "../types/userProfile.js";
 import { countDifferentiatorTags } from "./differentiatorCoverage.js";
+import { isLargeEmployerByHeadcount } from "./companyEmployeeCount.js";
 import {
-  extractCompanyEmployeeCount,
-  isLargeEmployerByHeadcount,
-} from "./companyEmployeeCount.js";
+  resolveEmployerScale,
+  scoreEmployerRecognizabilityFromScale,
+} from "./employerScale.js";
 import { FRESH_POST_RE } from "./poolCompetitiveness.js";
 import { structuredFirstJobBlob } from "./structuredFirstJobBlob.js";
 import { countTechCanonOverlap } from "./techCanon.js";
@@ -30,13 +31,6 @@ export type PoolFriendlinessResult = {
 
 const clampPool = (n: number): number =>
   Math.min(POOL_FRIENDLINESS.MAX, Math.max(POOL_FRIENDLINESS.MIN, n));
-
-/** Household-name employers — matched against display name only. */
-const BRAND_EMPLOYER_RE =
-  /\b(google|alphabet|meta|facebook|amazon|microsoft|apple|netflix|stripe|spotify|uber|airbnb|salesforce|databricks|openai|anthropic|notion|figma|palantir|coinbase|robinhood|doordash|instacart)\b/i;
-
-const NICHE_EMPLOYER_RE =
-  /\b(township|municipal|county|borough|village of|school district|public library|nonprofit|ngo)\b/i;
 
 const COMPANY_BOILERPLATE_RE =
   /\b(linkedin|indeed|glassdoor|insider connection|reach out via|find any email|email credits|beyond your network)\b/gi;
@@ -70,24 +64,19 @@ const listingStackBlob = (job: ExtractedJobData): string =>
 
 /**
  * How recognizable the listing employer is (0 = niche, 1 = household name).
- * Uses companyDisplayName / company (+ optional headcount floor) — never scraped rawText for brand match.
+ * Uses shared employer-scale (brand/niche lists + headcount floor) — never scraped rawText for brand match.
  */
 export const scoreListingEmployerRecognizability = (job: ExtractedJobData): number => {
   const company = resolveEmployerDisplayName(job);
-
-  let score = POOL_FRIENDLINESS.DEFAULT_EMPLOYER_RECOGNIZABILITY;
   if (!company || company === "unknown") {
-    score = POOL_FRIENDLINESS.DEFAULT_EMPLOYER_RECOGNIZABILITY;
-  } else if (BRAND_EMPLOYER_RE.test(company)) {
-    score = 0.82;
-  } else if (NICHE_EMPLOYER_RE.test(company)) {
-    score = 0.28;
+    const scale = resolveEmployerScale(job, "");
+    return scoreEmployerRecognizabilityFromScale({
+      ...scale,
+      isBrandName: false,
+      isNicheName: false,
+    });
   }
-
-  if (isLargeEmployerByHeadcount(job)) {
-    score = Math.max(score, POOL_FRIENDLINESS.LARGE_EMPLOYER_RECOGNIZABILITY_FLOOR);
-  }
-  return score;
+  return scoreEmployerRecognizabilityFromScale(resolveEmployerScale(job, company));
 };
 
 const candidateProfileBlob = (profile: UserProfile): string =>
