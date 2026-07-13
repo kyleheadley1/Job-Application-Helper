@@ -13,6 +13,8 @@ export const APPLY_NOW_URGENCY_MESSAGE =
 
 export const APPLY_NOW_MAX_HOURS = 6;
 export const APPLY_NOW_SMALL_EMPLOYER_MAX = 200;
+/** Relative JD chrome is only trusted when the job record itself is this fresh. */
+export const RELATIVE_CHROME_MAX_RECORD_AGE_HOURS = 12;
 
 const RELATIVE_HOURS_RE =
   /\b(?:posted\s+)?(\d+)\s*(minutes?|mins?|hours?|hrs?)\s+ago\b/i;
@@ -23,22 +25,21 @@ export type PostedAtFreshnessInput = {
   postedAt?: string;
   rawText?: string;
   trackerPostedAt?: string;
+  /** JobRecord.createdAt — required to trust frozen relative chrome in rawText. */
+  jobCreatedAt?: string;
 };
 
-/** Hours since post when known; undefined when no usable timestamp. */
-export const parsePostedAtHoursAgo = (
-  job: PostedAtFreshnessInput,
-  nowMs: number = Date.now(),
-): number | undefined => {
-  for (const iso of [job.postedAt, job.trackerPostedAt]) {
-    if (!iso?.trim()) continue;
-    const ms = Date.parse(iso);
-    if (!Number.isFinite(ms)) continue;
-    const hours = (nowMs - ms) / (1000 * 60 * 60);
-    if (hours >= 0) return hours;
-  }
+const hoursSinceIso = (iso: string | undefined, nowMs: number): number | undefined => {
+  if (!iso?.trim()) return undefined;
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return undefined;
+  const hours = (nowMs - ms) / (1000 * 60 * 60);
+  return hours >= 0 ? hours : undefined;
+};
 
-  const blob = normalizeText(job.rawText ?? "");
+/** Parse relative chrome alone (no createdAt adjustment). */
+const parseRelativeChromeHours = (rawText: string | undefined): number | undefined => {
+  const blob = normalizeText(rawText ?? "");
   if (!blob) return undefined;
 
   if (JUST_POSTED_RE.test(blob)) return 0;
@@ -57,9 +58,34 @@ export const parsePostedAtHoursAgo = (
     return n * 24;
   }
 
-  // Fallback: generic fresh-post chrome without a parseable N (treat as unknown, not <6h).
   if (FRESH_POST_RE.test(blob) && /\byesterday\b/i.test(blob)) return 24;
   return undefined;
+};
+
+/**
+ * Hours since post when known; undefined when no usable timestamp.
+ * ISO postedAt / tracker.postedAt always win.
+ * Relative chrome in rawText is only used when jobCreatedAt is recent (&lt;12h);
+ * effective age = chrome hours + hours since createdAt.
+ */
+export const parsePostedAtHoursAgo = (
+  job: PostedAtFreshnessInput,
+  nowMs: number = Date.now(),
+): number | undefined => {
+  for (const iso of [job.postedAt, job.trackerPostedAt]) {
+    const hours = hoursSinceIso(iso, nowMs);
+    if (hours != null) return hours;
+  }
+
+  const chromeHours = parseRelativeChromeHours(job.rawText);
+  if (chromeHours == null) return undefined;
+
+  const recordAgeHours = hoursSinceIso(job.jobCreatedAt, nowMs);
+  if (recordAgeHours == null || recordAgeHours > RELATIVE_CHROME_MAX_RECORD_AGE_HOURS) {
+    return undefined;
+  }
+
+  return chromeHours + recordAgeHours;
 };
 
 export const isSmallEmployerForApplyNow = (job: ExtractedJobData): boolean => {
@@ -94,6 +120,7 @@ export const evaluateApplyNowUrgency = (params: {
   scoreBand?: ScoreBand;
   final?: number;
   trackerPostedAt?: string;
+  jobCreatedAt?: string;
   nowMs?: number;
 }): boolean => {
   const hoursAgo = parsePostedAtHoursAgo(
@@ -101,6 +128,7 @@ export const evaluateApplyNowUrgency = (params: {
       postedAt: params.extracted.postedAt,
       rawText: params.extracted.rawText,
       trackerPostedAt: params.trackerPostedAt,
+      jobCreatedAt: params.jobCreatedAt,
     },
     params.nowMs,
   );
