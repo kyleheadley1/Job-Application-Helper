@@ -1,0 +1,38 @@
+{
+  "id": "heritage-bank-institution-calibration",
+  "anchorNote": "Actual financial institution (commercial bank) — financePenalty must fire and domainFit must be capped",
+  "extracted": {
+    "company": "Heritage Bank",
+    "title": "Software Engineer",
+    "location": "New York, NY",
+    "remoteType": "hybrid",
+    "seniority": "mid",
+    "stack": ["Java", "Spring"],
+    "requiredSkills": ["Java", "banking systems"],
+    "preferredSkills": [],
+    "domainTags": ["finance", "banking"],
+    "degreeRequirement": {
+      "level": "required",
+      "raw": "Bachelor's degree required"
+    },
+    "requirements": [
+      "Bachelor's degree required",
+      "Banking systems experience",
+      "Java / Spring"
+    ],
+    "responsibilities": [
+      "Maintain core banking and loan origination platforms",
+      "Support retail banking product delivery"
+    ],
+    "rawText": "Heritage Bank — Software Engineer\nHybrid — New York, NY\nCommercial bank building loan origination and retail banking platforms.\nFDIC-insured institution. Experience with banking systems required.\nBachelor's degree required. Java / Spring."
+  },
+  "storedCategoryScores": {
+    "stackFit": 12,
+    "levelFit": 12,
+    "domainFit": 8,
+    "resumeStoryClarity": 7,
+    "functionalOverlap": 10,
+    "recruiterFriendliness": 9,
+    "careerValue": 6
+  }
+}

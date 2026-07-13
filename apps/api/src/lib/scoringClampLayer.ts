@@ -33,11 +33,24 @@ const jobBlob = (job: ExtractedJobData): string =>
     ].join("\n"),
   );
 
+/** Employer-industry finance signals — not benefits (401k/pension) or bare "insurance" wellness copy. */
 const FINANCE_DOMAIN_RE =
-  /\b(finance|fintech|trading|quant(?:itative)?|banking|investment|asset management|hedge fund|market maker|retirement|401k|pension|insurance|prudential|jane street|citadel|two sigma|goldman|jpmorgan|blackrock)\b/i;
+  /\b(fintech|trading|quant(?:itative)?|banking|investment\s+bank|asset management|hedge fund|market maker|insurance\s+carrier|life\s+insurer|prudential|jane street|citadel|two sigma|goldman|jpmorgan|blackrock)\b/i;
+
+const FINANCE_DOMAIN_TAG_RE =
+  /\b(finance|fintech|banking|trading|quant|insurance|investment)\b/i;
 
 const QUANT_TRADING_RE =
   /\b(quant(?:itative)?\s+trading|trading\s+firm|market\s+maker|proprietary\s+trading|jane\s+street|citadel|two\s+sigma|hudson\s+river|de\s+shaw)\b/i;
+
+/** Drop benefits / wellness boilerplate so 401k and "health insurance" cannot open the finance path. */
+const stripBenefitsBoilerplate = (text: string): string =>
+  normalizeText(text)
+    .replace(/\bbenefits?\b[:\s-][^\n.]{0,400}/gi, " ")
+    .replace(
+      /\b(401\(?k\)?|retirement\s+planning|financial\s+wellness|pension\s+(?:plan|education)|health\s+insurance|competitive\s+salary)\b/gi,
+      " ",
+    );
 
 const STAFFING_AGENCY_RE =
   /\b(consulting|staffing|recruiting|talent\s+solutions|tech\s+consulting|jsr\s+tech|contractor|staff\s+aug|staff-aug)\b/i;
@@ -71,10 +84,25 @@ export const detectFinanceClampContext = (
   job: ExtractedJobData,
   rules: RuleEvaluation,
 ): { financePenalty: boolean; quantTrading: boolean } => {
-  const blob = jobBlob(job);
+  const blob = stripBenefitsBoilerplate(jobBlob(job));
+  const employerFocused = stripBenefitsBoilerplate(
+    normalizeText(
+      [
+        job.company,
+        job.employerCompanyName,
+        job.title,
+        ...(job.domainTags ?? []),
+        ...(job.responsibilities ?? []),
+        ...(job.requirements ?? []),
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    ),
+  );
   const financeDomain =
     rules.financePenalty ||
-    (job.domainTags ?? []).some((t) => FINANCE_DOMAIN_RE.test(t)) ||
+    (job.domainTags ?? []).some((t) => FINANCE_DOMAIN_TAG_RE.test(t)) ||
+    FINANCE_DOMAIN_RE.test(employerFocused) ||
     FINANCE_DOMAIN_RE.test(blob);
   if (!financeDomain) return { financePenalty: false, quantTrading: false };
 
@@ -87,8 +115,8 @@ export const detectFinanceClampContext = (
 
   const credentialHeavy =
     rules.credentialHeavyFintechAlgorithm ||
-    rules.explicitDegreeRisk ||
-    /\b(gaap|series\s+\d+|licensed|cfa|frm|actuarial)\b/i.test(blob);
+    (rules.financePenalty && rules.explicitDegreeRisk) ||
+    /\b(gaap|series\s+\d+|licensed|cfa|frm|actuarial)\b/i.test(employerFocused);
 
   const quantTrading = QUANT_TRADING_RE.test(blob);
   const financePenalty = credentialHeavy || staffingPlacement || quantTrading || rules.financePenalty;
