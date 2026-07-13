@@ -38,6 +38,8 @@ export const CALIBRATION_FIXTURES = {
   nytNewsMultimodal: "nytNewsMultimodal.json",
   nytContentDataProducts: "nytContentDataProducts.json",
   nytAiPlatformsProducts: "nytAiPlatformsProducts.json",
+  saasSellsToFinance: "saasSellsToFinance.json",
+  heritageBankInstitution: "heritageBankInstitution.json",
 } as const;
 
 export type CalibrationFixtureKey = keyof typeof CALIBRATION_FIXTURES;

@@ -70,20 +70,45 @@ const includesAny = (haystack: string, needles: string[]): boolean =>
 
 const BANK_LIKE_COMPANY = /\b(bank|bancorp|bancshares)\b/i;
 
+/**
+ * SaaS / AI vendor selling *to* finance or insurance customers — not itself a financial institution.
+ * Suppresses customer-industry phrase matches (underwriting, insurance carrier, banks as customers).
+ */
+export const textImpliesSellsToFinanceCustomers = (text: string): boolean => {
+  const n = normalizeText(text);
+  return /\b(sell(?:s|ing)?\s+(?:software|products?|solutions?|ai)\s+to|customers?\s+(?:include|are|in)|used\s+by\s+(?:finance|insurance|banks?)|helps?\s+(?:finance|insurance)\s+(?:operations?\s+)?teams|for\s+(?:insurance\s+carriers?|banks?|financial\s+services)|finance\s+and\s+insurance\s+(?:operations?\s+)?teams|fortune\s+500\s+customers|builds?\s+(?:ai\s+)?(?:software|tools|systems)\s+for\s+(?:insurance|banks?|financial))\b/i.test(
+    n,
+  );
+};
+
+const EMPLOYER_FINANCE_SELF_IDENTITY =
+  /\b(we\s+are\s+an?\s+(?:commercial\s+|retail\s+|investment\s+)?(?:bank|insurer|insurance\s+carrier|hedge\s+fund|asset\s+manager)|fdic[-\s]?insured|our\s+(?:bank|insurance\s+carrier|fund))\b/i;
+
+const NAMED_FINANCE_EMPLOYER =
+  /\b(jpmorgan|goldman|morgan stanley|citigroup|citi\b|wells fargo|bank of america|deutsche bank|barclays|ubs\b|credit suisse|prudential|jane street|citadel|two sigma|blackrock)\b/i;
+
 /** Explicit finance / banking / trading employer or JD — not generic "enterprise" or "customers". */
 export const detectStrictFinanceEmployerContext = (combinedText: string, companyNorm: string): boolean => {
   const c = normalizeText(combinedText);
   const co = normalizeText(companyNorm);
-  if (includesAny(c, STRICT_FINANCE_PHRASES)) return true;
-  if (/\b(quantitative trader|quant researcher|trading firm|market maker)\b/i.test(c)) return true;
   if (BANK_LIKE_COMPANY.test(co) && !/\bfood\s+bank\b/i.test(co)) return true;
-  if (
-    /\b(jpmorgan|goldman|morgan stanley|citigroup|citi\b|wells fargo|bank of america|deutsche bank|barclays|ubs\b|credit suisse)\b/i.test(
-      c,
-    )
-  )
+  if (EMPLOYER_FINANCE_SELF_IDENTITY.test(c)) return true;
+  if (NAMED_FINANCE_EMPLOYER.test(co)) return true;
+
+  const sellsToFinanceCustomers = textImpliesSellsToFinanceCustomers(c);
+  // Named banks / carriers in body: employer when company matches; otherwise ignore vendor customer lists.
+  if (NAMED_FINANCE_EMPLOYER.test(c) && !sellsToFinanceCustomers) return true;
+
+  if (/\b(quantitative trader|quant researcher|trading firm|market maker)\b/i.test(c)) return true;
+  if (/\b(fintech)\b/i.test(c) && /\b(lending|core banking|treasury)\b/i.test(c)) {
+    return !sellsToFinanceCustomers;
+  }
+
+  if (includesAny(c, STRICT_FINANCE_PHRASES)) {
+    // Customer/vendor boilerplate ("for insurance carriers", "loan origination tools we sell") is not the employer.
+    if (sellsToFinanceCustomers) return false;
     return true;
-  if (/\b(fintech)\b/i.test(c) && /\b(lending|core banking|treasury)\b/i.test(c)) return true;
+  }
   return false;
 };
 

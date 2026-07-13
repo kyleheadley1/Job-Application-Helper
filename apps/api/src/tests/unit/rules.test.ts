@@ -115,6 +115,27 @@ Series B startup. Not a bank.
     expect(rules.locationMismatch).toBe(false);
   });
 
+  it("does not treat benefits/401k + sells-to-finance copy as a financial institution", () => {
+    const rules = evaluateRules(
+      makeJob({
+        company: "Acme Analytics",
+        title: "Full Stack Engineer",
+        remoteType: "remote",
+        location: "Remote",
+        domainTags: ["saas", "b2b"],
+        degreeRequirement: { level: "required", raw: "Bachelor's degree required" },
+        rawText: `
+Acme Analytics is a Series A B2B SaaS company. Our product helps finance and insurance operations teams.
+Customers are banks — we sell software to them.
+Benefits: 401(k) matching, retirement planning, financial wellness stipend, health insurance.
+Bachelor's degree required.
+        `.trim(),
+      }),
+      userProfile,
+    );
+    expect(rules.financePenalty).toBe(false);
+  });
+
   it("classifies research-heavy applied AI researcher roles", () => {
     const rules = evaluateRules(
       makeJob({

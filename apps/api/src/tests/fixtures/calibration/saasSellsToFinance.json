@@ -1,0 +1,38 @@
+{
+  "id": "saas-sells-to-finance-calibration",
+  "anchorNote": "B2B SaaS selling TO finance/insurance customers — not a financial institution; benefits/401k must not trigger financePenalty",
+  "extracted": {
+    "company": "Acme Analytics",
+    "title": "Full Stack Engineer",
+    "location": "Remote",
+    "remoteType": "remote",
+    "seniority": "mid",
+    "stack": ["TypeScript", "React", "Node.js", "PostgreSQL"],
+    "requiredSkills": ["TypeScript", "React", "Node.js"],
+    "preferredSkills": [],
+    "domainTags": ["saas", "b2b"],
+    "degreeRequirement": {
+      "level": "required",
+      "raw": "Bachelor's degree required"
+    },
+    "requirements": [
+      "Bachelor's degree required",
+      "Strong TypeScript and React",
+      "Experience shipping B2B SaaS product features"
+    ],
+    "responsibilities": [
+      "Build product features for B2B SaaS used by finance and insurance operations teams",
+      "Ship end-to-end TypeScript/React workflows"
+    ],
+    "rawText": "Acme Analytics — Full Stack Engineer\nRemote\nSeries A B2B SaaS company. Our product helps finance and insurance operations teams run workflows.\nCustomers are banks and Fortune 500 financial services firms — we sell software to them.\nBenefits: competitive salary, 401(k) matching, retirement planning, financial wellness stipend, health insurance.\nBachelor's degree required. Strong TypeScript and React. We are a software company."
+  },
+  "storedCategoryScores": {
+    "stackFit": 17,
+    "levelFit": 15,
+    "domainFit": 8,
+    "resumeStoryClarity": 8,
+    "functionalOverlap": 13,
+    "recruiterFriendliness": 11,
+    "careerValue": 8
+  }
+}
