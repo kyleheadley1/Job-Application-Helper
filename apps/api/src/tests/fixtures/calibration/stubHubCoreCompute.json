@@ -1,0 +1,64 @@
+{
+  "id": "stubhub-core-compute-platform-calibration",
+  "anchorNote": "StubHub Core Compute Platform — platform/infra false-positive; developer-enablement role where aws/backend/api tokens must not grant strong differentiator",
+  "extracted": {
+    "company": "StubHub",
+    "companyDisplayName": "StubHub",
+    "title": "Software Engineer, Core Compute Platform",
+    "location": "Remote",
+    "remoteType": "remote",
+    "seniority": "Mid Level",
+    "stack": [
+      "Kubernetes",
+      "Terraform",
+      "AWS",
+      "Go",
+      "Python",
+      "Docker",
+      "backend",
+      "API"
+    ],
+    "requiredSkills": [
+      "Kubernetes",
+      "Terraform",
+      "AWS",
+      "Infrastructure as Code",
+      "platform engineering",
+      "backend services"
+    ],
+    "preferredSkills": [
+      "Go",
+      "Python",
+      "observability",
+      "CI/CD"
+    ],
+    "domainTags": [
+      "platform engineering",
+      "infrastructure",
+      "developer experience"
+    ],
+    "requirements": [
+      "Experience building and operating Kubernetes platforms on AWS",
+      "Strong Infrastructure as Code skills with Terraform",
+      "Familiarity with backend APIs and internal platform services",
+      "Experience reducing engineer cognitive load through reusable platform interfaces"
+    ],
+    "responsibilities": [
+      "Build and maintain the Core Compute Platform that enables product engineering teams",
+      "Design reusable SDKs and platform interfaces for internal developers",
+      "Own Kubernetes/Terraform infrastructure that reduces engineer cognitive load",
+      "Provide developer enablement tooling and self-serve platform capabilities",
+      "Operate backend platform services and APIs consumed by other engineering teams"
+    ],
+    "rawText": "StubHub — Software Engineer, Core Compute Platform\nRemote\nMid Level\nJoin StubHub's Core Compute Platform team building the internal compute platform that powers product engineering.\nYou will design reusable SDKs and platform interfaces, operate Kubernetes and Terraform on AWS, and reduce engineer cognitive load through self-serve developer enablement.\nBuild backend platform services and APIs consumed by other engineers — not end-user product features.\nStrong experience with Kubernetes, Terraform, AWS, Infrastructure as Code, and platform engineering required."
+  },
+  "storedCategoryScores": {
+    "stackFit": 17,
+    "levelFit": 15,
+    "domainFit": 6,
+    "resumeStoryClarity": 8,
+    "functionalOverlap": 14,
+    "recruiterFriendliness": 10,
+    "careerValue": 7
+  }
+}

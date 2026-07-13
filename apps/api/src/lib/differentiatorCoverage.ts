@@ -2,11 +2,13 @@ import {
   ADJACENT_ROLE_FUNCTION,
   DIFFERENTIATOR_COVERAGE,
   FRONTEND_PRIMARY_ROLE,
+  PLATFORM_INFRA_ROLE,
 } from "../config/capabilitySurvivabilityPolicy.js";
 import type { ExtractedJobData } from "../types/job.js";
 import type { CapabilityBreakdown } from "../types/scoring.js";
 import {
   classifyFrontendPrimaryRole,
+  classifyPlatformInfraRole,
   classifyRoleFunction,
 } from "./roleFunctionClassifier.js";
 import { normalizeText } from "./text.js";
@@ -18,6 +20,12 @@ export type DifferentiatorCoverageResult = {
   matchCount: number;
   matchedTags: string[];
   note: string;
+};
+
+export type DifferentiatorCoverageOptions = {
+  adjacentRoleFunction?: boolean;
+  frontendPrimaryRole?: boolean;
+  platformInfraRole?: boolean;
 };
 
 /** Authentication-context tags — not employment/work authorization. */
@@ -54,6 +62,24 @@ const BUILDING_DIFFERENTIATOR_TAGS = new Set([
   "api",
 ]);
 
+/** Surface-level infra/cloud tokens that look strong on platform JDs without product edge. */
+const PLATFORM_GENERIC_TAGS = new Set([
+  "backend",
+  "rest api",
+  "api gateway",
+  "microservice",
+  "api",
+  "aws",
+  "lambda",
+  "dynamodb",
+  "s3",
+  "cloudwatch",
+  "eventbridge",
+  "docker",
+  "node",
+  "express",
+]);
+
 /** AI-tooling / LLM tags that remain in play even on frontend-primary roles. */
 const AI_TOOLING_DIFFERENTIATOR_TAGS = new Set([
   "llm",
@@ -83,7 +109,7 @@ export const jobDescriptionBlob = (job: ExtractedJobData): string =>
 
 export const countDifferentiatorTags = (
   text: string,
-  options?: { adjacentRoleFunction?: boolean; frontendPrimaryRole?: boolean },
+  options?: DifferentiatorCoverageOptions,
 ): { count: number; matchedTags: string[] } => {
   const blob = stripWorkAuthorizationPhrases(text);
   const matchedTags: string[] = [];
@@ -103,14 +129,15 @@ export const countDifferentiatorTags = (
     ) {
       continue;
     }
-    // Frontend-primary: never credit backend/API edge from token presence alone —
-    // roles consume APIs; building-regex also false-fires on "backend … services".
-    // AI-tooling tags still count when present.
     if (
       options?.frontendPrimaryRole &&
       BUILDING_DIFFERENTIATOR_TAGS.has(tag) &&
       !AI_TOOLING_DIFFERENTIATOR_TAGS.has(tag)
     ) {
+      continue;
+    }
+    // Platform/infra: aws/backend/api/docker alone are surface vocabulary — bench them.
+    if (options?.platformInfraRole && PLATFORM_GENERIC_TAGS.has(tag)) {
       continue;
     }
     matchedTags.push(tag);
@@ -127,21 +154,32 @@ export const countDifferentiatorTags = (
 
 export const evaluateDifferentiatorCoverage = (
   job: ExtractedJobData,
-  options?: { adjacentRoleFunction?: boolean; frontendPrimaryRole?: boolean },
+  options?: DifferentiatorCoverageOptions,
 ): DifferentiatorCoverageResult => {
   const adjacentRoleFunction =
     options?.adjacentRoleFunction ?? classifyRoleFunction(job).detected;
   const frontendPrimaryRole =
     options?.frontendPrimaryRole ?? classifyFrontendPrimaryRole(job).detected;
+  const platformInfraRole =
+    options?.platformInfraRole ?? classifyPlatformInfraRole(job).detected;
   const blob = jobDescriptionBlob(job);
   const { count, matchedTags } = countDifferentiatorTags(blob, {
     adjacentRoleFunction,
     frontendPrimaryRole,
+    platformInfraRole,
   });
-  const preFilter = frontendPrimaryRole
+  const preFilterFe = frontendPrimaryRole
     ? countDifferentiatorTags(blob, {
         adjacentRoleFunction,
         frontendPrimaryRole: false,
+        platformInfraRole,
+      })
+    : null;
+  const preFilterPlatform = platformInfraRole
+    ? countDifferentiatorTags(blob, {
+        adjacentRoleFunction,
+        frontendPrimaryRole,
+        platformInfraRole: false,
       })
     : null;
 
@@ -152,12 +190,20 @@ export const evaluateDifferentiatorCoverage = (
     tier = "partial";
   }
 
-  // Consumption tokens alone looked "strong" but were benched → report partial, not none.
   if (
     frontendPrimaryRole &&
     tier === "none" &&
-    preFilter &&
-    preFilter.count >= DIFFERENTIATOR_COVERAGE.STRONG_MIN_TAGS
+    preFilterFe &&
+    preFilterFe.count >= DIFFERENTIATOR_COVERAGE.STRONG_MIN_TAGS
+  ) {
+    tier = "partial";
+  }
+
+  if (
+    platformInfraRole &&
+    tier === "none" &&
+    preFilterPlatform &&
+    preFilterPlatform.count >= 1
   ) {
     tier = "partial";
   }
@@ -178,6 +224,14 @@ export const evaluateDifferentiatorCoverage = (
     tier = "partial";
   }
 
+  if (
+    platformInfraRole &&
+    tier === "strong" &&
+    PLATFORM_INFRA_ROLE.DIFFERENTIATOR_TIER_CEILING === "partial"
+  ) {
+    tier = "partial";
+  }
+
   if (tier === "strong") {
     const sample = matchedTags.slice(0, 3).join(", ");
     return {
@@ -189,6 +243,14 @@ export const evaluateDifferentiatorCoverage = (
   }
 
   if (tier === "partial") {
+    if (platformInfraRole) {
+      return {
+        tier: "partial",
+        matchCount: count,
+        matchedTags,
+        note: `Differentiator coverage: partial — ${PLATFORM_INFRA_ROLE.NOTE}`,
+      };
+    }
     if (frontendPrimaryRole) {
       const aiKept = matchedTags.filter((t) => AI_TOOLING_DIFFERENTIATOR_TAGS.has(t));
       const aiNote = aiKept.length > 0 ? `; AI-tooling still in play (${aiKept.join(", ")})` : "";
@@ -207,6 +269,15 @@ export const evaluateDifferentiatorCoverage = (
       matchCount: count,
       matchedTags,
       note: `Differentiator coverage: partial (${matchedTags.join(", ")}) — capped stack/functional credit${adjacentNote}`,
+    };
+  }
+
+  if (platformInfraRole) {
+    return {
+      tier: "none",
+      matchCount: 0,
+      matchedTags: [],
+      note: `Differentiator coverage: none — ${PLATFORM_INFRA_ROLE.NOTE}`,
     };
   }
 
@@ -231,18 +302,26 @@ export const evaluateDifferentiatorCoverage = (
 export const applyDifferentiatorCoverageCap = (
   breakdown: CapabilityBreakdown,
   job: ExtractedJobData,
-  options?: { adjacentRoleFunction?: boolean; frontendPrimaryRole?: boolean },
+  options?: DifferentiatorCoverageOptions,
 ): { breakdown: CapabilityBreakdown; coverage: DifferentiatorCoverageResult } => {
   const adjacentRoleFunction =
     options?.adjacentRoleFunction ?? classifyRoleFunction(job).detected;
   const frontendPrimaryRole =
     options?.frontendPrimaryRole ?? classifyFrontendPrimaryRole(job).detected;
+  const platformInfraRole =
+    options?.platformInfraRole ?? classifyPlatformInfraRole(job).detected;
   const coverage = evaluateDifferentiatorCoverage(job, {
     adjacentRoleFunction,
     frontendPrimaryRole,
+    platformInfraRole,
   });
 
-  if (coverage.tier === "strong" && !adjacentRoleFunction && !frontendPrimaryRole) {
+  if (
+    coverage.tier === "strong" &&
+    !adjacentRoleFunction &&
+    !frontendPrimaryRole &&
+    !platformInfraRole
+  ) {
     return { breakdown, coverage };
   }
 
@@ -251,18 +330,19 @@ export const applyDifferentiatorCoverageCap = (
       ? DIFFERENTIATOR_COVERAGE.NONE_CAP
       : DIFFERENTIATOR_COVERAGE.PARTIAL_CAP;
 
-  // Frontend-primary that would have been "strong" from API-consumption tokens needs the
-  // milder FE cap (~75-76), not the harsh generic none-cap. Pure frontend with no false
-  // tags still uses the normal differentiator caps (Fubo stays ~73).
   let cap = normalCap;
   if (frontendPrimaryRole) {
     const preFilter = countDifferentiatorTags(jobDescriptionBlob(job), {
       adjacentRoleFunction,
       frontendPrimaryRole: false,
+      platformInfraRole,
     });
     if (preFilter.count >= DIFFERENTIATOR_COVERAGE.STRONG_MIN_TAGS) {
       cap = FRONTEND_PRIMARY_ROLE.CAP;
     }
+  }
+  if (platformInfraRole) {
+    cap = PLATFORM_INFRA_ROLE.CAP;
   }
 
   const adjacentCap = adjacentRoleFunction ? ADJACENT_ROLE_FUNCTION.CAP : null;

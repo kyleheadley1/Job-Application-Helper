@@ -110,6 +110,17 @@ export const FRONTEND_PRIMARY_ROLE = {
   NOTE: "frontend-only role, backend/API edge benched (you'd consume APIs, not build them)",
 } as const;
 
+/**
+ * Platform / infra / SRE / DevOps roles — consumers are other engineers, not end users.
+ * Generic aws/backend/api tokens alone must not grant strong differentiator credit.
+ */
+export const PLATFORM_INFRA_ROLE = {
+  CAP: { stackFit: 18, functionalOverlap: 18 },
+  FLAG: "role-type: platform/infra — engineer-facing platform, product edge not in play",
+  DIFFERENTIATOR_TIER_CEILING: "partial" as const,
+  NOTE: "platform/infra role — aws/backend/api tokens are surface-level; consumers are other engineers",
+} as const;
+
 /** Listing-shape pool friendliness — tunable weights for survivability sub-factor. */
 export const POOL_FRIENDLINESS = {
   NEUTRAL_BASE: 0.5,

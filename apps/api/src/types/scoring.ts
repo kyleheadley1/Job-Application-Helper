@@ -277,6 +277,8 @@ export type RuleEvaluation = {
   adjacentRoleFunction?: boolean;
   /** Frontend-primary role: backend/API differentiator benched (consume, don't build). */
   frontendPrimaryRole?: boolean;
+  /** Platform/infra/SRE role: engineer-facing platform; aws/backend/api edge not load-bearing. */
+  platformInfraRole?: boolean;
   /** JD explicitly welcomes portfolio / experience over formal degree credentials. */
   jdDegreePositive?: boolean;
   /** JD accepts any of a listed language set; candidate matches ≥1 — no core-language gate. */
