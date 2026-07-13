@@ -48,6 +48,10 @@ import {
 import { buildContractCaveat, contractFinalDock } from "./contractEmployment.js";
 import { GENAI_RESTRICTION_WARNING } from "./genAiRestriction.js";
 import {
+  APPLY_NOW_URGENCY_MESSAGE,
+  evaluateApplyNowUrgency,
+} from "./postedAtFreshness.js";
+import {
   computeFinalComposite,
   computeGapDock,
   computeWorthTailoring,
@@ -441,6 +445,7 @@ export const buildScoreDisplay = (params: {
   referralPathwayAvailable?: boolean;
   referralPathwayNotes?: string;
   hardGateReasons?: string[];
+  trackerPostedAt?: string;
 }): ScoreDisplay | undefined => {
   const profile = params.profile ?? defaultUserProfile;
   const headlineCapability = params.score.capability;
@@ -540,6 +545,15 @@ export const buildScoreDisplay = (params: {
   const genAiRestrictionWarning = params.rules.jdProhibitsGenAI
     ? GENAI_RESTRICTION_WARNING
     : undefined;
+  const applyNowUrgency = evaluateApplyNowUrgency({
+    extracted: params.extracted,
+    rules: params.rules,
+    recommendation: params.recommendation,
+    scoreBand,
+    final,
+    trackerPostedAt: params.trackerPostedAt,
+  });
+  const applyNowUrgencyNote = applyNowUrgency ? APPLY_NOW_URGENCY_MESSAGE : undefined;
 
   const eligibilityAdvisories = [
     params.rules.eligibilityFlag,
@@ -570,6 +584,8 @@ export const buildScoreDisplay = (params: {
     degreePositiveNote,
     contractCaveat,
     genAiRestrictionWarning,
+    applyNowUrgency,
+    applyNowUrgencyNote,
     credentialBoostNote: params.score.certificationBoost?.note ?? breakdown?.certificationBoost?.note,
     poolFriendlinessNote: breakdown?.poolFriendlinessMeta?.note,
     eligibilityAdvisory: eligibilityAdvisories[0],

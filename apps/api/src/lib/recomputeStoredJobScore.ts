@@ -96,6 +96,7 @@ export const recomputeStoredJobScore = (params: {
     referralPathwayAvailable: referralPathway.referralPathwayAvailable,
     referralPathwayNotes: referralPathway.referralPathwayNotes,
     hardGateReasons: composite.hardGateReasons,
+    trackerPostedAt: job.tracker?.postedAt,
   });
 
   const finalRecommendation = guardCompositeRecommendation({
@@ -115,6 +116,7 @@ export const recomputeStoredJobScore = (params: {
     referralPathwayAvailable: referralPathway.referralPathwayAvailable,
     referralPathwayNotes: referralPathway.referralPathwayNotes,
     hardGateReasons: composite.hardGateReasons,
+    trackerPostedAt: job.tracker?.postedAt,
   });
 
   const scoreWithDisplay: ScoreBreakdown = scoreDisplayFinal
