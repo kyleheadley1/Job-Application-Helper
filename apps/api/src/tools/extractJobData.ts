@@ -30,6 +30,7 @@ import { applyCompanyPresentation } from "./companyExtraction.js";
 import { attachGeoScope } from "../lib/geoEligibility.js";
 import { attachClearanceCitizenshipFields } from "../lib/clearanceCitizenship.js";
 import { reconcileSeniority } from "../lib/seniorityReconciliation.js";
+import { extractCompanyEmployeeCount } from "../lib/companyEmployeeCount.js";
 
 const fallbackExtraction = (input: { url?: string; rawText?: string; companyHint?: string }): ExtractedJobData => ({
   company: input.companyHint ?? "Unknown Company",
@@ -124,6 +125,11 @@ const finalizeExtracted = (extracted: ExtractedJobData, normalizedText: string, 
     company: ensureCompanyName(out.companyDisplayName ?? out.company),
     title: ensureJobTitle(out.title),
   };
+  const employeeCount =
+    out.companyEmployeeCount ?? extractCompanyEmployeeCount({ ...out, rawText: normalizedText });
+  if (employeeCount != null) {
+    out = { ...out, companyEmployeeCount: employeeCount };
+  }
   return attachClearanceCitizenshipFields(attachGeoScope(out));
 };
 
