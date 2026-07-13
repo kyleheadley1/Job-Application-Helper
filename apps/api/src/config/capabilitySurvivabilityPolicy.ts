@@ -132,6 +132,10 @@ export const POOL_FRIENDLINESS = {
   CROWDED_MAX: 0.45,
   NICHE_EMPLOYER_MAX: 0.45,
   BRAND_EMPLOYER_MIN: 0.7,
+  /** Headcount ≥ this → never apply niche-employer bonus. */
+  LARGE_EMPLOYER_EMPLOYEE_FLOOR: 10_000,
+  /** Recognizability floor when large employer by headcount (additive with name heuristic). */
+  LARGE_EMPLOYER_RECOGNIZABILITY_FLOOR: 0.55,
   /** Default recognizability when company is absent from brand/niche lists. */
   DEFAULT_EMPLOYER_RECOGNIZABILITY: 0.3,
   SPECIFIC_STACK_MIN_HITS: 4,

@@ -83,6 +83,11 @@ export type ExtractedJobData = {
   /** User-facing company label (employer, agency client, or listing company). */
   companyDisplayName?: string;
   companyConfidence?: "direct_or_unclear" | "agency_only" | "explicit_employer" | "low";
+  /**
+   * Parsed Simplify/board employee-count floor when available
+   * (e.g. "10,001+ employees" → 10001, "51-200" → 51).
+   */
+  companyEmployeeCount?: number;
   companyExtractionNotes?: string[];
 };
 
