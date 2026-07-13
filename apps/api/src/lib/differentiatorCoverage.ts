@@ -7,12 +7,14 @@ import {
 import type { ExtractedJobData } from "../types/job.js";
 import type { CapabilityBreakdown } from "../types/scoring.js";
 import {
-  classifyFrontendPrimaryRole,
-  classifyPlatformInfraRole,
-  classifyRoleFunction,
+  classifyRoleLane,
+  roleLaneIsAdjacent,
+  roleLaneIsFrontendPrimary,
+  roleLaneIsPlatformInfra,
 } from "./roleFunctionClassifier.js";
 import { structuredFirstJobBlob } from "./structuredFirstJobBlob.js";
 import { normalizeText } from "./text.js";
+import type { RoleLaneLabel } from "../types/scoring.js";
 
 export type DifferentiatorCoverageTier = "none" | "partial" | "strong";
 
@@ -27,6 +29,7 @@ export type DifferentiatorCoverageOptions = {
   adjacentRoleFunction?: boolean;
   frontendPrimaryRole?: boolean;
   platformInfraRole?: boolean;
+  roleLane?: import("../types/scoring.js").RoleLaneLabel;
 };
 
 /** Authentication-context tags — not employment/work authorization. */
@@ -146,12 +149,13 @@ export const evaluateDifferentiatorCoverage = (
   job: ExtractedJobData,
   options?: DifferentiatorCoverageOptions,
 ): DifferentiatorCoverageResult => {
+  const lane: RoleLaneLabel = options?.roleLane ?? classifyRoleLane(job).label;
   const adjacentRoleFunction =
-    options?.adjacentRoleFunction ?? classifyRoleFunction(job).detected;
+    options?.adjacentRoleFunction ?? roleLaneIsAdjacent(lane);
   const frontendPrimaryRole =
-    options?.frontendPrimaryRole ?? classifyFrontendPrimaryRole(job).detected;
+    options?.frontendPrimaryRole ?? roleLaneIsFrontendPrimary(lane);
   const platformInfraRole =
-    options?.platformInfraRole ?? classifyPlatformInfraRole(job).detected;
+    options?.platformInfraRole ?? roleLaneIsPlatformInfra(lane);
   const blob = jobDescriptionBlob(job);
   const { count, matchedTags } = countDifferentiatorTags(blob, {
     adjacentRoleFunction,
@@ -294,12 +298,13 @@ export const applyDifferentiatorCoverageCap = (
   job: ExtractedJobData,
   options?: DifferentiatorCoverageOptions,
 ): { breakdown: CapabilityBreakdown; coverage: DifferentiatorCoverageResult } => {
+  const lane: RoleLaneLabel = options?.roleLane ?? classifyRoleLane(job).label;
   const adjacentRoleFunction =
-    options?.adjacentRoleFunction ?? classifyRoleFunction(job).detected;
+    options?.adjacentRoleFunction ?? roleLaneIsAdjacent(lane);
   const frontendPrimaryRole =
-    options?.frontendPrimaryRole ?? classifyFrontendPrimaryRole(job).detected;
+    options?.frontendPrimaryRole ?? roleLaneIsFrontendPrimary(lane);
   const platformInfraRole =
-    options?.platformInfraRole ?? classifyPlatformInfraRole(job).detected;
+    options?.platformInfraRole ?? roleLaneIsPlatformInfra(lane);
   const coverage = evaluateDifferentiatorCoverage(job, {
     adjacentRoleFunction,
     frontendPrimaryRole,

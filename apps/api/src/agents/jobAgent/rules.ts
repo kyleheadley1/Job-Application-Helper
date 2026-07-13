@@ -20,6 +20,7 @@ import {
 } from '../../lib/coreLanguageRequirements.js';
 import { evaluateDisjunctiveLanguageRequirement, filterGapsAfterDisjunctiveMatch } from '../../lib/disjunctiveLanguageRequirement.js';
 import { isFdeBuilderSoftwarePrimaryShape } from '../../lib/fdeBuilderRole.js';
+import { classifyRoleLane, detectBackendProductApiShape } from '../../lib/roleFunctionClassifier.js';
 import { detectRoleSeniorityOverreach } from '../../lib/seniorityGate.js';
 import {
   jdHasAppliedAiSystemsOverlap,
@@ -252,18 +253,14 @@ export const evaluateRules = (
   const citizenshipMismatch = clearanceCitizenship.citizenshipMismatch;
   const clearanceMismatch = clearanceCitizenship.clearanceMismatch;
 
+  const roleLaneEarly = classifyRoleLane(job);
   const backendProductApiRole =
-    /\b(backend|api|full[-\s]?stack|product engineer|product engineering|customer problems?|feature development|features|reliable systems?|testing|debugging|production systems?)\b/i.test(
-      combinedText,
-    ) &&
-    !/\b(sre|site reliability|platform engineering|devops|terraform|iac|infrastructure tooling|airgapped|linux internals|container runtime|supply chain security|security hardening)\b/i.test(
-      combinedText,
-    );
-  const infraCoreRole =
-    /\b(sre|site reliability|platform engineering|devops|infrastructure tooling|kubernetes platform|container runtime|linux internals|terraform|iac|airgapped|supply chain|security hardening)\b/i.test(
-      combinedText,
-    ) &&
-    !/\b(product features?|pm|design|customer problems?|full[-\s]?stack|backend api)\b/i.test(combinedText);
+    roleLaneEarly.label === "product_backend" ||
+    (roleLaneEarly.label !== "platform_infra" &&
+      roleLaneEarly.label !== "adjacent_non_engineering" &&
+      roleLaneEarly.label !== "product_frontend" &&
+      detectBackendProductApiShape(job));
+  const infraCoreRole = roleLaneEarly.label === "platform_infra";
   const infraStackShapeMismatch =
     !backendProductApiRole &&
     !includesAny(combinedText, [

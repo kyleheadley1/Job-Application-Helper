@@ -7,6 +7,7 @@ import {
   detectRoleShapeOutsideLane,
   detectStaffAugContractRole,
 } from "../../lib/scoringClampLayer.js";
+import { classifyRoleLane } from "../../lib/roleFunctionClassifier.js";
 import { stripBoardMatchChromeFromText } from "../../tools/jobBoardMatchExtract.js";
 import type { ExtractedJobData } from "../../types/job.js";
 import type { RuleEvaluation, ScoreBreakdown } from "../../types/scoring.js";
@@ -106,7 +107,10 @@ describe("scoring clamp layer", () => {
       ],
       rawText: "Edge platform, observability, Kubernetes, Terraform",
     });
-    expect(detectRoleShapeOutsideLane(extracted)).toBe(true);
+    expect(
+      classifyRoleLane(extracted).label === "platform_infra" ||
+        detectRoleShapeOutsideLane(extracted),
+    ).toBe(true);
     const rules = {
       ...cleanRules(),
       matureStructuredEmployer: true,

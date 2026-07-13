@@ -62,6 +62,10 @@ const hasCoreLanguageClamp = (rules: RuleEvaluation): boolean =>
         (rules.coreLanguageGap?.length ?? 0) > 0),
   );
 
+/**
+ * Residual shapes when `platform_infra` lane is not enough (edge/platform chrome,
+ * ML/research). Prefer `classifyRoleLane` → `platform_infra` for true platform titles.
+ */
 export const detectRoleShapeOutsideLane = (job: ExtractedJobData): boolean => {
   const blob = jobBlob(job);
   return INFRA_PLATFORM_SHAPE_RE.test(blob) || ML_RESEARCH_SHAPE_RE.test(blob);
