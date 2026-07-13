@@ -4,6 +4,10 @@ import { userProfile as defaultUserProfile } from "../config/userProfile.js";
 import type { ExtractedJobData } from "../types/job.js";
 import type { UserProfile } from "../types/userProfile.js";
 import { countDifferentiatorTags } from "./differentiatorCoverage.js";
+import {
+  extractCompanyEmployeeCount,
+  isLargeEmployerByHeadcount,
+} from "./companyEmployeeCount.js";
 import { FRESH_POST_RE } from "./poolCompetitiveness.js";
 import { countTechCanonOverlap } from "./techCanon.js";
 import { normalizeText } from "./text.js";
@@ -79,17 +83,24 @@ const listingStackBlob = (job: ExtractedJobData): string =>
 
 /**
  * How recognizable the listing employer is (0 = niche, 1 = household name).
- * Uses companyDisplayName / company ONLY — never scraped rawText.
+ * Uses companyDisplayName / company (+ optional headcount floor) — never scraped rawText for brand match.
  */
 export const scoreListingEmployerRecognizability = (job: ExtractedJobData): number => {
   const company = resolveEmployerDisplayName(job);
 
+  let score = POOL_FRIENDLINESS.DEFAULT_EMPLOYER_RECOGNIZABILITY;
   if (!company || company === "unknown") {
-    return POOL_FRIENDLINESS.DEFAULT_EMPLOYER_RECOGNIZABILITY;
+    score = POOL_FRIENDLINESS.DEFAULT_EMPLOYER_RECOGNIZABILITY;
+  } else if (BRAND_EMPLOYER_RE.test(company)) {
+    score = 0.82;
+  } else if (NICHE_EMPLOYER_RE.test(company)) {
+    score = 0.28;
   }
-  if (BRAND_EMPLOYER_RE.test(company)) return 0.82;
-  if (NICHE_EMPLOYER_RE.test(company)) return 0.28;
-  return POOL_FRIENDLINESS.DEFAULT_EMPLOYER_RECOGNIZABILITY;
+
+  if (isLargeEmployerByHeadcount(job)) {
+    score = Math.max(score, POOL_FRIENDLINESS.LARGE_EMPLOYER_RECOGNIZABILITY_FLOOR);
+  }
+  return score;
 };
 
 const candidateProfileBlob = (profile: UserProfile): string =>
@@ -203,18 +214,24 @@ export const computePoolFriendliness = (
   const remote = isRemoteListing(job, blob);
   const entryLevel = isEntryLevelListing(job, blob);
   const cattleCall = remote && entryLevel && isLowBarrierListing(job, blob);
+  const largeEmployer = isLargeEmployerByHeadcount(job);
 
-  if (employerRec < POOL_FRIENDLINESS.NICHE_EMPLOYER_MAX && !cattleCall) {
+  // Large employers (10k+) never get the niche-employer bonus, regardless of name heuristic.
+  if (
+    employerRec < POOL_FRIENDLINESS.NICHE_EMPLOYER_MAX &&
+    !cattleCall &&
+    !largeEmployer
+  ) {
     adjustments.push({
       id: "nicheEmployer",
       label: "niche employer",
       delta: POOL_FRIENDLINESS.NICHE_EMPLOYER_BONUS,
     });
   }
-  if (employerRec > POOL_FRIENDLINESS.BRAND_EMPLOYER_MIN) {
+  if (employerRec > POOL_FRIENDLINESS.BRAND_EMPLOYER_MIN || largeEmployer) {
     adjustments.push({
       id: "brandEmployer",
-      label: "recognizable employer",
+      label: largeEmployer ? "large employer (headcount)" : "recognizable employer",
       delta: POOL_FRIENDLINESS.BRAND_EMPLOYER_PENALTY,
     });
   }
