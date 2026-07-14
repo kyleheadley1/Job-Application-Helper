@@ -71,7 +71,7 @@ import {
   selectDominantLever,
 } from "./strategicLever.js";
 import { composeSpecializationGapActionLine } from "./gapActionLine.js";
-import { deriveReferralAdvice } from "./referralAdvice.js";
+import { deriveReferralAdvice, hasRequiredStackLanguageMismatch } from "./referralAdvice.js";
 import { certificationCredentialLeverLabel } from "./certificationBoost.js";
 import { computePoolFriendliness } from "./poolFriendliness.js";
 import type { SurvivabilityBreakdown } from "./survivabilityScore.js";
@@ -591,6 +591,7 @@ export const buildScoreDisplay = (params: {
     referralPathwayAvailable: params.referralPathwayAvailable,
     referralPathwayNotes: params.referralPathwayNotes,
     jdDegreePositive: params.rules.jdDegreePositive,
+    requiredStackLanguageMismatch: hasRequiredStackLanguageMismatch(params.rules),
   });
 
   const degreePositiveNote = params.rules.jdDegreePositive

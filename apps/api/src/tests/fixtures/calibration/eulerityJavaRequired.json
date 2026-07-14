@@ -1,0 +1,38 @@
+{
+  "id": "eulerity-java-required-verbiage",
+  "anchorNote": "VERBIAGE pair A — Eulerity Associate Backend Engineer: required Java year (“at least 1 year building in Java”) with Node/TS profile. Niche employer would previously yield optional referral advice despite Key Risk naming the Java gap. Tests referral text severity, not score band.",
+  "extracted": {
+    "company": "Eulerity",
+    "companyDisplayName": "Eulerity",
+    "title": "Associate Backend Engineer",
+    "location": "New York, NY",
+    "remoteType": "hybrid",
+    "locationIsCommutable": true,
+    "seniority": "junior",
+    "yearsExperience": { "raw": "1+ years", "min": 1 },
+    "stack": ["Java", "Spring", "SQL", "AWS"],
+    "requiredSkills": ["Java", "SQL", "AWS"],
+    "preferredSkills": ["Kafka"],
+    "domainTags": ["adtech", "backend"],
+    "companyEmployeeCount": 51,
+    "requirements": [
+      "at least 1 year building in Java",
+      "Strong coding skills and the ability to collaborate across teams",
+      "Familiarity with SQL and cloud services (e.g. AWS)"
+    ],
+    "responsibilities": [
+      "Build and maintain backend services powering advertising campaigns",
+      "Collaborate with product and frontend engineers on APIs"
+    ],
+    "rawText": "Eulerity\nAssociate Backend Engineer\nEntry Level\n51-200 employees\nHybrid — New York, NY\nRequirements\nat least 1 year building in Java\nStrong coding skills and the ability to collaborate across teams\nFamiliarity with SQL and cloud services (e.g. AWS)\nResponsibilities\nBuild and maintain backend services powering advertising campaigns\nCollaborate with product and frontend engineers on APIs"
+  },
+  "storedCategoryScores": {
+    "stackFit": 12,
+    "levelFit": 14,
+    "domainFit": 7,
+    "resumeStoryClarity": 7,
+    "functionalOverlap": 11,
+    "recruiterFriendliness": 9,
+    "careerValue": 7
+  }
+}

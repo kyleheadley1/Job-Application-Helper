@@ -44,6 +44,9 @@ export const CALIBRATION_FIXTURES = {
   leapHealthcareProduct: "leapHealthcareProduct.json",
   extractionFailureCascade: "extractionFailureCascade.json",
   namedRequiredToolAbsent: "namedRequiredToolAbsent.json",
+  eulerityJavaRequired: "eulerityJavaRequired.json",
+  nytCdpRequiredLanguage: "nytCdpRequiredLanguage.json",
+  preferredOnlyGapVerbiage: "preferredOnlyGapVerbiage.json",
 } as const;
 
 export type CalibrationFixtureKey = keyof typeof CALIBRATION_FIXTURES;

@@ -1,0 +1,38 @@
+{
+  "id": "nyt-cdp-required-language-verbiage",
+  "anchorNote": "VERBIAGE pair B — NYT Content Data Products–class listing with a hard required backend language (Go) absent from the Node/TS profile. Paired with Eulerity for referral-advice severity consistency when requiredStackLanguageMismatch is true (distinct from the GenAI-restriction CDP fixture).",
+  "extracted": {
+    "company": "The New York Times",
+    "companyDisplayName": "The New York Times",
+    "title": "Software Engineer, Content Data Products",
+    "location": "New York, NY",
+    "remoteType": "hybrid",
+    "locationIsCommutable": true,
+    "seniority": "mid",
+    "yearsExperience": { "raw": "2+ years", "min": 2 },
+    "stack": ["Go", "Python", "Java", "SQL", "AWS"],
+    "requiredSkills": ["Go", "SQL", "AWS"],
+    "preferredSkills": ["Spark", "Python"],
+    "domainTags": ["news", "data products"],
+    "companyEmployeeCount": 10001,
+    "requirements": [
+      "2+ years of software engineering experience",
+      "Must have production experience building in Go",
+      "Experience designing and building data backend services and APIs",
+      "Strong SQL and cloud platform familiarity (AWS or GCP)"
+    ],
+    "responsibilities": [
+      "Build content data products that power newsroom and reader experiences"
+    ],
+    "rawText": "The New York Times\nSoftware Engineer, Content Data Products\n10,001+ employees\nHybrid — New York, NY\nRequirements\n2+ years of software engineering experience\nMust have production experience building in Go\nExperience designing and building data backend services and APIs\nStrong SQL and cloud platform familiarity (AWS or GCP)\nPreferred\nSpark\nPython data pipelines\nResponsibilities\nBuild content data products that power newsroom and reader experiences"
+  },
+  "storedCategoryScores": {
+    "stackFit": 12,
+    "levelFit": 14,
+    "domainFit": 7,
+    "resumeStoryClarity": 8,
+    "functionalOverlap": 12,
+    "recruiterFriendliness": 9,
+    "careerValue": 7
+  }
+}
