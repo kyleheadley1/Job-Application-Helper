@@ -6,6 +6,7 @@ import {
   SURVIVABILITY_WEIGHTS,
   type SurvivabilitySubFactorKey,
 } from "../config/capabilitySurvivabilityPolicy.js";
+import type { RuleEvaluation } from "../types/scoring.js";
 import type { SurvivabilityBreakdown } from "./survivabilityScore.js";
 
 export type ReferralUrgency = "strongly_advised" | "advised" | "optional";
@@ -14,6 +15,21 @@ const REFERRAL_ADDRESSABLE_KEYS: SurvivabilitySubFactorKey[] = [
   "credentialSignal",
   "employerRecognizability",
 ];
+
+/**
+ * Same required-language/stack signal that drives Key Risks ("Required core language gap: …")
+ * and hard-rule notes — used so referral verbiage stays consistent with that severity.
+ */
+export const hasRequiredStackLanguageMismatch = (
+  rules?: Pick<
+    RuleEvaluation,
+    "stackMismatch" | "explicitCoreLanguageMismatch" | "coreLanguageGap"
+  > | null,
+): boolean => {
+  if (!rules) return false;
+  if (rules.explicitCoreLanguageMismatch) return true;
+  return Boolean(rules.stackMismatch && (rules.coreLanguageGap?.length ?? 0) > 0);
+};
 
 /** Weighted headroom below neutral on factors a referral can realistically help. */
 export const computeReferralAddressableShortfall = (
@@ -62,16 +78,47 @@ export type ReferralAdviceResult = {
   shortfall: number;
 };
 
-/** Derived from score only — never feeds back into scoring. */
+const appendPathway = (
+  advice: string,
+  referralPathwayAvailable?: boolean,
+  referralPathwayNotes?: string,
+): string => {
+  if (!referralPathwayAvailable || !referralPathwayNotes?.trim()) return advice;
+  return `${advice.replace(/\.$/, "")} — and you have a connection via ${pathwaySource(referralPathwayNotes)}.`;
+};
+
+/** Derived from score display inputs — never feeds back into scoring. */
 export const deriveReferralAdvice = (params: {
   survivabilityBreakdown?: SurvivabilityBreakdown;
   referralPathwayAvailable?: boolean;
   referralPathwayNotes?: string;
   jdDegreePositive?: boolean;
+  /**
+   * Required (not preferred) stack/language mismatch — same flag that surfaces
+   * "Required core language gap" Key Risks. Escalates verbiage independent of
+   * credential/recognizability shortfall so niche Java-required roles don't get
+   * "odds are solid" when Key Risks already call out a hard gap.
+   */
+  requiredStackLanguageMismatch?: boolean;
 }): ReferralAdviceResult => {
   const shortfall = params.survivabilityBreakdown
     ? computeReferralAddressableShortfall(params.survivabilityBreakdown)
     : 0;
+
+  // Required stack/language gaps escalate regardless of employer-size / credential shortfall.
+  // Do not soften via degree-positive — Key Risks already treat this as hard.
+  if (params.requiredStackLanguageMismatch) {
+    return {
+      advice: appendPathway(
+        "Cold-apply odds are low for a required core-language / stack gap — a referral would substantially help.",
+        params.referralPathwayAvailable,
+        params.referralPathwayNotes,
+      ),
+      urgency: "strongly_advised",
+      shortfall,
+    };
+  }
+
   let urgency = resolveReferralUrgency(shortfall);
 
   if (
@@ -98,9 +145,7 @@ export const deriveReferralAdvice = (params: {
     advice = "Odds are solid; a referral is optional but never hurts.";
   }
 
-  if (params.referralPathwayAvailable && params.referralPathwayNotes?.trim()) {
-    advice = `${advice.replace(/\.$/, "")} — and you have a connection via ${pathwaySource(params.referralPathwayNotes)}.`;
-  }
+  advice = appendPathway(advice, params.referralPathwayAvailable, params.referralPathwayNotes);
 
   return { advice, urgency, shortfall };
 };
