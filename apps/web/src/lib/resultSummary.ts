@@ -94,6 +94,7 @@ const riskStrength = (risk: string): number => {
               ? 12
               : 10;
   if (/\b(required|hard|must|cannot|limited|strongly preferred)\b/.test(t)) score += 8;
+  if (/\bnamed tool\/platform\b/.test(t) || /\bno experience found in your background\b/.test(t)) score += 18;
   if (/\b(go|language|stack)\b/.test(t)) score += 8;
   if (/\b(scale|internet scale|infrastructure|production systems)\b/.test(t)) score += 7;
   return score;

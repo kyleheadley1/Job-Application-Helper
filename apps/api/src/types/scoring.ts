@@ -309,6 +309,8 @@ export type RuleEvaluation = {
   /** JD accepts any of a listed language set; candidate matches ≥1 — no core-language gate. */
   disjunctiveLanguageRequirementSatisfied?: boolean;
   disjunctiveAcceptedLanguages?: string[];
+  /** Named product/platform from "must have experience with X" absent from candidate background. */
+  namedHardRequirementGaps?: string[];
   notes: string[];
   penaltyVector?: Record<string, number>;
 };
