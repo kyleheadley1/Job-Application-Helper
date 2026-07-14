@@ -49,14 +49,13 @@ const DESIGN_RESUME_EVIDENCE =
 const PYTHON_BACKEND_RE = /\b(python|flask|django)\b/i;
 const NODE_LEAD_RE = /\bnode(?:\.js)?\b/i;
 
-/** Derive backend pillar label from JD text — never hardcode Flask when JD says Django. */
+/** Derive backend pillar label from Requirements/Responsibilities (+ title) — never skill-tag order. */
 export const extractJdBackendLabel = (job: ExtractedJobData): string | undefined => {
   const blob = normalizeText(
     [
       job.title ?? "",
-      ...(job.stack ?? []),
-      ...(job.requiredSkills ?? []),
       ...(job.requirements ?? []),
+      ...(job.responsibilities ?? []),
     ].join("\n"),
   );
   if (!PYTHON_BACKEND_RE.test(blob)) return undefined;
@@ -211,10 +210,13 @@ export const detectBackendStackSpecializationGap = (
   const strength = analyzeLanguageRequirementStrength(job, jdSide);
   if (strength === "soft") return undefined;
 
-  const inRequired = PYTHON_BACKEND_RE.test(hardRequiredBlob(job));
+  const proseRequired = normalizeText(
+    [...(job.requirements ?? []), ...(job.responsibilities ?? [])].join("\n"),
+  );
+  const inRequired = PYTHON_BACKEND_RE.test(proseRequired);
   const inTitle = PYTHON_BACKEND_RE.test(job.title ?? "");
-  const inStack = PYTHON_BACKEND_RE.test((job.stack ?? []).join(" "));
-  if (!inRequired && !inTitle && !inStack) return undefined;
+  // Skill-tag / stack order alone must not count as "leads with" evidence.
+  if (!inRequired && !inTitle) return undefined;
 
   const resume = normalizeText(resumeText ?? "");
   const resumeSide = extractResumeBackendLabel(resume);
@@ -226,12 +228,8 @@ export const detectBackendStackSpecializationGap = (
     inRequired,
     inPreferred: PYTHON_BACKEND_RE.test(preferredBlob(job)),
     candidateHasAdjacent: hasPython,
-    signalCount: [inRequired, inTitle, inStack && strength === "hard"].filter(Boolean).length,
+    signalCount: [inRequired, inTitle].filter(Boolean).length,
   });
-
-  if (strength === "neutral" && inStack && !inRequired && !inTitle) {
-    severity = hasPython ? "minor" : "moderate";
-  }
 
   if (severity === "minor" && hasPython) return undefined;
 

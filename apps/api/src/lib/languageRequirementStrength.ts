@@ -4,7 +4,7 @@ import { normalizeText } from "./text.js";
 export type LanguageRequirementStrength = "hard" | "soft" | "neutral";
 
 const FUNDAMENTALS_OVER_LANGUAGE_RE =
-  /\b(?:we\s+)?(?:value|weight|prioritize|emphasize|care\s+(?:more\s+)?about)\b[^.\n]{0,100}\b(?:engineering\s+)?fundamentals?\b[^.\n]{0,120}\b(?:and\s+)?(?:learning speed|learning velocity|learn(?:ing)? quickly|ramp(?:ing)? quickly|problem[-\s]?solving)\b[^.\n]{0,80}\b(?:over|than|more than|beyond)\b[^.\n]{0,60}\b(?:expertise in\s+)?(?:any\s+)?(?:specific\s+)?(?:programming\s+)?language|\b(?:fundamentals?|learning speed|learning velocity)\b[^.\n]{0,60}\bover\b[^.\n]{0,40}\b(?:expertise in\s+)?(?:any\s+)?(?:specific\s+)?(?:programming\s+)?language|\blanguage[-\s]agnostic\b|\bnot\s+tied\s+to\s+(?:a\s+)?specific\s+language|\bany\s+modern\s+(?:programming\s+)?language\b/i;
+  /\b(?:we\s+)?(?:value|weight|prioritize|emphasize|care\s+(?:more\s+)?about)\b[^.\n]{0,100}\b(?:engineering\s+)?fundamentals?\b[^.\n]{0,120}\b(?:and\s+)?(?:learning speed|learning velocity|learn(?:ing)? quickly|ramp(?:ing)? quickly|problem[-\s]?solving)\b[^.\n]{0,80}\b(?:over|than|more than|beyond)\b[^.\n]{0,60}\b(?:expertise in\s+)?(?:any\s+)?(?:specific\s+)?(?:programming\s+)?language|\b(?:fundamentals?|learning speed|learning velocity)\b[^.\n]{0,60}\bover\b[^.\n]{0,40}\b(?:expertise in\s+)?(?:any\s+)?(?:specific\s+)?(?:programming\s+)?language|\blanguage[-\s]agnostic\b|\bnot\s+tied\s+to\s+(?:a\s+)?specific\s+language|\bany\s+modern\s+(?:programming\s+)?language\b|\b(?:strong\s+)?coding\s+skills?\s+in\s+any\s+(?:programming\s+)?language\b|\bany\s+programming\s+language\b/i;
 
 const SOFT_NEAR_LANGUAGE_RE =
   /\b(?:is\s+)?(?:a\s+)?plus\b|\bnice\s+to\s+have\b|\bpreferred\b|\bbonus\b|\bideally\b|\boptional\b|\bhelpful\b|\bwould\s+be\s+(?:great|nice)\b|\bfamiliarity\s+with\b|\bexposure\s+to\b/i;
@@ -75,26 +75,40 @@ const languageOnlyInPreferred = (job: ExtractedJobData, needle: RegExp): boolean
   return needle.test(pref) && !needle.test(req) && !needle.test(title);
 };
 
+const jobProseBlob = (job: ExtractedJobData): string =>
+  normalizeText(
+    [job.title ?? "", ...(job.requirements ?? []), ...(job.responsibilities ?? [])].join("\n"),
+  );
+
 /**
  * Classify how strongly a backend language pillar is required vs merely preferred.
  * Hard = explicit production/required language; soft = plus/preferred/fundamentals-over-language.
+ * Soft / fundamentals phrasing is judged from Requirements/Responsibilities prose — not skill-tag order.
  */
 export const analyzeLanguageRequirementStrength = (
   job: ExtractedJobData,
   pillar?: string,
 ): LanguageRequirementStrength => {
   const blob = jobBlob(job);
+  const prose = jobProseBlob(job);
   const needle = pillarLanguageNeedle(pillar);
-  if (!needle.test(blob)) return "neutral";
+  if (!needle.test(blob) && !needle.test(prose)) {
+    // Soft language-agnostic Requirements copy can still classify the JD even when the
+    // language only appears in the skill-tag cloud.
+    if (FUNDAMENTALS_OVER_LANGUAGE_RE.test(prose)) return "soft";
+    return "neutral";
+  }
 
   const langKey = pillarLanguageKey(pillar);
-  if (HARD_LANGUAGE_PATTERNS[langKey].some((re) => re.test(blob))) return "hard";
+  if (HARD_LANGUAGE_PATTERNS[langKey].some((re) => re.test(prose) || re.test(blob))) return "hard";
 
   if (languageOnlyInPreferred(job, needle)) return "soft";
 
-  if (FUNDAMENTALS_OVER_LANGUAGE_RE.test(blob)) return "soft";
+  if (FUNDAMENTALS_OVER_LANGUAGE_RE.test(prose) || FUNDAMENTALS_OVER_LANGUAGE_RE.test(blob)) {
+    return "soft";
+  }
 
-  const ctx = windowAround(blob, needle);
+  const ctx = windowAround(prose, needle) || windowAround(blob, needle);
   if (ctx && SOFT_NEAR_LANGUAGE_RE.test(ctx) && !/\b(?:must|required|minimum)\b/i.test(ctx)) {
     return "soft";
   }
@@ -102,9 +116,19 @@ export const analyzeLanguageRequirementStrength = (
   const stackBlob = normalizeText((job.stack ?? []).join(" "));
   const reqBlob = hardRequiredBlob(job);
   if (needle.test(stackBlob) && !needle.test(reqBlob) && !needle.test(job.title ?? "")) {
-    if (FUNDAMENTALS_OVER_LANGUAGE_RE.test(blob) || SOFT_NEAR_LANGUAGE_RE.test(blob)) {
+    if (FUNDAMENTALS_OVER_LANGUAGE_RE.test(prose) || SOFT_NEAR_LANGUAGE_RE.test(blob)) {
       return "soft";
     }
+  }
+
+  // Language only in skill-tag cloud with language-agnostic Requirements → soft.
+  if (
+    FUNDAMENTALS_OVER_LANGUAGE_RE.test(prose) ||
+    (/\bany\s+programming\s+language\b/i.test(prose) &&
+      !needle.test(prose) &&
+      needle.test(normalizeText([...(job.stack ?? []), ...(job.requiredSkills ?? [])].join("\n"))))
+  ) {
+    return "soft";
   }
 
   return "neutral";
