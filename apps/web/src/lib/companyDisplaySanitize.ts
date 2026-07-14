@@ -95,6 +95,8 @@ export function headerCompanyFromRawText(rawText?: string): string | null {
     const next = lines[i + 1];
     if (!next || !ACTIVITY_LINE_RE.test(next)) continue;
     if (isProseCompanyName(line) || isJobTitleLikeLine(line)) continue;
+    // Title → chrome → Posted date is UI noise (e.g. Simplify "Link"), not employer.
+    if (i > 0 && isJobTitleLikeLine(lines[i - 1]!)) continue;
     if (line.split(/\s+/).length > 4) continue;
     return line;
   }

@@ -253,16 +253,21 @@ export const extractFromRawText = (normalizedText: string, companyHint?: string)
   let yMin: number | undefined;
   let yMax: number | undefined;
   let rawYears: string | undefined;
-  const mPlus = lower.match(/\b(\d+)\s*\+\s*years?\b/);
-  if (mPlus) {
-    yMin = Number.parseInt(mPlus[1], 10);
-    rawYears = mPlus[0];
-  }
-  const mRange = lower.match(/\b(\d+)\s*-\s*(\d+)\s+years?\s+of\s+experience\b/);
+  // Prefer explicit ranges including en-dash and "2–10+ years" before bare "N+ years"
+  // (otherwise "10+" inside "2–10+" wrongly becomes min=10).
+  const mRange =
+    lower.match(/\b(\d+)\s*[–-]\s*(\d+)\+?\s*years?(?:\s+of\s+(?:industry\s+)?experience)?\b/) ??
+    lower.match(/\b(\d+)\s*-\s*(\d+)\s+years?\s+of\s+experience\b/);
   if (mRange) {
-    yMin = Number.parseInt(mRange[1], 10);
-    yMax = Number.parseInt(mRange[2], 10);
+    yMin = Number.parseInt(mRange[1]!, 10);
+    yMax = Number.parseInt(mRange[2]!, 10);
     rawYears = mRange[0];
+  } else {
+    const mPlus = lower.match(/\b(\d+)\s*\+\s*years?\b/);
+    if (mPlus) {
+      yMin = Number.parseInt(mPlus[1]!, 10);
+      rawYears = mPlus[0];
+    }
   }
   if (yMin !== undefined) {
     partial.yearsExperience = { raw: rawYears, min: yMin, max: yMax };

@@ -42,6 +42,7 @@ export const CALIBRATION_FIXTURES = {
   heritageBankInstitution: "heritageBankInstitution.json",
   clinicalInkHealthcare: "clinicalInkHealthcare.json",
   leapHealthcareProduct: "leapHealthcareProduct.json",
+  extractionFailureCascade: "extractionFailureCascade.json",
 } as const;
 
 export type CalibrationFixtureKey = keyof typeof CALIBRATION_FIXTURES;
