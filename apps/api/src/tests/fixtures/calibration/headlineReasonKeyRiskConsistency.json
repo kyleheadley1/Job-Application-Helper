@@ -1,0 +1,57 @@
+{
+  "id": "headline-reason-vs-key-risk-consistency",
+  "anchorNote": "GUARD — headline-reason vs Key Risk / referral consistency. Eulerity Associate Backend (required Java). Three independent text paths must name the same driver: (1) Key Risks notes, (2) deriveReferralAdvice, (3) deriveActionLine skip headline. Regression: skip band used selectDominantLever → employer recognizability while Key Risks + referral correctly named Java. Issue B (stackFit display 18→16 / levelFit 29→27 between screenshots): maps to raw categories 10→9 and 19→18. Neither 051118a nor Item G roleLane caps touch product_backend levelFit or further dock stack below STACK_MISMATCH tier1 (10). Documented as unexplained by those commits (likely LLM re-triage drift); not treated as intentional Item G tightening. Snapshot pairs below are the screenshot-era category scores for audit; scoring uses storedCategoryScores (post-mismatch clamp baseline).",
+  "screenshotSnapshots": {
+    "preFixApplyBand": {
+      "note": "UI showed Apply / worth applying — capability ~63, final ~60",
+      "capabilityBreakdown": { "stackFit": 18, "levelFit": 29 },
+      "impliedRawCategories": { "stackFit": 10, "levelFit": 19 },
+      "capability": 63,
+      "finalApprox": 60,
+      "scoreBand": "apply"
+    },
+    "postReferralFixSkipBand": {
+      "note": "UI showed Skip — Not worth the effort — employer recognizability (bug); capability ~59, final ~56",
+      "capabilityBreakdown": { "stackFit": 16, "levelFit": 27 },
+      "impliedRawCategories": { "stackFit": 9, "levelFit": 18 },
+      "capability": 59,
+      "finalApprox": 56,
+      "scoreBand": "skip",
+      "buggyActionReason": "employer recognizability"
+    }
+  },
+  "extracted": {
+    "company": "Eulerity",
+    "companyDisplayName": "Eulerity",
+    "title": "Associate Backend Engineer",
+    "location": "New York, NY",
+    "remoteType": "hybrid",
+    "locationIsCommutable": true,
+    "seniority": "junior",
+    "yearsExperience": { "raw": "1+ years", "min": 1 },
+    "stack": ["Java", "Spring", "SQL", "AWS"],
+    "requiredSkills": ["Java", "SQL", "AWS"],
+    "preferredSkills": ["Kafka"],
+    "domainTags": ["adtech", "backend"],
+    "companyEmployeeCount": 51,
+    "requirements": [
+      "at least 1 year building in Java",
+      "Strong coding skills and the ability to collaborate across teams",
+      "Familiarity with SQL and cloud services (e.g. AWS)"
+    ],
+    "responsibilities": [
+      "Build and maintain backend services powering advertising campaigns",
+      "Collaborate with product and frontend engineers on APIs"
+    ],
+    "rawText": "Eulerity\nAssociate Backend Engineer\nEntry Level\n51-200 employees\nHybrid — New York, NY\nRequirements\nat least 1 year building in Java\nStrong coding skills and the ability to collaborate across teams\nFamiliarity with SQL and cloud services (e.g. AWS)\nResponsibilities\nBuild and maintain backend services powering advertising campaigns\nCollaborate with product and frontend engineers on APIs"
+  },
+  "storedCategoryScores": {
+    "stackFit": 12,
+    "levelFit": 14,
+    "domainFit": 7,
+    "resumeStoryClarity": 7,
+    "functionalOverlap": 11,
+    "recruiterFriendliness": 9,
+    "careerValue": 7
+  }
+}
