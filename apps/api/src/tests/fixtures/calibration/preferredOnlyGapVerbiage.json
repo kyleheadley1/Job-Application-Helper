@@ -1,0 +1,34 @@
+{
+  "id": "preferred-only-gap-verbiage",
+  "anchorNote": "Preferred Java (nice-to-have) without a required core-language mismatch — referral verbiage must stay calm (not escalated).",
+  "extracted": {
+    "company": "Garage",
+    "companyDisplayName": "Garage",
+    "title": "Full Stack Engineer",
+    "location": "Remote",
+    "remoteType": "remote",
+    "seniority": "mid",
+    "stack": ["TypeScript", "React", "Node.js"],
+    "requiredSkills": ["TypeScript", "React", "Node.js"],
+    "preferredSkills": ["Java", "Spring"],
+    "domainTags": ["product"],
+    "companyEmployeeCount": 80,
+    "requirements": [
+      "Strong TypeScript and React experience",
+      "Node.js production services"
+    ],
+    "responsibilities": [
+      "Ship full-stack product features"
+    ],
+    "rawText": "Garage\nFull Stack Engineer\nRemote\n80 employees\nRequirements\nStrong TypeScript and React experience\nNode.js production services\nPreferred\nJava\nSpring experience is a plus\nResponsibilities\nShip full-stack product features"
+  },
+  "storedCategoryScores": {
+    "stackFit": 17,
+    "levelFit": 15,
+    "domainFit": 8,
+    "resumeStoryClarity": 8,
+    "functionalOverlap": 13,
+    "recruiterFriendliness": 11,
+    "careerValue": 8
+  }
+}
