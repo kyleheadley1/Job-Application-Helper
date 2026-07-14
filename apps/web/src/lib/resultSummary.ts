@@ -155,10 +155,51 @@ export function selectTopFits(job: JobRecord, n = 2): string[] {
 
 /** Merge LLM-scored risks with soft rule notes (hard gates use `rules.hardRuleNotes` separately). */
 export function buildKeyRisks(job: JobRecord, max = 3): string[] {
-  const fromLlm = selectDistinctRisks(job, 2);
-  const out = [...fromLlm];
-  const seen = new Set(out.map((s) => normalizeText(s)));
-  for (const n of job.rules.notes) {
+  const namedToolNotes = (job.rules?.notes ?? []).filter((n) =>
+    /JD requires named tool\/platform\b/i.test(n),
+  );
+  const namedToolNeedles = namedToolNotes
+    .map((n) => {
+      const m = n.match(/named tool\/platform\s+(.+?)\s+—/i);
+      return normalizeText(m?.[1] ?? "");
+    })
+    .filter(Boolean);
+
+  const llmRiskOverlapsNamedTool = (risk: string): boolean => {
+    if (!namedToolNeedles.length) return false;
+    const t = normalizeText(risk);
+    if (namedToolNeedles.some((tool) => tool.length >= 3 && t.includes(tool))) return true;
+    // Generic LLM paraphrase of the same gap ("No explicit TULIP Interfaces experience…").
+    if (
+      /\b(no explicit|no (?:listed|demonstrated)|lacks?|missing|without)\b/i.test(risk) &&
+      /\bexperience\b/i.test(risk) &&
+      namedToolNeedles.some((tool) => tool.split(/\s+/).some((w) => w.length >= 4 && t.includes(w)))
+    ) {
+      return true;
+    }
+    return false;
+  };
+
+  // Prefer the canonical named-tool Key Risk; drop overlapping LLM paraphrases so we don't
+  // show two TULIP lines and bury them behind a softer degree mainRisk.
+  const fromLlm = selectDistinctRisks(job, 2).filter((risk) => !llmRiskOverlapsNamedTool(risk));
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const n of namedToolNotes) {
+    const k = normalizeText(n);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(n);
+  }
+  for (const n of fromLlm) {
+    const k = normalizeText(n);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(n);
+    if (out.length >= max) break;
+  }
+  for (const n of job.rules?.notes ?? []) {
+    if (namedToolNotes.includes(n)) continue;
     const k = normalizeText(n);
     if (!k || seen.has(k)) continue;
     seen.add(k);
