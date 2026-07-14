@@ -43,6 +43,7 @@ export const CALIBRATION_FIXTURES = {
   clinicalInkHealthcare: "clinicalInkHealthcare.json",
   leapHealthcareProduct: "leapHealthcareProduct.json",
   extractionFailureCascade: "extractionFailureCascade.json",
+  namedRequiredToolAbsent: "namedRequiredToolAbsent.json",
 } as const;
 
 export type CalibrationFixtureKey = keyof typeof CALIBRATION_FIXTURES;

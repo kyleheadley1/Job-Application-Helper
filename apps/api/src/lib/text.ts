@@ -1,5 +1,7 @@
+import { repairMidWordLineBreaks } from "./repairMidWordLineBreaks.js";
+
 export const normalizeText = (value: string | undefined): string =>
-  (value ?? "")
+  repairMidWordLineBreaks(value ?? "")
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim();
@@ -9,3 +11,5 @@ export const normalizeMatcherText = (value: string | undefined): string =>
   normalizeText((value ?? "").replace(/[-–—/]/g, " "));
 
 export const dedupeStrings = (values: string[]): string[] => [...new Set(values.map((v) => v.trim()).filter(Boolean))];
+
+export { repairMidWordLineBreaks };
