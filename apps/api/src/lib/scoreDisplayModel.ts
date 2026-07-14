@@ -477,6 +477,16 @@ export const deriveActionLine = (params: {
     if (gapWorthy && gap) {
       return composeSpecializationGapActionLine("Stretch", gap, false);
     }
+    // Same required-language signal as Key Risks + referralAdvice — do not fall
+    // through to selectDominantLever (e.g. employer recognizability) when the
+    // hard gate is already a core-language / stack mismatch.
+    if (hasRequiredStackLanguageMismatch(rules)) {
+      const langs = (rules.coreLanguageGap ?? []).filter(Boolean);
+      const reason = langs.length
+        ? `required core-language gap (${langs.join(", ")})`
+        : "required core-language / stack gap";
+      return `Not worth the effort — ${reason}.`;
+    }
     if (rules.capabilityGap) {
       return `Not worth the effort — ${rules.capabilityGap.reason}.`;
     }

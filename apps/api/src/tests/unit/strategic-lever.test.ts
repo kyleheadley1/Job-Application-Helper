@@ -155,7 +155,9 @@ describe("strategicLever selection", () => {
     });
 
     for (const line of lines) {
-      expect(line).toMatch(/tailored|Strong shot|Worth applying/i);
+      // total 37 → skip band; dominant lever is employerRecognizability (binding), not
+      // jittered cosmetic impactMetricQuality — action line must stay stable on that lever.
+      expect(line).toMatch(/Not worth the effort — employer recognizability/i);
       expect(line).not.toMatch(/impact metric quality/i);
       expect(line).not.toMatch(/Codesmith/i);
       expect(line).not.toMatch(/referral/i);

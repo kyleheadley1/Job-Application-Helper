@@ -47,6 +47,7 @@ export const CALIBRATION_FIXTURES = {
   eulerityJavaRequired: "eulerityJavaRequired.json",
   nytCdpRequiredLanguage: "nytCdpRequiredLanguage.json",
   preferredOnlyGapVerbiage: "preferredOnlyGapVerbiage.json",
+  headlineReasonKeyRiskConsistency: "headlineReasonKeyRiskConsistency.json",
 } as const;
 
 export type CalibrationFixtureKey = keyof typeof CALIBRATION_FIXTURES;
