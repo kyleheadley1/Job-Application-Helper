@@ -9,6 +9,7 @@ import { repairMidWordLineBreaks } from "../../lib/repairMidWordLineBreaks.js";
 import { normalizeText } from "../../lib/text.js";
 import {
   calibrationSweResumeContexts,
+  fixtureToJobRecord,
   loadCalibrationFixture,
   scoreCalibrationAnchor,
 } from "../fixtures/calibrationAnchors.js";
@@ -84,6 +85,25 @@ describe("named hard-requirement detector", () => {
       detectNamedHardRequirementGaps(job, "Production Salesforce Apex workflows"),
     ).toEqual([]);
   });
+
+  it("does not fire scary gap when must-have is a skill the resume already has (React)", () => {
+    const resume = calibrationSweResumeContexts().SWE!.rawText;
+    expect(/\breact\b/i.test(resume)).toBe(true);
+    const job = makeJob({
+      stack: ["React"],
+      requiredSkills: ["React"],
+      requirements: ["Must have experience with React"],
+      rawText: "Must have experience with React",
+    });
+    expect(extractNamedHardRequirements(job)).toEqual(["React"]);
+    expect(detectNamedHardRequirementGaps(job, resume)).toEqual([]);
+    const rules = evaluateRules(job, userProfile, {
+      resumeContexts: calibrationSweResumeContexts(),
+      activeResumeType: "SWE",
+    });
+    expect(rules.namedHardRequirementGaps ?? []).toEqual([]);
+    expect(rules.notes.some((n) => /named tool\/platform React/i.test(n))).toBe(false);
+  });
 });
 
 describe("named required-tool absent calibration (PCG / TULIP)", () => {
@@ -109,6 +129,28 @@ describe("named required-tool absent calibration (PCG / TULIP)", () => {
     const scored = scoreCalibrationAnchor("namedRequiredToolAbsent");
     expect(scored.rules.namedHardRequirementGaps).toContain("TULIP Interfaces");
     expect(scored.rules.notes.some((n) => /TULIP Interfaces/.test(n))).toBe(true);
+  });
+
+  it("Key Risks UI promotes canonical TULIP note and drops overlapping LLM paraphrase", async () => {
+    const { buildKeyRisks } = await import("../../../../web/src/lib/resultSummary.ts");
+    const rules = evaluateRules(fixture.extracted, userProfile, {
+      resumeContexts: calibrationSweResumeContexts(),
+      activeResumeType: "SWE",
+    });
+    const job = {
+      ...fixtureToJobRecord(fixture),
+      rules,
+      mainRisk:
+        "The posting requests a BS or equivalent; the candidate lacks a bachelor’s degree (Codesmith grad), which some conservative screens may de-prioritize despite the equivalency clause.",
+      risks: [
+        "No explicit TULIP Interfaces experience is listed on the profile, which may be a screening blocker.",
+      ],
+    };
+    const keyRisks = buildKeyRisks(job, 5);
+    expect(keyRisks[0]).toMatch(/JD requires named tool\/platform TULIP Interfaces/);
+    const tulipLines = keyRisks.filter((r) => /TULIP/i.test(r));
+    expect(tulipLines).toHaveLength(1);
+    expect(keyRisks.some((r) => /No explicit TULIP/i.test(r))).toBe(false);
   });
 });
 
