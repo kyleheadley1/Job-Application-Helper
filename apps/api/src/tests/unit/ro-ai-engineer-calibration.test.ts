@@ -53,13 +53,24 @@ describe("seniority gate — role level only", () => {
         yearsExperience: { min: 6, raw: "6+ years" },
       }),
     ).toBe(true);
+    // Empty structured seniority + body years alone → fail safe (manual review), not gate.
+    expect(
+      detectRoleSeniorityOverreach({
+        ...RO_AI_ENGINEER_JOB,
+        title: "AI Engineer",
+        seniority: undefined,
+        yearsExperience: { min: 6, raw: "6+ years" },
+        rawText: "AI Engineer\n6+ years experience building products.",
+      }),
+    ).toBe(false);
+    // Early-career chrome + polluted years ≥5 → fail safe, not silent gate.
     expect(
       detectRoleSeniorityOverreach({
         ...RO_AI_ENGINEER_JOB,
         title: "AI Engineer",
         yearsExperience: { min: 6, raw: "6+ years" },
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 });
 

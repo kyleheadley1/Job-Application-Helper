@@ -15,11 +15,19 @@ const TITLE_ARCHITECT_ROLE_RE =
 const VERB_ARCHITECT_TITLE_RE =
   /^architect\s+(?:core|the|our|a|an|and|to|scalable|robust|high|new|ml|ai|data|backend|frontend|distributed|key|major|production|cloud|mobile|agent|llm|rag|api|platform|pipeline|system|systems|solution|solutions|features|services|infrastructure|components|workflows|integrations|products|experiences|capabilities)\b/i;
 
-const METADATA_SENIORITY_LABEL_RE =
-  /^(entry|junior|mid level|mid-level|junior, mid|associate|new grad|intern)$/i;
+/** Labeled Simplify Seniority next-line values (early + senior). */
+const METADATA_SENIORITY_VALUE_RE =
+  /^(entry|junior|mid level|mid-level|junior, mid|associate|new grad|intern|senior|staff|principal|lead|senior level|entry level|mid)$/i;
 
-/** Structured seniority from posting chrome (Simplify/Jobright labels) — wins over body-inferred senior. */
-export const resolveStructuredSeniorityLevel = (job: ExtractedJobData): string => {
+const EARLY_METADATA_SENIORITY_VALUE_RE =
+  /^(entry|junior|mid level|mid-level|junior, mid|associate|new grad|intern|entry level|mid)$/i;
+
+/**
+ * Explicit "Seniority" chrome label + next line. Preferred structured source.
+ * Bare unlabeled "Junior, Mid" lines (title-adjacent Simplify chrome) are NOT trusted alone
+ * for gating — they may exist without a real Seniority field.
+ */
+export const readLabeledSeniorityValue = (job: ExtractedJobData): string | null => {
   const lines = (job.rawText ?? "")
     .split("\n")
     .map((l) => l.trim())
@@ -28,14 +36,37 @@ export const resolveStructuredSeniorityLevel = (job: ExtractedJobData): string =
   const seniorityLabelIdx = lines.findIndex((l) => /^seniority$/i.test(l));
   if (seniorityLabelIdx >= 0) {
     const next = lines[seniorityLabelIdx + 1];
-    if (next && METADATA_SENIORITY_LABEL_RE.test(next)) return next;
+    if (next && METADATA_SENIORITY_VALUE_RE.test(next)) return next;
   }
+  return null;
+};
 
+export const hasTrustedStructuredSeniority = (job: ExtractedJobData): boolean =>
+  Boolean(readLabeledSeniorityValue(job)?.trim() || job.seniority?.trim());
+
+/** True when only years/body year bands exist — no Seniority label and no seniority field. */
+export const hasEmptyStructuredSeniority = (job: ExtractedJobData): boolean =>
+  !readLabeledSeniorityValue(job)?.trim() && !job.seniority?.trim();
+
+/**
+ * Structured seniority for gating.
+ * Prefer labeled Seniority field; then early-career chrome lines (Mid Level / Junior, Mid);
+ * then job.seniority. Unlabeled early lines never promote senior/staff — that avoided
+ * body pollution, but early chrome must still veto over a polluted seniority field.
+ */
+export const resolveStructuredSeniorityLevel = (job: ExtractedJobData): string => {
+  const labeled = readLabeledSeniorityValue(job);
+  if (labeled) return labeled;
+
+  const lines = (job.rawText ?? "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
   for (const line of lines.slice(0, 30)) {
-    if (METADATA_SENIORITY_LABEL_RE.test(line)) return line;
+    if (EARLY_METADATA_SENIORITY_VALUE_RE.test(line)) return line;
   }
 
-  return job.seniority ?? "";
+  return job.seniority?.trim() ?? "";
 };
 
 export const isEarlyCareerStructuredLevel = (level: string): boolean =>
@@ -57,15 +88,41 @@ export const yearsExperienceSignalsOverreach = (min?: number | null): boolean =>
   (min ?? 0) >= 5;
 
 /**
- * Early-career structured level vetoes the seniority hard gate entirely.
- * Body prose (architect verb, founding team, etc.) cannot override this.
+ * Early-career structured level with compatible years vetoes the seniority hard gate.
+ * When early-career chrome conflicts with years ≥5 (polluted parse), do NOT veto via this
+ * path — the gate fail-safes to manual review instead of firing on years alone.
  */
 export const earlyCareerLevelVetoesSeniorityGate = (job: ExtractedJobData): boolean => {
   const level = normalizeText(resolveStructuredSeniorityLevel(job));
+  if (!level || !isEarlyCareerStructuredLevel(level)) return false;
   const yearsMin = job.yearsExperience?.min;
-  const hasEarlyBand = isEarlyCareerStructuredLevel(level);
-  const yearsWithinEarlyBand = yearsMin == null || yearsMin <= 4;
-  return hasEarlyBand && yearsWithinEarlyBand;
+  return yearsMin == null || yearsMin <= 4;
+};
+
+/**
+ * Early chrome says junior/mid but yearsExperience.min ≥5 — extraction conflict.
+ * Fail safe: do not silently gate from the years parse.
+ */
+export const earlyCareerConflictsWithYears = (job: ExtractedJobData): boolean => {
+  const level = normalizeText(resolveStructuredSeniorityLevel(job));
+  if (!level || !isEarlyCareerStructuredLevel(level)) return false;
+  return yearsExperienceSignalsOverreach(job.yearsExperience?.min);
+};
+
+/**
+ * Flag for manual review when:
+ * - structured seniority is empty and body years alone would gate, OR
+ * - early-career chrome conflicts with years ≥5 (polluted year parse like 2–10+ → min 10).
+ * Do not silently fire the hard gate in those cases.
+ */
+export const seniorityNeedsManualReview = (job: ExtractedJobData): boolean => {
+  if (roleTitleSignalsSeniority(job.title)) return false;
+  if (earlyCareerLevelVetoesSeniorityGate(job)) return false;
+  if (earlyCareerConflictsWithYears(job)) return true;
+  if (hasEmptyStructuredSeniority(job) && yearsExperienceSignalsOverreach(job.yearsExperience?.min)) {
+    return true;
+  }
+  return false;
 };
 
 export type SeniorityGateTriggerExplanation = {
@@ -76,6 +133,7 @@ export type SeniorityGateTriggerExplanation = {
   triggerDetail?: string;
   resolvedLevel?: string;
   parsedSeniorityField?: string | null;
+  needsManualReview?: boolean;
 };
 
 /** Trace which signal would add the seniority hard gate (for calibration/debug). */
@@ -86,6 +144,7 @@ export const explainSeniorityGateTrigger = (
   const resolvedLevel = resolveStructuredSeniorityLevel(job);
   const parsedSeniorityField = job.seniority ?? null;
   const base = { resolvedLevel, parsedSeniorityField };
+  const needsManualReview = seniorityNeedsManualReview(job);
 
   if (earlyCareerLevelVetoesSeniorityGate(job)) {
     return {
@@ -93,6 +152,7 @@ export const explainSeniorityGateTrigger = (
       wouldFire: false,
       vetoed: true,
       vetoReason: `early-career structured level (${resolvedLevel || parsedSeniorityField}) with years min ${job.yearsExperience?.min ?? "unset"} ≤ 4`,
+      needsManualReview: false,
     };
   }
 
@@ -103,6 +163,19 @@ export const explainSeniorityGateTrigger = (
       vetoed: false,
       triggerSource: "title",
       triggerDetail: job.title ?? "",
+      needsManualReview: false,
+    };
+  }
+
+  if (needsManualReview) {
+    return {
+      ...base,
+      wouldFire: false,
+      vetoed: false,
+      needsManualReview: true,
+      triggerDetail: earlyCareerConflictsWithYears(job)
+        ? "early-career seniority conflicts with years min ≥5 — fail safe, no gate"
+        : "structured seniority empty — years/prose alone do not gate",
     };
   }
 
@@ -113,6 +186,7 @@ export const explainSeniorityGateTrigger = (
       vetoed: false,
       triggerSource: "yearsExperience",
       triggerDetail: String(job.yearsExperience?.min),
+      needsManualReview: false,
     };
   }
 
@@ -124,6 +198,7 @@ export const explainSeniorityGateTrigger = (
       vetoed: false,
       triggerSource: "seniorityField",
       triggerDetail: seniorityField ?? "",
+      needsManualReview: false,
     };
   }
 
@@ -134,10 +209,11 @@ export const explainSeniorityGateTrigger = (
       vetoed: false,
       triggerSource: "rulesFlagOnly",
       triggerDetail: "rules.seniorityOverreach=true without detectable trigger",
+      needsManualReview: false,
     };
   }
 
-  return { ...base, wouldFire: false, vetoed: false };
+  return { ...base, wouldFire: false, vetoed: false, needsManualReview: false };
 };
 
 export const logSeniorityGateEvaluation = (
@@ -148,6 +224,10 @@ export const logSeniorityGateEvaluation = (
   const explanation = explainSeniorityGateTrigger(job, rules);
   if (vetoed) {
     logger.info("Seniority hard gate vetoed at evaluation", explanation);
+    return;
+  }
+  if (explanation.needsManualReview) {
+    logger.info("Seniority hard gate deferred for manual review", explanation);
     return;
   }
   if (explanation.wouldFire || rules.seniorityOverreach) {
@@ -182,15 +262,22 @@ export const effectiveSeniorityFieldForGate = (job: ExtractedJobData): string | 
 };
 
 /**
- * Hard seniority gate — PRIMARY evidence: title (noun), structured level, yearsExperience.min.
- * Early-career junior/mid + years ≤4 vetoes the gate regardless of polluted title text.
+ * Hard seniority gate — PRIMARY evidence: title (noun), structured level, yearsExperience.min
+ * when structured seniority is present and consistent.
+ *
+ * Fail safe (no gate + manual review) when:
+ * - structured seniority is empty and only body years would fire, OR
+ * - early-career chrome conflicts with years ≥5 (polluted year parse).
  */
 export const detectRoleSeniorityOverreach = (job: ExtractedJobData): boolean => {
   if (earlyCareerLevelVetoesSeniorityGate(job)) return false;
+  if (roleTitleSignalsSeniority(job.title)) return true;
+  if (seniorityNeedsManualReview(job)) return false;
   const seniorityField = effectiveSeniorityFieldForGate(job);
   return (
-    roleTitleSignalsSeniority(job.title) ||
     yearsExperienceSignalsOverreach(job.yearsExperience?.min) ||
     seniorityFieldSignalsOverreach(seniorityField)
   );
 };
+
+export { EARLY_METADATA_SENIORITY_VALUE_RE };

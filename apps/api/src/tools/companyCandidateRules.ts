@@ -430,12 +430,19 @@ export function parseExplicitCompanyLabel(line: string): string | null {
   return null;
 }
 
+/**
+ * Company immediately before a Posted/Reposted timestamp — but NOT the chrome
+ * line sandwiched between a job title and the date (e.g. Simplify "Link" UI).
+ * Prefer duplicate-before-employee-count / labeled Company when that pattern appears.
+ */
 export function extractCompanyFromPostedHeader(lines: string[]): string | null {
   const clean = lines.map((l) => l.trim()).filter(Boolean);
   for (let i = 0; i < Math.min(clean.length - 1, 8); i++) {
     const current = clean[i]!;
     const next = clean[i + 1]!;
     if (isJobTitleLikeLine(current)) continue;
+    // Title → chrome → "Posted on …" is UI noise, not an employer field.
+    if (i > 0 && isJobTitleLikeLine(clean[i - 1]!)) continue;
     if (isValidCompanyCandidate(current) && isPostedTimestampLine(next)) {
       return current;
     }
@@ -635,11 +642,21 @@ export function resolveCompanyFromText(
   }
 
   const posted = extractCompanyFromPostedHeader(lines);
-  if (posted) {
-    candidates.push({ value: posted, source: "posted_header", rank: COMPANY_SOURCE_RANK.posted_header });
+  const duplicate = extractDuplicateCompanyBeforeEmployeeCount(lines);
+  // Duplicate company before employee-count is a real Simplify company card.
+  // Prefer it over posted_header when they disagree — header proximity alone is not a company field.
+  if (
+    posted &&
+    (!duplicate ||
+      normalizeCompanyCandidateKey(posted) === normalizeCompanyCandidateKey(duplicate))
+  ) {
+    candidates.push({
+      value: posted,
+      source: "posted_header",
+      rank: COMPANY_SOURCE_RANK.posted_header,
+    });
   }
 
-  const duplicate = extractDuplicateCompanyBeforeEmployeeCount(lines);
   if (duplicate) {
     candidates.push({
       value: duplicate,

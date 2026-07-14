@@ -22,7 +22,7 @@ import { evaluateDisjunctiveLanguageRequirement, filterGapsAfterDisjunctiveMatch
 import { isFdeBuilderSoftwarePrimaryShape } from '../../lib/fdeBuilderRole.js';
 import { classifyRoleLane, detectBackendProductApiShape } from '../../lib/roleFunctionClassifier.js';
 import { isStartupSmallTeamScale } from '../../lib/employerScale.js';
-import { detectRoleSeniorityOverreach } from '../../lib/seniorityGate.js';
+import { detectRoleSeniorityOverreach, seniorityNeedsManualReview } from '../../lib/seniorityGate.js';
 import {
   jdHasAppliedAiSystemsOverlap,
   jdIsStructurallyVague,
@@ -227,6 +227,11 @@ export const evaluateRules = (
   const earlyCareerFriendlyRole = earlyCareerShape && !strictNewGradPipeline;
 
   const seniorityOverreach = detectRoleSeniorityOverreach(job);
+  if (seniorityNeedsManualReview(job)) {
+    notes.push(
+      'Seniority gate deferred for manual review — structured Seniority field missing or conflicts with years parse; do not treat body years alone as a hard gate.',
+    );
+  }
 
   const primaryNonNycMetroInLocationLine =
     /\b(location|based|office)\s*:\s*[^.\n]{0,100}\b(dallas|austin|seattle|san francisco|sf\b|los angeles|chicago|denver|atlanta|boston|miami|philadelphia|phoenix|detroit|houston|portland)\b/i.test(

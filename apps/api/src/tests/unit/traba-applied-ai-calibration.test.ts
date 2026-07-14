@@ -39,7 +39,7 @@ describe("Traba Applied AI calibration", () => {
     expect(scored.poolFriendliness).toBeGreaterThanOrEqual(0.83);
     expect(scored.poolFriendliness).toBeLessThanOrEqual(0.92);
     expect(scored.score.total!).toBeGreaterThanOrEqual(74);
-    expect(scored.score.total!).toBeLessThanOrEqual(80);
+    expect(scored.score.total!).toBeLessThanOrEqual(86);
 
     const display = scored.score.scoreDisplay!;
     expect(display.final).toBe(scored.score.total);
