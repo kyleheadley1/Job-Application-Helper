@@ -231,6 +231,7 @@ export const RuleEvaluationSchema = z.object({
     .optional(),
   disjunctiveLanguageRequirementSatisfied: z.boolean().optional().default(false),
   disjunctiveAcceptedLanguages: z.array(z.string()).optional().default([]),
+  namedHardRequirementGaps: z.array(z.string()).optional().default([]),
   notes: z.array(z.string()).default([]),
   penaltyVector: z.record(z.string(), z.number()).optional(),
 });

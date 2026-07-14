@@ -41,6 +41,8 @@ import {
   resolveDegreeEquivalencyRules,
 } from '../../lib/degreeEquivalency.js';
 import { jdProhibitsGenAI } from '../../lib/genAiRestriction.js';
+import { detectNamedHardRequirementGaps } from '../../lib/namedHardRequirement.js';
+import { repairMidWordLineBreaks } from '../../lib/repairMidWordLineBreaks.js';
 
 const includesAny = (haystack: string, needles: string[]): boolean =>
   needles.some((needle) => haystack.includes(needle));
@@ -113,7 +115,7 @@ export const evaluateRules = (
   const notes: string[] = [];
   const penaltyVector: Record<string, number> = {};
 
-  const raw = normalizeText(job.rawText ?? '');
+  const rawRepaired = repairMidWordLineBreaks(job.rawText ?? '');
   const companyNorm = normalizeText(job.company ?? '');
 
   const structuredParts = [
@@ -132,10 +134,10 @@ export const evaluateRules = (
     .join(' ');
 
   const combinedText = normalizeText(
-    [companyNorm, structuredParts, raw].filter(Boolean).join(' '),
+    [companyNorm, structuredParts, rawRepaired].filter(Boolean).join(' '),
   );
   const matcherText = normalizeMatcherText(
-    [companyNorm, structuredParts, raw].filter(Boolean).join(' '),
+    [companyNorm, structuredParts, rawRepaired].filter(Boolean).join(' '),
   );
   const jdDegreePositive = jdIsDegreePositive(job);
   const jdProhibitsGenAIContent = jdProhibitsGenAI(job);
@@ -284,6 +286,33 @@ export const evaluateRules = (
     ]);
 
   const claimable = claimableStackFromContexts(options?.resumeContexts, options?.activeResumeType ?? 'SWE');
+  const resumeType = options?.activeResumeType ?? 'SWE';
+  const resumeRaw =
+    options?.resumeContexts?.[resumeType]?.rawText ??
+    options?.resumeContexts?.SWE?.rawText ??
+    '';
+  const candidateBackgroundBlob = [
+    resumeRaw,
+    profile.headline,
+    ...(profile.strengths ?? []),
+    ...(profile.recurringStory ?? []),
+    ...(profile.flagshipProjects ?? []).flatMap((p) => [p.name, ...(p.tech ?? [])]),
+    ...(profile.certifications ?? []).flatMap((c) => [c.name, ...(c.relatedSkills ?? [])]),
+    profile.training?.program ?? '',
+    ...claimable.skills.map((s) => s.label),
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const namedHardRequirementGaps = detectNamedHardRequirementGaps(job, candidateBackgroundBlob).map(
+    (g) => g.name,
+  );
+  for (const name of [...namedHardRequirementGaps].reverse()) {
+    notes.unshift(
+      `JD requires named tool/platform ${name} — no experience found in your background.`,
+    );
+  }
+
   const stackAnalysis = analyzeStackMismatch(job, claimable);
   const disjunctiveLanguage = evaluateDisjunctiveLanguageRequirement(job, claimable);
   let stackMismatch = stackAnalysis.stackMismatch;
@@ -711,6 +740,7 @@ export const evaluateRules = (
     geoExclusionHardGate: geoEligibility.geoExclusionHardGate,
     geoExclusionReason: geoEligibility.geoExclusionReason,
     hardRuleNotes,
+    namedHardRequirementGaps,
     notes: [...new Set(notes)],
     penaltyVector,
   };
