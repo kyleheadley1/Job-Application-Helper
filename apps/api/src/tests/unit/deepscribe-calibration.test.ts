@@ -4,6 +4,10 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { evaluateRules } from "../../agents/jobAgent/rules.js";
 import { userProfile } from "../../config/userProfile.js";
+import {
+  COMPOSITE_SCORING,
+  SURVIVABILITY_TUNING,
+} from "../../config/capabilitySurvivabilityPolicy.js";
 import { computeCompositeScore } from "../../lib/compositeScoreModel.js";
 import { applyScoringClampLayer } from "../../lib/scoringClampLayer.js";
 import { buildScoreDisplay } from "../../lib/scoreDisplayModel.js";
@@ -89,8 +93,10 @@ describe("DeepScribe calibration anchor", () => {
     expect(composite.recommendation).not.toBe("apply_cold");
     expect(composite.score.capability).toBeGreaterThanOrEqual(75);
     expect(composite.score.capability).toBeLessThanOrEqual(84);
-    expect(composite.score.survivability).toBeGreaterThanOrEqual(0.35);
-    expect(composite.score.survivability).toBeLessThanOrEqual(0.5);
+    // Weak cold-apply odds: below named production thresholds (never a bare 0.5).
+    expect(composite.score.survivability).toBeLessThan(SURVIVABILITY_TUNING.goodOddsThreshold);
+    expect(composite.score.survivability).toBeLessThan(COMPOSITE_SCORING.SURV_NEUTRAL);
+    expect(composite.score.survivability).toBeGreaterThanOrEqual(SURVIVABILITY_TUNING.floor);
     expect(composite.score.total).toBeGreaterThanOrEqual(65);
     expect(composite.score.total).toBeLessThan(80);
     expect(composite.scoreBand).toBe("apply");
