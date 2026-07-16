@@ -92,6 +92,14 @@ describe("differentiator coverage detection", () => {
     expect(coverage.tier).toBe("strong");
     expect(coverage.matchCount).toBeGreaterThanOrEqual(3);
   });
+
+  it("does not match short tags inside ordinary words", () => {
+    const blob =
+      "Assess business workflows for AI automations. Research tools for local businesses. Build lightweight applications.";
+    const { matchedTags } = countDifferentiatorTags(blob);
+    expect(matchedTags).not.toContain("sse");
+    expect(matchedTags).not.toContain("api");
+  });
 });
 
 describe("differentiator coverage caps", () => {

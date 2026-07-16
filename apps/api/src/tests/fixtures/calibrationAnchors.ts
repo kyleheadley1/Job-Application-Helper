@@ -50,6 +50,7 @@ export const CALIBRATION_FIXTURES = {
   headlineReasonKeyRiskConsistency: "headlineReasonKeyRiskConsistency.json",
   resumeSurvivabilitySelectionConsistency: "resumeSurvivabilitySelectionConsistency.json",
   neonTextuallyUngrounded: "neonTextuallyUngrounded.json",
+  kongAiEnablementUngrounded: "kongAiEnablementUngrounded.json",
   deepscribeSurvivabilityBoundary: "deepscribeSurvivabilityBoundary.json",
 } as const;
 

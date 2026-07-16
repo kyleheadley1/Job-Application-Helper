@@ -555,9 +555,19 @@ export const evaluateRules = (
     notes.push(goNote);
   } else if (backendProductApiRole && !infraCoreRole) {
     const companyLabel = job.company?.trim() || 'This company';
+    const backendApiGroundingText = jdDutiesText.replace(
+      /\b(ai\s+apis?|api\s+management)\b/gi,
+      " ",
+    );
     const backendOrApiInDuties =
-      /\b(backend|apis?|rest|graphql|services?|infra|serverside|server[-\s]?side)\b/i.test(
-        jdDutiesText,
+      /\b(backend|rest|graphql|microservices?|infra(?:structure)?|serverside|server[-\s]?side)\b/i.test(
+        backendApiGroundingText,
+      ) ||
+      /\b(build|develop|design|implement|maintain|own|ship)\b[^.\n]{0,80}\bapis?\b/i.test(
+        backendApiGroundingText,
+      ) ||
+      /\bapis?\b[^.\n]{0,80}\b(build|develop|design|implement|maintain|own|ship|services?)\b/i.test(
+        backendApiGroundingText,
       );
     // Require payments/fintech + rigor language in Required/Responsibilities —
     // do not infer a mature payments hiring bar from company/industry alone.

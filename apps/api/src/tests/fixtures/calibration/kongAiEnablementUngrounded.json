@@ -1,0 +1,77 @@
+{
+  "id": "kong-ai-enablement-ungrounded-inference",
+  "anchorNote": "GUARD — Kong AI Enablement Specialist: second recurring ungrounded-inference anchor alongside Neon. JD is about AI workflow assessment, AI automations, coaching, docs, governance, and Desired tools (AI APIs, Zapier, Make, n8n, Claude Code, Gemini Enterprise). Required/Responsibilities do NOT ask for Go, SSE/server-side streaming, platform engineering, or backend/API product engineering. Company chrome says API management/connectivity and Kong Konnect is a plus; that must not produce platform/backend Key Risks or differentiator tags.",
+  "extracted": {
+    "company": "Kong",
+    "companyDisplayName": "Kong",
+    "title": "AI Enablement Specialist",
+    "location": "Remote (US)",
+    "remoteType": "remote",
+    "locationIsCommutable": false,
+    "seniority": "junior",
+    "yearsExperience": { "raw": "2–3 years", "min": 2, "max": 3 },
+    "salary": { "min": 77800, "max": 111200, "currency": "USD" },
+    "stack": [
+      "AI APIs",
+      "Zapier",
+      "Make",
+      "n8n",
+      "Claude Code",
+      "Gemini Enterprise",
+      "scripting",
+      "Slack",
+      "Google Workspace",
+      "Jira",
+      "Salesforce",
+      "Kong Konnect"
+    ],
+    "requiredSkills": [
+      "Practical experience using AI tools in day-to-day work with examples",
+      "Genuine curiosity about how AI tools work",
+      "Clear written and verbal communication skills",
+      "Organized and reliable in a fast-moving environment"
+    ],
+    "preferredSkills": [
+      "Experience building with AI APIs",
+      "Experience with automation platforms (Zapier, Make, n8n, Claude Code, Gemini Enterprise)",
+      "Coding or scripting background",
+      "Experience explaining technology to non-technical audiences",
+      "Familiarity with Slack, Google Workspace, Jira, Salesforce",
+      "Knowledge of or interest in Kong Konnect / API management"
+    ],
+    "domainTags": ["AI enablement", "API management"],
+    "requirements": [
+      "2–3 years of professional or project-based experience — internships, independent work, or coursework all count if you can demonstrate what you built or accomplished.",
+      "Practical experience using AI tools in your day-to-day work, with clear examples of how you've applied them beyond basic question-and-answer use.",
+      "Genuine curiosity about how AI tools work and a drive to understand them at a deeper level than most users do.",
+      "Clear written and verbal communication skills — the ability to explain a technical tool or process to someone who's unfamiliar with it.",
+      "Organized and reliable in a fast-moving environment where priorities can shift and multiple workstreams run at once."
+    ],
+    "responsibilities": [
+      "Work alongside senior team members to assess business workflows and identify where AI tools could meaningfully improve how work gets done.",
+      "Build and iterate on AI automations, prompt-based tools, and lightweight applications based on team feedback and real usage.",
+      "Participate in coaching sessions with business team members, helping people get comfortable with AI tools through hands-on practice.",
+      "Maintain clear documentation for the tools and workflows you help build, so others can understand, adapt, and build on them.",
+      "Test AI tools before they go to users — identifying gaps, inconsistencies, and edge cases that matter in a real work environment.",
+      "Track and report on how business team members are progressing in their AI skill development.",
+      "Research emerging AI tools and platforms and summarize what's relevant for Kong's business context.",
+      "Follow Kong's AI governance guidelines and collaborate with IT and Security to ensure tools meet internal standards.",
+      "Desired Qualifications",
+      "Experience building with AI APIs, automation platforms (e.g., Zapier, Make, n8n, Claude Code, Gemini Enterprise), or scripting tools.",
+      "Any coding or scripting background — language matters less than demonstrated initiative and the ability to learn quickly.",
+      "Experience explaining technology to non-technical audiences, whether through peer tutoring, training sessions, or informal support.",
+      "Familiarity with common enterprise tools such as Slack, Google Workspace, Jira, or Salesforce.",
+      "Knowledge of or interest in Kong Konnect, API management, or how AI models connect to enterprise systems is a plus."
+    ],
+    "rawText": "AI Enablement Specialist\nKong\n1,001-5,000 employees\nHigh-performance API management and connectivity\nRemote within the United States\nCategory: Software Engineering, AI/ML/GenAI Engineering\nRequirements\n2–3 years of professional or project-based experience — internships, independent work, or coursework all count if you can demonstrate what you built or accomplished.\nPractical experience using AI tools in your day-to-day work, with clear examples of how you've applied them beyond basic question-and-answer use.\nGenuine curiosity about how AI tools work and a drive to understand them at a deeper level than most users do.\nClear written and verbal communication skills — the ability to explain a technical tool or process to someone who's unfamiliar with it.\nOrganized and reliable in a fast-moving environment where priorities can shift and multiple workstreams run at once.\nResponsibilities\nWork alongside senior team members to assess business workflows and identify where AI tools could meaningfully improve how work gets done.\nBuild and iterate on AI automations, prompt-based tools, and lightweight applications based on team feedback and real usage.\nParticipate in coaching sessions with business team members, helping people get comfortable with AI tools through hands-on practice.\nMaintain clear documentation for the tools and workflows you help build, so others can understand, adapt, and build on them.\nTest AI tools before they go to users — identifying gaps, inconsistencies, and edge cases that matter in a real work environment.\nTrack and report on how business team members are progressing in their AI skill development.\nResearch emerging AI tools and platforms and summarize what's relevant for Kong's business context.\nFollow Kong's AI governance guidelines and collaborate with IT and Security to ensure tools meet internal standards.\nDesired Qualifications\nExperience building with AI APIs, automation platforms (e.g., Zapier, Make, n8n, Claude Code, Gemini Enterprise), or scripting tools.\nAny coding or scripting background — language matters less than demonstrated initiative and the ability to learn quickly.\nExperience explaining technology to non-technical audiences, whether through peer tutoring, training sessions, or informal support.\nFamiliarity with common enterprise tools such as Slack, Google Workspace, Jira, or Salesforce.\nKnowledge of or interest in Kong Konnect, API management, or how AI models connect to enterprise systems is a plus."
+  },
+  "storedCategoryScores": {
+    "stackFit": 13,
+    "levelFit": 17,
+    "domainFit": 6,
+    "resumeStoryClarity": 8,
+    "functionalOverlap": 11,
+    "recruiterFriendliness": 11,
+    "careerValue": 7
+  }
+}

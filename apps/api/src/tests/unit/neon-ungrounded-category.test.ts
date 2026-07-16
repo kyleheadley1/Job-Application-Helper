@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { evaluateRules } from "../../agents/jobAgent/rules.js";
 import { userProfile } from "../../config/userProfile.js";
 import {
+  countDifferentiatorTags,
+  jobDescriptionBlob,
+} from "../../lib/differentiatorCoverage.js";
+import {
   calibrationSweResumeContexts,
   scoreCalibrationAnchor,
 } from "../fixtures/calibrationAnchors.js";
@@ -37,5 +41,24 @@ describe("Neon — textually-ungrounded company-category inference", () => {
     const scored = scoreCalibrationAnchor("stubHubCoreCompute");
     expect(scored.rules.platformInfraRole || scored.rules.roleLane === "platform_infra").toBe(true);
     expect(scored.score.scoreDisplay?.capabilityBreakdown?.stackFit).toBeLessThanOrEqual(18);
+  });
+
+  it("Kong does not infer platform/backend risks from company API-management chrome", () => {
+    const scored = scoreCalibrationAnchor("kongAiEnablementUngrounded");
+    const rules = evaluateRules(scored.fixture.extracted, userProfile, {
+      resumeContexts: calibrationSweResumeContexts(),
+      activeResumeType: "SWE",
+    });
+    const notes = rules.notes.join(" | ");
+
+    expect(notes).not.toMatch(/backend\/API product work/i);
+    expect(notes).not.toMatch(/platform engineering|pure platform engineering/i);
+    expect(notes).not.toMatch(/Preferred Go|platform stack/i);
+    expect(scored.score.scoreDisplay?.differentiatorCoverageNote).not.toMatch(/\bsse\b/i);
+    expect(scored.score.scoreDisplay?.differentiatorCoverageNote).not.toMatch(/\bgo\b/i);
+
+    const tags = countDifferentiatorTags(jobDescriptionBlob(scored.fixture.extracted));
+    expect(tags.matchedTags).not.toContain("sse");
+    expect(tags.matchedTags).not.toContain("go");
   });
 });
