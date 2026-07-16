@@ -289,7 +289,7 @@ export const evaluateDifferentiatorCoverage = (
     tier: "none",
     matchCount: 0,
     matchedTags: [],
-    note: `Differentiator coverage: none — generic stack match, capped${adjacentNote}`,
+    note: `Differentiator coverage: none — generic stack match (no specialized edge credit)${adjacentNote}`,
   };
 };
 
@@ -322,7 +322,7 @@ export const applyDifferentiatorCoverageCap = (
 
   const normalCap =
     coverage.tier === "none"
-      ? DIFFERENTIATOR_COVERAGE.NONE_CAP
+      ? null // differentiator absence is additive signal only — do not cap a fully-satisfied match
       : DIFFERENTIATOR_COVERAGE.PARTIAL_CAP;
 
   let cap = normalCap;
@@ -334,6 +334,9 @@ export const applyDifferentiatorCoverageCap = (
     });
     if (preFilter.count >= DIFFERENTIATOR_COVERAGE.STRONG_MIN_TAGS) {
       cap = FRONTEND_PRIMARY_ROLE.CAP;
+    } else if (!cap) {
+      // Frontend role shape still applies its own lane cap when no differentiator tags.
+      cap = FRONTEND_PRIMARY_ROLE.CAP;
     }
   }
   if (platformInfraRole) {
@@ -342,17 +345,21 @@ export const applyDifferentiatorCoverageCap = (
 
   const adjacentCap = adjacentRoleFunction ? ADJACENT_ROLE_FUNCTION.CAP : null;
 
+  if (!cap && !adjacentCap) {
+    return { breakdown, coverage };
+  }
+
   return {
     breakdown: {
       ...breakdown,
       stackFit: Math.min(
         breakdown.stackFit,
-        cap.stackFit,
+        cap?.stackFit ?? Number.POSITIVE_INFINITY,
         adjacentCap?.stackFit ?? Number.POSITIVE_INFINITY,
       ),
       functionalOverlap: Math.min(
         breakdown.functionalOverlap,
-        cap.functionalOverlap,
+        cap?.functionalOverlap ?? Number.POSITIVE_INFINITY,
         adjacentCap?.functionalOverlap ?? Number.POSITIVE_INFINITY,
       ),
     },

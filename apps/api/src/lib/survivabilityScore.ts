@@ -24,6 +24,15 @@ export type SurvivabilityBreakdown = Record<SurvivabilitySubFactorKey, number> &
   poolFriendlinessMeta?: PoolFriendlinessMeta;
 };
 
+/** Fixed precision before threshold compares (avoids 0.1-style binary accumulation noise). */
+export const roundSurvivabilityScalar = (
+  n: number,
+  decimals: number = SURVIVABILITY_TUNING.decimalPlaces,
+): number => {
+  const factor = 10 ** decimals;
+  return Math.round(n * factor) / factor;
+};
+
 export const toPersistedSurvivabilityBreakdown = (
   breakdown: SurvivabilityBreakdown,
 ): Record<string, number> => ({
@@ -151,8 +160,11 @@ export const scoreCredentialSignal = (
 
 export const scoreImpactMetricQuality = (resumeText: string): number => {
   const t = normalizeText(resumeText);
+  // Honest hedges (~30%, "(est.)") are NOT weak markers: \b before "~" never matched
+  // anyway, so "~30% (est.)" never fired; keeping them out of weak is intentional —
+  // early-career hedged metrics must not score identically to "no metric / pilot only."
   const weak =
-    /\b(~\d+%|\best\.|\(est\.\)|\d+\+\s+internal|10\+ internal|small[-\s]?scale|pilot)\b/i.test(t);
+    /\b(\d+\+\s+internal|10\+ internal|small[-\s]?scale|pilot)\b/i.test(t);
   const strong =
     /\b(\d{1,3}[mMbBkK]\+?\s+(users|customers|requests|transactions)|million|billion|\d{2,3}%[^~]{0,20}(increase|reduction|growth|improvement))\b/i.test(
       t,
@@ -255,9 +267,9 @@ export const computeSurvivability = (params: {
     weightedAverage = Math.min(1, weightedAverage + 0.03);
   }
 
-  const multiplier = Math.min(
-    1,
-    Math.max(SURVIVABILITY_TUNING.floor, weightedAverage),
+  weightedAverage = roundSurvivabilityScalar(weightedAverage);
+  const multiplier = roundSurvivabilityScalar(
+    Math.min(1, Math.max(SURVIVABILITY_TUNING.floor, weightedAverage)),
   );
 
   return {

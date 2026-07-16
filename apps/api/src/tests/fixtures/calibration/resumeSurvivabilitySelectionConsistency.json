@@ -1,0 +1,38 @@
+{
+  "id": "resume-survivability-selection-consistency",
+  "anchorNote": "GUARD — Varsity/BSN class: Software Engineer I recommends EARLY_CAREER. Triage scoreJob and recomputeStoredJobScore must yield the same impactMetricQuality (0.52 from early_career resume), not 0.32 from hardcoded SWE. Regex note: ~30% (est.) never matched weak markers (\\b before ~); honest hedges are intentionally excluded from weak — only 10+ internal / pilot / small-scale dock to 0.32.",
+  "extracted": {
+    "company": "Varsity Brands",
+    "companyDisplayName": "Varsity Brands",
+    "title": "Software Engineer I",
+    "location": "Remote (US)",
+    "remoteType": "remote",
+    "locationIsCommutable": false,
+    "seniority": "junior",
+    "yearsExperience": { "raw": "1+", "min": 1 },
+    "stack": ["React", "TypeScript", "Node.js"],
+    "requiredSkills": ["React", "TypeScript", "Node.js"],
+    "preferredSkills": [],
+    "domainTags": ["frontend", "backend"],
+    "companyEmployeeCount": 1000,
+    "requirements": [
+      "Bachelor's degree in Computer Science or related field, or equivalent practical experience",
+      "1+ years experience with React and TypeScript",
+      "Experience building REST APIs and backend services with Node.js"
+    ],
+    "responsibilities": [
+      "Build and maintain React + TypeScript front-end features",
+      "Develop API/back-end services and collaborate across teams"
+    ],
+    "rawText": "Varsity Brands\n· 1 hour ago\nSoftware Engineer I\nposition\nUnited States\ntime\nFull-time\nremote\nRemote\nseniority\nEntry Level\nmoney\n$95,000 – $115,000\nRequirements\nBachelor's degree in Computer Science or related field, or equivalent practical experience\n1+ years experience with React and TypeScript\nExperience building REST APIs and backend services with Node.js\nResponsibilities\nBuild and maintain React + TypeScript front-end features\nDevelop API/back-end services and collaborate across teams"
+  },
+  "storedCategoryScores": {
+    "stackFit": 13,
+    "levelFit": 19,
+    "domainFit": 7,
+    "resumeStoryClarity": 8,
+    "functionalOverlap": 13,
+    "recruiterFriendliness": 10,
+    "careerValue": 7
+  }
+}

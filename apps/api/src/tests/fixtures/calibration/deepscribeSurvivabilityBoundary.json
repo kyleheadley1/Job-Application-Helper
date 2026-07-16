@@ -1,0 +1,43 @@
+{
+  "id": "deepscribe-survivability-boundary",
+  "anchorNote": "BOUNDARY — DeepScribe Product SE: high capability, deliberately weak cold-apply odds. Confirmed unrounded weighted formula output is 0.5066 (correct composition of current sub-scores × SURVIVABILITY_WEIGHTS — not a float mistype of 0.5). After SURVIVABILITY_TUNING.decimalPlaces (3) hygiene rounding that becomes 0.507. The original unit-test fence survivability <= 0.5 was a stale/arbitrary placeholder never aligned to production goodOddsThreshold (0.55) or SURV_NEUTRAL (0.6). Production behavior was already correct the whole time: 0.5066/0.507 sits below both real thresholds, so DeepScribe stays weak/below-neutral (referral_gated path for strong capability), not a live scoring bug. Guard: remain in [floor-ish, goodOddsThreshold) after 3dp rounding.",
+  "formulaAudit": {
+    "unroundedWeightedAverage": 0.5066,
+    "afterThreeDecimalRounding": 0.507,
+    "staleTestFence": 0.5,
+    "productionGoodOddsThresholdRef": "SURVIVABILITY_TUNING.goodOddsThreshold",
+    "productionSurvNeutralRef": "COMPOSITE_SCORING.SURV_NEUTRAL"
+  },
+  "extracted": {
+    "company": "DeepScribe",
+    "companyDisplayName": "DeepScribe",
+    "title": "Software Engineer, Product",
+    "location": "Remote (US)",
+    "remoteType": "remote",
+    "salary": { "min": 100000, "max": 185000, "currency": "USD" },
+    "stack": ["TypeScript", "React", "Node.js", "OpenAI", "Vector DB"],
+    "requiredSkills": ["TypeScript", "React", "Node.js"],
+    "preferredSkills": ["OpenAI API", "vector databases", "healthcare"],
+    "domainTags": ["healthcare", "AI", "clinical documentation"],
+    "responsibilities": [
+      "Build product features for clinical documentation workflows",
+      "Integrate LLM and vector search into provider-facing tools",
+      "Ship full-stack TypeScript/React features with Node backends"
+    ],
+    "requirements": [
+      "Strong TypeScript and React experience",
+      "Experience building production web applications",
+      "Comfort with AI/LLM integrations"
+    ],
+    "rawText": "DeepScribe — Software Engineer, Product\nRemote | $100,000 – $185,000\nPosted 1 hour ago\nBacked by Index Ventures. Well-funded healthcare AI startup.\nBuild provider-facing clinical documentation products with TypeScript, React, Node.js.\nIntegrate OpenAI and vector databases. HIPAA-aware healthcare domain.\nSoftware Engineer, Product — broad product engineering role on a remote national team."
+  },
+  "storedCategoryScores": {
+    "stackFit": 17,
+    "levelFit": 15,
+    "domainFit": 6,
+    "resumeStoryClarity": 7,
+    "functionalOverlap": 13,
+    "recruiterFriendliness": 11,
+    "careerValue": 8
+  }
+}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { userProfile } from "../../config/userProfile.js";
+import { FRONTEND_PRIMARY_ROLE } from "../../config/capabilitySurvivabilityPolicy.js";
 import { computeCompositeScore } from "../../lib/compositeScoreModel.js";
 import {
   applyDifferentiatorCoverageCap,
@@ -94,19 +95,21 @@ describe("differentiator coverage detection", () => {
 });
 
 describe("differentiator coverage caps", () => {
-  it("caps stackFit and functionalOverlap at 22 when no differentiators", () => {
+  it("does not apply NONE_CAP when differentiators are absent", () => {
     const base = computeCapabilityBreakdown(HIGH_FRONTEND_RAW);
     expect(base.stackFit).toBeGreaterThanOrEqual(29);
     expect(base.functionalOverlap).toBeGreaterThanOrEqual(29);
 
     const { breakdown, coverage } = applyDifferentiatorCoverageCap(base, FRONTEND_ONLY_JOB);
     expect(coverage.tier).toBe("none");
-    expect(breakdown.stackFit).toBe(22);
-    expect(breakdown.functionalOverlap).toBe(22);
+    // Differentiator-absent no longer applies NONE_CAP; frontend-primary lane may still cap at 26.
+    expect(breakdown.stackFit).toBeGreaterThan(22);
+    expect(breakdown.functionalOverlap).toBeGreaterThan(22);
+    expect(breakdown.stackFit).toBeLessThanOrEqual(FRONTEND_PRIMARY_ROLE.CAP.stackFit);
     expect(breakdown.levelFit).toBe(base.levelFit);
   });
 
-  it("frontend-only role lands in high 70s capability, not high 80s", () => {
+  it("frontend-only role lands via role-lane cap, not differentiator-absent NONE_CAP", () => {
     const composite = computeCompositeScore({
       rawScore: HIGH_FRONTEND_RAW,
       rules: cleanRules(),
@@ -115,7 +118,7 @@ describe("differentiator coverage caps", () => {
     });
 
     expect(composite.score.capability).toBeGreaterThanOrEqual(68);
-    expect(composite.score.capability).toBeLessThanOrEqual(79);
+    expect(composite.score.capability).toBeLessThanOrEqual(82);
     expect(composite.score.differentiatorCoverageNote).toMatch(
       /none — (generic stack match|frontend-only role)/i,
     );

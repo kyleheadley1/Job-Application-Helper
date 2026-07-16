@@ -451,6 +451,18 @@ export const evaluateRules = (
       competitiveHiringContext) ||
     competitivePoolSignals.signalCount >= 3;
 
+  const jdDutiesText = normalizeText(
+    [...(job.requirements ?? []), ...(job.responsibilities ?? [])].join("\n"),
+  );
+  const productionRigorInDuties =
+    /\b(production ownership|meaningful scope|on[-\s]?call|end[-\s]?to[-\s]?end|own(s|\s+the)?\s+(the\s+)?(features?|roadmap|slice|technical|service|area|product)|technical ownership|operate in production|production systems?|ship(ped|ping)?[^.\n]{0,60}production|reliability|slo|incident|operational maturity|scale)\b/i.test(
+      jdDutiesText,
+    );
+  const paymentsOrFintechInDuties =
+    /\b(plaid|stripe|fintech|payments|banking[-\s]?api|financial infrastructure|payment)\b/i.test(
+      jdDutiesText,
+    );
+
   if (degreeRequiredSignal && degreeHasEquivalencyClause && !degreeEquivalencySatisfied) {
     notes.push(
       'Degree mentioned but JD allows equivalent, project, or bootcamp experience — treat as a soft screen note, not a hard gate.',
@@ -543,13 +555,21 @@ export const evaluateRules = (
     notes.push(goNote);
   } else if (backendProductApiRole && !infraCoreRole) {
     const companyLabel = job.company?.trim() || 'This company';
-    const matureFintechApi =
-      /\b(plaid|stripe|fintech|payments|banking[-\s]?api|financial infrastructure)\b/i.test(combinedText);
-    notes.push(
-      matureFintechApi
-        ? `${companyLabel} operates payment- or API-heavy product infrastructure; hiring rubrics often emphasize production reliability, backend fundamentals, and operational maturity.`
-        : `${companyLabel} lists backend/API product work with infra tooling context — screeners may still probe scale and fundamentals without treating this as pure platform engineering.`,
-    );
+    const backendOrApiInDuties =
+      /\b(backend|apis?|rest|graphql|services?|infra|serverside|server[-\s]?side)\b/i.test(
+        jdDutiesText,
+      );
+    // Require payments/fintech + rigor language in Required/Responsibilities —
+    // do not infer a mature payments hiring bar from company/industry alone.
+    if (paymentsOrFintechInDuties && productionRigorInDuties) {
+      notes.push(
+        `${companyLabel} lists payment- or API-heavy product work with production/reliability expectations; hiring rubrics often emphasize production reliability, backend fundamentals, and operational maturity.`,
+      );
+    } else if (backendOrApiInDuties) {
+      notes.push(
+        `${companyLabel} lists backend/API product work with infra tooling context — screeners may still probe scale and fundamentals without treating this as pure platform engineering.`,
+      );
+    }
   } else if (infraCoreRole) {
     notes.push(
       'Role appears platform/infra-core; deeper production infra background may be screened more strictly.',
@@ -591,7 +611,7 @@ export const evaluateRules = (
       'Go-primary backend expectations are outside the strongest TypeScript/Node lane and are a major stack caveat.',
     );
   }
-  if (productionBarCompetitivePool) {
+  if (productionBarCompetitivePool && productionRigorInDuties) {
     notes.push(
       'Mature production-ownership bar with competitive hiring context — keep recruiter-screen realism conservative unless the profile matches JD stack details and production depth.',
     );

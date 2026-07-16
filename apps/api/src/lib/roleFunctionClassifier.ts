@@ -91,7 +91,7 @@ const CORE_SWE_TITLE_RE =
   /\b(software engineer|backend engineer|full[-\s]?stack engineer|platform engineer|product engineer|machine learning engineer|ai engineer)\b/i;
 
 const FRONTEND_TITLE_RE =
-  /\b(front[\s-]?end(?:\s+engineer|\s+developer)?|frontend(?:\s+engineer|\s+developer)?|ui\s+engineer|ui\s+developer)\b/i;
+  /\b(front[\s-]?end(?:\s+engineer|\s+developer)?|frontend(?:\s+engineer|\s+developer)?|ui\s+engineer|ui\s+developer|web\s+design\s+engineer|design\s+engineer|(?:ui|ux)\/(?:ui|ux)\s+engineer)\b/i;
 
 const FULL_STACK_OR_BACKEND_TITLE_RE =
   /\b(full[\s-]?stack|back[\s-]?end(?:\s+engineer|\s+developer)?|backend(?:\s+engineer|\s+developer)?)\b/i;
@@ -111,6 +111,9 @@ const FRONTEND_WORK_PATTERNS: RegExp[] = [
   /\bfrontend\s+(?:product|features?|systems?|engineering|reliability|architecture)\b/i,
   /\breact\s+(?:components?|applications?|native)\b/i,
   /\bpolished\s+(?:ux|ui)\b/i,
+  /\bfigma\b/i,
+  /\bpixel[-\s]?perfect\b/i,
+  /\bvisual\s+design\b/i,
 ];
 
 const BACKEND_BUILDING_PATTERNS: RegExp[] = [

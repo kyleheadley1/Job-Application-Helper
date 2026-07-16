@@ -13,7 +13,9 @@ import { RECOMMENDATION_LABELS } from '../../config/capabilitySurvivabilityPolic
 import { evaluateRules } from './rules.js';
 import { scoreJob } from './scoring.js';
 import { computeSalaryAsk } from './salaryAsk.js';
-import { selectResume } from './resumeSelector.js';
+import { deterministicResumeSelection, selectResume } from './resumeSelector.js';
+import { computeCompositeScore } from '../../lib/compositeScoreModel.js';
+import type { ResumeType } from '../../types/resume.js';
 import { fetchJobPosting } from '../../tools/fetchJobPosting.js';
 import { parseJobText } from '../../tools/parseJobText.js';
 import { extractJobData } from '../../tools/extractJobData.js';
@@ -66,9 +68,16 @@ export const triageJob = async (input: {
   const resumeContexts = await resumeContextService.getAvailableContexts();
   stageMs.resumeContext = Date.now() - resumeCtxStart;
 
+  // Preview resume before scoring so survivability uses the same text as recommendedResume
+  // (selectResume historically ran after scoreJob and hardcoded SWE for impactMetricQuality).
+  const resumePreview = deterministicResumeSelection(extracted, resumeContexts);
+  let activeResumeType: ResumeType = resumePreview.recommendedResume;
+  let resumeTextForScore =
+    resumeContexts?.[activeResumeType]?.rawText ?? resumeContexts?.SWE?.rawText;
+
   const rulesStart = Date.now();
   const rules = withSanitizedRuleNotes(
-    evaluateRules(extracted, userProfile, { resumeContexts, activeResumeType: 'SWE' }),
+    evaluateRules(extracted, userProfile, { resumeContexts, activeResumeType }),
     extracted,
     userProfile,
   );
@@ -79,16 +88,15 @@ export const triageJob = async (input: {
     rules: scoredRules,
     scoringDiagnostics,
     scoringLlmSucceeded,
-  } = await scoreJob({ extracted, rules, userProfile, resumeContexts, preScoringMetadata });
-  stageMs.scoring = Date.now() - scoringStart;
-  const salaryStart = Date.now();
-  const salaryAsk = computeSalaryAsk({
+  } = await scoreJob({
     extracted,
-    score: scored.score,
-    recommendation: scored.recommendation,
-    rules: scoredRules,
+    rules,
+    userProfile,
+    resumeContexts,
+    resumeText: resumeTextForScore,
+    preScoringMetadata,
   });
-  stageMs.salary = Date.now() - salaryStart;
+  stageMs.scoring = Date.now() - scoringStart;
   const resumeSelStart = Date.now();
   const resumeSelection = await selectResume({
     extracted,
@@ -100,33 +108,63 @@ export const triageJob = async (input: {
   });
   stageMs.resumeSelection = Date.now() - resumeSelStart;
 
+  let scoredScore = scored.score;
+  let scoredRulesFinal = scoredRules;
+  let scoredRecommendation = scored.recommendation;
+  activeResumeType = resumeSelection.recommendedResume;
+  const finalResumeText =
+    resumeContexts?.[activeResumeType]?.rawText ?? resumeTextForScore;
+  // Ambiguous LLM resume selection may diverge from the deterministic preview —
+  // recompute survivability so impactMetricQuality still matches recommendedResume.
+  if (finalResumeText !== resumeTextForScore) {
+    resumeTextForScore = finalResumeText;
+    const recomposite = computeCompositeScore({
+      rawScore: scored.score,
+      rules: scoredRules,
+      extracted,
+      profile: userProfile,
+      resumeText: finalResumeText,
+    });
+    scoredScore = recomposite.score;
+    scoredRecommendation = recomposite.recommendation;
+  }
+
+  const salaryStart = Date.now();
+  const salaryAsk = computeSalaryAsk({
+    extracted,
+    score: scoredScore,
+    recommendation: scoredRecommendation,
+    rules: scoredRulesFinal,
+  });
+  stageMs.salary = Date.now() - salaryStart;
+
   const referralPathway = detectReferralPathway({
     profile: userProfile,
     extracted,
-    resumeText: resumeContexts?.SWE?.rawText,
+    resumeText: finalResumeText,
   });
 
   const scoreDisplay = buildScoreDisplay({
-    score: scored.score,
-    rules: scoredRules,
+    score: scoredScore,
+    rules: scoredRulesFinal,
     extracted,
     profile: userProfile,
-    recommendation: scored.recommendation,
+    recommendation: scoredRecommendation,
     referralPathwayAvailable: referralPathway.referralPathwayAvailable,
     referralPathwayNotes: referralPathway.referralPathwayNotes,
   });
 
   const finalRecommendation = guardCompositeRecommendation({
-    recommendation: scored.recommendation,
-    capability: scored.score.capability ?? 0,
-    survivability: scored.score.survivability ?? 0,
-    rules: scoredRules,
+    recommendation: scoredRecommendation,
+    capability: scoredScore.capability ?? 0,
+    survivability: scoredScore.survivability ?? 0,
+    rules: scoredRulesFinal,
     survivabilityPenalties: scoreDisplay?.survivabilityPenalties ?? [],
   });
 
   const scoreDisplayFinal = buildScoreDisplay({
-    score: scored.score,
-    rules: scoredRules,
+    score: scoredScore,
+    rules: scoredRulesFinal,
     extracted,
     profile: userProfile,
     recommendation: finalRecommendation,
@@ -136,12 +174,12 @@ export const triageJob = async (input: {
 
   const scoreWithDisplay = scoreDisplayFinal
     ? {
-        ...scored.score,
+        ...scoredScore,
         scoreDisplay: scoreDisplayFinal,
         recommendationLabel: scoreDisplayFinal.bandHeadline,
       }
     : {
-        ...scored.score,
+        ...scoredScore,
         recommendationLabel: RECOMMENDATION_LABELS[finalRecommendation],
       };
 
@@ -149,7 +187,7 @@ export const triageJob = async (input: {
   const initialRecord: JobRecord = {
     id: randomUUID(),
     extracted,
-    rules: scoredRules,
+    rules: scoredRulesFinal,
     score: scoreWithDisplay,
     recommendation: finalRecommendation,
     referralPathwayAvailable: referralPathway.referralPathwayAvailable,
@@ -205,7 +243,7 @@ export const triageJob = async (input: {
                 ? 'Skip unless special reason'
                 : 'Do not apply — hard gate',
       statusOutcome: finalRecommendation,
-      color: getTrackerColor('to_review', scored.score.total),
+      color: getTrackerColor('to_review', scoreWithDisplay.total),
     },
     status: 'to_review',
     createdAt: now,
@@ -213,7 +251,7 @@ export const triageJob = async (input: {
     scoreHistory: [
       {
         scoredAt: now,
-        score: scored.score,
+        score: scoreWithDisplay,
         recommendation: finalRecommendation,
       },
     ],

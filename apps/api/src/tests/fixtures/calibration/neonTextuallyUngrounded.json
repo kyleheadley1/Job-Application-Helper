@@ -1,0 +1,38 @@
+{
+  "id": "neon-textually-ungrounded-category",
+  "anchorNote": "GUARD — Neon: short React/TypeScript full-stack bar fully met; differentiator-absent must NOT cap stack/FO. Company-chrome / domainTags may say payments, but Required/Responsibilities do NOT — Key Risks must not assert mature production-ownership bar, backend fundamentals rigor, or degree risk from industry inference alone.",
+  "extracted": {
+    "company": "Neon",
+    "companyDisplayName": "Neon",
+    "title": "Software Engineer",
+    "location": "Remote (US)",
+    "remoteType": "remote",
+    "seniority": "junior",
+    "yearsExperience": { "raw": "1+", "min": 1 },
+    "stack": ["React", "TypeScript"],
+    "requiredSkills": ["React", "TypeScript"],
+    "preferredSkills": [],
+    "domainTags": ["payments", "fintech"],
+    "companyEmployeeCount": 200,
+    "requirements": [
+      "1+ years of software engineering experience",
+      "Proficiency with React and TypeScript in a full-stack web context",
+      "Ability to collaborate in a distributed team"
+    ],
+    "responsibilities": [
+      "Build and ship React + TypeScript product features",
+      "Collaborate with design and product on user-facing workflows",
+      "Participate in code review and iterative delivery"
+    ],
+    "rawText": "Neon\n· 2 hours ago\nSoftware Engineer\nAbout Neon: we are a growing payments company helping merchants move money.\nRequirements\n1+ years of software engineering experience\nProficiency with React and TypeScript in a full-stack web context\nAbility to collaborate in a distributed team\nResponsibilities\nBuild and ship React + TypeScript product features\nCollaborate with design and product on user-facing workflows\nParticipate in code review and iterative delivery"
+  },
+  "storedCategoryScores": {
+    "stackFit": 17,
+    "levelFit": 17,
+    "domainFit": 7,
+    "resumeStoryClarity": 8,
+    "functionalOverlap": 14,
+    "recruiterFriendliness": 11,
+    "careerValue": 7
+  }
+}

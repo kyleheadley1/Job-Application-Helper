@@ -21,6 +21,8 @@ export const SURVIVABILITY_TUNING = {
   strongCapabilityThreshold: 70,
   /** Final score when a Section-1 hard gate fires. */
   hardGateScoreFloor: 25,
+  /** Fixed decimals applied before any survivability threshold comparison. */
+  decimalPlaces: 3,
 } as const;
 
 /** Weighted-average deduction when JD likely requires an existing clearance at hire. */
@@ -83,7 +85,10 @@ export const DIFFERENTIATOR_COVERAGE = {
     "sse",
     "server-side streaming",
   ] as const,
-  /** Zero differentiator tags — generic stack match only. */
+  /**
+   * Historical none-cap values — no longer applied by applyDifferentiatorCoverageCap
+   * (differentiator absence is additive/note-only; role-lane caps still apply).
+   */
   NONE_CAP: { stackFit: 22, functionalOverlap: 22 },
   /** One or two differentiator tags — partial edge. */
   PARTIAL_CAP: { stackFit: 28, functionalOverlap: 28 },
