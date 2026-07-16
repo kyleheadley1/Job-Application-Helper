@@ -1,5 +1,6 @@
 import type { ExtractedJobData } from "../types/job.js";
 import type { RuleEvaluation } from "../types/scoring.js";
+import { jdSignalsSeniorDepthRequirements } from "./jdGroundedRiskNotes.js";
 import {
   earlyCareerLevelVetoesSeniorityGate,
   logSeniorityGateEvaluation,
@@ -34,7 +35,9 @@ export const evaluateHardGates = (
   }
 
   if (rules.seniorityOverreach) {
-    const vetoed = earlyCareerLevelVetoesSeniorityGate(extracted);
+    const earlyVeto = earlyCareerLevelVetoesSeniorityGate(extracted);
+    // Multi-band Mid/Junior veto still yields to senior-depth Required text (Luminos).
+    const vetoed = earlyVeto && !jdSignalsSeniorDepthRequirements(extracted);
     logSeniorityGateEvaluation(extracted, rules, vetoed);
     if (!vetoed) {
       reasons.push("Role seniority/staff bar exceeds early-career profile.");

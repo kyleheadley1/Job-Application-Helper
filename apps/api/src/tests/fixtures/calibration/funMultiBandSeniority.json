@@ -1,0 +1,45 @@
+{
+  "id": "fun-multi-band-seniority-generic-backend",
+  "anchorNote": "TICKET 3 — Fun (Web3/crypto payments): multi-value seniority tag \"Mid, Senior Level, Lead/Staff\" must gate on the LOWEST band (Mid). Required text is generic backend language without senior-depth asks (memory management / load testing / profiling). Hard seniority gate must NOT fire. Also guards Ticket 1/2: Key Risks must not invent co-branded card or share verbatim associate-level boilerplate with Luminos.",
+  "extracted": {
+    "company": "Fun",
+    "companyDisplayName": "Fun",
+    "title": "Software Engineer, Backend",
+    "location": "Remote (US)",
+    "remoteType": "remote",
+    "locationIsCommutable": false,
+    "seniority": "Mid, Senior Level, Lead/Staff",
+    "yearsExperience": { "raw": "2–5 years", "min": 2, "max": 5 },
+    "stack": ["TypeScript", "Node.js", "PostgreSQL", "AWS", "APIs"],
+    "requiredSkills": [
+      "Strong backend engineering fundamentals",
+      "Experience building and maintaining APIs",
+      "Familiarity with relational databases",
+      "Comfort collaborating in a fast-moving product team"
+    ],
+    "preferredSkills": ["Crypto or Web3 payments familiarity", "Distributed systems"],
+    "domainTags": ["crypto payments", "Web3", "fintech"],
+    "requirements": [
+      "2+ years of professional software engineering experience",
+      "Strong backend fundamentals and API design",
+      "Experience with relational databases and cloud services",
+      "Ability to ship reliable product features in a collaborative team"
+    ],
+    "responsibilities": [
+      "Build and maintain backend services powering crypto payments product flows",
+      "Design and implement APIs used by product and partner integrations",
+      "Collaborate with product and frontend on shipping customer-facing features",
+      "Improve reliability and observability of production services"
+    ],
+    "rawText": "Software Engineer, Backend\nFun\nSeniority\nMid, Senior Level, Lead/Staff\nRemote (US)\nRequirements\n2+ years of professional software engineering experience\nStrong backend fundamentals and API design\nExperience with relational databases and cloud services\nAbility to ship reliable product features in a collaborative team\nResponsibilities\nBuild and maintain backend services powering crypto payments product flows\nDesign and implement APIs used by product and partner integrations\nCollaborate with product and frontend on shipping customer-facing features\nImprove reliability and observability of production services\nWeb3 crypto payments company."
+  },
+  "storedCategoryScores": {
+    "stackFit": 14,
+    "levelFit": 12,
+    "domainFit": 5,
+    "resumeStoryClarity": 11,
+    "functionalOverlap": 10,
+    "recruiterFriendliness": 10,
+    "careerValue": 7
+  }
+}

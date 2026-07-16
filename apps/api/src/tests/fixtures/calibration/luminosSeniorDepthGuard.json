@@ -1,0 +1,44 @@
+{
+  "id": "luminos-senior-depth-required-guard",
+  "anchorNote": "TICKET 3 GUARD — Luminos: multi-band tag includes Mid (\"Mid, Senior Level\") but Required text is genuinely senior-depth (memory management, load testing, profiling). Hard seniority gate MUST still fire. Paired control for Fun multi-band lowest-band fix. Also Ticket 1: Key Risks must cite this JD's Required spans, not shared associate-level boilerplate.",
+  "extracted": {
+    "company": "Luminos",
+    "companyDisplayName": "Luminos",
+    "title": "Software Engineer",
+    "location": "New York, NY",
+    "remoteType": "hybrid",
+    "locationIsCommutable": true,
+    "seniority": "Mid, Senior Level",
+    "yearsExperience": { "raw": "3+ years", "min": 3 },
+    "stack": ["C++", "Python", "Linux", "Profiling", "Load testing"],
+    "requiredSkills": [
+      "Strong systems programming fundamentals",
+      "Experience with memory management",
+      "Load testing and performance profiling",
+      "Comfort debugging production performance issues"
+    ],
+    "preferredSkills": ["Distributed systems", "Cloud infrastructure"],
+    "domainTags": ["systems", "backend"],
+    "requirements": [
+      "3+ years of professional software engineering experience",
+      "Hands-on experience with memory management in production systems",
+      "Proven ability to run load testing and performance profiling to diagnose bottlenecks",
+      "Strong debugging skills for latency and resource issues under load"
+    ],
+    "responsibilities": [
+      "Own performance-critical backend services",
+      "Profile and tune systems for latency and memory efficiency",
+      "Partner with product engineering on reliable delivery"
+    ],
+    "rawText": "Software Engineer\nLuminos\nSeniority\nMid, Senior Level\nNew York, NY\nRequirements\n3+ years of professional software engineering experience\nHands-on experience with memory management in production systems\nProven ability to run load testing and performance profiling to diagnose bottlenecks\nStrong debugging skills for latency and resource issues under load\nResponsibilities\nOwn performance-critical backend services\nProfile and tune systems for latency and memory efficiency\nPartner with product engineering on reliable delivery"
+  },
+  "storedCategoryScores": {
+    "stackFit": 10,
+    "levelFit": 8,
+    "domainFit": 4,
+    "resumeStoryClarity": 9,
+    "functionalOverlap": 8,
+    "recruiterFriendliness": 8,
+    "careerValue": 6
+  }
+}

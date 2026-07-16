@@ -42,9 +42,18 @@ export function cleanupVisibleLineFragments(text: string): string {
 
 export function sanitizeRoleCardLine(text: string, companyName: string): string {
   let cleaned = cleanupVisibleLineFragments(stripEvaluatorJargon(text, companyName));
+  // Strip ungrounded retail-payments boilerplate left on cached jobs.
+  cleaned = cleaned.replace(/\s*or\s+co[-\s]?branded\s+cards?\s*/gi, " ");
+  cleaned = cleaned.replace(/\bco[-\s]?branded\s+cards?\b/gi, "payments domain");
   cleaned = cleaned.replace(
-    /\b(role|position)\s+may\s+overreach\s+current\s+level\s+story\b/gi,
-    "Team may still screen for backend/cloud/database production depth despite the associate level",
+    /\bteam may still screen for backend\/cloud\/database production depth despite the associate level\b[^.]*\.?/gi,
+    "JD seniority may exceed the early-career profile for recruiter screen.",
   );
+  cleaned = cleaned.replace(
+    /;\s*hiring rubrics often emphasize production reliability, backend fundamentals, and operational maturity\.?/gi,
+    " — screeners may probe production reliability and backend fundamentals for this listing.",
+  );
+  // Do not rewrite seniority overreach into a shared "associate level" template —
+  // that produced identical Key Risks across unrelated results.
   return cleanupVisibleLineFragments(cleaned);
 }
