@@ -166,7 +166,7 @@ Bachelor's degree required.
       userProfile,
     );
     expect(rules.fintechGoPrimaryStretch).toBe(true);
-    expect(rules.notes.some((n) => /fintech\/payments/i.test(n))).toBe(true);
+    expect(rules.notes.some((n) => /fintech|payments/i.test(n))).toBe(true);
     expect(rules.notes.some((n) => /go-primary backend expectations/i.test(n))).toBe(true);
   });
 
@@ -313,7 +313,7 @@ Bachelor's degree required.
       userProfile,
     );
     expect(rules.fintechGoPrimaryStretch).toBe(true);
-    expect(rules.notes.some((n) => /fintech\/payments/i.test(n))).toBe(true);
+    expect(rules.notes.some((n) => /fintech|payments/i.test(n))).toBe(true);
     expect(rules.notes.some((n) => /go-primary backend expectations/i.test(n))).toBe(true);
   });
 

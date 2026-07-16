@@ -255,10 +255,21 @@ export function sanitizeVisibleRiskLine(text: string, ctx: VisibleSanitizeContex
     /\b(no|limited)\s+(go|golang|graphql|docker|kubernetes|cloud deployments?)\b[^.]*\b(low|major)\s+(fit|score|match)\b/gi,
     "Preferred Go/GraphQL/platform stack is not the candidate's strongest lane",
   );
+  // Do not rewrite seniority overreach into a shared "associate level" boilerplate —
+  // that produced byte-identical Key Risks across unrelated JDs (Luminos/Fun/etc.).
   t = t.replace(
-    /\b(role|position)\s+may\s+overreach\s+current\s+level\s+story\b/gi,
-    "Team may still screen for backend/cloud/database production depth despite the associate level",
+    /\bteam may still screen for backend\/cloud\/database production depth despite the associate level\b[^.]*\.?/gi,
+    "JD seniority may exceed the early-career profile for recruiter screen.",
   );
+  t = t.replace(
+    /;\s*hiring rubrics often emphasize production reliability, backend fundamentals, and operational maturity\.?/gi,
+    " — screeners may probe production reliability and backend fundamentals for this listing.",
+  );
+  const evidenceHasCoBranded = /\bco[-\s]?branded\b/i.test(evidenceBlob);
+  if (!evidenceHasCoBranded) {
+    t = t.replace(/\s*or\s+co[-\s]?branded\s+cards?\s*/gi, " ");
+    t = t.replace(/\bco[-\s]?branded\s+cards?\b/gi, "payments domain");
+  }
   if (ctx.rules?.researchHeavyAiRole) {
     t = t.replace(
       /\bresearch[-\s]?heavy[^.]*\./gi,
@@ -270,9 +281,10 @@ export function sanitizeVisibleRiskLine(text: string, ctx: VisibleSanitizeContex
     );
   }
   if (ctx.rules?.fintechGoPrimaryStretch) {
+    // Keep fintech stretch wording, but never inject "co-branded card" when absent from JD evidence.
     t = t.replace(
-      /\b(finance\/banking role context typically screens more strictly|no prior fintech\/payments[^.]*stricter screening)\.?\s*(and\s+)?/gi,
-      "No prior fintech/payments or co-branded card experience may create a steeper ramp and stricter screening. ",
+      /\b(finance\/banking role context typically screens more strictly)\.?\s*/gi,
+      "No prior experience matching this JD's fintech/payments focus may create a steeper ramp and stricter screening. ",
     );
     t = t.replace(
       /\bgo-primary backend expectations[^.]*major stack caveat\./gi,
