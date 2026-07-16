@@ -100,6 +100,18 @@ export const stripWorkAuthorizationPhrases = (text: string): string =>
 
 export const jobDescriptionBlob = (job: ExtractedJobData): string => structuredFirstJobBlob(job);
 
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const tagMatchesBlob = (blob: string, tag: string): boolean => {
+  if (tag === "api") return /\bapis?\b/i.test(blob);
+  if (tag === "rest api") return /\brest\s+apis?\b/i.test(blob);
+  if (tag === "sse") return /\bsse\b/i.test(blob);
+  if (/^[a-z0-9+#.]+$/i.test(tag)) {
+    return new RegExp(`\\b${escapeRegExp(tag)}\\b`, "i").test(blob);
+  }
+  return blob.includes(tag);
+};
+
 export const countDifferentiatorTags = (
   text: string,
   options?: DifferentiatorCoverageOptions,
@@ -111,7 +123,7 @@ export const countDifferentiatorTags = (
 
   const tags = [...DIFFERENTIATOR_COVERAGE.TAGS].sort((a, b) => b.length - a.length);
   for (const tag of tags) {
-    if (!blob.includes(tag) || matchedTags.includes(tag)) continue;
+    if (!tagMatchesBlob(blob, tag) || matchedTags.includes(tag)) continue;
     if (validationOnlyApi && (tag === "api" || tag === "rest api") && !apiBuilding) {
       continue;
     }
