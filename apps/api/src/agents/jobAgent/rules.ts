@@ -22,7 +22,14 @@ import { evaluateDisjunctiveLanguageRequirement, filterGapsAfterDisjunctiveMatch
 import { isFdeBuilderSoftwarePrimaryShape } from '../../lib/fdeBuilderRole.js';
 import { classifyRoleLane, detectBackendProductApiShape } from '../../lib/roleFunctionClassifier.js';
 import { isStartupSmallTeamScale } from '../../lib/employerScale.js';
-import { detectRoleSeniorityOverreach, seniorityNeedsManualReview } from '../../lib/seniorityGate.js';
+import { detectRoleSeniorityOverreach, resolveStructuredSeniorityLevel, seniorityNeedsManualReview } from '../../lib/seniorityGate.js';
+import {
+  citeBackendApiSpan,
+  citeFintechDomainSpan,
+  citeProductionRigorSpan,
+  citeSeniorDepthSpan,
+  firstJdMatch,
+} from '../../lib/jdGroundedRiskNotes.js';
 import {
   jdHasAppliedAiSystemsOverlap,
   jdIsStructurallyVague,
@@ -498,8 +505,9 @@ export const evaluateRules = (
     notes.push('Finance/banking role context typically screens more strictly.');
   } else if (fintechGoPrimaryStretch) {
     penaltyVector.finance = 5;
+    const domainCite = citeFintechDomainSpan(job, combinedText);
     notes.push(
-      'No prior fintech/payments or co-branded card experience may create a steeper ramp and stricter screening.',
+      `No prior experience matching this JD's "${domainCite}" focus may create a steeper ramp and stricter screening.`,
     );
   }
   if (strictNewGradPipeline) {
@@ -516,7 +524,15 @@ export const evaluateRules = (
   }
   if (seniorityOverreach) {
     penaltyVector.seniority = scoringPolicy.hardPenalties.seniorityOverreach;
-    notes.push('Role may overreach current level story for recruiter screen.');
+    const depthCite = citeSeniorDepthSpan(job);
+    const band =
+      resolveStructuredSeniorityLevel(job) || job.seniority?.trim() || 'senior/staff';
+    const titleBit = job.title?.trim() ? ` for "${job.title.trim()}"` : '';
+    notes.push(
+      depthCite
+        ? `JD Required cites "${depthCite}"${titleBit}, which may exceed the early-career profile for recruiter screen.`
+        : `JD seniority (${band})${titleBit} may exceed the early-career profile for recruiter screen.`,
+    );
   }
   if (locationMismatch) {
     penaltyVector.location = scoringPolicy.hardPenalties.locationMismatch;
@@ -572,12 +588,18 @@ export const evaluateRules = (
     // Require payments/fintech + rigor language in Required/Responsibilities —
     // do not infer a mature payments hiring bar from company/industry alone.
     if (paymentsOrFintechInDuties && productionRigorInDuties) {
+      const payCite =
+        firstJdMatch(jdDutiesText, [
+          /\b(payments?|fintech|financial infrastructure|banking api|credit card|issuing)\b[^.\n]{0,50}/i,
+        ]) ?? citeFintechDomainSpan(job, jdDutiesText);
+      const rigorCite = citeProductionRigorSpan(jdDutiesText);
       notes.push(
-        `${companyLabel} lists payment- or API-heavy product work with production/reliability expectations; hiring rubrics often emphasize production reliability, backend fundamentals, and operational maturity.`,
+        `${companyLabel} Required/Responsibilities mention "${payCite}" alongside "${rigorCite}" — screeners may probe production reliability and backend fundamentals for this listing.`,
       );
     } else if (backendOrApiInDuties) {
+      const apiCite = citeBackendApiSpan(backendApiGroundingText);
       notes.push(
-        `${companyLabel} lists backend/API product work with infra tooling context — screeners may still probe scale and fundamentals without treating this as pure platform engineering.`,
+        `${companyLabel} Required/Responsibilities mention "${apiCite}" — screeners may still probe scale and fundamentals without treating this as pure platform engineering.`,
       );
     }
   } else if (infraCoreRole) {
@@ -622,8 +644,9 @@ export const evaluateRules = (
     );
   }
   if (productionBarCompetitivePool && productionRigorInDuties) {
+    const rigorCite = citeProductionRigorSpan(jdDutiesText);
     notes.push(
-      'Mature production-ownership bar with competitive hiring context — keep recruiter-screen realism conservative unless the profile matches JD stack details and production depth.',
+      `JD Required/Responsibilities cite "${rigorCite}" in a competitive hiring context — keep recruiter-screen realism conservative unless the profile matches this listing's stack details and production depth.`,
     );
   }
   if (goDistributedDataInfraCandidateGap) {

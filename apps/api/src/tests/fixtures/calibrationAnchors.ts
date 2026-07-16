@@ -52,6 +52,8 @@ export const CALIBRATION_FIXTURES = {
   neonTextuallyUngrounded: "neonTextuallyUngrounded.json",
   kongAiEnablementUngrounded: "kongAiEnablementUngrounded.json",
   deepscribeSurvivabilityBoundary: "deepscribeSurvivabilityBoundary.json",
+  funMultiBandSeniority: "funMultiBandSeniority.json",
+  luminosSeniorDepthGuard: "luminosSeniorDepthGuard.json",
 } as const;
 
 export type CalibrationFixtureKey = keyof typeof CALIBRATION_FIXTURES;

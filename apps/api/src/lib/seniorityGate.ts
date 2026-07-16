@@ -1,5 +1,6 @@
 import type { ExtractedJobData } from "../types/job.js";
 import type { RuleEvaluation } from "../types/scoring.js";
+import { jdSignalsSeniorDepthRequirements } from "./jdGroundedRiskNotes.js";
 import { normalizeText } from "./text.js";
 import { logger } from "./logger.js";
 
@@ -15,12 +16,20 @@ const TITLE_ARCHITECT_ROLE_RE =
 const VERB_ARCHITECT_TITLE_RE =
   /^architect\s+(?:core|the|our|a|an|and|to|scalable|robust|high|new|ml|ai|data|backend|frontend|distributed|key|major|production|cloud|mobile|agent|llm|rag|api|platform|pipeline|system|systems|solution|solutions|features|services|infrastructure|components|workflows|integrations|products|experiences|capabilities)\b/i;
 
-/** Labeled Simplify Seniority next-line values (early + senior). */
-const METADATA_SENIORITY_VALUE_RE =
-  /^(entry|junior|mid level|mid-level|junior, mid|associate|new grad|intern|senior|staff|principal|lead|senior level|entry level|mid)$/i;
+/** Single seniority band token (Simplify / Greenhouse multi-select values). */
+const SENIORITY_BAND_TOKEN =
+  "(?:entry(?:\\s+level)?|junior|mid(?:\\s*-?\\s*level)?|associate|new\\s*grad|intern|senior(?:\\s+level)?|staff|principal|lead(?:\\/?staff)?|lead\\/staff)";
 
-const EARLY_METADATA_SENIORITY_VALUE_RE =
-  /^(entry|junior|mid level|mid-level|junior, mid|associate|new grad|intern|entry level|mid)$/i;
+/** Labeled Simplify Seniority next-line values — single band or comma-separated multi-band. */
+const METADATA_SENIORITY_VALUE_RE = new RegExp(
+  `^${SENIORITY_BAND_TOKEN}(?:\\s*,\\s*${SENIORITY_BAND_TOKEN})*$`,
+  "i",
+);
+
+const EARLY_METADATA_SENIORITY_VALUE_RE = new RegExp(
+  `^(?:entry(?:\\s+level)?|junior|mid(?:\\s*-?\\s*level)?|associate|new\\s*grad|intern)(?:\\s*,\\s*${SENIORITY_BAND_TOKEN})*$`,
+  "i",
+);
 
 /**
  * Explicit "Seniority" chrome label + next line. Preferred structured source.
@@ -74,13 +83,14 @@ export const isEarlyCareerStructuredLevel = (level: string): boolean =>
 
 /**
  * Whether the structured seniority field describes a senior/staff/principal role level.
- * Multi-band listings ("Junior, Mid") are early-career openings, not overreach.
+ * Multi-band listings gate on the LOWEST listed band — "Mid, Senior Level, Lead/Staff"
+ * is open to Mid and is not field-overreach by itself (Lead/Staff must not win).
  */
 export const seniorityFieldSignalsOverreach = (seniority?: string | null): boolean => {
   if (!seniority?.trim()) return false;
   const s = normalizeText(seniority);
-  if (/\b(junior|entry|early career|associate|new grad|intern)\b/i.test(s)) return false;
-  if (/\bmid\b/i.test(s) && !/\b(senior|staff|principal|director)\b/i.test(s)) return false;
+  // Lowest band wins: any early/mid band present → field alone is not overreach.
+  if (/\b(junior|mid|entry|early career|associate|new grad|intern)\b/i.test(s)) return false;
   return /\b(senior|staff|principal|director|lead)\b/i.test(s);
 };
 
@@ -147,6 +157,17 @@ export const explainSeniorityGateTrigger = (
   const needsManualReview = seniorityNeedsManualReview(job);
 
   if (earlyCareerLevelVetoesSeniorityGate(job)) {
+    if (jdSignalsSeniorDepthRequirements(job)) {
+      return {
+        ...base,
+        wouldFire: true,
+        vetoed: false,
+        triggerSource: "seniorityField",
+        triggerDetail:
+          "early-career multi-band tag present, but Required text signals senior-depth asks",
+        needsManualReview: false,
+      };
+    }
     return {
       ...base,
       wouldFire: false,
@@ -265,12 +286,17 @@ export const effectiveSeniorityFieldForGate = (job: ExtractedJobData): string | 
  * Hard seniority gate — PRIMARY evidence: title (noun), structured level, yearsExperience.min
  * when structured seniority is present and consistent.
  *
+ * When a multi-band tag includes Mid/Junior (early-career veto), still overreach if
+ * Required/requiredSkills text is specifically senior-depth (Luminos guard).
+ *
  * Fail safe (no gate + manual review) when:
  * - structured seniority is empty and only body years would fire, OR
  * - early-career chrome conflicts with years ≥5 (polluted year parse).
  */
 export const detectRoleSeniorityOverreach = (job: ExtractedJobData): boolean => {
-  if (earlyCareerLevelVetoesSeniorityGate(job)) return false;
+  if (earlyCareerLevelVetoesSeniorityGate(job)) {
+    return jdSignalsSeniorDepthRequirements(job);
+  }
   if (roleTitleSignalsSeniority(job.title)) return true;
   if (seniorityNeedsManualReview(job)) return false;
   const seniorityField = effectiveSeniorityFieldForGate(job);
@@ -280,4 +306,4 @@ export const detectRoleSeniorityOverreach = (job: ExtractedJobData): boolean => 
   );
 };
 
-export { EARLY_METADATA_SENIORITY_VALUE_RE };
+export { EARLY_METADATA_SENIORITY_VALUE_RE, jdSignalsSeniorDepthRequirements };
