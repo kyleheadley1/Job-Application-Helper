@@ -74,8 +74,11 @@ import { composeSpecializationGapActionLine } from "./gapActionLine.js";
 import { deriveReferralAdvice, hasRequiredStackLanguageMismatch } from "./referralAdvice.js";
 import { certificationCredentialLeverLabel } from "./certificationBoost.js";
 import { computePoolFriendliness } from "./poolFriendliness.js";
-import type { SurvivabilityBreakdown } from "./survivabilityScore.js";
-import { hydrateSurvivabilityBreakdown } from "./survivabilityScore.js";
+import {
+  hydrateSurvivabilityBreakdown,
+  roundSurvivabilityScalar,
+  type SurvivabilityBreakdown,
+} from "./survivabilityScore.js";
 
 export type {
   CapabilityBreakdown,
@@ -547,13 +550,13 @@ export const buildScoreDisplay = (params: {
     if (params.rules.clearanceRequiresExistingPenalty) {
       weightedAverage -= CLEARANCE_REQUIRES_EXISTING_SURV_PENALTY;
     }
+    weightedAverage = roundSurvivabilityScalar(weightedAverage);
     breakdown = {
       ...breakdownRaw,
       poolFriendliness: poolMeta.score,
       weightedAverage,
-      multiplier: Math.min(
-        1,
-        Math.max(SURVIVABILITY_TUNING.floor, weightedAverage),
+      multiplier: roundSurvivabilityScalar(
+        Math.min(1, Math.max(SURVIVABILITY_TUNING.floor, weightedAverage)),
       ),
       poolFriendlinessMeta: poolMeta,
     };

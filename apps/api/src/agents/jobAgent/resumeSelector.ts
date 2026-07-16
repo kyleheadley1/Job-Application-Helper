@@ -23,7 +23,11 @@ const ResumeSelectionSchema = z.object({
   rationale: z.array(z.string()).default([]),
 });
 
-const deterministicResumeSelection = (
+/**
+ * JD-only resume preview — does not need a score. Call this before scoreJob so
+ * survivability can use the same resume text as recommendedResume.
+ */
+export const deterministicResumeSelection = (
   job: ExtractedJobData,
   resumeContexts?: ResumeContextSet,
 ): ResumeSelection & { ambiguous: boolean } => {
@@ -112,7 +116,7 @@ const deterministicResumeSelection = (
     const types: ResumeType[] = ["SWE", "SIE", "EARLY_CAREER"];
     for (const type of types) {
       const ctx = resumeContexts[type];
-      if (!ctx) continue;
+      if (!ctx?.metadata?.keywords) continue;
       const keywordOverlap = ctx.metadata.keywords.filter((k) => words.has(k)).length;
       const themeOverlap = ctx.metadata.strongestThemes.filter((t) => stackAndNeeds.includes(normalizeText(t))).length;
       metaScoreByType[type] = keywordOverlap + themeOverlap * 2;

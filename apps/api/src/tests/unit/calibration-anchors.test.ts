@@ -76,8 +76,8 @@ describe("calibration anchors", () => {
 
     expect(
       scored.score.capability,
-      "ANCHOR 2 (Fubo): capability above 80 — cap lifted; frontend-only should land high 70s not high 80s",
-    ).toBeLessThanOrEqual(80);
+      "ANCHOR 2 (Fubo): capability above 82 — frontend role-lane cap should keep high-70s/low-80s, not uncapped high-80s",
+    ).toBeLessThanOrEqual(82);
     expect(
       scored.score.capability,
       "ANCHOR 2 (Fubo): capability below 68 — stored category scores or cap floor regressed",

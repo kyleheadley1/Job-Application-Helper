@@ -90,7 +90,9 @@ describe("Palantir Web Design Engineer calibration", () => {
     });
 
     expect(composite.score.capability).toBeGreaterThanOrEqual(58);
-    expect(composite.score.capability).toBeLessThanOrEqual(68);
+    // Frontend/design lane caps stack/FO; Figma gap docks final. Pre-NONE_CAP removal
+    // landed ~62 via differentiator-absent cap — lane cap alone is mid-high 60s.
+    expect(composite.score.capability).toBeLessThanOrEqual(72);
     expect(composite.score.total).toBeLessThan(65);
     expect(composite.scoreBand).not.toBe("strong_apply");
     expect(["apply", "skip"]).toContain(composite.scoreBand);

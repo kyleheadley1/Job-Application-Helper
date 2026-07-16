@@ -210,6 +210,8 @@ export const scoreJob = async (params: {
   rules: RuleEvaluation;
   userProfile: UserProfile;
   resumeContexts?: import("../../types/resumeContext.js").ResumeContextSet;
+  /** Resume text for survivability / gaps — must match recommendedResume when known. */
+  resumeText?: string;
   preScoringMetadata?: {
     companyName: string | null;
     jobTitle: string | null;
@@ -222,12 +224,14 @@ export const scoreJob = async (params: {
   scoringDiagnostics: StructuredCallDiagnostics;
   scoringLlmSucceeded: boolean;
 }> => {
+  const resumeText =
+    params.resumeText ?? params.resumeContexts?.SWE?.rawText;
   const fallback = () =>
     deterministicFallback(
       params.extracted,
       params.rules,
       params.userProfile,
-      params.resumeContexts?.SWE?.rawText,
+      resumeText,
     );
   const scoredRun = await responsesClient.runStructured({
     systemPrompt: scoringSystemPrompt,
@@ -270,11 +274,11 @@ export const scoreJob = async (params: {
     extracted: params.extracted,
     rules: params.rules,
   });
-  const capabilityGap = detectCapabilityGap(params.extracted, clamped.score, params.resumeContexts?.SWE?.rawText);
+  const capabilityGap = detectCapabilityGap(params.extracted, clamped.score, resumeText);
   const specializationGap = detectSpecializationGap(
     params.extracted,
     clamped.score,
-    params.resumeContexts?.SWE?.rawText,
+    resumeText,
   );
   const rulesWithGap: RuleEvaluation = {
     ...clamped.rules,
@@ -286,7 +290,7 @@ export const scoreJob = async (params: {
     extracted: params.extracted,
     rules: rulesWithGap,
     profile: params.userProfile,
-    resumeText: params.resumeContexts?.SWE?.rawText,
+    resumeText,
   });
 
   const polished = polishScoringNarrative({

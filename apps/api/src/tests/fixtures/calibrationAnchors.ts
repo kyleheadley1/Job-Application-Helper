@@ -48,6 +48,9 @@ export const CALIBRATION_FIXTURES = {
   nytCdpRequiredLanguage: "nytCdpRequiredLanguage.json",
   preferredOnlyGapVerbiage: "preferredOnlyGapVerbiage.json",
   headlineReasonKeyRiskConsistency: "headlineReasonKeyRiskConsistency.json",
+  resumeSurvivabilitySelectionConsistency: "resumeSurvivabilitySelectionConsistency.json",
+  neonTextuallyUngrounded: "neonTextuallyUngrounded.json",
+  deepscribeSurvivabilityBoundary: "deepscribeSurvivabilityBoundary.json",
 } as const;
 
 export type CalibrationFixtureKey = keyof typeof CALIBRATION_FIXTURES;
