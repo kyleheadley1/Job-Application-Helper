@@ -49,15 +49,14 @@ const DESIGN_RESUME_EVIDENCE =
 const PYTHON_BACKEND_RE = /\b(python|flask|django)\b/i;
 const NODE_LEAD_RE = /\bnode(?:\.js)?\b/i;
 
-/** Derive backend pillar label from Requirements/Responsibilities (+ title) — never skill-tag order. */
-export const extractJdBackendLabel = (job: ExtractedJobData): string | undefined => {
-  const blob = normalizeText(
-    [
-      job.title ?? "",
-      ...(job.requirements ?? []),
-      ...(job.responsibilities ?? []),
-    ].join("\n"),
-  );
+/** Non-binding list phrasing — languages here are examples, not hard requirements. */
+const INCLUDING_BUT_NOT_LIMITED_CLAUSE =
+  /\bincluding\s+but\s+not\s+limited\s+to\b[^.\n]{0,220}/gi;
+
+const stripIncludingButNotLimitedClauses = (text: string): string =>
+  text.replace(INCLUDING_BUT_NOT_LIMITED_CLAUSE, " ");
+
+const labelFromPythonBlob = (blob: string): string | undefined => {
   if (!PYTHON_BACKEND_RE.test(blob)) return undefined;
   const hasDjango = /\bdjango\b/i.test(blob);
   const hasFlask = /\bflask\b/i.test(blob);
@@ -68,6 +67,36 @@ export const extractJdBackendLabel = (job: ExtractedJobData): string | undefined
   if (hasFlask) return "Flask";
   if (hasPython) return "Python";
   return undefined;
+};
+
+/** Required-section prose names Node/TS as the backend stack (authoritative). */
+const requiredNamesNodeBackend = (requirementsProse: string): boolean =>
+  /\bbackend\s+development\s+using\s+node(?:\.js)?\b/i.test(requirementsProse) ||
+  /\bnode(?:\.js)?\s*\([^)]*(?:express|nestjs)[^)]*\)/i.test(requirementsProse) ||
+  (/\bnode(?:\.js)?\b/i.test(requirementsProse) &&
+    /\b(backend|express|nestjs|restful\s+api|rest\s+api)\b/i.test(requirementsProse));
+
+/**
+ * Derive backend pillar label from Requirements prose as authoritative.
+ * Responsibilities (and especially "including but not limited to" lists) are secondary/non-binding.
+ * Never use skill-tag order alone.
+ */
+export const extractJdBackendLabel = (job: ExtractedJobData): string | undefined => {
+  const requirementsProse = normalizeText(
+    stripIncludingButNotLimitedClauses((job.requirements ?? []).join("\n")),
+  );
+  const responsibilitiesProse = normalizeText(
+    stripIncludingButNotLimitedClauses((job.responsibilities ?? []).join("\n")),
+  );
+
+  const fromRequired = labelFromPythonBlob(requirementsProse);
+  if (fromRequired) return fromRequired;
+
+  // Required names Node.js as the backend — do not let Responsibilities example lists
+  // (or contaminated skill tags) invent a Python-primary stack.
+  if (requiredNamesNodeBackend(requirementsProse)) return undefined;
+
+  return labelFromPythonBlob(responsibilitiesProse);
 };
 
 export const extractResumeBackendLabel = (resumeText: string): string | undefined => {
@@ -210,10 +239,11 @@ export const detectBackendStackSpecializationGap = (
   const strength = analyzeLanguageRequirementStrength(job, jdSide);
   if (strength === "soft") return undefined;
 
-  const proseRequired = normalizeText(
-    [...(job.requirements ?? []), ...(job.responsibilities ?? [])].join("\n"),
+  // Authoritative Required-section only — Responsibilities example lists do not count as "required".
+  const requirementsProse = normalizeText(
+    stripIncludingButNotLimitedClauses((job.requirements ?? []).join("\n")),
   );
-  const inRequired = PYTHON_BACKEND_RE.test(proseRequired);
+  const inRequired = PYTHON_BACKEND_RE.test(requirementsProse);
   const inTitle = PYTHON_BACKEND_RE.test(job.title ?? "");
   // Skill-tag / stack order alone must not count as "leads with" evidence.
   if (!inRequired && !inTitle) return undefined;

@@ -2,6 +2,7 @@ import {
   explicitCoreLanguageRiskSummary,
   type CoreLanguageId,
 } from "./coreLanguageRequirements.js";
+import { jdMentionsDegreeLanguage } from "./degreeEquivalency.js";
 import { fdeBuilderPrimaryRiskSummary } from "./fdeBuilderRole.js";
 import type { ExtractedJobData } from "../types/job.js";
 import type { LegacyScoreDimension, RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
@@ -351,6 +352,23 @@ export const isLowSignalEnterpriseDomainRisk = (risk: string, jdBlob: string): b
   return true;
 };
 
+/** Ungrounded "no bachelor's / degree could hurt" lines when the JD never mentions a degree. */
+export const isUngroundedDegreeRisk = (
+  risk: string,
+  extracted: ExtractedJobData,
+  rules?: RuleEvaluation,
+): boolean => {
+  if (rules?.explicitDegreeRisk) return false;
+  if (jdMentionsDegreeLanguage(extracted)) return false;
+  const t = risk.toLowerCase();
+  if (!/\b(degree|bachelor|bs\b|b\.s\.|credential)\b/.test(t)) return false;
+  return (
+    /\b(no |lack|lacking|without|missing|absent|not(ed)?\s+on|could\s+(hurt|disadvantage)|disadvantage|ats\s+filter|conservative\s+(financial|screens?))\b/.test(
+      t,
+    ) || /\bno bachelor'?s?\s+degree\s+noted\b/.test(t)
+  );
+};
+
 const riskPriority = (risk: string, jdBlob: string, rules?: RuleEvaluation): number => {
   const t = normalizeText(risk);
   if (/explicit\s+\w+\s+backend requirement vs type/i.test(t)) return 98;
@@ -455,7 +473,11 @@ export function polishRisksAndMain(params: {
   const merged = uniqueRisks(
     [...rawList, params.travelLine].filter((x): x is string => Boolean(x?.trim())),
   );
-  const filtered = merged.filter((r) => !isLowSignalEnterpriseDomainRisk(r, jdBlob));
+  const filtered = merged.filter(
+    (r) =>
+      !isLowSignalEnterpriseDomainRisk(r, jdBlob) &&
+      !isUngroundedDegreeRisk(r, params.extracted, params.rules),
+  );
   const sorted = [...filtered].sort(
     (a, b) => riskPriority(b, jdBlob, params.rules) - riskPriority(a, jdBlob, params.rules),
   );

@@ -54,6 +54,7 @@ export const CALIBRATION_FIXTURES = {
   deepscribeSurvivabilityBoundary: "deepscribeSurvivabilityBoundary.json",
   funMultiBandSeniority: "funMultiBandSeniority.json",
   luminosSeniorDepthGuard: "luminosSeniorDepthGuard.json",
+  jsrTechConsultingRequiredNode: "jsrTechConsultingRequiredNode.json",
 } as const;
 
 export type CalibrationFixtureKey = keyof typeof CALIBRATION_FIXTURES;

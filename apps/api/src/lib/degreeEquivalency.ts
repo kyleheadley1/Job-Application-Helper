@@ -14,6 +14,25 @@ export const jobCredentialBlob = (job: ExtractedJobData): string =>
     ].join("\n"),
   );
 
+/**
+ * True when the JD actually mentions degree/credential requirements (Required/raw/degree field).
+ * Used to block ungrounded "no bachelor's could hurt" Key Risks from industry inference alone.
+ */
+export const jdMentionsDegreeLanguage = (job: ExtractedJobData): boolean => {
+  if (job.degreeRequirement?.raw?.trim() || job.degreeRequirement?.level === "required") {
+    return true;
+  }
+  const blob = jobCredentialBlob(job);
+  return (
+    /\b(bachelor'?s?|bachelors|bs\s+in|b\.s\.|ba\s+in|undergraduate\s+degree|four[\s-]year\s+degree)\b/i.test(
+      blob,
+    ) ||
+    /\b(degree\s+in|cs\s+degree|computer\s+science\s+degree|master'?s?\s+degree|phd|ph\.d)\b/i.test(blob) ||
+    /\b(degree|bachelor)\b[^.\n]{0,80}\b(required|preferred|mandatory)\b/i.test(blob) ||
+    /\b(required|preferred|mandatory)\b[^.\n]{0,80}\b(degree|bachelor)\b/i.test(blob)
+  );
+};
+
 /** Broader than equivalency-clause detection — portfolio-first / experience-over-degree framing. */
 export const jdIsDegreePositive = (job: ExtractedJobData): boolean => {
   const degreeLevel = job.degreeRequirement?.level ?? "unknown";
