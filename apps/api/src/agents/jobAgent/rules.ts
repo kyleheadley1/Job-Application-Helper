@@ -590,7 +590,9 @@ export const evaluateRules = (
     if (paymentsOrFintechInDuties && productionRigorInDuties) {
       const payCite =
         firstJdMatch(jdDutiesText, [
-          /\b(payments?|fintech|financial infrastructure|banking api|credit card|issuing)\b[^.\n]{0,50}/i,
+          /\b(payment(?:s)?\s+(?:platform|infrastructure|processing|flows?|systems?|apis?|product))\b/i,
+          /\b(fintech|financial infrastructure|banking api|issuing)\b/i,
+          /\bpayments?\b/i,
         ]) ?? citeFintechDomainSpan(job, jdDutiesText);
       const rigorCite = citeProductionRigorSpan(jdDutiesText);
       notes.push(

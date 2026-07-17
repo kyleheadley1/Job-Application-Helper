@@ -487,6 +487,7 @@ export const JobRecordSchema = z.object({
       shortlistTag: z.string().optional(),
       freshnessTier: z.string().optional(),
       postedAt: z.string().optional(),
+      appliedAt: z.string().optional(),
       notes: z.string().optional(),
     })
     .default({}),
@@ -537,6 +538,17 @@ export const UpdateJobStatusBodySchema = z.object({
 
 export const UpdateJobNotesBodySchema = z.object({
   notes: z.string().trim().max(10000),
+});
+
+export const UpdateJobAppliedAtBodySchema = z.object({
+  appliedAt: z
+    .string()
+    .trim()
+    .min(1)
+    .refine(
+      (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) || !Number.isNaN(new Date(v).getTime()),
+      "Expected YYYY-MM-DD or a valid ISO date.",
+    ),
 });
 
 const parseBooleanQuery = z.union([

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { evaluateRules } from "../../agents/jobAgent/rules.js";
+import { computeSalaryAsk } from "../../agents/jobAgent/salaryAsk.js";
 import { userProfile } from "../../config/userProfile.js";
+import { computeCompositeScore } from "../../lib/compositeScoreModel.js";
 import { evaluateHardGates } from "../../lib/hardGates.js";
 import {
   normalizeRiskBulletForDedup,
@@ -29,6 +31,54 @@ describe("Fun + Luminos seniority + Key Risks grounding", () => {
     expect(riskText.toLowerCase()).not.toMatch(/co-branded\s+card/);
     expect(riskText.toLowerCase()).not.toContain(
       "backend/cloud/database production depth despite the associate level",
+    );
+  });
+
+  it("Fun: $95K→$105K salary shift is the deterministic downstream effect of fixing seniority", () => {
+    const fixture = loadCalibrationFixture("funMultiBandSeniority");
+    const newScored = scoreCalibrationAnchor("funMultiBandSeniority");
+    const newAsks = Array.from({ length: 5 }, () =>
+      computeSalaryAsk({
+        extracted: fixture.extracted,
+        score: newScored.score,
+        recommendation: newScored.recommendation,
+        rules: newScored.rules,
+      }),
+    );
+
+    // Reconstruct the old highest-band parse: the same JD/category scores, but the
+    // structured seniority parser selected Lead/Staff instead of the lowest Mid band.
+    const oldExtracted = {
+      ...fixture.extracted,
+      seniority: "Lead/Staff",
+      rawText: (fixture.extracted.rawText ?? "").replace(
+        "Mid, Senior Level, Lead/Staff",
+        "Lead/Staff",
+      ),
+    };
+    const oldRules = evaluateRules(oldExtracted, userProfile);
+    const oldComposite = computeCompositeScore({
+      rawScore: { ...fixture.storedCategoryScores, total: 0 },
+      rules: oldRules,
+      extracted: oldExtracted,
+      profile: userProfile,
+    });
+    const oldAsks = Array.from({ length: 5 }, () =>
+      computeSalaryAsk({
+        extracted: oldExtracted,
+        score: oldComposite.score,
+        recommendation: oldComposite.recommendation,
+        rules: oldRules,
+      }),
+    );
+
+    expect(oldComposite.recommendation).toBe("no");
+    expect(oldAsks).toEqual(
+      Array(5).fill({ number: 95_000, rangeMin: 85_000, rangeMax: 105_000 }),
+    );
+    expect(newScored.recommendation).not.toBe("no");
+    expect(newAsks).toEqual(
+      Array(5).fill({ number: 105_000, rangeMin: 95_000, rangeMax: 115_000 }),
     );
   });
 

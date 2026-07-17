@@ -65,6 +65,11 @@ export const api = {
     request<JobRecord>(`/jobs/${id}/status`, { method: "PATCH", body: JSON.stringify({ status, note }) }),
   updateNotes: (id: string, notes: string) =>
     request<JobRecord>(`/jobs/${id}/notes`, { method: "PATCH", body: JSON.stringify({ notes }) }),
+  updateAppliedAt: (id: string, appliedAt: string) =>
+    request<JobRecord>(`/jobs/${id}/applied-at`, {
+      method: "PATCH",
+      body: JSON.stringify({ appliedAt }),
+    }),
   deleteJob: async (id: string) => {
     const response = await fetch(`${API_BASE}/jobs/${id}`, { method: "DELETE" });
     if (!response.ok) {

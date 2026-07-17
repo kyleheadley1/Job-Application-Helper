@@ -9,6 +9,7 @@ import { FilterBar } from "../components/FilterBar";
 import { etDateKey, etRangeKeys, isDateKeyInRange } from "../lib/dateEt";
 import {
   appliedAtIso,
+  appliedAtToDateInputValue,
   hasJdSource,
   isAppliedPipelineStatus,
   salaryAskCompact,
@@ -230,6 +231,8 @@ export const TrackerPage = () => {
   const [refreshShortlistMessage, setRefreshShortlistMessage] = useState<string | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [busyJobId, setBusyJobId] = useState<string>("");
+  const [editingAppliedAtId, setEditingAppliedAtId] = useState<string>("");
+  const [editingAppliedAtValue, setEditingAppliedAtValue] = useState<string>("");
   const [showExtras, setShowExtras] = useState(
     () => typeof localStorage !== "undefined" && localStorage.getItem(LS_SHOW_EXTRAS) === "1",
   );
@@ -325,6 +328,30 @@ export const TrackerPage = () => {
     setBusyJobId(jobId);
     try {
       await api.deleteJob(jobId);
+      await loadJobs();
+    } finally {
+      setBusyJobId("");
+    }
+  };
+
+  const beginEditAppliedAt = (job: JobRecord) => {
+    setEditingAppliedAtId(job.id);
+    setEditingAppliedAtValue(
+      appliedAtToDateInputValue(job.tracker.appliedAt || appliedAtIso(job) || new Date().toISOString()),
+    );
+  };
+
+  const cancelEditAppliedAt = () => {
+    setEditingAppliedAtId("");
+    setEditingAppliedAtValue("");
+  };
+
+  const saveAppliedAtFromRow = async (jobId: string) => {
+    if (busyJobId || !editingAppliedAtValue.trim()) return;
+    setBusyJobId(jobId);
+    try {
+      await api.updateAppliedAt(jobId, editingAppliedAtValue);
+      cancelEditAppliedAt();
       await loadJobs();
     } finally {
       setBusyJobId("");
@@ -547,12 +574,64 @@ export const TrackerPage = () => {
               : main.source === "discussed"
                 ? "Discussed (spreadsheet)"
                 : "Added / triaged";
-          const title = `${source}: ${main.sourceValue} · Workflow ISO: ${mainIso} · Last updated: ${updatedIso}`;
-        return (
-          <span className="muted tracker-updated" title={title}>
+          const title = `${source}: ${main.sourceValue} · Workflow ISO: ${mainIso} · Last updated: ${updatedIso} · Click to edit date applied`;
+          if (editingAppliedAtId === job.id) {
+            return (
+              <div
+                className="tracker-date-edit"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="date"
+                  className="tracker-date-input"
+                  value={editingAppliedAtValue}
+                  autoFocus
+                  disabled={busyJobId === job.id}
+                  onChange={(e) => setEditingAppliedAtValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void saveAppliedAtFromRow(job.id);
+                    }
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      cancelEditAppliedAt();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="tracker-inline-action"
+                  disabled={busyJobId === job.id || !editingAppliedAtValue.trim()}
+                  onClick={() => void saveAppliedAtFromRow(job.id)}
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  className="tracker-inline-action"
+                  disabled={busyJobId === job.id}
+                  onClick={cancelEditAppliedAt}
+                >
+                  Cancel
+                </button>
+              </div>
+            );
+          }
+          return (
+            <button
+              type="button"
+              className="muted tracker-updated tracker-date-button"
+              title={title}
+              onClick={(e) => {
+                e.stopPropagation();
+                beginEditAppliedAt(job);
+              }}
+            >
               {main.displayText}
-          </span>
-        );
+            </button>
+          );
         }
       default:
         return null;
