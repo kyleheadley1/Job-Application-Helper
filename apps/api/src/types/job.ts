@@ -169,6 +169,8 @@ export type JobRecord = {
     freshnessTier?: string;
     /** Best-effort posting date override for freshness rules. */
     postedAt?: string;
+    /** Manual override for date applied (ISO). Wins over statusHistory-derived appliedAt. */
+    appliedAt?: string;
     notes?: string;
   };
   /** Spreadsheet-shaped cells (camelCase); export maps to exact column labels. */

@@ -83,6 +83,25 @@ describe("tracker routes", () => {
     expect(got.body.tracker.notes).toContain("Applied via referral");
   });
 
+  it("PATCH /:id/applied-at sets manual date applied and rewrites applied history", async () => {
+    const created = await triage(STARTUP_RAW, "Nimbus Labs");
+    const updated = await request(app).patch(`/api/jobs/${created.id}/applied-at`).send({
+      appliedAt: "2026-07-10",
+    });
+    expect(updated.status).toBe(200);
+    expect(updated.body.tracker.appliedAt).toBe("2026-07-10T12:00:00.000Z");
+    expect(updated.body.status).toBe("applied");
+    const appliedHistory = (updated.body.statusHistory ?? []).filter(
+      (h: { toStatus: string }) => h.toStatus === "applied",
+    );
+    expect(appliedHistory.length).toBeGreaterThanOrEqual(1);
+    expect(appliedHistory[0].createdAt).toBe("2026-07-10T12:00:00.000Z");
+
+    const got = await request(app).get(`/api/jobs/${created.id}`);
+    expect(got.status).toBe(200);
+    expect(got.body.tracker.appliedAt).toBe("2026-07-10T12:00:00.000Z");
+  });
+
   it("GET /api/jobs filters by status/shortlist/recommendation/resume/minScore/company", async () => {
     const high = await triage(STARTUP_RAW, "Nimbus Labs");
     const low = await triage(BAD_FIT_RAW, "Heritage Bank");

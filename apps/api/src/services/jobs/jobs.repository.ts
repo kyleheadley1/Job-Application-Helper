@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { getTrackerColor } from "../../config/scoringPolicy.js";
+import { toAppliedAtIso } from "../../lib/appliedAtDate.js";
 import { recomputeStoredJobScore } from "../../lib/recomputeStoredJobScore.js";
 import { shortlistTrackerFields } from "../../lib/shortlist.js";
 import { getDb } from "../../config/mongo.js";
@@ -266,6 +267,84 @@ export class JobsRepository {
         $set: {
           tracker: { ...prevJob.tracker, notes: notes.trim() },
           trackerSpreadsheet: nextSpreadsheet,
+          updatedAt: now,
+        },
+      },
+    );
+    const next = await col.findOne({ _id: id });
+    return next ? this.fromDoc(next) : null;
+  }
+
+  /**
+   * Manually set date applied. Stores tracker.appliedAt and rewrites (or creates)
+   * the earliest applied statusHistory timestamp so counters/export stay consistent.
+   * If the role is still to_review/skip, promotes status to applied.
+   */
+  async updateAppliedAt(id: string, appliedAtInput: string): Promise<JobRecord | null> {
+    const col = await this.collection();
+    const prev = await col.findOne({ _id: id });
+    if (!prev) return null;
+    const prevJob = this.fromDoc(prev);
+    const appliedAt = toAppliedAtIso(appliedAtInput);
+    const now = new Date().toISOString();
+
+    const history = [...(prevJob.statusHistory ?? [])];
+    const appliedIndexes = history
+      .map((h, i) => (h.toStatus === "applied" ? i : -1))
+      .filter((i) => i >= 0);
+    let earliestIdx = -1;
+    if (appliedIndexes.length) {
+      earliestIdx = appliedIndexes.reduce((best, i) =>
+        new Date(history[i].createdAt).getTime() < new Date(history[best].createdAt).getTime()
+          ? i
+          : best,
+      );
+      history[earliestIdx] = {
+        ...history[earliestIdx],
+        createdAt: appliedAt,
+        note: history[earliestIdx].note?.trim()
+          ? history[earliestIdx].note
+          : "Applied date set manually",
+      };
+    } else {
+      history.push({
+        id: randomUUID(),
+        jobId: prevJob.id,
+        fromStatus: prevJob.status,
+        toStatus: "applied",
+        note: "Applied date set manually",
+        createdAt: appliedAt,
+      });
+    }
+
+    const promoteToApplied = prevJob.status === "to_review" || prevJob.status === "skip";
+    const nextStatus = promoteToApplied ? "applied" : prevJob.status;
+    const nextTracker = {
+      ...prevJob.tracker,
+      appliedAt,
+      ...(promoteToApplied
+        ? {
+            statusOutcome: "applied",
+            color: getTrackerColor("applied", prevJob.score.total),
+            shortlist: false,
+            shortlistTag: undefined,
+            freshnessTier: undefined,
+          }
+        : {}),
+    };
+    const nextSpreadsheet = {
+      ...prevJob.trackerSpreadsheet,
+      ...(promoteToApplied ? { statusOutcome: "applied" as const } : {}),
+    };
+
+    await col.updateOne(
+      { _id: id },
+      {
+        $set: {
+          status: nextStatus,
+          tracker: nextTracker,
+          trackerSpreadsheet: nextSpreadsheet,
+          statusHistory: history,
           updatedAt: now,
         },
       },

@@ -9,6 +9,12 @@ const ADVANCED_APPLICATION_STATUSES = new Set<JobStatus>([
 ]);
 
 export const appliedAtIso = (job: JobRecord): string => {
+  // Manual override (tracker Date edit) wins over derived status-history timestamp.
+  const override = job.tracker?.appliedAt?.trim();
+  if (override) {
+    const t = new Date(override).getTime();
+    if (Number.isFinite(t)) return new Date(t).toISOString();
+  }
   const times = (job.statusHistory ?? [])
     .filter((h) => h.toStatus === "applied")
     .map((h) => new Date(h.createdAt).getTime())

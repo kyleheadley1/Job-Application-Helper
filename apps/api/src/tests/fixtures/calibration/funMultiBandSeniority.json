@@ -1,6 +1,6 @@
 {
   "id": "fun-multi-band-seniority-generic-backend",
-  "anchorNote": "TICKET 3 — Fun (Web3/crypto payments): multi-value seniority tag \"Mid, Senior Level, Lead/Staff\" must gate on the LOWEST band (Mid). Required text is generic backend language without senior-depth asks (memory management / load testing / profiling). Hard seniority gate must NOT fire. Also guards Ticket 1/2: Key Risks must not invent co-branded card or share verbatim associate-level boilerplate with Luminos.",
+  "anchorNote": "TICKET 3 — Fun (Web3/crypto payments): multi-value seniority tag \"Mid, Senior Level, Lead/Staff\" must gate on the LOWEST band (Mid). Required text is generic backend language without senior-depth asks (memory management / load testing / profiling). Hard seniority gate must NOT fire. Expected downstream salary effect: the old highest-band parse produced a hard-gated `no` recommendation and the deterministic no-posted-salary formula deducted $10K ($95K ask, $85K–$105K range); the corrected Mid threshold removes that deduction ($105K ask, $95K–$115K range). This is an intentional consequence of the seniority fix, not salary jitter. Also guards Ticket 1/2: Key Risks must not invent co-branded card or share verbatim associate-level boilerplate with Luminos.",
   "extracted": {
     "company": "Fun",
     "companyDisplayName": "Fun",

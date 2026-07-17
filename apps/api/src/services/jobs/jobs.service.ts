@@ -293,6 +293,12 @@ export class JobsService {
     return updated;
   }
 
+  async updateAppliedAt(id: string, appliedAt: string): Promise<JobRecord> {
+    const updated = await jobsRepository.updateAppliedAt(id, appliedAt);
+    if (!updated) throw new JobNotFoundError();
+    return updated;
+  }
+
   async removeFromTracker(id: string): Promise<void> {
     const deletedTracked = await jobsRepository.deleteById(id);
     const deletedDraft = this.draftJobs.delete(id);
@@ -316,6 +322,7 @@ export class JobsService {
       tracker: {
         ...draft.tracker,
         statusOutcome: "applied",
+        appliedAt: now,
         shortlist: false,
         shortlistTag: undefined,
         freshnessTier: undefined,
