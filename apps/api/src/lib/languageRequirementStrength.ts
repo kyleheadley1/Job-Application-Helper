@@ -7,7 +7,7 @@ const FUNDAMENTALS_OVER_LANGUAGE_RE =
   /\b(?:we\s+)?(?:value|weight|prioritize|emphasize|care\s+(?:more\s+)?about)\b[^.\n]{0,100}\b(?:engineering\s+)?fundamentals?\b[^.\n]{0,120}\b(?:and\s+)?(?:learning speed|learning velocity|learn(?:ing)? quickly|ramp(?:ing)? quickly|problem[-\s]?solving)\b[^.\n]{0,80}\b(?:over|than|more than|beyond)\b[^.\n]{0,60}\b(?:expertise in\s+)?(?:any\s+)?(?:specific\s+)?(?:programming\s+)?language|\b(?:fundamentals?|learning speed|learning velocity)\b[^.\n]{0,60}\bover\b[^.\n]{0,40}\b(?:expertise in\s+)?(?:any\s+)?(?:specific\s+)?(?:programming\s+)?language|\blanguage[-\s]agnostic\b|\bnot\s+tied\s+to\s+(?:a\s+)?specific\s+language|\bany\s+modern\s+(?:programming\s+)?language\b|\b(?:strong\s+)?coding\s+skills?\s+in\s+any\s+(?:programming\s+)?language\b|\bany\s+programming\s+language\b/i;
 
 const SOFT_NEAR_LANGUAGE_RE =
-  /\b(?:is\s+)?(?:a\s+)?plus\b|\bnice\s+to\s+have\b|\bpreferred\b|\bbonus\b|\bideally\b|\boptional\b|\bhelpful\b|\bwould\s+be\s+(?:great|nice)\b|\bfamiliarity\s+with\b|\bexposure\s+to\b/i;
+  /\b(?:is\s+)?(?:a\s+)?plus\b|\bnice\s+to\s+have\b|\bpreferred\b|\bbonus\b|\bideally\b|\boptional\b|\bhelpful\b|\bwould\s+be\s+(?:great|nice)\b|\bfamiliarity\s+with\b|\bexposure\s+to\b|\bincluding\s+but\s+not\s+limited\s+to\b/i;
 
 const HARD_LANGUAGE_PATTERNS: Record<"python" | "django" | "flask", RegExp[]> = {
   python: [
