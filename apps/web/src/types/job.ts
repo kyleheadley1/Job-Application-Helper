@@ -264,6 +264,8 @@ export type JobRecord = {
     shortlistTag?: string;
     freshnessTier?: string;
     postedAt?: string;
+    /** Manual override for date applied (ISO). Wins over statusHistory-derived appliedAt. */
+    appliedAt?: string;
     notes?: string;
   };
   status: JobStatus;

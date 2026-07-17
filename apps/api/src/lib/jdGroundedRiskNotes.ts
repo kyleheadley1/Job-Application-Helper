@@ -1,13 +1,60 @@
 import type { ExtractedJobData } from "../types/job.js";
 import { normalizeText } from "./text.js";
 
+const DEFAULT_CITE_MAX = 72;
+
+/** Strip trailing conjunctions/prepositions left by clause cuts ("… issues to"). */
+const stripTrailingDangling = (text: string): string => {
+  let t = text.trim().replace(/[,;:]+$/g, "").trim();
+  for (let i = 0; i < 3; i++) {
+    const next = t
+      .replace(/\b(to|and|or|of|for|with|the|a|an|in|on|at|by|as|that|which|who|from|into|onto)\s*$/i, "")
+      .trim()
+      .replace(/[,;:]+$/g, "")
+      .trim();
+    if (next === t) break;
+    t = next;
+  }
+  return t;
+};
+
+/**
+ * Cap a JD cite without cutting mid-word; prefer last space / soft punctuation
+ * before maxLen, then drop dangling connectors.
+ */
+export const trimCiteSpan = (raw: string, maxLen = DEFAULT_CITE_MAX): string => {
+  let t = raw.replace(/\s+/g, " ").trim();
+  if (!t) return t;
+  if (t.length > maxLen) {
+    let cut = t.slice(0, maxLen);
+    const boundary = Math.max(
+      cut.lastIndexOf(" "),
+      cut.lastIndexOf(","),
+      cut.lastIndexOf(";"),
+      cut.lastIndexOf(":"),
+      cut.lastIndexOf("—"),
+      cut.lastIndexOf("–"),
+    );
+    if (boundary > Math.floor(maxLen * 0.35)) {
+      cut = cut.slice(0, boundary);
+    } else {
+      // No good boundary — back up to last whitespace even if early
+      const sp = cut.lastIndexOf(" ");
+      if (sp > 0) cut = cut.slice(0, sp);
+    }
+    t = cut.trim();
+  }
+  return stripTrailingDangling(t);
+};
+
 /** First short JD span matching any pattern — for Key Risk grounding. */
 export const firstJdMatch = (text: string, patterns: RegExp[]): string | null => {
   const hay = text ?? "";
   for (const re of patterns) {
     const m = hay.match(re);
     if (m?.[0]) {
-      return m[0].replace(/\s+/g, " ").trim().slice(0, 90);
+      const trimmed = trimCiteSpan(m[0]);
+      if (trimmed) return trimmed;
     }
   }
   return null;
@@ -29,7 +76,7 @@ export const jdSignalsSeniorDepthRequirements = (job: ExtractedJobData): boolean
 
 export const citeSeniorDepthSpan = (job: ExtractedJobData): string | null =>
   firstJdMatch(jdDutiesBlob(job), [
-    /\b(memory management|load testing|profiling|performance profiling|capacity planning|performance tuning)[^.\n]{0,40}/i,
+    /\b(memory management|load testing|performance profiling|capacity planning|performance tuning)\b/i,
     SENIOR_DEPTH_REQUIREMENT_RE,
   ]);
 
@@ -49,14 +96,15 @@ export const citeFintechDomainSpan = (job: ExtractedJobData, fallbackText = ""):
 
 export const citeProductionRigorSpan = (dutiesText: string): string =>
   firstJdMatch(dutiesText, [
-    /\b(production ownership|meaningful scope|on[-\s]?call|end[-\s]?to[-\s]?end ownership|technical ownership|operate in production|production systems?|reliability|slo|incident|operational maturity)\b[^.\n]{0,40}/i,
+    /\b(incident response|production ownership|meaningful scope|end[-\s]?to[-\s]?end ownership|technical ownership|operate in production|production systems?|operational maturity|on[-\s]?call)\b/i,
+    /\b(reliability|slo|incident)\b/i,
   ]) ?? "production/reliability expectations";
 
 export const citeBackendApiSpan = (dutiesText: string): string =>
   firstJdMatch(dutiesText, [
-    /\b(build|develop|design|implement|maintain|own|ship)\b[^.\n]{0,80}\bapis?\b/i,
-    /\bapis?\b[^.\n]{0,80}\b(build|develop|design|implement|maintain|own|ship|services?)\b/i,
-    /\b(backend|rest|graphql|microservices?|infra(?:structure)?|server[-\s]?side)\b[^.\n]{0,50}/i,
+    /\b(build|develop|design|implement|maintain|own|ship)\s+(?:and\s+)?(?:maintain\s+)?(?:backend\s+)?apis?\b/i,
+    /\bapis?\s+(?:used\s+by|for|and)\s+[\w\s-]{0,40}/i,
+    /\b(backend|rest|graphql|microservices?|infra(?:structure)?|server[-\s]?side)\b/i,
   ]) ?? "backend/API product work";
 
 /**

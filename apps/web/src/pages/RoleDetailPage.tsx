@@ -4,7 +4,13 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { JobRecord, JobStatus } from "../types/job";
 import { JsonPanel } from "../components/JsonPanel";
-import { jdSourceText, agencyDisclosureNote, jobHeaderLabel } from "../lib/jobDisplay";
+import {
+  agencyDisclosureNote,
+  appliedAtIso,
+  appliedAtToDateInputValue,
+  jdSourceText,
+  jobHeaderLabel,
+} from "../lib/jobDisplay";
 
 const statuses: JobStatus[] = [
   "to_review",
@@ -25,6 +31,7 @@ export const RoleDetailPage = () => {
   const [status, setStatus] = useState<JobStatus>("to_review");
   const [note, setNote] = useState("");
   const [notes, setNotes] = useState("");
+  const [appliedAt, setAppliedAt] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -32,6 +39,7 @@ export const RoleDetailPage = () => {
       setJob(data);
       setStatus(data.status);
       setNotes(data.tracker.notes ?? "");
+      setAppliedAt(appliedAtToDateInputValue(data.tracker.appliedAt || appliedAtIso(data)));
     });
   }, [id]);
 
@@ -42,6 +50,7 @@ export const RoleDetailPage = () => {
     const updated = await api.updateStatus(job.id, status, note);
     setJob({ ...job, ...updated });
     setNotes(updated.tracker.notes ?? notes);
+    setAppliedAt(appliedAtToDateInputValue(updated.tracker.appliedAt || appliedAtIso(updated)));
     setNote("");
     setBusy(false);
   };
@@ -51,6 +60,19 @@ export const RoleDetailPage = () => {
     const updated = await api.updateNotes(job.id, notes);
     setJob({ ...job, ...updated });
     setBusy(false);
+  };
+
+  const saveAppliedAt = async () => {
+    if (!appliedAt.trim()) return;
+    setBusy(true);
+    try {
+      const updated = await api.updateAppliedAt(job.id, appliedAt);
+      setJob({ ...job, ...updated });
+      setStatus(updated.status);
+      setAppliedAt(appliedAtToDateInputValue(updated.tracker.appliedAt || appliedAtIso(updated)));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const markRejected = async () => {
@@ -105,6 +127,21 @@ export const RoleDetailPage = () => {
           <button onClick={saveStatus} disabled={busy}>Update status</button>
           <button onClick={markRejected} disabled={busy}>Mark rejected</button>
           <button onClick={removeFromTracker} disabled={busy}>Remove from tracker</button>
+        </div>
+        <div className="row" style={{ marginTop: "0.75rem", alignItems: "center", gap: "0.5rem" }}>
+          <label htmlFor="applied-at">Date applied</label>
+          <input
+            id="applied-at"
+            type="date"
+            value={appliedAt}
+            onChange={(e) => setAppliedAt(e.target.value)}
+          />
+          <button onClick={saveAppliedAt} disabled={busy || !appliedAt.trim()}>
+            Save date applied
+          </button>
+          <span className="muted" style={{ fontSize: "0.85rem" }}>
+            Updates the tracker Date column and applied counters.
+          </span>
         </div>
         <div className="stack">
           <label htmlFor="notes">Tracker notes</label>

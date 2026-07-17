@@ -210,6 +210,12 @@ function earliestValidIso(values: Array<string | undefined>): string {
 
 export function appliedAtIso(job: JobRecord): string {
   if (!isAppliedPipelineStatus(job.status)) return "";
+  // Manual override (tracker Date edit) wins over derived status-history timestamp.
+  const override = job.tracker?.appliedAt?.trim();
+  if (override) {
+    const t = new Date(override).getTime();
+    if (Number.isFinite(t)) return new Date(t).toISOString();
+  }
   // Applied counters should only key off an explicit "applied" transition,
   // not later status transitions like "rejected" made on a different date.
   return earliestValidIso(
@@ -217,6 +223,17 @@ export function appliedAtIso(job: JobRecord): string {
       .filter((h) => h.toStatus === "applied")
       .map((h) => h.createdAt),
   );
+}
+
+/** YYYY-MM-DD for `<input type="date">` from a stored appliedAt ISO. */
+export function appliedAtToDateInputValue(iso?: string | null): string {
+  if (!iso?.trim()) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function parseDiscussedDate(raw: string): Date | null {
