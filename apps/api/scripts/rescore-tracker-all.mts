@@ -13,8 +13,10 @@
  */
 import "../src/config/env.js";
 import { closeDb } from "../src/config/mongo.js";
+import { userProfile } from "../src/config/userProfile.js";
 import { isBlockedStatusForRescore } from "../src/lib/trackerRescore.js";
 import { recomputeStoredJobScore } from "../src/lib/recomputeStoredJobScore.js";
+import { polishRisksAndMain } from "../src/lib/scoringOutputPolish.js";
 import { resumeContextService } from "../src/services/resume/resumeContext.js";
 import { jobsRepository } from "../src/services/jobs/jobs.repository.js";
 import type { JobRecord } from "../src/types/job.js";
@@ -63,6 +65,14 @@ async function main() {
       );
 
       if (apply) {
+        const polished = polishRisksAndMain({
+          mainRisk: job.mainRisk,
+          risks: job.risks ?? [],
+          extracted: job.extracted,
+          rules: next.rules,
+          userProfile,
+          max: 5,
+        });
         const saved = await jobsRepository.applyTrackerRescore({
           id: job.id,
           previousScoreTotal: oldTotal,
@@ -71,9 +81,9 @@ async function main() {
           recommendation: next.recommendation,
           salaryAsk: next.salaryAsk,
           topMatch: job.topMatch,
-          mainRisk: job.mainRisk,
+          mainRisk: polished.mainRisk,
           rationale: job.rationale,
-          risks: job.risks,
+          risks: polished.risks,
           referralPathwayAvailable: next.referralPathwayAvailable,
           referralPathwayNotes: next.referralPathwayNotes,
         });

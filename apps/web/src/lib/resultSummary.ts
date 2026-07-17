@@ -26,6 +26,33 @@ const normalizeText = (s: string): string =>
     .replace(/\s+/g, " ")
     .trim();
 
+const jdMentionsDegreeLanguageClient = (job: JobRecord): boolean => {
+  const e = job.extracted;
+  const degreeReq = (e as { degreeRequirement?: { raw?: string; level?: string } }).degreeRequirement;
+  if (degreeReq?.raw?.trim() || degreeReq?.level === "required") return true;
+  const blob = [e.rawText ?? "", ...(e.requirements ?? []), ...(e.responsibilities ?? [])]
+    .join("\n")
+    .toLowerCase();
+  return (
+    /\b(bachelor'?s?|bachelors|bs\s+in|b\.s\.|undergraduate\s+degree|degree\s+in|cs\s+degree)\b/.test(
+      blob,
+    ) ||
+    /\b(degree|bachelor)\b[^.\n]{0,80}\b(required|preferred|mandatory)\b/.test(blob) ||
+    /\b(required|preferred|mandatory)\b[^.\n]{0,80}\b(degree|bachelor)\b/.test(blob)
+  );
+};
+
+const isUngroundedDegreeRiskClient = (risk: string, job: JobRecord): boolean => {
+  if (job.rules?.explicitDegreeRisk) return false;
+  if (jdMentionsDegreeLanguageClient(job)) return false;
+  if (!/\b(degree|bachelor|bs\b|b\.s\.|credential)\b/i.test(risk)) return false;
+  return (
+    /\b(no |lack|lacking|without|missing|absent|not(ed)?\s+on|could\s+(hurt|disadvantage)|disadvantage|ats\s+filter|conservative\s+(financial|screens?))\b/i.test(
+      risk,
+    ) || /\bno bachelor'?s?\s+degree\s+noted\b/i.test(risk)
+  );
+};
+
 const NEGATIVE_RE = /\b(but|however|though|while|lack|lacking|limited|gap|missing|risk|cannot|can't|do not|don't|without|no\b)\b/i;
 const POSITIVE_RE = /\b(strong|fit|overlap|align|match|good|relevant|clear|experience|ownership|collaboration|growth)\b/i;
 const CONTRAST_SPLIT_RE = /\b(?:but|however|though|while)\b/i;
@@ -182,7 +209,9 @@ export function buildKeyRisks(job: JobRecord, max = 3): string[] {
 
   // Prefer the canonical named-tool Key Risk; drop overlapping LLM paraphrases so we don't
   // show two TULIP lines and bury them behind a softer degree mainRisk.
-  const fromLlm = selectDistinctRisks(job, 2).filter((risk) => !llmRiskOverlapsNamedTool(risk));
+  const fromLlm = selectDistinctRisks(job, 2)
+    .filter((risk) => !llmRiskOverlapsNamedTool(risk))
+    .filter((risk) => !isUngroundedDegreeRiskClient(risk, job));
   const out: string[] = [];
   const seen = new Set<string>();
   for (const n of namedToolNotes) {
@@ -200,6 +229,7 @@ export function buildKeyRisks(job: JobRecord, max = 3): string[] {
   }
   for (const n of job.rules?.notes ?? []) {
     if (namedToolNotes.includes(n)) continue;
+    if (isUngroundedDegreeRiskClient(n, job)) continue;
     const k = normalizeText(n);
     if (!k || seen.has(k)) continue;
     seen.add(k);
