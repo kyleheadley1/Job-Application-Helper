@@ -70,6 +70,40 @@ Bachelor's degree in computer science
 Battelle is a research and development organization committed to science and technology.
 `.trim();
 
+const TRIA_FEDERAL_JD = `
+Tria Federal (Tria)
+·
+3 hours ago
+Software Engineer
+position
+United States
+time
+Full-time
+remote
+Remote
+seniority
+Entry Level
+date
+1+ years exp
+91%
+STRONG MATCH
+Experience Level
+100%
+Skill
+75%
+Industry Exp.
+82%
+Tria Federal delivers digital services and technology solutions that support the health and safety of veterans, service members and civilians. They are seeking a Full-Stack Engineer to design and build AI-enabled helpdesks and contact centers to solve real-world problems for federal missions.
+Consulting
+Information Technology
+Insider Connection @Tria Federal (Tria)
+Responsibilities
+Build intelligent agents that plan, reason, and interact with users
+Required
+Must be a U.S. citizen due to the security clearance required for this position
+1–3 years of hands-on experience building and deploying full-stack applications Node.js
+`.trim();
+
 describe("job posting metadata extract (Simplify-style)", () => {
   it("case 1: GreenLite contract role", () => {
     const meta = extractJobPostingMetadata(CASE_1);
@@ -134,5 +168,34 @@ describe("job posting metadata extract (Simplify-style)", () => {
     expect(presented.title).toBe("Software Engineer (Early Career)");
     const headerLabel = `${presented.companyDisplayName} - ${presented.title}`;
     expect(headerLabel).toBe("Battelle - Software Engineer (Early Career)");
+  });
+
+  it("Tria Federal: parenthetical alias + middot chrome + delivers self-description", () => {
+    expect(isHardRejectedCompanyCandidate("Tria Federal (Tria)")).toBe(false);
+    expect(looksLikeBrandCompanyName("Tria Federal (Tria)")).toBe(true);
+
+    const meta = extractJobPostingMetadata(TRIA_FEDERAL_JD);
+    expect(meta.companyName).toMatch(/Tria Federal/);
+    expect(meta.jobTitle).toBe("Software Engineer");
+    expect(extractCompanyName(TRIA_FEDERAL_JD)).toMatch(/Tria Federal/);
+    expect(validateExtractedCompany("Unknown Company", TRIA_FEDERAL_JD)).toMatch(/Tria Federal/);
+
+    const presented = applyCompanyPresentation({
+      company: meta.companyName!,
+      title: meta.jobTitle!,
+      rawText: TRIA_FEDERAL_JD,
+      listingCompanyName: meta.companyName!,
+      companyDisplayName: meta.companyName!,
+      stack: [],
+      requiredSkills: [],
+      preferredSkills: [],
+      domainTags: [],
+      responsibilities: [],
+      requirements: [],
+    });
+    expect(presented.companyDisplayName).toMatch(/Tria Federal/);
+    expect(`${presented.companyDisplayName} - ${presented.title}`).toMatch(
+      /Tria Federal.*Software Engineer/,
+    );
   });
 });

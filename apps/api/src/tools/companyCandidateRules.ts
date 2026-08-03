@@ -185,9 +185,9 @@ export const EMPLOYEE_COUNT_RE =
 export const BODY_SECTION_HEADER_RE =
   /^(responsibilities|qualification|qualifications|required|preferred|what you.?ll do|what you.?ll be doing|what we.?re looking for|who we are|who you are|about the role|about the company|about you|overview|company|role|this role is for you if|this role is likely not for you if|our tech stack|our benefits|workplace policy|equal opportunity|candidate privacy notice|accommodations|what the job involves)$/i;
 
-/** Verbs in "{Company} is reinventing/building/..." hiring-entity intros. */
+/** Verbs in "{Company} is reinventing/building/..." or "{Company} delivers/provides/..." hiring-entity intros. */
 const HIRING_ENTITY_SELF_DESCRIPTION_RE =
-  /^(.{2,48}?)\s+is\s+(?:a|an|the|building|hiring|looking|seeking|reinventing|transforming|leading|helping|partnering|creating|developing|scaling|growing|expanding|disrupting|delivering|providing|offering|empowering|powering|launching|operating|on a mission)\b/i;
+  /^(.{2,48}?)\s+(?:is\s+(?:a|an|the|building|hiring|looking|seeking|reinventing|transforming|leading|helping|partnering|creating|developing|scaling|growing|expanding|disrupting|delivering|providing|offering|empowering|powering|launching|operating|on a mission)|delivers|provides|offers|builds|helps|powers|enables)\b/i;
 
 /** @deprecated use POSTED_TIMESTAMP_RE */
 export const ACTIVITY_TIMESTAMP_RE = POSTED_TIMESTAMP_RE;
@@ -312,6 +312,21 @@ export function isCompanyProseCandidate(line: string): boolean {
 
 const COMPANY_NAME_PARTICLES = new Set(["of", "the", "and", "&"]);
 
+/**
+ * Simplify-style "Tria Federal (Tria)" — brand + parenthetical short alias.
+ * Returns the core name without the alias when the paren looks like a short brand tag.
+ */
+export function stripParentheticalCompanyAlias(line: string): string {
+  const trimmed = line.trim();
+  const m = trimmed.match(/^(.+?)\s*\(([A-Za-z0-9&'.-]{1,24})\)\s*$/);
+  if (!m?.[1] || !m[2]) return trimmed;
+  const core = m[1].trim();
+  if (!core || core.length > 40) return trimmed;
+  // Avoid stripping legal-entity or location-looking paren noise.
+  if (/^(inc|llc|ltd|corp|co|usa|us)$/i.test(m[2])) return trimmed;
+  return core;
+}
+
 function hasAcceptableCompanyWordCasing(trimmed: string): boolean {
   const words = trimmed.split(/\s+/);
   return words.every((word, index) => {
@@ -322,6 +337,10 @@ function hasAcceptableCompanyWordCasing(trimmed: string): boolean {
 
 export function isBrandLikeCompany(line: string): boolean {
   const trimmed = line.trim();
+  const core = stripParentheticalCompanyAlias(trimmed);
+  // Validate the core brand when Simplify appends "(ShortName)".
+  if (core !== trimmed) return isBrandLikeCompany(core);
+
   const words = trimmed.split(/\s+/);
 
   if (!trimmed) return false;
@@ -366,6 +385,9 @@ export function isValidCompanyCandidate(line: string): boolean {
   if (isBoardMatchChromeLine(trimmed)) return false;
   if (/^\d{1,3}%$/.test(trimmed)) return false;
   if (isSeniorityOrLevelCompanyCandidate(trimmed)) return false;
+  // Parenthetical alias: validate core brand ("Tria Federal (Tria)" → "Tria Federal").
+  const core = stripParentheticalCompanyAlias(trimmed);
+  if (core !== trimmed) return isValidCompanyCandidate(core);
   if (isLegalEntityCompanyName(trimmed)) return true;
   if (isLocationOrCountryCompanyCandidate(trimmed)) return false;
   if (isCompanyProseCandidate(trimmed)) return false;
@@ -434,15 +456,24 @@ export function parseExplicitCompanyLabel(line: string): string | null {
  * Company immediately before a Posted/Reposted timestamp — but NOT the chrome
  * line sandwiched between a job title and the date (e.g. Simplify "Link" UI).
  * Prefer duplicate-before-employee-count / labeled Company when that pattern appears.
+ * Tolerate a lone middot/bullet line between company and "N hours ago".
  */
 export function extractCompanyFromPostedHeader(lines: string[]): string | null {
   const clean = lines.map((l) => l.trim()).filter(Boolean);
   for (let i = 0; i < Math.min(clean.length - 1, 8); i++) {
     const current = clean[i]!;
-    const next = clean[i + 1]!;
     if (isJobTitleLikeLine(current)) continue;
     // Title → chrome → "Posted on …" is UI noise, not an employer field.
     if (i > 0 && isJobTitleLikeLine(clean[i - 1]!)) continue;
+
+    let nextIdx = i + 1;
+    // Simplify often inserts a lone "·" between company and "3 hours ago".
+    if (nextIdx < clean.length && /^[·•\-|]$/.test(clean[nextIdx]!)) {
+      nextIdx += 1;
+    }
+    const next = clean[nextIdx];
+    if (!next) continue;
+
     if (isValidCompanyCandidate(current) && isPostedTimestampLine(next)) {
       return current;
     }
