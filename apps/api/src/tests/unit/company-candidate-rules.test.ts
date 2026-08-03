@@ -49,6 +49,23 @@ describe("companyCandidateRules", () => {
     expect(extractCompanyFromSelfDescription(text)).toBe("Picnic");
   });
 
+  it("accepts Simplify parenthetical brand aliases like Tria Federal (Tria)", () => {
+    expect(isValidCompanyCandidate("Tria Federal (Tria)")).toBe(true);
+    expect(looksLikeBrandCompanyName("Tria Federal (Tria)")).toBe(true);
+    expect(isValidCompanyCandidate("Tria Federal")).toBe(true);
+  });
+
+  it("extracts company when middot chrome sits between name and timestamp", () => {
+    const lines = ["Tria Federal (Tria)", "·", "3 hours ago", "Software Engineer"];
+    expect(extractHeaderCompanyBeforeActivity(lines)).toBe("Tria Federal (Tria)");
+  });
+
+  it("extracts self-description with delivers verb", () => {
+    const text =
+      "Tria Federal delivers digital services and technology solutions that support veterans.";
+    expect(extractCompanyFromSelfDescription(text)).toBe("Tria Federal");
+  });
+
   it("rejects job-board UI section headers", () => {
     expect(isValidCompanyCandidate("Why This Job")).toBe(false);
     expect(isValidCompanyCandidate("Overview")).toBe(false);
