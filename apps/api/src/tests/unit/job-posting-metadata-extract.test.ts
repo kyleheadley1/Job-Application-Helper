@@ -104,6 +104,58 @@ Must be a U.S. citizen due to the security clearance required for this position
 1–3 years of hands-on experience building and deploying full-stack applications Node.js
 `.trim();
 
+const JUNIOR_AI_JD = `
+Full Stack Engineer
+Updated on 8/1/2026
+
+Unlock job analytics with
+Simplify+
+Junior AI
+Junior AI
+Compensation Overview
+$150k - $190k/yr
+
++ Equity + Private healthcare + 401(k)
+Junior, Mid
+
+New York, NY, USA
+
+In Person
+
+Candidates must be based in New York City or committed to relocating and work in the office.
+
+Category
+
+Software Engineering
+(1)
+
+Full-Stack Engineering
+Required Skills
+Skills that you prefer have been highlighted
+
+LLM
+React.js
+Data Structures & Algorithms
+Postgres
+TypeScript
+Next.js
+CRM
+
+History
+Summary
+Full Job Posting
+Why This Job is a Match
+
+About Junior
+Junior is building the AI operating system for investment research. Our software helps private equity firms, consultants, and financial institutions complete high-stakes research workflows dramatically faster.
+
+Design and build new modes of working with computers
+
+Talk directly to the clients who use what you build, and let that shape product decisions
+
+If you're excited to drive innovation at Junior, we'd love to hear from you!
+`.trim();
+
 describe("job posting metadata extract (Simplify-style)", () => {
   it("case 1: GreenLite contract role", () => {
     const meta = extractJobPostingMetadata(CASE_1);
@@ -197,5 +249,31 @@ describe("job posting metadata extract (Simplify-style)", () => {
     expect(`${presented.companyDisplayName} - ${presented.title}`).toMatch(
       /Tria Federal.*Software Engineer/,
     );
+  });
+
+  it("Junior AI: duplicate before Compensation Overview, not Simplify+ client", () => {
+    const meta = extractJobPostingMetadata(JUNIOR_AI_JD);
+    expect(meta.companyName).toBe("Junior AI");
+    expect(meta.jobTitle).toBe("Full Stack Engineer");
+    expect(extractCompanyName(JUNIOR_AI_JD)).toBe("Junior AI");
+    expect(validateExtractedCompany("Simplify+", JUNIOR_AI_JD)).toBe("Junior AI");
+
+    const presented = applyCompanyPresentation({
+      company: meta.companyName!,
+      title: meta.jobTitle!,
+      rawText: JUNIOR_AI_JD,
+      listingCompanyName: meta.companyName!,
+      companyDisplayName: meta.companyName!,
+      stack: [],
+      requiredSkills: [],
+      preferredSkills: [],
+      domainTags: [],
+      responsibilities: [],
+      requirements: [],
+    });
+    expect(presented.companyDisplayName).toBe("Junior AI");
+    expect(presented.listingCompanyName).toBe("Junior AI");
+    expect(presented.companyConfidence).not.toBe("agency_only");
+    expect(presented.companyDisplayName).not.toMatch(/Simplify/);
   });
 });

@@ -78,4 +78,22 @@ Ask great questions, then drive yourself to the answer
     expect(out.employerCompanyName).toBeNull();
     expect(out.companyConfidence).toBe("direct_or_unclear");
   });
+
+  it("does not treat 'working with computers' product prose as agency representation", () => {
+    const jd = `
+Junior AI
+Junior AI
+Compensation Overview
+Junior is building the AI operating system for investment research.
+Design and build new modes of working with computers
+Talk directly to the clients who use what you build
+    `.trim();
+    const out = resolveCompanyPresentation({
+      listingCompanyName: "Junior AI",
+      rawText: jd,
+    });
+    expect(out.companyDisplayName).toBe("Junior AI");
+    expect(out.companyConfidence).not.toBe("agency_only");
+    expect(out.agencyCompanyName).toBeNull();
+  });
 });

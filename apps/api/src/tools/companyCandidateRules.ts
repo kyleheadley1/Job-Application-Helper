@@ -228,12 +228,47 @@ export const JOB_BOARD_UI_SECTION_HEADERS = new Set(
     "what we're looking for",
     "overview",
     "who we are",
+    "simplify",
+    "simplify+",
+    "compensation overview",
   ].map((s) => normalizeCompanyCandidateKey(s)),
 );
 
 export function isJobBoardUiSectionHeader(line: string): boolean {
   const key = normalizeCompanyCandidateKey(line);
   return JOB_BOARD_UI_SECTION_HEADERS.has(key);
+}
+
+/** Strip leading emoji / decorative glyphs so "👶 About Junior" still matches. */
+export function stripLeadingLineDecorators(line: string): string {
+  return line
+    .trim()
+    .replace(/^(?:[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D]+\s*)+/gu, "")
+    .trim();
+}
+
+/**
+ * When About/self-desc captures a seniority-colliding short brand ("Junior") that fails
+ * validation, upgrade to a fuller brand present in the listing ("Junior AI").
+ */
+export function expandSeniorityCollidingBrand(shortName: string, lines: string[]): string | null {
+  const key = normalizeCompanyCandidateKey(shortName);
+  if (!key || !SENIORITY_COMPANY_REJECT_EXACT.has(key)) return null;
+  for (const line of lines.slice(0, 50)) {
+    const trimmed = stripLeadingLineDecorators(line);
+    const lineKey = normalizeCompanyCandidateKey(trimmed);
+    if (!lineKey.startsWith(`${key} `)) continue;
+    if (isValidCompanyCandidate(trimmed)) return trimmed;
+  }
+  return null;
+}
+
+/** Simplify company-card followers after a duplicated employer name. */
+export function isCompanyCardFollowerLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (EMPLOYEE_COUNT_RE.test(trimmed)) return true;
+  const key = normalizeCompanyCandidateKey(trimmed);
+  return key === "compensation overview";
 }
 
 export function isLocationOrCountryCompanyCandidate(line: string): boolean {
@@ -490,7 +525,9 @@ export function extractDuplicateCompanyBeforeEmployeeCount(lines: string[]): str
     const current = clean[i]!;
     const prev = clean[i - 1]!;
     const prevPrev = clean[i - 2]!;
-    if (!EMPLOYEE_COUNT_RE.test(current)) continue;
+    // GreenLite/Stripe: Company\nCompany\n51-200 employees
+    // Junior AI: Company\nCompany\nCompensation Overview
+    if (!isCompanyCardFollowerLine(current)) continue;
     if (prev !== prevPrev) continue;
     if (!isValidCompanyCandidate(prev)) continue;
     return prev;
@@ -500,26 +537,30 @@ export function extractDuplicateCompanyBeforeEmployeeCount(lines: string[]): str
 
 export function extractCompanyFromAboutHeader(lines: string[]): string | null {
   for (const line of lines) {
-    const trimmed = line.trim();
+    const trimmed = stripLeadingLineDecorators(line);
     const match = trimmed.match(
       /^About\s+([A-Z][A-Za-z0-9&'.-]*(?:\s+[A-Z][A-Za-z0-9&'.-]*){0,3})$/i,
     );
     if (!match?.[1]) continue;
     const company = match[1].trim();
     if (isValidCompanyCandidate(company)) return company;
+    const expanded = expandSeniorityCollidingBrand(company, lines);
+    if (expanded) return expanded;
   }
   return null;
 }
 
 export function extractCompanyFromSelfDescriptionLines(lines: string[]): string | null {
   for (const line of lines) {
-    const trimmed = line.trim();
+    const trimmed = stripLeadingLineDecorators(line);
     const match = trimmed.match(HIRING_ENTITY_SELF_DESCRIPTION_RE);
     if (!match?.[1]) continue;
     const company = match[1].trim();
     if (isCompanyNameStopword(company)) continue;
     if (isJobBoardUiSectionHeader(company)) continue;
     if (isValidCompanyCandidate(company)) return company;
+    const expanded = expandSeniorityCollidingBrand(company, lines);
+    if (expanded) return expanded;
   }
   return null;
 }

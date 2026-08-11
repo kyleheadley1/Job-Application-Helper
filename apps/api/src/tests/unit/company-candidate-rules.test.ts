@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   extractCompanyFromSelfDescription,
+  extractDuplicateCompanyBeforeEmployeeCount,
   extractHeaderCompanyBeforeActivity,
   isActivityTimestampLine,
   isHardRejectedCompanyCandidate,
   isValidCompanyCandidate,
   looksLikeBrandCompanyName,
+  resolveCompanyFromText,
 } from "../../tools/companyCandidateRules.js";
 
 describe("companyCandidateRules", () => {
@@ -64,6 +66,28 @@ describe("companyCandidateRules", () => {
     const text =
       "Tria Federal delivers digital services and technology solutions that support veterans.";
     expect(extractCompanyFromSelfDescription(text)).toBe("Tria Federal");
+  });
+
+  it("rejects Simplify+ job-board chrome as a company", () => {
+    expect(isValidCompanyCandidate("Simplify+")).toBe(false);
+    expect(isValidCompanyCandidate("Simplify")).toBe(false);
+  });
+
+  it("extracts duplicate company before Compensation Overview", () => {
+    const lines = ["Junior AI", "Junior AI", "Compensation Overview", "$150k - $190k/yr"];
+    expect(extractDuplicateCompanyBeforeEmployeeCount(lines)).toBe("Junior AI");
+  });
+
+  it("expands About Junior to Junior AI when full brand is in the card", () => {
+    const text = `
+Junior AI
+Junior AI
+Compensation Overview
+👶 About Junior
+Junior is building the AI operating system for investment research.
+`.trim();
+    expect(extractCompanyFromSelfDescription(text)).toBe("Junior AI");
+    expect(resolveCompanyFromText(text)).toBe("Junior AI");
   });
 
   it("rejects job-board UI section headers", () => {
