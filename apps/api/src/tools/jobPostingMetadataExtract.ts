@@ -19,6 +19,7 @@ import {
   findBodySectionStartIndex,
   followsMetadataLabelLine,
   isAfterBodySection,
+  isCompanyCardFollowerLine,
   isPostedTimestampLine,
   isValidCompanyCandidate,
   normalizeJobLines as normalizeCompanyLines,
@@ -238,9 +239,9 @@ export const scoreCompanyCandidates = (lines: string[]): CompanyCandidateScore[]
       score += 55;
       reasons.push("consecutive_duplicate");
     }
-    if (next && isEmployeeCountLine(next)) {
+    if (next && isCompanyCardFollowerLine(next)) {
       score += 45;
-      reasons.push("before_employee_count");
+      reasons.push(isEmployeeCountLine(next) ? "before_employee_count" : "before_company_card");
     }
     if (next && isPostedTimestampLine(next)) {
       score += 120;
@@ -249,7 +250,7 @@ export const scoreCompanyCandidates = (lines: string[]): CompanyCandidateScore[]
     if (i < headerEnd) {
       score += 50;
       reasons.push("header_region");
-    } else if (!duplicatePattern && !(next && isEmployeeCountLine(next))) {
+    } else if (!duplicatePattern && !(next && isCompanyCardFollowerLine(next))) {
       continue;
     }
     if (i < 8) {
