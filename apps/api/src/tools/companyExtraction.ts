@@ -23,8 +23,9 @@ export type CompanyPresentation = {
 const AGENCY_NAME_RE =
   /\b(talent acquisition|recruiting|recruitment|recruiter|staffing|search firm|search group|talent partners|talent solutions|executive search)\b/i;
 
+// Require agency-shaped phrasing — bare "working with computers" / "work with TypeScript" must not fire.
 const AGENCY_JD_RE =
-  /\b(working with|work with|our client|we are partnering with|we're partnering with|we are representing|we're representing|on behalf of|confidential client|undisclosed client|client company)\b/i;
+  /\b((?:is|are|we(?:'re| are))\s+working with(?:\s+(?:a|an|our))?|working with (?:a|an|our)|work with (?:a|an|our)|our client|we are partnering with|we're partnering with|we are representing|we're representing|on behalf of|confidential client|undisclosed client|client company)\b/i;
 
 const VAGUE_EMPLOYER_RE =
   /\b(?:a|an|the)\s+(?:fast[-\s]?growing|profitable|leading|innovative|well[-\s]?funded|stealth|technology|tech|software|ai|startup|early[-\s]?stage)\s+(?:company|organization|firm|team|employer|client)\b/i;
