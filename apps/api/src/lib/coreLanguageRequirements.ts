@@ -2,6 +2,7 @@ import type { ExtractedJobData } from "../types/job.js";
 import type { UserProfile } from "../types/userProfile.js";
 import type { ClaimableStack } from "./claimableStack.js";
 import { evaluateDisjunctiveLanguageRequirement } from "./disjunctiveLanguageRequirement.js";
+import { GO_LANGUAGE_RE, textMentionsGoLanguage } from "./goLanguage.js";
 import { languagePresentInJd } from "./jdLanguagePresence.js";
 import { normalizeText } from "./text.js";
 
@@ -98,7 +99,7 @@ function hasProductionJava(profileBlob: string): boolean {
 }
 
 function hasProductionGo(profileBlob: string): boolean {
-  return /\b(go|golang)\b/i.test(profileBlob) && /\b(production|professional|ship|built|backend)\b/i.test(profileBlob);
+  return textMentionsGoLanguage(profileBlob) && /\b(production|professional|ship|built|backend)\b/i.test(profileBlob);
 }
 
 function hasProductionPython(profileBlob: string): boolean {
@@ -179,7 +180,7 @@ export function analyzeCoreLanguageRequirement(
       language === "java"
         ? windowAround(/\bjava\b/i)
         : language === "go"
-          ? windowAround(/\b(go|golang)\b/i)
+          ? windowAround(GO_LANGUAGE_RE)
           : windowAround(/\bpython\b/i);
     if (SOFT_STACK_FRAMING.test(ctx) && !/\b(must|required)\b/i.test(ctx)) {
       explicit = false;

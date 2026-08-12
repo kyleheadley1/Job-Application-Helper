@@ -1,9 +1,10 @@
 import type { ExtractedJobData } from "../types/job.js";
+import { GO_LANGUAGE_PATTERNS } from "./goLanguage.js";
 import { normalizeText } from "./text.js";
 
 /** Canonical language labels aligned with stack-mismatch / hard-rule citations. */
 const JD_LANGUAGE_PATTERNS: Array<{ label: string; patterns: RegExp[] }> = [
-  { label: "Go", patterns: [/\bgolang\b/i, /\bgo\b/i] },
+  { label: "Go", patterns: GO_LANGUAGE_PATTERNS },
   { label: "Java", patterns: [/\bjava\b(?!script)/i] },
   { label: "Python", patterns: [/\bpython\b/i] },
   { label: "PHP", patterns: [/\bphp\b/i, /\blaravel\b/i] },

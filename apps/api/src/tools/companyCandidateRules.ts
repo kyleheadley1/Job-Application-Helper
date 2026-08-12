@@ -154,6 +154,10 @@ export function isCompanyNameStopword(name: string): boolean {
   const key = normalizeCompanyCandidateKey(trimmed);
   if (COMPANY_NAME_STOPWORDS.has(key)) return true;
   if (!trimmed.includes(" ") && COMPANY_NAME_STOPWORDS.has(key)) return true;
+  // "This Role" / "The Company" from "About This Role" section chrome — not employers.
+  if (/^(this|the|our|a|an)\s+(role|company|team|job|position|opportunity)$/i.test(trimmed)) {
+    return true;
+  }
   return false;
 }
 
@@ -183,7 +187,7 @@ export const EMPLOYEE_COUNT_RE =
   /^\d{1,3}(?:,\d{3})?(?:\s*-\s*\d{1,3}(?:,\d{3})?|\+)?\s+employees$/i;
 
 export const BODY_SECTION_HEADER_RE =
-  /^(responsibilities|qualification|qualifications|required|preferred|what you.?ll do|what you.?ll be doing|what we.?re looking for|who we are|who you are|about the role|about the company|about you|overview|company|role|this role is for you if|this role is likely not for you if|our tech stack|our benefits|workplace policy|equal opportunity|candidate privacy notice|accommodations|what the job involves)$/i;
+  /^(responsibilities|qualification|qualifications|required|preferred|what you.?ll do|what you.?ll be doing|what we.?re looking for|who we are|who you are|about the role|about this role|about the company|about you|overview|company|role|this role|the role|what success looks like|this role is for you if|this role is likely not for you if|our tech stack|our benefits|workplace policy|equal opportunity|candidate privacy notice|accommodations|what the job involves)$/i;
 
 /** Verbs in "{Company} is reinventing/building/..." or "{Company} delivers/provides/..." hiring-entity intros. */
 const HIRING_ENTITY_SELF_DESCRIPTION_RE =
@@ -222,6 +226,13 @@ export const JOB_BOARD_UI_SECTION_HEADERS = new Set(
     "company",
     "role",
     "about the role",
+    "about this role",
+    "this role",
+    "the role",
+    "our team",
+    "the company",
+    "about us",
+    "what success looks like",
     "about the company",
     "what you'll do",
     "what you'll be doing",

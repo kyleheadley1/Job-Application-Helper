@@ -3,6 +3,7 @@ import {
   languagePresentInJd,
   suppressAbsentLanguageClaims,
 } from "./jdLanguagePresence.js";
+import { textMentionsGoLanguage } from "./goLanguage.js";
 import type { ExtractedJobData } from "../types/job.js";
 import type { RuleEvaluation } from "../types/scoring.js";
 import type { UserProfile } from "../types/userProfile.js";
@@ -126,7 +127,7 @@ export function collectTechFromText(blob: string, into: Set<string>): void {
   if (/\bpostgres\b|\bpostgresql\b/.test(compact)) into.add("postgresql");
   if (/\bmongodb\b|\bmongo\b/.test(compact)) into.add("mongodb");
   if (/\bpython\b/.test(compact)) into.add("python");
-  if (/\bgolang\b/.test(compact) || /\bgo\b/.test(compact)) into.add("go");
+  if (textMentionsGoLanguage(compact)) into.add("go");
   if (/\breact\b/.test(compact)) into.add("react");
   if (/\bvue\b/.test(compact)) into.add("vue");
   if (/\bangular\b/.test(compact)) into.add("angular");

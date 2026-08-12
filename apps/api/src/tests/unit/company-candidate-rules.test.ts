@@ -90,6 +90,20 @@ Junior is building the AI operating system for investment research.
     expect(resolveCompanyFromText(text)).toBe("Junior AI");
   });
 
+  it("rejects About This Role as a company and keeps Rollout", () => {
+    expect(isValidCompanyCandidate("This Role")).toBe(false);
+    expect(isValidCompanyCandidate("The Role")).toBe(false);
+    expect(isValidCompanyCandidate("Rollout")).toBe(true);
+    const text = `
+Rollout
+Rollout
+1-10 employees
+About This Role
+In person, NYC.
+`.trim();
+    expect(resolveCompanyFromText(text)).toBe("Rollout");
+  });
+
   it("rejects job-board UI section headers", () => {
     expect(isValidCompanyCandidate("Why This Job")).toBe(false);
     expect(isValidCompanyCandidate("Overview")).toBe(false);

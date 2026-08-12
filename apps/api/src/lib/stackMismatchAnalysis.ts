@@ -1,5 +1,6 @@
 import type { ExtractedJobData } from "../types/job.js";
 import { evaluateDisjunctiveLanguageRequirement, filterGapsAfterDisjunctiveMatch } from "./disjunctiveLanguageRequirement.js";
+import { GO_LANGUAGE_PATTERNS } from "./goLanguage.js";
 import { filterLanguagesToJdPresence } from "./jdLanguagePresence.js";
 import { normalizeText } from "./text.js";
 import type { ClaimableStack } from "./claimableStack.js";
@@ -32,7 +33,7 @@ type TechToken = {
 const TECH_TOKENS: TechToken[] = [
   { id: "php", label: "PHP", family: "php", kind: "core_language", patterns: [/\bphp\b/i, /\blaravel\b/i] },
   { id: "java", label: "Java", family: "java", kind: "core_language", patterns: [/\bjava\b/i] },
-  { id: "go", label: "Go", family: "go", kind: "core_language", patterns: [/\bgolang\b/i, /\bgo\b/i] },
+  { id: "go", label: "Go", family: "go", kind: "core_language", patterns: GO_LANGUAGE_PATTERNS },
   { id: "ruby", label: "Ruby", family: "ruby", kind: "core_language", patterns: [/\bruby\b/i, /\brails\b/i] },
   { id: "csharp", label: "C#/.NET", family: "csharp", kind: "core_language", patterns: [/\bc#\b/i, /\bcsharp\b/i, /\.net\b/i] },
   { id: "cpp", label: "C/C++", family: "cpp", kind: "core_language", patterns: [/\bc\+\+\b/i, /\bc\/c\+\+\b/i] },

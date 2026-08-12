@@ -8,6 +8,7 @@ import type { ExtractedJobData } from "../types/job.js";
 import type { LegacyScoreDimension, RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
 import type { UserProfile } from "../types/userProfile.js";
 import { normalizeText } from "./text.js";
+import { textMentionsGoLanguage } from "./goLanguage.js";
 import {
   sanitizeVisibleNarrativeLine,
   sanitizeVisibleRiskLine,
@@ -113,7 +114,7 @@ export function profileHasGoDataInfraProductionEvidence(profile: UserProfile): b
     ].join(" "),
   );
   if (!blob.trim()) return false;
-  const go = /\b(go|golang)\b/i.test(blob);
+  const go = textMentionsGoLanguage(blob);
   const stream = /\b(kafka|kinesis|amazon\s*sqs|\bsqs\b|pulsar|event streaming|stream processing)\b/i.test(
     blob,
   );

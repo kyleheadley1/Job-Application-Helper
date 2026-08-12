@@ -96,4 +96,23 @@ Talk directly to the clients who use what you build
     expect(out.companyConfidence).not.toBe("agency_only");
     expect(out.agencyCompanyName).toBeNull();
   });
+
+  it("prefers Rollout card over About This Role body false positive", () => {
+    const jd = `
+Rollout
+Rollout
+1-10 employees
+About This Role
+In person, NYC. We work together in the New York City area.
+You're the team's go-to authority on AI-assisted development.
+you go find the answer rather than wait to be handed one.
+    `.trim();
+    const out = resolveCompanyPresentation({
+      listingCompanyName: "Rollout",
+      rawText: jd,
+    });
+    expect(out.companyDisplayName).toBe("Rollout");
+    expect(out.employerCompanyName).not.toBe("This Role");
+    expect(out.companyConfidence).not.toBe("low");
+  });
 });
