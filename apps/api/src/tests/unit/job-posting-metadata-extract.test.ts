@@ -156,6 +156,59 @@ Talk directly to the clients who use what you build, and let that shape product 
 If you're excited to drive innovation at Junior, we'd love to hear from you!
 `.trim();
 
+const ROLLOUT_JD = `
+Founding Software Engineer
+Confirmed live in the last 24 hours
+Unlock job analytics with
+Simplify+
+Rollout
+Rollout
+1-10 employees
+
+Mobile feature flags and rollout management
+
+No salary listed
+
+Entry
+
+New York, NY, USA
+
+Hybrid
+
+Hybrid work in the New York City area, with travel to customer sites including Louisville.
+
+Category
+
+Software Engineering
+(1)
+
+AI/ML/GenAI Engineering
+
+History
+Summary
+Full Job Posting
+Why This Job is a Match
+
+About This Role
+In person, NYC. We work together in the New York City area, with hybrid flexibility.
+
+Responsibilities
+Be our in-house scout on AI-powered software development
+
+Qualifications
+Genuine fluency and excitement for modern AI coding tools (Claude Code, Cursor, Copilot, etc.)
+Solid CS fundamentals and a track record of shipping working software
+
+What Success Looks Like
+Twelve months in:
+
+You're the team's go-to authority on AI-assisted development — everyone ships faster because of workflows you found or built.
+
+Curiosity and initiative — you go find the answer rather than wait to be handed one.
+
+You can take a fuzzy problem and turn it into a shipped solution with minimal hand-holding.
+`.trim();
+
 describe("job posting metadata extract (Simplify-style)", () => {
   it("case 1: GreenLite contract role", () => {
     const meta = extractJobPostingMetadata(CASE_1);
@@ -275,5 +328,37 @@ describe("job posting metadata extract (Simplify-style)", () => {
     expect(presented.listingCompanyName).toBe("Junior AI");
     expect(presented.companyConfidence).not.toBe("agency_only");
     expect(presented.companyDisplayName).not.toMatch(/Simplify/);
+  });
+
+  it("Rollout: duplicate employee card wins over About This Role", () => {
+    expect(isHardRejectedCompanyCandidate("This Role")).toBe(true);
+    expect(looksLikeBrandCompanyName("Rollout")).toBe(true);
+
+    const meta = extractJobPostingMetadata(ROLLOUT_JD);
+    expect(meta.companyName).toBe("Rollout");
+    expect(meta.jobTitle).toBe("Founding Software Engineer");
+    expect(extractCompanyName(ROLLOUT_JD)).toBe("Rollout");
+
+    const presented = applyCompanyPresentation({
+      company: meta.companyName!,
+      title: meta.jobTitle!,
+      rawText: ROLLOUT_JD,
+      listingCompanyName: meta.companyName!,
+      companyDisplayName: meta.companyName!,
+      stack: [],
+      requiredSkills: [],
+      preferredSkills: [],
+      domainTags: [],
+      responsibilities: [
+        "Be our in-house scout on AI-powered software development",
+      ],
+      requirements: [
+        "Curiosity and initiative — you go find the answer rather than wait to be handed one.",
+        "You're the team's go-to authority on AI-assisted development",
+      ],
+    });
+    expect(presented.companyDisplayName).toBe("Rollout");
+    expect(presented.listingCompanyName).toBe("Rollout");
+    expect(presented.companyDisplayName).not.toBe("This Role");
   });
 });

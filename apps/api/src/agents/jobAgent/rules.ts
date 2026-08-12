@@ -19,6 +19,7 @@ import {
   jdPythonFlexibleWithJsOrTs,
 } from '../../lib/coreLanguageRequirements.js';
 import { evaluateDisjunctiveLanguageRequirement, filterGapsAfterDisjunctiveMatch } from '../../lib/disjunctiveLanguageRequirement.js';
+import { textMentionsGoLanguage } from '../../lib/goLanguage.js';
 import { isFdeBuilderSoftwarePrimaryShape } from '../../lib/fdeBuilderRole.js';
 import { classifyRoleLane, detectBackendProductApiShape } from '../../lib/roleFunctionClassifier.js';
 import { isStartupSmallTeamScale } from '../../lib/employerScale.js';
@@ -401,7 +402,7 @@ export const evaluateRules = (
     /\b(data infrastructure|analytics infrastructure|data platform|stats?\s*(and|&)\s*analytics|metrics platform|analytics engine)\b/i.test(
       combinedText,
     );
-  const hasGoMention = /\b(go|golang)\b/i.test(combinedText);
+  const hasGoMention = textMentionsGoLanguage(combinedText);
   const goDistributedDataInfraRole =
     hasGoMention &&
     (goPrimaryBackend || dataInfraCoreContext) &&

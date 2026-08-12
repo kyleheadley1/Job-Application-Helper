@@ -199,6 +199,34 @@ describe("jd language presence — output boundary (Change 2)", () => {
     expect(labels.has("Go")).toBe(false);
   });
 
+  it("does not treat English go-to / go find prose as the Go language", () => {
+    const job: ExtractedJobData = {
+      ...GO_FREE_JD,
+      company: "Rollout",
+      title: "Founding Software Engineer",
+      stack: [],
+      requiredSkills: [],
+      preferredSkills: [],
+      responsibilities: [
+        "You're the team's go-to authority on AI-assisted development",
+      ],
+      requirements: [
+        "Curiosity and initiative — you go find the answer rather than wait to be handed one.",
+        "Fast learner: you can go from an unfamiliar codebase to a working solution",
+      ],
+      rawText: "Founding Software Engineer at Rollout. go-to authority. go find the answer.",
+    };
+    const labels = extractJdLanguageLabels(job);
+    expect(labels.has("Go")).toBe(false);
+
+    const rules = evaluateRules(job, userProfile, { activeResumeType: "SWE" });
+    expect(rules.coreLanguageGap ?? []).not.toContain("Go");
+    expect(rules.stackMismatch).toBe(false);
+    expect(coreLanguageMismatchMessage(["Go"])).toMatch(/Go/);
+    const flags = buildHardRuleFlags(job, rules);
+    expect(flags.some((f) => f.id === "coreLanguageMismatch")).toBe(false);
+  });
+
   it("1 — applyJdLanguageOutputBoundary drops absent Go, keeps non-language penalty", () => {
     const input: RuleEvaluation = {
       ...minimalRules(),

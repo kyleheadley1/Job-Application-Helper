@@ -1,6 +1,7 @@
 import type { ExtractedJobData } from "../types/job.js";
 import type { ClaimableStack } from "./claimableStack.js";
 import { hasClaimableCoverage } from "./claimableStack.js";
+import { GO_LANGUAGE_PATTERNS } from "./goLanguage.js";
 import { normalizeText } from "./text.js";
 
 /** Languages that may appear in JD disjunctive "at least one of" lists. */
@@ -50,7 +51,7 @@ const DISJUNCTIVE_LANGUAGE_CATALOG: Array<{
     id: "go",
     label: "Go",
     claimableIds: ["go"],
-    patterns: [/\bgolang\b/i, /\bgo\b/i],
+    patterns: GO_LANGUAGE_PATTERNS,
   },
   {
     id: "csharp",
