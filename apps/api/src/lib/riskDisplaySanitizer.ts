@@ -1,4 +1,6 @@
 import { applyJdLanguageOutputBoundary } from "./jdLanguageOutputBoundary.js";
+import { riskContradictsSatisfiedDisjunctiveRequirement } from "./disjunctiveLanguageRequirement.js";
+import { riskLineReferencesAbsentJdConcepts } from "./riskJdConceptGrounding.js";
 import {
   languagePresentInJd,
   suppressAbsentLanguageClaims,
@@ -82,28 +84,9 @@ const STRIP_ORDER: Array<{ canon: TechCanon; patterns: RegExp[] }> = [
 function jobBlobForAllowlist(extracted: ExtractedJobData): string {
   return normalizeText(
     [
-      extracted.company,
-      extracted.title,
+      // JD-grounded only: do NOT trust generated arrays for tech allowlisting.
       extracted.rawText ?? "",
-      ...(extracted.stack ?? []),
-      ...(extracted.requiredSkills ?? []),
-      ...(extracted.preferredSkills ?? []),
-      ...(extracted.domainTags ?? []),
-      ...(extracted.requirements ?? []),
-      ...(extracted.responsibilities ?? []),
-    ].join("\n"),
-  );
-}
-
-function profileBlob(profile: UserProfile): string {
-  return normalizeText(
-    [
-      profile.headline,
-      ...profile.strengths,
-      ...profile.weakerAreas,
-      ...profile.recurringStory,
-      ...profile.targetRoles,
-      ...profile.flagshipProjects.flatMap((p) => [p.name, p.summary, ...p.tech, ...p.outcomes]),
+      ...(extracted.skillTags ?? []).map((t) => `${t.term} ${t.sourceQuote}`),
     ].join("\n"),
   );
 }
@@ -150,12 +133,10 @@ export function collectTechFromText(blob: string, into: Set<string>): void {
 
 export function buildAllowedTechCanonicalSet(params: {
   extracted: ExtractedJobData;
-  userProfile?: UserProfile;
   rules?: Pick<RuleEvaluation, "explicitCoreLanguage">;
 }): Set<string> {
   const allowed = new Set<string>();
   collectTechFromText(jobBlobForAllowlist(params.extracted), allowed);
-  if (params.userProfile) collectTechFromText(profileBlob(params.userProfile), allowed);
   const lang = params.rules?.explicitCoreLanguage?.toLowerCase();
   if (lang === "go" && languagePresentInJd("Go", params.extracted)) allowed.add("go");
   if (lang === "python" && languagePresentInJd("Python", params.extracted)) allowed.add("python");
@@ -223,11 +204,16 @@ export type VisibleSanitizeContext = {
 
 export function sanitizeVisibleRiskLine(text: string, ctx: VisibleSanitizeContext): string {
   if (!text.trim()) return text;
+  if (ctx.rules && riskContradictsSatisfiedDisjunctiveRequirement(text, ctx.rules)) {
+    return "";
+  }
+  if (riskLineReferencesAbsentJdConcepts(text, ctx.extracted)) {
+    return "";
+  }
   const suppressed = suppressAbsentLanguageClaims(text, ctx.extracted);
   if (!suppressed.trim()) return "";
   const allowed = buildAllowedTechCanonicalSet({
     extracted: ctx.extracted,
-    userProfile: ctx.userProfile,
     rules: ctx.rules,
   });
   let t = stripEvaluatorJargon(suppressed, ctx.extracted.company);

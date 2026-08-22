@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { JobRecordSchema } from "../../agents/jobAgent/schemas.js";
+import { JobRecordSchema, TriageStageDebugSchema } from "../../agents/jobAgent/schemas.js";
 import { sanitizeScoreBreakdown, sanitizeStoredJobRecord } from "../../lib/sanitizeStoredJob.js";
 import type { JobRecord } from "../../types/job.js";
 import type { ScoreBreakdown } from "../../types/scoring.js";
@@ -136,5 +136,16 @@ describe("sanitizeStoredJobRecord", () => {
     const sanitized = sanitizeStoredJobRecord(job);
     expect(sanitized.rules.specializationGap).toBeUndefined();
     expect(JobRecordSchema.safeParse(sanitized).success).toBe(true);
+  });
+
+  it("accepts null debug errorCode fields from successful LLM stages", () => {
+    const stage = {
+      success: true,
+      fallbackUsed: false,
+      errorCode: null,
+      errorType: null,
+      errorMessage: null,
+    };
+    expect(TriageStageDebugSchema.safeParse(stage).success).toBe(true);
   });
 });

@@ -1,0 +1,40 @@
+{
+  "id": "eulerity-title-responsibility-mismatch",
+  "anchorNote": "Eulerity Associate Backend Engineer — Associate/Junior title paired with senior-autonomy responsibilities (own services end to end, you decide architecture, production ownership without mentorship). Same title/responsibility mismatch class as August Law FDE.",
+  "extracted": {
+    "company": "Eulerity",
+    "companyDisplayName": "Eulerity",
+    "title": "Associate Backend Engineer",
+    "location": "New York, NY",
+    "remoteType": "hybrid",
+    "locationIsCommutable": true,
+    "seniority": "junior",
+    "yearsExperience": { "raw": "1+ years", "min": 1 },
+    "stack": ["Java", "Spring", "SQL", "AWS"],
+    "requiredSkills": ["Java", "SQL", "AWS"],
+    "preferredSkills": ["Kafka"],
+    "domainTags": ["adtech", "backend"],
+    "companyEmployeeCount": 51,
+    "requirements": [
+      "at least 1 year building in Java",
+      "Strong coding skills and the ability to collaborate across teams",
+      "Familiarity with SQL and cloud services (e.g. AWS)"
+    ],
+    "responsibilities": [
+      "Own backend services end to end — you decide what done means for campaign delivery systems",
+      "Define how this function works across adtech production systems with no margin for error",
+      "Run live production cutovers and own on-call incident response without a stated mentorship ramp",
+      "Build and maintain specialized advertising campaign services in Java"
+    ],
+    "rawText": "Eulerity\nAssociate Backend Engineer\nEntry Level\nJunior\n51-200 employees\nHybrid — New York, NY\nRequirements\nat least 1 year building in Java\nStrong coding skills and the ability to collaborate across teams\nFamiliarity with SQL and cloud services (e.g. AWS)\nResponsibilities\nOwn backend services end to end — you decide what done means for campaign delivery systems\nDefine how this function works across adtech production systems with no margin for error\nRun live production cutovers and own on-call incident response without a stated mentorship ramp\nBuild and maintain specialized advertising campaign services in Java"
+  },
+  "storedCategoryScores": {
+    "stackFit": 12,
+    "levelFit": 16,
+    "domainFit": 7,
+    "resumeStoryClarity": 7,
+    "functionalOverlap": 11,
+    "recruiterFriendliness": 9,
+    "careerValue": 7
+  }
+}

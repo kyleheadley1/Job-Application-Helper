@@ -177,7 +177,9 @@ export function selectTopFits(job: JobRecord, n = 2): string[] {
   }
   const slice = out.slice(0, n);
   if (slice.length === 2) slice[1] = dampWhyConsiderSecond(slice[0], slice[1]);
-  return slice.map((s) => sanitizeRoleCardLine(s, companyDisplayLabel(job.extracted)));
+  return slice.map((s) =>
+    sanitizeRoleCardLine(s, companyDisplayLabel(job.extracted), job.extracted, job.rules),
+  );
 }
 
 /** Merge LLM-scored risks with soft rule notes (hard gates use `rules.hardRuleNotes` separately). */
@@ -207,11 +209,29 @@ export function buildKeyRisks(job: JobRecord, max = 3): string[] {
     return false;
   };
 
+  const contradictsDisjunctive = (risk: string): boolean => {
+    if (!job.rules?.disjunctiveLanguageRequirementSatisfied) return false;
+    const accepted = job.rules.disjunctiveAcceptedLanguages ?? [];
+    if (accepted.length < 2) return false;
+    const t = risk.trim();
+    if (!t) return false;
+    const DISJUNCTIVE_GAP =
+      /\b(no|without|lacks?|missing|not demonstrated|primary accepted|lists .{0,48} as (?:a )?(?:primary|required|common|accepted))\b/i;
+    if (!DISJUNCTIVE_GAP.test(t)) return false;
+    return accepted.some((label) => {
+      if (/ruby|rails|ror/i.test(label) || label === "Ruby on Rails") {
+        return /\b(ruby|rails|ror)\b/i.test(t);
+      }
+      return new RegExp(`\\b${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(t);
+    });
+  };
+
   // Prefer the canonical named-tool Key Risk; drop overlapping LLM paraphrases so we don't
   // show two TULIP lines and bury them behind a softer degree mainRisk.
   const fromLlm = selectDistinctRisks(job, 2)
     .filter((risk) => !llmRiskOverlapsNamedTool(risk))
-    .filter((risk) => !isUngroundedDegreeRiskClient(risk, job));
+    .filter((risk) => !isUngroundedDegreeRiskClient(risk, job))
+    .filter((risk) => !contradictsDisjunctive(risk));
   const out: string[] = [];
   const seen = new Set<string>();
   for (const n of namedToolNotes) {
@@ -230,13 +250,17 @@ export function buildKeyRisks(job: JobRecord, max = 3): string[] {
   for (const n of job.rules?.notes ?? []) {
     if (namedToolNotes.includes(n)) continue;
     if (isUngroundedDegreeRiskClient(n, job)) continue;
+    if (contradictsDisjunctive(n)) continue;
     const k = normalizeText(n);
     if (!k || seen.has(k)) continue;
     seen.add(k);
     out.push(n);
     if (out.length >= max) break;
   }
-  return out.slice(0, max).map((s) => sanitizeRoleCardLine(s, companyDisplayLabel(job.extracted)));
+  return out
+    .slice(0, max)
+    .map((s) => sanitizeRoleCardLine(s, companyDisplayLabel(job.extracted), job.extracted, job.rules))
+    .filter(Boolean);
 }
 
 export function selectDistinctRisks(job: JobRecord, n = 2): string[] {

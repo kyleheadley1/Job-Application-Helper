@@ -1,5 +1,5 @@
 import type { ExtractedJobData } from "../types/job.js";
-import { evaluateDisjunctiveLanguageRequirement, filterGapsAfterDisjunctiveMatch } from "./disjunctiveLanguageRequirement.js";
+import { evaluateDisjunctiveLanguageRequirement, filterGapsAfterDisjunctiveMatch, lineDisjunctiveRequirementSatisfied } from "./disjunctiveLanguageRequirement.js";
 import { GO_LANGUAGE_PATTERNS } from "./goLanguage.js";
 import { filterLanguagesToJdPresence } from "./jdLanguagePresence.js";
 import { normalizeText } from "./text.js";
@@ -93,10 +93,26 @@ const lineIsRequired = (line: string, job: ExtractedJobData): boolean => {
 const isCoreLanguageRequirement = (token: TechToken, line: string, index: number): boolean => {
   const ctx = normalizeText(line);
   if (token.kind !== "core_language") return false;
-  if (/\b(must have|required|minimum|proficiency in|experience with|strong)[^.\n]{0,80}\b/i.test(ctx)) return true;
-  if (/\bcustom\s+php\b|\bphp\s+full[-\s]?stack\b|\bprimary\s+(backend\s+)?language\b/i.test(ctx)) return true;
+  if (
+    /\b(must have|required|minimum|proficiency in|experience with|experience developing|strong)\b/i.test(
+      ctx,
+    )
+  ) {
+    return true;
+  }
+  if (/\busing\s+(php|ruby|java|go|python|laravel)\b/i.test(ctx)) return true;
+  if (
+    /\b(apis?|applications?)\s+(using|in|with)\b/i.test(ctx) &&
+    token.patterns.some((re) => re.test(ctx))
+  ) {
+    return true;
+  }
+  if (/\bcustom\s+php\b|\bphp\s+full[-\s]?stack\b|\bphp\s+development\b/i.test(ctx)) return true;
+  if (/\bprimary\s+(backend\s+)?language\b/i.test(ctx)) return true;
   if (index < 2 && token.patterns.some((re) => re.test(ctx))) return true;
-  if (/\b(full[-\s]?stack|backend|development)\b/i.test(ctx) && token.patterns.some((re) => re.test(ctx))) return true;
+  if (/\b(full[-\s]?stack|backend|development)\b/i.test(ctx) && token.patterns.some((re) => re.test(ctx))) {
+    return true;
+  }
   return false;
 };
 
@@ -147,6 +163,7 @@ export const analyzeStackMismatch = (
   const allScanLines = [...qualificationBullets, ...requiredLines];
   for (let i = 0; i < allScanLines.length; i++) {
     const line = allScanLines[i]!;
+    if (lineDisjunctiveRequirementSatisfied(line, claimable)) continue;
     const tokens = matchTokens(line);
     for (const token of tokens) {
       if (token.claimableId && hasClaimableCoverage(claimable, token.claimableId)) continue;
@@ -169,9 +186,18 @@ export const analyzeStackMismatch = (
     }
   }
 
-  for (const line of qualificationBullets) {
+  for (const line of [...(job.requirements ?? []), ...requiredLines]) {
     if (/\bcustom\s+php\b|\bphp\s+full[-\s]?stack\b|\bphp\s+development\b/i.test(line)) {
       if (!coreLanguageGaps.includes("PHP")) coreLanguageGaps.push("PHP");
+      continue;
+    }
+    if (
+      /\b(laravel|php)\b/i.test(line) &&
+      /\b(experience|developing|backend|apis?|applications?)\b/i.test(line) &&
+      !lineDisjunctiveRequirementSatisfied(line, claimable)
+    ) {
+      const label = /\blaravel\b/i.test(line) ? "PHP/Laravel" : "PHP";
+      if (!coreLanguageGaps.includes(label)) coreLanguageGaps.push(label);
     }
   }
 

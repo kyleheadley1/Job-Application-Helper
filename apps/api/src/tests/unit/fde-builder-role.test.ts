@@ -56,4 +56,27 @@ describe("fdeBuilderRole", () => {
     };
     expect(isFdeBuilderSoftwarePrimaryShape(job)).toBe(false);
   });
+
+  it("does not mark BisectHosting Web Developer as FDE when only body mentions growth engineering", () => {
+    const job: ExtractedJobData = {
+      company: "BisectHosting",
+      title: "Web Developer",
+      seniority: "Entry Level",
+      stack: ["React", "TypeScript", "PHP", "Laravel"],
+      requiredSkills: ["React", "TypeScript", "JavaScript"],
+      preferredSkills: [],
+      domainTags: ["gaming", "web hosting"],
+      responsibilities: [
+        "Build customer-facing web applications with React and Nuxt/Vue.",
+        "Contribute to growth engineering, experimentation, and integrations.",
+      ],
+      requirements: [
+        "Strong experience with JavaScript/TypeScript and React, Vue, or Nuxt",
+        "Experience developing backend applications and APIs using PHP Laravel",
+      ],
+      rawText:
+        "BisectHosting Web Developer SDE1. Frontend with React and Nuxt/Vue, backend PHP Laravel, growth engineering and experimentation.",
+    };
+    expect(isFdeBuilderSoftwarePrimaryShape(job)).toBe(false);
+  });
 });

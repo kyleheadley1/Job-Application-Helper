@@ -18,7 +18,9 @@ import { applyScoringClampLayer } from '../../lib/scoringClampLayer.js';
 import { applyJdLanguageOutputBoundary } from '../../lib/jdLanguageOutputBoundary.js';
 import { detectCapabilityGap, detectSpecializationGap } from '../../lib/capabilityGap.js';
 import { computeCompositeScore } from '../../lib/compositeScoreModel.js';
+import { storedCategoryScores } from '../../lib/recomputeStoredJobScore.js';
 import { userProfile as defaultUserProfile } from '../../config/userProfile.js';
+import { textSignalsEarlyCareerExceedSeverity } from '../../lib/titleResponsibilitySeniority.js';
 
 const categorySchema = z.object({
   stackFit: z.number().min(0).max(SCORE_CATEGORY_MAXES.stackFit),
@@ -205,6 +207,97 @@ export const scoreJobDeterministicPreview = (params: {
     params.resumeText,
   );
 
+export type PreservedScoringSnapshot = {
+  categoryScores: ScoreBreakdown;
+  narrative: Pick<ScoringResult, 'topMatch' | 'mainRisk' | 'risks' | 'rationale'>;
+};
+
+const finishScoringFromRawCategories = (params: {
+  rawScore: ScoreBreakdown;
+  extracted: ExtractedJobData;
+  rules: RuleEvaluation;
+  userProfile: UserProfile;
+  resumeText?: string;
+  narrative: Pick<ScoringResult, 'topMatch' | 'mainRisk' | 'risks' | 'rationale'>;
+}): {
+  scoring: ScoringResult;
+  rules: RuleEvaluation;
+} => {
+  const narrativeBlob = [
+    params.narrative.mainRisk,
+    ...(params.narrative.risks ?? []),
+    ...(params.rules.notes ?? []),
+  ].join('\n');
+  const rulesForClamp: RuleEvaluation = {
+    ...params.rules,
+    earlyCareerExceedSeverityRisk:
+      Boolean(params.rules.earlyCareerExceedSeverityRisk) ||
+      textSignalsEarlyCareerExceedSeverity(narrativeBlob),
+  };
+
+  const clamped = applyScoringClampLayer({
+    score: params.rawScore,
+    extracted: params.extracted,
+    rules: rulesForClamp,
+  });
+  const capabilityGap = detectCapabilityGap(params.extracted, clamped.score, params.resumeText);
+  const specializationGap = detectSpecializationGap(
+    params.extracted,
+    clamped.score,
+    params.resumeText,
+  );
+  const rulesWithGap: RuleEvaluation = {
+    ...clamped.rules,
+    capabilityGap,
+    specializationGap,
+  };
+  let composite = compositeFromCategories({
+    score: clamped.score,
+    extracted: params.extracted,
+    rules: rulesWithGap,
+    profile: params.userProfile,
+    resumeText: params.resumeText,
+  });
+
+  const polished = polishScoringNarrative({
+    narrative: params.narrative,
+    score: composite.score,
+    extracted: params.extracted,
+    userProfile: params.userProfile,
+    rules: rulesWithGap,
+  });
+
+  // If narrative polish further docked levelFit, recompute composite so Capability/final match.
+  if (polished.score.levelFit !== composite.score.levelFit) {
+    composite = compositeFromCategories({
+      score: {
+        ...storedCategoryScores(polished.score),
+        total: 0,
+      },
+      extracted: params.extracted,
+      rules: rulesWithGap,
+      profile: params.userProfile,
+      resumeText: params.resumeText,
+    });
+  }
+
+  return {
+    scoring: {
+      ...params.narrative,
+      score: {
+        ...composite.score,
+        // Keep polished total alignment if composite already incorporates docked levelFit
+      },
+      topMatch: polished.topMatch,
+      mainRisk: polished.mainRisk,
+      risks: polished.risks,
+      rationale: polished.rationale,
+      recommendation: composite.recommendation,
+    },
+    rules: applyJdLanguageOutputBoundary(params.extracted, rulesWithGap),
+  };
+};
+
 export const scoreJob = async (params: {
   extracted: ExtractedJobData;
   rules: RuleEvaluation;
@@ -218,14 +311,48 @@ export const scoreJob = async (params: {
     location: string | null;
     confidence?: 'high' | 'medium' | 'low';
   };
+  /** When JD text hash is unchanged on retriage, reuse prior LLM category + narrative scores. */
+  preservedScoring?: PreservedScoringSnapshot;
 }): Promise<{
   scoring: ScoringResult;
   rules: RuleEvaluation;
   scoringDiagnostics: StructuredCallDiagnostics;
   scoringLlmSucceeded: boolean;
+  scoringCategoriesReused?: boolean;
 }> => {
   const resumeText =
     params.resumeText ?? params.resumeContexts?.SWE?.rawText;
+
+  if (params.preservedScoring) {
+    const rawScore = {
+      ...storedCategoryScores(params.preservedScoring.categoryScores),
+      total: 0,
+    };
+    logger.info('Job scoring reused stored LLM categories (JD text hash unchanged)', {
+      levelFit: rawScore.levelFit,
+      domainFit: rawScore.domainFit,
+      stackFit: rawScore.stackFit,
+    });
+    const finished = finishScoringFromRawCategories({
+      rawScore,
+      extracted: params.extracted,
+      rules: params.rules,
+      userProfile: params.userProfile,
+      resumeText,
+      narrative: params.preservedScoring.narrative,
+    });
+    return {
+      ...finished,
+      scoringDiagnostics: {
+        fallbackUsed: false,
+        parseStage: 'ok',
+        reason: 'jd_text_hash_unchanged_reused_categories',
+      },
+      scoringLlmSucceeded: true,
+      scoringCategoriesReused: true,
+    };
+  }
+
   const fallback = () =>
     deterministicFallback(
       params.extracted,
@@ -269,54 +396,22 @@ export const scoreJob = async (params: {
     total: rawScore.total,
   }));
 
-  const clamped = applyScoringClampLayer({
-    score: llmResult.score,
+  const finished = finishScoringFromRawCategories({
+    rawScore,
     extracted: params.extracted,
     rules: params.rules,
-  });
-  const capabilityGap = detectCapabilityGap(params.extracted, clamped.score, resumeText);
-  const specializationGap = detectSpecializationGap(
-    params.extracted,
-    clamped.score,
+    userProfile: params.userProfile,
     resumeText,
-  );
-  const rulesWithGap: RuleEvaluation = {
-    ...clamped.rules,
-    capabilityGap,
-    specializationGap,
-  };
-  const composite = compositeFromCategories({
-    score: clamped.score,
-    extracted: params.extracted,
-    rules: rulesWithGap,
-    profile: params.userProfile,
-    resumeText,
-  });
-
-  const polished = polishScoringNarrative({
     narrative: {
       topMatch: llmResult.topMatch,
       mainRisk: llmResult.mainRisk,
       risks: llmResult.risks,
       rationale: llmResult.rationale,
     },
-    score: composite.score,
-    extracted: params.extracted,
-    userProfile: params.userProfile,
-    rules: rulesWithGap,
   });
 
   return {
-    scoring: {
-      ...llmResult,
-      score: polished.score,
-      topMatch: polished.topMatch,
-      mainRisk: polished.mainRisk,
-      risks: polished.risks,
-      rationale: polished.rationale,
-      recommendation: composite.recommendation,
-    },
-    rules: applyJdLanguageOutputBoundary(params.extracted, rulesWithGap),
+    ...finished,
     scoringDiagnostics: scoredRun.diagnostics,
     scoringLlmSucceeded: scoredRun.success,
   };

@@ -17,6 +17,11 @@ import {
 } from "./roleFunctionClassifier.js";
 import { isContractEmploymentType } from "./contractEmployment.js";
 import { structuredFirstJobBlob } from "./structuredFirstJobBlob.js";
+import {
+  EARLY_CAREER_EXCEED_SEVERITY_LEVEL_FIT_MAX,
+  TITLE_RESPONSIBILITY_MISMATCH_LEVEL_FIT_MAX,
+  textSignalsEarlyCareerExceedSeverity,
+} from "./titleResponsibilitySeniority.js";
 
 const jobBlob = (job: ExtractedJobData): string => structuredFirstJobBlob(job);
 
@@ -283,7 +288,40 @@ export const applyScoringClampLayer = (params: {
     score.careerValue = Math.max(0, score.careerValue - 1);
   }
 
-  const boundedRules = applyJdLanguageOutputBoundary(params.extracted, rules);
+  // After all stack caps — full credit when and/or stack requirement is satisfied (React+TS satisfies Rails/React/TS line).
+  if (
+    rules.disjunctiveLanguageRequirementSatisfied &&
+    !rules.stackMismatch &&
+    score.stackFit < 17
+  ) {
+    score.stackFit = Math.max(score.stackFit, 17);
+  }
+
+  // Title/responsibility seniority mismatch / early-career-exceed severity → Level fit dock.
+  // Core function ownership beyond early-career must move capability, not only Key Risk prose.
+  const notesBlob = [...(rules.notes ?? []), ...(rules.hardRuleNotes ?? [])].join("\n");
+  const severityFromNotes = textSignalsEarlyCareerExceedSeverity(notesBlob);
+  let earlyCareerExceedSeverityRisk = Boolean(rules.earlyCareerExceedSeverityRisk) || severityFromNotes;
+  const levelFitBefore = params.score.levelFit;
+  if (rules.titleResponsibilityMismatch) {
+    score.levelFit = Math.min(score.levelFit, TITLE_RESPONSIBILITY_MISMATCH_LEVEL_FIT_MAX);
+    score.recruiterFriendliness = Math.min(score.recruiterFriendliness, 9);
+  } else if (earlyCareerExceedSeverityRisk) {
+    score.levelFit = Math.min(score.levelFit, EARLY_CAREER_EXCEED_SEVERITY_LEVEL_FIT_MAX);
+  }
+
+  const scoringRiskScoreInconsistency =
+    earlyCareerExceedSeverityRisk &&
+    score.levelFit > EARLY_CAREER_EXCEED_SEVERITY_LEVEL_FIT_MAX &&
+    levelFitBefore === score.levelFit;
+
+  const rulesWithSeniority: RuleEvaluation = {
+    ...rules,
+    earlyCareerExceedSeverityRisk,
+    scoringRiskScoreInconsistency,
+  };
+
+  const boundedRules = applyJdLanguageOutputBoundary(params.extracted, rulesWithSeniority);
   return { score, rules: boundedRules };
 };
 

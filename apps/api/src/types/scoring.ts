@@ -26,6 +26,15 @@ export type CapabilityGap = {
 
 export type SpecializationGapLever = "none" | "portfolio" | "upskill" | "resume";
 
+/** Where in the JD a skill tag was sourced — drives penalty eligibility. */
+export type TagSourceStrength = "REQUIRED" | "PREFERRED" | "NARRATIVE";
+
+export type ExtractedSkillTag = {
+  term: string;
+  sourceQuote: string;
+  strength: TagSourceStrength;
+};
+
 export type SpecializationGapKind = "backend_stack" | "design_portfolio" | "enterprise_iam";
 
 export type SpecializationGapSeverity = "central" | "moderate" | "minor";
@@ -249,6 +258,20 @@ export type RuleEvaluation = {
   fintechGoPrimaryStretch?: boolean;
   /** Founding/very-early startup role with high-autonomy ownership risk despite technical overlap. */
   foundingEngineerStretch?: boolean;
+  /**
+   * Title seniority vs responsibilities disagree by >1 band, or junior/1–2yr tagging
+   * conflicts with industry-senior title / high-autonomy responsibilities.
+   */
+  titleResponsibilityMismatch?: boolean;
+  /** High-autonomy JD with no mentorship language at a small early-stage org. */
+  highOwnershipLowSupport?: boolean;
+  /**
+   * Narrative Key Risk asserts role likely exceeds early-career exposure —
+   * must dock levelFit; set when mismatch flag alone did not already cover it.
+   */
+  earlyCareerExceedSeverityRisk?: boolean;
+  /** Scoring-pipeline inconsistency: severity risk prose present without a levelFit dock. */
+  scoringRiskScoreInconsistency?: boolean;
   /**
    * JD requires a CS (or equivalent strict) degree plus multiple finance/accounting, publication,
    * or legacy-OOP gates the profile does not satisfy — generic SWE overlap must not dominate.

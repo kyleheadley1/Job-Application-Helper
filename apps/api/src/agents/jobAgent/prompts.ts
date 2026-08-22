@@ -30,6 +30,9 @@ Required shape (field names must match exactly):
 - yearsExperience: if present, MUST be an object like { "raw": "2+", "min": 2, "max": 4 } — never a bare number or bare string at the top level.
 - degreeRequirement: if present, MUST be an object like { "raw": "Bachelor's required", "level": "required" } — never a bare string.
 - stack, requiredSkills, preferredSkills, domainTags, responsibilities, requirements: arrays of strings (empty arrays allowed).
+- Every stack/requiredSkills/preferredSkills entry MUST appear verbatim (or as an unambiguous synonym like React.js→React) in the posting text. Never invent tool names (e.g. do not add Figma unless "Figma" appears in the JD).
+- Narrative/culture prose ("Who You Are", "good design", "delightful UX") is NOT a hard requirement — do not put those concepts in requiredSkills.
+- Simplify "Required Skills" chip lists are preference hints unless the same skill appears in Qualifications/Requirements prose with must-have language.
 - Use the provided parsed companyName unless it is null or obviously incorrect. Do not replace a concrete company name with "Unknown Company".
 - Do not infer company from the role title. Ignore page chrome (Simplify+, Open user menu, Updated on, History, Summary, Full Job Posting).
 - For scraped layouts with metadata labels (position, time, remote, seniority, money, date), use pre-parsed company/title/location — the value after "position" is usually location, not job title.

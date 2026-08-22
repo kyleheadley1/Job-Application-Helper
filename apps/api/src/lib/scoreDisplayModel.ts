@@ -1,6 +1,7 @@
 import {
   CAPABILITY_MAXES,
   CLEARANCE_REQUIRES_EXISTING_SURV_PENALTY,
+  HIGH_OWNERSHIP_LOW_SUPPORT_SURV_PENALTY,
   LEGACY_CAPABILITY_SOURCE_MAXES,
   resolveSubFactorBindingness,
   resolveSubFactorPenaltyName,
@@ -279,6 +280,20 @@ export const buildSurvivabilityRows = (
     });
   }
 
+  if (rules.highOwnershipLowSupport) {
+    rows.push({
+      key: "highOwnershipLowSupport",
+      label: "High ownership, low support",
+      score: 0,
+      weight: 0,
+      contribution: -HIGH_OWNERSHIP_LOW_SUPPORT_SURV_PENALTY,
+      lever: "none",
+      leverLabel: STRUCTURAL_LEVER_LABEL,
+      bindingness: "structural",
+      penaltyName: "high ownership without mentorship at early-stage org",
+    });
+  }
+
   return rows.sort((a, b) => a.score - b.score);
 };
 
@@ -549,6 +564,9 @@ export const buildScoreDisplay = (params: {
     }
     if (params.rules.clearanceRequiresExistingPenalty) {
       weightedAverage -= CLEARANCE_REQUIRES_EXISTING_SURV_PENALTY;
+    }
+    if (params.rules.highOwnershipLowSupport) {
+      weightedAverage -= HIGH_OWNERSHIP_LOW_SUPPORT_SURV_PENALTY;
     }
     weightedAverage = roundSurvivabilityScalar(weightedAverage);
     breakdown = {

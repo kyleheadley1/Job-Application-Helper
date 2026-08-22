@@ -2,6 +2,13 @@ import {
   explicitCoreLanguageRiskSummary,
   type CoreLanguageId,
 } from "./coreLanguageRequirements.js";
+import { riskContradictsSatisfiedDisjunctiveRequirement } from "./disjunctiveLanguageRequirement.js";
+import { riskLineReferencesAbsentJdConcepts } from "./riskJdConceptGrounding.js";
+import {
+  EARLY_CAREER_EXCEED_SEVERITY_LEVEL_FIT_MAX,
+  TITLE_RESPONSIBILITY_MISMATCH_LEVEL_FIT_MAX,
+  textSignalsEarlyCareerExceedSeverity,
+} from "./titleResponsibilitySeniority.js";
 import { jdMentionsDegreeLanguage } from "./degreeEquivalency.js";
 import { fdeBuilderPrimaryRiskSummary } from "./fdeBuilderRole.js";
 import type { ExtractedJobData } from "../types/job.js";
@@ -373,6 +380,9 @@ export const isUngroundedDegreeRisk = (
 const riskPriority = (risk: string, jdBlob: string, rules?: RuleEvaluation): number => {
   const t = normalizeText(risk);
   if (/explicit\s+\w+\s+backend requirement vs type/i.test(t)) return 98;
+  if (/title\s*\/\s*responsibility\s+mismatch/i.test(t)) return 99;
+  if (textSignalsEarlyCareerExceedSeverity(risk)) return 98;
+  if (/high ownership,\s*low support/i.test(t)) return 95;
   /** Third-priority stretch risk: after Python/stack and travel/hybrid. */
   if (
     /customer[-\s]?facing production ai|production ai ownership/.test(t) &&
@@ -464,6 +474,18 @@ export function polishRisksAndMain(params: {
       rawList.unshift(fdeBuilderPrimaryRiskSummary);
     }
   }
+  const mismatchNotes = (params.rules?.notes ?? []).filter((n) =>
+    /title\s*\/\s*responsibility\s+mismatch/i.test(n),
+  );
+  for (const n of [...mismatchNotes].reverse()) {
+    if (!rawList.some((r) => similarSentence(r, n))) rawList.unshift(n);
+  }
+  const highOwnNotes = (params.rules?.notes ?? []).filter((n) =>
+    /high ownership,\s*low support/i.test(n),
+  );
+  for (const n of highOwnNotes) {
+    if (!rawList.some((r) => similarSentence(r, n))) rawList.push(n);
+  }
   const suggestOwnershipRisk =
     max >= 3 &&
     /\b(customer[-\s]?facing|production ai)\b/i.test(jdBlob) &&
@@ -477,7 +499,9 @@ export function polishRisksAndMain(params: {
   const filtered = merged.filter(
     (r) =>
       !isLowSignalEnterpriseDomainRisk(r, jdBlob) &&
-      !isUngroundedDegreeRisk(r, params.extracted, params.rules),
+      !isUngroundedDegreeRisk(r, params.extracted, params.rules) &&
+      !(params.rules && riskContradictsSatisfiedDisjunctiveRequirement(r, params.rules)) &&
+      !riskLineReferencesAbsentJdConcepts(r, params.extracted),
   );
   const sorted = [...filtered].sort(
     (a, b) => riskPriority(b, jdBlob, params.rules) - riskPriority(a, jdBlob, params.rules),
@@ -1733,18 +1757,43 @@ export function polishScoringNarrative(params: {
     userProfile: params.userProfile,
     rules: params.rules,
   };
+  const riskMax =
+    params.rules.credentialHeavyFintechAlgorithm ||
+    params.rules.goDistributedDataInfraCandidateGap ||
+    params.rules.titleResponsibilityMismatch ||
+    params.rules.highOwnershipLowSupport
+      ? 3
+      : 2;
   const { mainRisk, risks } = polishRisksAndMain({
     mainRisk: params.narrative.mainRisk,
     risks: params.narrative.risks,
     extracted: params.extracted,
     travelLine,
-    max:
-      params.rules.credentialHeavyFintechAlgorithm || params.rules.goDistributedDataInfraCandidateGap
-        ? 3
-        : 2,
+    max: riskMax,
     rules: params.rules,
     userProfile: params.userProfile,
   });
+
+  // Bug 1: severity-flagged Key Risk prose must dock Level fit — not leave Strong Yes intact.
+  const riskBlob = [mainRisk, ...risks, ...(params.rules.notes ?? [])].join("\n");
+  const severityInProse = textSignalsEarlyCareerExceedSeverity(riskBlob);
+  let score = params.score;
+  if (params.rules.titleResponsibilityMismatch) {
+    if (score.levelFit > TITLE_RESPONSIBILITY_MISMATCH_LEVEL_FIT_MAX) {
+      const next = {
+        ...score,
+        levelFit: TITLE_RESPONSIBILITY_MISMATCH_LEVEL_FIT_MAX,
+      };
+      score = { ...next, total: sumScoreParts(next) };
+    }
+  } else if (severityInProse && score.levelFit > EARLY_CAREER_EXCEED_SEVERITY_LEVEL_FIT_MAX) {
+    const next = {
+      ...score,
+      levelFit: EARLY_CAREER_EXCEED_SEVERITY_LEVEL_FIT_MAX,
+    };
+    score = { ...next, total: sumScoreParts(next) };
+  }
+
   const rationale = polishRationaleBullets(params.narrative.rationale, 2, visibleCtx);
   const rawTop = params.narrative.topMatch?.trim() ?? "";
   let topMatch = appendMatureLanguageShotGuidance(
@@ -1755,7 +1804,7 @@ export function polishScoringNarrative(params: {
   topMatch = appendFoundingStretchGuidance(topMatch, { rules: params.rules });
   topMatch = appendCredentialedAccountingSystemsGuidance(topMatch, { rules: params.rules });
   topMatch = appendGoDistributedDataInfraStretchGuidance(topMatch, { rules: params.rules });
-  topMatch = appendLotteryTicketGuidance(topMatch, { score: params.score, rules: params.rules });
+  topMatch = appendLotteryTicketGuidance(topMatch, { score, rules: params.rules });
   topMatch = sanitizeVisibleNarrativeLine(topMatch, visibleCtx);
-  return { score: params.score, topMatch, mainRisk, risks, rationale };
+  return { score, topMatch, mainRisk, risks, rationale };
 }
