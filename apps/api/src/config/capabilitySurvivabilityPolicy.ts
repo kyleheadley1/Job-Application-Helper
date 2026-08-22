@@ -28,6 +28,9 @@ export const SURVIVABILITY_TUNING = {
 /** Weighted-average deduction when JD likely requires an existing clearance at hire. */
 export const CLEARANCE_REQUIRES_EXISTING_SURV_PENALTY = 0.17;
 
+/** Deduction when high-autonomy role has no support structure at a small early-stage org. */
+export const HIGH_OWNERSHIP_LOW_SUPPORT_SURV_PENALTY = 0.12;
+
 /** Additive composite: capability backbone + bounded survivability adjustment − gap dock. */
 export const COMPOSITE_SCORING = {
   /** Survivability at/above this = no penalty; below = steep dock. */

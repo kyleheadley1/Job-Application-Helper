@@ -55,6 +55,10 @@ export const CALIBRATION_FIXTURES = {
   funMultiBandSeniority: "funMultiBandSeniority.json",
   luminosSeniorDepthGuard: "luminosSeniorDepthGuard.json",
   jsrTechConsultingRequiredNode: "jsrTechConsultingRequiredNode.json",
+  fleetioMarketplace: "fleetioMarketplace.json",
+  bisectHostingWebDeveloper: "bisectHostingWebDeveloper.json",
+  augustLawForwardDeployed: "augustLawForwardDeployed.json",
+  eulerityTitleResponsibilityMismatch: "eulerityTitleResponsibilityMismatch.json",
 } as const;
 
 export type CalibrationFixtureKey = keyof typeof CALIBRATION_FIXTURES;

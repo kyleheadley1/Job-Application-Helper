@@ -107,6 +107,7 @@ export class ResponsesClient {
         },
         body: JSON.stringify({
           model: env.openAiModel,
+          // gpt-5-mini (Responses API) rejects `temperature` — omit it; retriage JD-hash reuse handles determinism.
           input: [
             { role: "system", content: request.systemPrompt },
             { role: "user", content: request.userPrompt },

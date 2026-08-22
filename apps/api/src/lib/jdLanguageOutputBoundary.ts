@@ -6,6 +6,7 @@ import {
   languagePresentInJd,
   normalizeGapLabel,
 } from "./jdLanguagePresence.js";
+import { riskContradictsSatisfiedDisjunctiveRequirement } from "./disjunctiveLanguageRequirement.js";
 
 export { normalizeGapLabel };
 
@@ -96,7 +97,12 @@ const extractCitedLanguagesFromNote = (note: string): string[] => {
 export const filterLanguageNoteAtBoundary = (
   note: string,
   job: ExtractedJobData,
+  rules?: Pick<
+    RuleEvaluation,
+    "disjunctiveLanguageRequirementSatisfied" | "disjunctiveAcceptedLanguages"
+  >,
 ): string | null => {
+  if (rules && riskContradictsSatisfiedDisjunctiveRequirement(note, rules)) return null;
   const cited = extractCitedLanguagesFromNote(note);
   if (cited.length === 0) return note;
   if (cited.some((l) => !languagePresentInJd(l, job))) return null;
@@ -118,11 +124,11 @@ export const applyJdLanguageOutputBoundary = (
     .filter((flag): flag is HardRuleFlag => flag != null);
 
   const notes = (rules.notes ?? [])
-    .map((note) => filterLanguageNoteAtBoundary(note, job))
+    .map((note) => filterLanguageNoteAtBoundary(note, job, rules))
     .filter((note): note is string => note != null);
 
   const hardRuleNotes = (rules.hardRuleNotes ?? [])
-    .map((note) => filterLanguageNoteAtBoundary(note, job))
+    .map((note) => filterLanguageNoteAtBoundary(note, job, rules))
     .filter((note): note is string => note != null);
 
   const stackMismatch =

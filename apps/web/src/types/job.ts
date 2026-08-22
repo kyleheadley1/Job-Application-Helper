@@ -39,6 +39,11 @@ export type ExtractedJobData = {
   companyDisplayName?: string;
   companyConfidence?: "direct_or_unclear" | "agency_only" | "explicit_employer" | "low";
   companyExtractionNotes?: string[];
+  skillTags?: Array<{
+    term: string;
+    sourceQuote: string;
+    strength: "REQUIRED" | "PREFERRED" | "NARRATIVE";
+  }>;
 };
 
 export type RuleEvaluation = {
@@ -71,6 +76,10 @@ export type RuleEvaluation = {
   researchHeavyAiRole?: boolean;
   fintechGoPrimaryStretch?: boolean;
   foundingEngineerStretch?: boolean;
+  titleResponsibilityMismatch?: boolean;
+  highOwnershipLowSupport?: boolean;
+  earlyCareerExceedSeverityRisk?: boolean;
+  scoringRiskScoreInconsistency?: boolean;
   credentialHeavyFintechAlgorithm?: boolean;
   productionBarCompetitivePool?: boolean;
   goDistributedDataInfraRole?: boolean;

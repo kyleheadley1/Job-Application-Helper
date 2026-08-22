@@ -1,0 +1,35 @@
+{
+  "id": "bisect-hosting-web-developer",
+  "anchorNote": "BisectHosting Web Developer — disjunctive React/Vue/Nuxt line satisfied by React+TS; standalone PHP Laravel required line must gap; no FDE/SIE/growth-engineering-title risk bleed.",
+  "extracted": {
+    "company": "BisectHosting",
+    "title": "Web Developer",
+    "location": "United States",
+    "remoteType": "remote",
+    "seniority": "Entry Level",
+    "stack": ["React", "TypeScript", "JavaScript", "Vue", "Nuxt", "PHP", "Laravel"],
+    "requiredSkills": ["React", "TypeScript", "JavaScript", "Vue", "Nuxt", "PHP", "Laravel"],
+    "preferredSkills": [],
+    "domainTags": ["gaming", "web hosting", "cloud computing"],
+    "responsibilities": [
+      "Build and improve customer-facing and internal web applications across the hosting platform",
+      "Frontend development with React and Nuxt/Vue; growth engineering and experimentation",
+      "Backend contributions using PHP Laravel; integrations, performance, and accessibility"
+    ],
+    "requirements": [
+      "Strong experience with JavaScript/TypeScript and React, Vue, or Nuxt",
+      "Experience developing backend applications and APIs using PHP Laravel",
+      "Comfortable working with experimentation and production issue resolution"
+    ],
+    "rawText": "BisectHosting\nWeb Developer\nRemote\nEntry Level\nBisectHosting is seeking a Web Developer (SDE1) to build and improve customer-facing and internal web applications across its hosting platform. The role focuses on frontend development with React and Nuxt/Vue, backend contributions using PHP Laravel, growth engineering, experimentation, integrations, performance, accessibility, and issue resolution.\nQualifications\nStrong experience with JavaScript/TypeScript and React, Vue, or Nuxt\nExperience developing backend applications and APIs using PHP Laravel\nComfortable working with experimentation and production issue resolution"
+  },
+  "storedCategoryScores": {
+    "stackFit": 17,
+    "levelFit": 16,
+    "domainFit": 6,
+    "resumeStoryClarity": 8,
+    "functionalOverlap": 12,
+    "recruiterFriendliness": 12,
+    "careerValue": 7
+  }
+}

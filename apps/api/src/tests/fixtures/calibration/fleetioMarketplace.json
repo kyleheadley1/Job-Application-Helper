@@ -1,0 +1,47 @@
+{
+  "id": "fleetio-marketplace",
+  "anchorNote": "Fleetio Marketplace — no Figma in JD; and/or Rails/React/TS line satisfied by React+TypeScript; narrative 'good design' must not trigger design portfolio penalty.",
+  "extracted": {
+    "company": "Fleetio",
+    "companyDisplayName": "Fleetio",
+    "title": "Software Engineer, Marketplace",
+    "location": "Remote in USA",
+    "remoteType": "remote",
+    "seniority": "junior",
+    "stack": ["Figma", "UI/UX Design", "React.js", "TypeScript", "PostgreSQL", "Ruby on Rails", "REST APIs"],
+    "requiredSkills": [
+      "Figma",
+      "UI/UX Design",
+      "React.js",
+      "TypeScript",
+      "PostgreSQL",
+      "Ruby on Rails",
+      "REST APIs",
+      "Software Testing",
+      "RDBMS",
+      "Data Modeling"
+    ],
+    "preferredSkills": ["GraphQL"],
+    "domainTags": ["fleet management", "saas"],
+    "responsibilities": [
+      "Build and maintain marketplace features across the Fleetio platform",
+      "Collaborate with product and design on customer-facing workflows",
+      "Write tested, maintainable full-stack code"
+    ],
+    "requirements": [
+      "2+ years experience with Ruby on Rails, React, and/or Typescript",
+      "Strong fundamentals in data modeling and REST APIs",
+      "Comfortable working in a remote-first engineering team"
+    ],
+    "rawText": "Software Engineer\nMarketplace\nPosted on 8/17/2026\nUnlock job analytics with\nSimplify+\nFleetio\nFleetio\n201-500 employees\nFleet management software for assets\nNo salary listed\nJunior\nRemote in USA + 1 more\nMore locations: Remote in Canada\nRemote\nCategory\nSoftware Engineering\n(1)\nFull-Stack Engineering\nRequired Skills\nSkills that you prefer have been highlighted\nUI/UX Design\nReact.js\nPostgres\nTypeScript\nREST APIs\nSoftware Testing\nRuby on Rails\nRDBMS\nData Modeling\nConnection\nHistory\nSummary\nFull Job Posting\nWhy This Job is a Match\nQualifications\n2+ years experience with Ruby on Rails, React, and/or Typescript\nStrong fundamentals in data modeling and REST APIs\nComfortable working in a remote-first engineering team\nWho You Are\nYou have a passion for solving business problems with good design, delightful UX, and scalable architecture.\nYou are a strong communicator and enjoy collaborating with product and customers.\nConsidered a plus\nExperience with GraphQL or event-driven architectures."
+  },
+  "storedCategoryScores": {
+    "stackFit": 13,
+    "levelFit": 18,
+    "domainFit": 8,
+    "resumeStoryClarity": 7,
+    "functionalOverlap": 11,
+    "recruiterFriendliness": 12,
+    "careerValue": 8
+  }
+}

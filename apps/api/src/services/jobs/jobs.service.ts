@@ -77,6 +77,7 @@ export class JobsService {
       rawText: rawText || undefined,
       companyHint,
       fullPrep: false,
+      retriageFrom: prev,
     });
 
     const extracted = preserveCompanyOnRetriage(prev.extracted, fresh.extracted);
@@ -107,6 +108,7 @@ export class JobsService {
       rationale: fresh.rationale,
       risks: fresh.risks,
       debugExtraction: fresh.debugExtraction,
+      scoringJdTextHash: fresh.scoringJdTextHash,
       generated: {},
       updatedAt: now,
       scoreHistory: [...(prev.scoreHistory ?? []), historyEntry],

@@ -21,6 +21,7 @@ import {
 import { evaluateDisjunctiveLanguageRequirement, filterGapsAfterDisjunctiveMatch } from '../../lib/disjunctiveLanguageRequirement.js';
 import { textMentionsGoLanguage } from '../../lib/goLanguage.js';
 import { isFdeBuilderSoftwarePrimaryShape } from '../../lib/fdeBuilderRole.js';
+import { evaluateTitleResponsibilitySeniority } from '../../lib/titleResponsibilitySeniority.js';
 import { classifyRoleLane, detectBackendProductApiShape } from '../../lib/roleFunctionClassifier.js';
 import { isStartupSmallTeamScale } from '../../lib/employerScale.js';
 import { detectRoleSeniorityOverreach, resolveStructuredSeniorityLevel, seniorityNeedsManualReview } from '../../lib/seniorityGate.js';
@@ -676,6 +677,16 @@ export const evaluateRules = (
     );
   }
 
+  const titleRespSeniority = evaluateTitleResponsibilitySeniority(job);
+  const titleResponsibilityMismatch = titleRespSeniority.mismatch;
+  const highOwnershipLowSupport = titleRespSeniority.highOwnershipLowSupport;
+  if (titleResponsibilityMismatch && titleRespSeniority.mismatchRiskNote) {
+    notes.unshift(titleRespSeniority.mismatchRiskNote);
+  }
+  if (highOwnershipLowSupport && titleRespSeniority.highOwnershipLowSupportNote) {
+    notes.push(titleRespSeniority.highOwnershipLowSupportNote);
+  }
+
   const coreLang = analyzeCoreLanguageRequirement(job, profile, claimable);
   const ventureFundedStartup = isVentureFundedStartupShape(job, combinedText);
   const matureStructuredEmployer =
@@ -784,6 +795,10 @@ export const evaluateRules = (
     researchHeavyAiRole,
     fintechGoPrimaryStretch,
     foundingEngineerStretch,
+    titleResponsibilityMismatch,
+    highOwnershipLowSupport,
+    earlyCareerExceedSeverityRisk: false,
+    scoringRiskScoreInconsistency: false,
     credentialHeavyFintechAlgorithm,
     productionBarCompetitivePool,
     goDistributedDataInfraRole,

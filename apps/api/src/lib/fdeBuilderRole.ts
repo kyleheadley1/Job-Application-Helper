@@ -32,12 +32,17 @@ export const STRONG_SIE_DESCRIPTOR_RES: RegExp[] = [
 export const jobBlobForFdeHeuristics = (job: ExtractedJobData): string =>
   structuredFirstJobBlob(job);
 
-/** Naming suggests Forward Deployed or growth engineering (not generic "engineer"). */
-export const hasFdeOrGrowthEngineerNaming = (blob: string): boolean =>
-  /\bforward\s+deployed\s+engineer\b/i.test(blob) ||
-  /\bforward\s+deployed\b/i.test(blob) ||
-  /\bgrowth\s+engineer\b/i.test(blob) ||
-  /\bgrowth\s+engineering\b/i.test(blob);
+/** Naming suggests Forward Deployed or growth engineering in the role title — not generic "growth engineering" work in body copy. */
+export const hasFdeOrGrowthEngineerNaming = (job: ExtractedJobData): boolean => {
+  const titleBlob = normalizeText([job.title, job.seniority].filter(Boolean).join(" "));
+  if (!titleBlob) return false;
+  return (
+    /\bforward\s+deployed\s+engineer\b/i.test(titleBlob) ||
+    /\bforward\s+deployed\b/i.test(titleBlob) ||
+    /\bgrowth\s+engineer\b/i.test(titleBlob) ||
+    /\bgrowth[-\s]engineering\s+(?:engineer|lead|manager|role)\b/i.test(titleBlob)
+  );
+};
 
 /**
  * External customer / solutions-delivery core (SIE-primary territory).
@@ -78,7 +83,7 @@ export const hasBuilderFirstSoftwareContext = (blob: string): boolean =>
  */
 export const isFdeBuilderSoftwarePrimaryShape = (job: ExtractedJobData): boolean => {
   const blob = jobBlobForFdeHeuristics(job);
-  if (!hasFdeOrGrowthEngineerNaming(blob)) return false;
+  if (!hasFdeOrGrowthEngineerNaming(job)) return false;
   if (hasStrongExternalCustomerDeliverySignals(blob)) return false;
   return true;
 };

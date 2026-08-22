@@ -92,6 +92,15 @@ export const ExtractedJobDataSchema = z.object({
   companyConfidence: z.enum(["direct_or_unclear", "agency_only", "explicit_employer", "low"]).optional(),
   companyEmployeeCount: z.number().optional(),
   companyExtractionNotes: z.array(z.string()).optional(),
+  skillTags: z
+    .array(
+      z.object({
+        term: z.string(),
+        sourceQuote: z.string(),
+        strength: z.enum(["REQUIRED", "PREFERRED", "NARRATIVE"]),
+      }),
+    )
+    .optional(),
   geoScope: z
     .object({
       titleRegion: z.string().nullable(),
@@ -149,6 +158,10 @@ export const RuleEvaluationSchema = z.object({
   researchHeavyAiRole: z.boolean().optional().default(false),
   fintechGoPrimaryStretch: z.boolean().optional().default(false),
   foundingEngineerStretch: z.boolean().optional().default(false),
+  titleResponsibilityMismatch: z.boolean().optional().default(false),
+  highOwnershipLowSupport: z.boolean().optional().default(false),
+  earlyCareerExceedSeverityRisk: z.boolean().optional().default(false),
+  scoringRiskScoreInconsistency: z.boolean().optional().default(false),
   credentialHeavyFintechAlgorithm: z.boolean().optional().default(false),
   productionBarCompetitivePool: z.boolean().optional().default(false),
   goDistributedDataInfraRole: z.boolean().optional().default(false),
@@ -382,15 +395,19 @@ export const GeneratedAssetsSchema = z.object({
   recruiterReplyDraft: z.string().optional(),
 });
 
+/** OpenAI / Mongo may emit null for absent optional debug fields — accept nullish. */
+const debugOptionalString = z.string().nullish();
+const debugOptionalNumber = z.number().nullish();
+
 export const TriageStageDebugSchema = z.object({
   success: z.boolean(),
   fallbackUsed: z.boolean(),
-  httpStatus: z.number().optional(),
-  errorCode: z.string().optional(),
-  errorType: z.string().optional(),
-  errorMessage: z.string().optional(),
-  parseStage: z.string().optional(),
-  reason: z.string().optional(),
+  httpStatus: debugOptionalNumber,
+  errorCode: debugOptionalString,
+  errorType: debugOptionalString,
+  errorMessage: debugOptionalString,
+  parseStage: debugOptionalString,
+  reason: debugOptionalString,
 });
 
 export const TriageDebugExtractionSchema = z.object({
@@ -405,12 +422,12 @@ export const TriageDebugExtractionSchema = z.object({
 export const AssetGenerationSliceDebugSchema = z.object({
   success: z.boolean(),
   fallbackUsed: z.boolean(),
-  httpStatus: z.number().optional(),
-  errorCode: z.string().optional(),
-  errorType: z.string().optional(),
-  errorMessage: z.string().optional(),
-  parseStage: z.string().optional(),
-  reason: z.string().optional(),
+  httpStatus: debugOptionalNumber,
+  errorCode: debugOptionalString,
+  errorType: debugOptionalString,
+  errorMessage: debugOptionalString,
+  parseStage: debugOptionalString,
+  reason: debugOptionalString,
 });
 
 export const DebugAssetGenerationSchema = z.object({
@@ -507,6 +524,7 @@ export const JobRecordSchema = z.object({
     )
     .optional(),
   statusHistory: z.array(StatusHistoryRecordSchema).optional(),
+  scoringJdTextHash: z.string().optional(),
 });
 
 export const TriageRequestSchema = z
