@@ -1,0 +1,39 @@
+{
+  "id": "august-law-forward-deployed",
+  "anchorNote": "August Law Forward Deployed Engineer — Junior/1–2yr tag + industry-senior FDE title + high-autonomy responsibilities (own deployments end to end, you decide what done means, live cutovers, no mentorship) at 11–50 / seed startup. Must dock Level fit, surface title/responsibility mismatch Key Risk, and high-ownership/low-support survivability line. Expect stretch range, not Strong Yes ~87.",
+  "extracted": {
+    "company": "August Law",
+    "companyDisplayName": "August Law",
+    "title": "Forward Deployed Engineer",
+    "location": "Remote",
+    "remoteType": "remote",
+    "seniority": "Junior",
+    "yearsExperience": { "raw": "1-2 years", "min": 1, "max": 2 },
+    "companyEmployeeCount": 11,
+    "stack": ["TypeScript", "React", "Node.js", "SharePoint", "iManage", "NetDocs"],
+    "requiredSkills": ["TypeScript", "React", "enterprise legal systems integrations"],
+    "preferredSkills": ["Word add-ins"],
+    "domainTags": ["legaltech", "enterprise"],
+    "responsibilities": [
+      "Own deployments end to end for enterprise legal clients — you decide what done means",
+      "Run live production cutovers and live-migration debugging with no margin for error",
+      "Build deep, hands-on integrations with enterprise legal systems (iManage, NetDocs, SharePoint, Word add-ins)",
+      "Define how this function works for the engineering org"
+    ],
+    "requirements": [
+      "1-2 years of software engineering experience",
+      "Strong TypeScript and React fundamentals",
+      "Comfortable debugging production issues under time pressure"
+    ],
+    "rawText": "August Law\nForward Deployed Engineer\nPosted recently\n11-50 employees\nSeed · $7M\nJunior\nRemote\n1-2 years exp\nAbout August Law\nAugust Law is a seed-stage legaltech startup (raised $7M) building tools for enterprise law firms.\nThe Role\nAs a Forward Deployed Engineer you will own deployments end to end for enterprise legal clients. You decide what done means. You will run live production cutovers and live-migration debugging in a no margin for error domain.\nResponsibilities\nOwn deployments end to end — you decide what done means\nRun live production cutovers and live-migration debugging\nBuild deep, hands-on integrations with enterprise legal systems (iManage, NetDocs, SharePoint, Word add-ins)\nDefine how this function works for the engineering org\nRequirements\n1-2 years of software engineering experience\nStrong TypeScript and React fundamentals\nComfortable debugging production issues under time pressure"
+  },
+  "storedCategoryScores": {
+    "stackFit": 16,
+    "levelFit": 18,
+    "domainFit": 7,
+    "resumeStoryClarity": 8,
+    "functionalOverlap": 12,
+    "recruiterFriendliness": 12,
+    "careerValue": 8
+  }
+}

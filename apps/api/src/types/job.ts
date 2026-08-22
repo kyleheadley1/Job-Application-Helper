@@ -1,5 +1,6 @@
 import type { ResumeType } from './resume.js';
 import type {
+  ExtractedSkillTag,
   Recommendation,
   RuleEvaluation,
   SalaryAsk,
@@ -89,6 +90,8 @@ export type ExtractedJobData = {
    */
   companyEmployeeCount?: number;
   companyExtractionNotes?: string[];
+  /** Grounded skill/stack tags with JD source quote and section strength. */
+  skillTags?: ExtractedSkillTag[];
 };
 
 export type GeneratedAssets = {
@@ -187,6 +190,11 @@ export type JobRecord = {
     recommendation: Recommendation;
   }>;
   statusHistory?: StatusHistoryRecord[];
+  /**
+   * SHA-256 of normalized JD source text from the last successful scoring LLM call.
+   * When retriage sees the same hash, stored LLM category scores are reused.
+   */
+  scoringJdTextHash?: string;
 };
 
 export type StatusHistoryRecord = {

@@ -1,5 +1,6 @@
 import {
   CLEARANCE_REQUIRES_EXISTING_SURV_PENALTY,
+  HIGH_OWNERSHIP_LOW_SUPPORT_SURV_PENALTY,
   SURVIVABILITY_TUNING,
   SURVIVABILITY_WEIGHTS,
   type SurvivabilitySubFactorKey,
@@ -257,6 +258,10 @@ export const computeSurvivability = (params: {
 
   if (params.rules.clearanceRequiresExistingPenalty) {
     weightedAverage -= CLEARANCE_REQUIRES_EXISTING_SURV_PENALTY;
+  }
+
+  if (params.rules.highOwnershipLowSupport) {
+    weightedAverage -= HIGH_OWNERSHIP_LOW_SUPPORT_SURV_PENALTY;
   }
 
   if (

@@ -51,6 +51,7 @@ export const normalizeGapLabel = (label: string): string => {
   if (/^c\+\+$|^c\/c\+\+$/i.test(t)) return "C/C++";
   if (/^c#|^csharp|^\.net$/i.test(t)) return "C#/.NET";
   if (/^django\/python$/i.test(t)) return "Python";
+  if (/^php\s*\/?\s*laravel$/i.test(t) || /^laravel$/i.test(t)) return "PHP";
   return t;
 };
 

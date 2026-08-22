@@ -7,6 +7,11 @@ import type {
   SpecializationGapSeverity,
 } from "../types/scoring.js";
 import { analyzeLanguageRequirementStrength } from "./languageRequirementStrength.js";
+import {
+  jdHasExplicitDesignToolRequirement,
+  jdHasNarrativeDesignLanguageOnly,
+  tagsAtLeastStrength,
+} from "./jdTagProvenance.js";
 import { normalizeText } from "./text.js";
 
 const structuredBlob = (job: ExtractedJobData): string =>
@@ -196,13 +201,17 @@ export const detectDesignFigmaSpecializationGap = (
   job: ExtractedJobData,
   resumeText?: string,
 ): SpecializationGap | undefined => {
-  const blob = structuredBlob(job);
-  const required = requiredBlob(job);
+  if (jdHasNarrativeDesignLanguageOnly(job)) return undefined;
+  if (!jdHasExplicitDesignToolRequirement(job)) return undefined;
+
+  const required = normalizeText(
+    [...(job.requirements ?? []), ...tagsAtLeastStrength(job, "REQUIRED").map((t) => t.term)].join("\n"),
+  );
   const inTitle = titleNamesDesign(job);
   const inRequired = DESIGN_JD_SIGNALS.test(required);
-  const signalCount = countDesignSignals(blob);
+  const signalCount = countDesignSignals(required);
 
-  if (!inTitle && !inRequired && signalCount < 2) return undefined;
+  if (!inTitle && !inRequired && signalCount < 1) return undefined;
 
   const resume = normalizeText(resumeText ?? "");
   if (DESIGN_RESUME_EVIDENCE.test(resume)) return undefined;
@@ -210,7 +219,9 @@ export const detectDesignFigmaSpecializationGap = (
   const severity = resolveSeverity({
     inTitle,
     inRequired,
-    inPreferred: DESIGN_JD_SIGNALS.test(preferredBlob(job)),
+    inPreferred: DESIGN_JD_SIGNALS.test(
+      normalizeText([...(job.preferredSkills ?? []), ...tagsAtLeastStrength(job, "PREFERRED").map((t) => t.term)].join("\n")),
+    ),
     candidateHasAdjacent: false,
     signalCount,
   });
@@ -220,7 +231,7 @@ export const detectDesignFigmaSpecializationGap = (
     name: "design/Figma",
     evidence: inTitle
       ? "Design/Figma pillar named in title and required qualifications"
-      : "Figma and design-craft requirements in JD; no design portfolio evidence on resume",
+      : "Explicit design-tool or portfolio requirements in JD; no design portfolio evidence on resume",
     severity,
     lever: "portfolio",
     jdSide: "design/Figma",

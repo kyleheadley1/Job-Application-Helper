@@ -87,6 +87,70 @@ describe("riskDisplaySanitizer", () => {
     expect(mainRisk.toLowerCase()).not.toContain("go");
     expect(mainRisk.toLowerCase()).not.toContain("kubernetes");
   });
+
+  it("strips Go from key-risk prose when JD never mentions Go", () => {
+    const extracted: ExtractedJobData = {
+      company: "Fleetio",
+      title: "Software Engineer, Marketplace",
+      stack: ["React", "TypeScript", "Ruby on Rails"],
+      requiredSkills: ["React", "TypeScript", "Ruby on Rails"],
+      preferredSkills: [],
+      domainTags: [],
+      responsibilities: [],
+      requirements: [
+        "2+ years experience with Ruby on Rails, React, and/or Typescript",
+      ],
+      rawText:
+        "Qualifications\n2+ years experience with Ruby on Rails, React, and/or Typescript\nWho You Are\nA passion for good design and delightful UX.",
+    };
+    const out = sanitizeVisibleRiskLine(
+      "The role lists Rails and Go as common stack components.",
+      {
+        extracted,
+        userProfile,
+        rules: baseRules(),
+      },
+    );
+    expect(out.toLowerCase()).toContain("rails");
+    expect(out.toLowerCase()).not.toMatch(/\bgo\b/);
+  });
+
+  it("drops Rails gap risk when disjunctive and/or requirement is already satisfied", () => {
+    const extracted: ExtractedJobData = {
+      company: "Fleetio",
+      title: "Software Engineer, Marketplace",
+      stack: ["React", "TypeScript", "Ruby on Rails"],
+      requiredSkills: ["React", "TypeScript"],
+      preferredSkills: [],
+      domainTags: [],
+      responsibilities: [],
+      requirements: [
+        "2+ years experience with Ruby on Rails, React, and/or Typescript",
+      ],
+      rawText:
+        "Qualifications\n2+ years experience with Ruby on Rails, React, and/or Typescript",
+    };
+    const rules: RuleEvaluation = {
+      ...baseRules(),
+      disjunctiveLanguageRequirementSatisfied: true,
+      disjunctiveAcceptedLanguages: ["Ruby on Rails", "React", "TypeScript"],
+    };
+    const line =
+      "No demonstrated Ruby on Rails experience (role lists RoR as a primary accepted language).";
+    expect(
+      sanitizeVisibleRiskLine(line, { extracted, userProfile, rules }).trim(),
+    ).toBe("");
+    const { mainRisk, risks } = polishRisksAndMain({
+      mainRisk: line,
+      risks: [],
+      extracted,
+      userProfile,
+      rules,
+      max: 3,
+    });
+    expect(mainRisk.trim()).toBe("");
+    expect(risks).toEqual([]);
+  });
 });
 
 describe("applyCharlieHealthProductCalibration", () => {

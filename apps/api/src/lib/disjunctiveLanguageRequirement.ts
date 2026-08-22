@@ -1,4 +1,5 @@
 import type { ExtractedJobData } from "../types/job.js";
+import type { RuleEvaluation } from "../types/scoring.js";
 import type { ClaimableStack } from "./claimableStack.js";
 import { hasClaimableCoverage } from "./claimableStack.js";
 import { GO_LANGUAGE_PATTERNS } from "./goLanguage.js";
@@ -28,6 +29,24 @@ const DISJUNCTIVE_LANGUAGE_CATALOG: Array<{
     label: "TypeScript",
     claimableIds: ["typescript", "javascript", "nodejs"],
     patterns: [/\btype\s*script\b/i, /\bts\b/i],
+  },
+  {
+    id: "react",
+    label: "React",
+    claimableIds: ["react", "typescript", "javascript"],
+    patterns: [/\breact(?:\.js)?\b/i],
+  },
+  {
+    id: "vue",
+    label: "Vue",
+    claimableIds: ["vue", "react", "typescript", "javascript"],
+    patterns: [/\bvue(?:\.js)?\b/i, /\bnuxt\b/i],
+  },
+  {
+    id: "rails",
+    label: "Ruby on Rails",
+    claimableIds: ["ruby"],
+    patterns: [/\bruby\s+on\s+rails\b/i, /\brails\b/i],
   },
   {
     id: "python",
@@ -80,7 +99,7 @@ const DISJUNCTIVE_LANGUAGE_CATALOG: Array<{
 ];
 
 const DISJUNCTIVE_FRAMING =
-  /\b(at least\s+(?:one|\d+|1)\b|one of|any of|such as|e\.g\.|including|among|from the following|proficiency in at least)\b/i;
+  /\b(and\s*\/\s*or|,\s*or\b|at least\s+(?:one|\d+|1)\b|one of|any of|one or more of|such as|e\.g\.|including|among|from the following|proficiency in at least|experience with any of|familiarity with one or more of)\b/i;
 
 const EXCLUSIVE_REQUIREMENT =
   /\b(must have|required|professional experience with|strong proficiency in|primary language is|our (?:main|primary) (?:backend )?language)\b/i;
@@ -104,6 +123,25 @@ const jobBlob = (job: ExtractedJobData): string =>
     ].join("\n"),
   );
 
+const requirementLinesForDisjunctive = (job: ExtractedJobData): string[] => {
+  const lines: string[] = [];
+  for (const req of job.requirements ?? []) {
+    const t = req.trim();
+    if (t) lines.push(t);
+  }
+  for (const skill of job.requiredSkills ?? []) {
+    const t = skill.trim();
+    if (t && !lines.includes(t)) lines.push(t);
+  }
+  for (const line of (job.rawText ?? "").split(/\r?\n/)) {
+    const t = line.trim();
+    if (t && DISJUNCTIVE_FRAMING.test(t) && !lines.some((l) => l === t)) {
+      lines.push(t);
+    }
+  }
+  return lines;
+};
+
 /** Extract spans that look like disjunctive language requirement lists. */
 export const extractDisjunctiveLanguageSpans = (blob: string): string[] => {
   const spans: string[] = [];
@@ -112,7 +150,7 @@ export const extractDisjunctiveLanguageSpans = (blob: string): string[] => {
   );
   if (parenLists) spans.push(...parenLists);
 
-  for (const line of blob.split("\n")) {
+  for (const line of blob.split(/\n/)) {
     if (DISJUNCTIVE_FRAMING.test(line)) spans.push(line);
   }
 
@@ -145,8 +183,7 @@ export const evaluateDisjunctiveLanguageRequirement = (
   job: ExtractedJobData,
   claimable: ClaimableStack,
 ): DisjunctiveLanguageEval => {
-  const blob = jobBlob(job);
-  const spans = extractDisjunctiveLanguageSpans(blob);
+  const spans = requirementLinesForDisjunctive(job);
 
   let bestAccepted: string[] = [];
 
@@ -154,8 +191,7 @@ export const evaluateDisjunctiveLanguageRequirement = (
     const langs = languagesInSpan(span);
     const isDisjunctive =
       DISJUNCTIVE_FRAMING.test(span) ||
-      langs.length >= 2 ||
-      /\b(server[-\s]?side|web technology|web technologies)\b/i.test(span);
+      (/\bor\b/i.test(span) && langs.length >= 2);
 
     if (!isDisjunctive || langs.length < 2) continue;
 
@@ -191,6 +227,18 @@ export const isExclusiveCoreLanguageRequirement = (blob: string, languageLabel: 
   return EXCLUSIVE_REQUIREMENT.test(blob) && !DISJUNCTIVE_FRAMING.test(blob) && languagesInSpan(blob).length <= 1;
 };
 
+
+/** True when a requirement line uses and/or (or similar) and candidate matches ≥1 listed stack item. */
+export const lineDisjunctiveRequirementSatisfied = (
+  line: string,
+  claimable: ClaimableStack,
+): boolean => {
+  if (!DISJUNCTIVE_FRAMING.test(line)) return false;
+  const langs = languagesInSpan(line);
+  if (langs.length < 2) return false;
+  return langs.some((l) => candidateCoversLanguage(l, claimable));
+};
+
 /** Remove stack gaps that only arise from a satisfied disjunctive accepted set. */
 export const filterGapsAfterDisjunctiveMatch = (
   coreLanguageGap: string[],
@@ -210,3 +258,56 @@ export const filterOutOfLaneAfterDisjunctiveMatch = (
   const accepted = new Set(disjunctive.acceptedLabels.map((l) => l.toLowerCase()));
   return labels.filter((l) => !accepted.has(l.toLowerCase()));
 };
+
+const DISJUNCTIVE_GAP_FRAMING =
+  /\b(no|without|lacks?|missing|not demonstrated|not listed|not in|unmet|gap|required core language|primary accepted|lists .{0,48} as (?:a )?(?:primary|required|common|accepted)|outside (?:the|your|claimable)|mismatch|weak(?:ness)?|limited|absent)\b/i;
+
+const DISJUNCTIVE_POSITIVE_FRAMING =
+  /\b(strong|solid|good|clear|align|match|overlap|proficiency in|demonstrated strength)\b/i;
+
+const labelPatternsForRisk = (label: string): RegExp[] => {
+  const entry = DISJUNCTIVE_LANGUAGE_CATALOG.find((l) => l.label === label);
+  if (entry) return entry.patterns;
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return [new RegExp(`\\b${escaped}\\b`, "i")];
+};
+
+/**
+ * True when prose treats a language from a satisfied disjunctive set as an unmet gap.
+ * Used to keep Key Risks aligned with stack-fit resolution (and/or = any-one satisfied).
+ */
+export const riskContradictsSatisfiedDisjunctiveRequirement = (
+  line: string,
+  rules: Pick<
+    RuleEvaluation,
+    "disjunctiveLanguageRequirementSatisfied" | "disjunctiveAcceptedLanguages"
+  >,
+): boolean => {
+  if (!rules.disjunctiveLanguageRequirementSatisfied) return false;
+  const accepted = rules.disjunctiveAcceptedLanguages ?? [];
+  if (accepted.length < 2) return false;
+
+  const t = line.trim();
+  if (!t) return false;
+
+  const mentionsAccepted = accepted.some((label) =>
+    labelPatternsForRisk(label).some((re) => re.test(t)),
+  );
+  if (!mentionsAccepted) return false;
+
+  if (DISJUNCTIVE_POSITIVE_FRAMING.test(t) && !DISJUNCTIVE_GAP_FRAMING.test(t)) {
+    return false;
+  }
+
+  return DISJUNCTIVE_GAP_FRAMING.test(t);
+};
+
+/** Drop risk/note lines that contradict a satisfied disjunctive language requirement. */
+export const filterDisjunctiveContradictingRiskLines = (
+  lines: string[],
+  rules: Pick<
+    RuleEvaluation,
+    "disjunctiveLanguageRequirementSatisfied" | "disjunctiveAcceptedLanguages"
+  >,
+): string[] =>
+  lines.filter((line) => !riskContradictsSatisfiedDisjunctiveRequirement(line, rules));

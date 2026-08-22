@@ -23,12 +23,19 @@ import { listMissingCriticalFields } from '../../tools/deterministicRawTextExtra
 import { resumeContextService } from '../../services/resume/resumeContext.js';
 import { logger } from '../../lib/logger.js';
 import { withSanitizedRuleNotes } from '../../lib/riskDisplaySanitizer.js';
+import {
+  canReuseStoredScoringCategories,
+  jdTextHashFromInput,
+} from '../../lib/jdTextHash.js';
+import { storedCategoryScores } from '../../lib/recomputeStoredJobScore.js';
 
 export const triageJob = async (input: {
   url?: string;
   rawText?: string;
   companyHint?: string;
   fullPrep?: boolean;
+  /** When re-triaging, pass the prior job to reuse stored LLM scores if JD text is unchanged. */
+  retriageFrom?: JobRecord;
 }): Promise<JobRecord> => {
   const t0 = Date.now();
   const stageMs = {
@@ -49,6 +56,26 @@ export const triageJob = async (input: {
     ? parseJobText(mergedText).normalized
     : undefined;
   stageMs.fetchAndParse = Date.now() - fetchStart;
+
+  const currentJdTextHash = jdTextHashFromInput({
+    rawText: input.rawText,
+    fetchedText,
+  });
+  const reuseStoredCategories = canReuseStoredScoringCategories({
+    currentJdTextHash,
+    previousJob: input.retriageFrom,
+  });
+  const preservedScoring = reuseStoredCategories && input.retriageFrom
+    ? {
+        categoryScores: storedCategoryScores(input.retriageFrom.score),
+        narrative: {
+          topMatch: input.retriageFrom.topMatch,
+          mainRisk: input.retriageFrom.mainRisk,
+          risks: input.retriageFrom.risks ?? [],
+          rationale: input.retriageFrom.rationale ?? [],
+        },
+      }
+    : undefined;
 
   const extractionStart = Date.now();
   const {
@@ -88,6 +115,7 @@ export const triageJob = async (input: {
     rules: scoredRules,
     scoringDiagnostics,
     scoringLlmSucceeded,
+    scoringCategoriesReused,
   } = await scoreJob({
     extracted,
     rules,
@@ -95,6 +123,7 @@ export const triageJob = async (input: {
     resumeContexts,
     resumeText: resumeTextForScore,
     preScoringMetadata,
+    preservedScoring,
   });
   stageMs.scoring = Date.now() - scoringStart;
   const resumeSelStart = Date.now();
@@ -183,6 +212,11 @@ export const triageJob = async (input: {
         recommendationLabel: RECOMMENDATION_LABELS[finalRecommendation],
       };
 
+  const scoringJdTextHash =
+    scoringLlmSucceeded && currentJdTextHash
+      ? currentJdTextHash
+      : input.retriageFrom?.scoringJdTextHash;
+
   const now = new Date().toISOString();
   const initialRecord: JobRecord = {
     id: randomUUID(),
@@ -200,6 +234,7 @@ export const triageJob = async (input: {
     rationale: scored.rationale,
     risks: scored.risks,
     generated: {},
+    scoringJdTextHash,
     debugExtraction: {
       fallbackUsed: !llmExtractionSucceeded,
       extraction: {
@@ -220,7 +255,9 @@ export const triageJob = async (input: {
         errorType: scoringDiagnostics.errorType,
         errorMessage: scoringDiagnostics.errorMessage,
         parseStage: scoringDiagnostics.parseStage,
-        reason: scoringDiagnostics.reason,
+        reason: scoringCategoriesReused
+          ? 'jd_text_hash_unchanged_reused_categories'
+          : scoringDiagnostics.reason,
       },
       extractedFromRawText: heuristicInferredFields,
       missingCriticalFields: listMissingCriticalFields(extracted),
@@ -270,6 +307,7 @@ export const triageJob = async (input: {
     hasRawTextInput: Boolean(input.rawText?.trim()),
     extractionLlmSucceeded: llmExtractionSucceeded,
     scoringLlmSucceeded,
+    scoringCategoriesReused: Boolean(scoringCategoriesReused),
   });
   return {
     ...initialRecord,

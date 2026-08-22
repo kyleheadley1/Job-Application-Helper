@@ -150,6 +150,7 @@ describe("jobsService.runRetriage", () => {
       expect.objectContaining({
         rawText: "Build internal AI tools with Claude Code.",
         companyHint: "Acme",
+        retriageFrom: expect.objectContaining({ id: "draft-1" }),
       }),
     );
   });
