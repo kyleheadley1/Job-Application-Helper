@@ -389,6 +389,26 @@ tbody .tracker-sticky-left {
   gap: 0.35rem;
 }
 
+.tracker-company-primary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.tracker-role-subtitle {
+  display: block;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  color: #9aa4b2;
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tracker-row-dot {
   width: 0.52rem;
   height: 0.52rem;

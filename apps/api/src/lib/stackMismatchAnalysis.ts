@@ -37,6 +37,7 @@ const TECH_TOKENS: TechToken[] = [
   { id: "ruby", label: "Ruby", family: "ruby", kind: "core_language", patterns: [/\bruby\b/i, /\brails\b/i] },
   { id: "csharp", label: "C#/.NET", family: "csharp", kind: "core_language", patterns: [/\bc#\b/i, /\bcsharp\b/i, /\.net\b/i] },
   { id: "cpp", label: "C/C++", family: "cpp", kind: "core_language", patterns: [/\bc\+\+\b/i, /\bc\/c\+\+\b/i] },
+  { id: "rust", label: "Rust", family: "rust", kind: "core_language", patterns: [/\brust\b/i] },
   { id: "salesforce", label: "Salesforce/Apex", family: "salesforce", kind: "core_language", patterns: [/\bsalesforce\b/i, /\bapex\b/i] },
   { id: "brightspot", label: "BrightSpot", family: "brightspot", kind: "core_language", patterns: [/\bbrightspot\b/i] },
   { id: "swift", label: "Swift", family: "mobile", kind: "core_language", patterns: [/\bswift\b/i] },
@@ -48,7 +49,12 @@ const TECH_TOKENS: TechToken[] = [
   { id: "react", label: "React", family: "javascript", kind: "framework", claimableId: "react", patterns: [/\breact\b/i] },
   { id: "nodejs", label: "Node.js", family: "javascript", kind: "framework", claimableId: "nodejs", patterns: [/\bnode(?:\.js)?\b/i] },
   { id: "python", label: "Python", family: "python", kind: "core_language", claimableId: "python", patterns: [/\bpython\b/i] },
+  { id: "terraform", label: "Terraform", family: "infra", kind: "framework", patterns: [/\bterraform\b/i] },
+  { id: "redis", label: "Redis", family: "infra", kind: "framework", patterns: [/\bredis\b/i] },
+  { id: "kubernetes", label: "Kubernetes", family: "infra", kind: "framework", patterns: [/\bkubernetes\b/i, /\bk8s\b/i] },
 ];
+
+const INFRA_CORE_STACK_IDS = new Set(["terraform", "redis", "kubernetes"]);
 
 const isSoftContext = (context: string): boolean => SOFT_SKILL_FRAMING.test(context);
 
@@ -68,13 +74,16 @@ const extractRequiredSkillLines = (job: ExtractedJobData): string[] => {
   for (const req of job.requirements ?? []) {
     if (req.trim() && !isSoftContext(req)) lines.push(req.trim());
   }
-  const requiredBlob = normalizeText([...(job.requiredSkills ?? []), ...(job.requirements ?? [])].join(" "));
+  // JD stack section is an authoritative core-tech list — count even when not
+  // echoed verbatim in Requirements bullets (Bubble Scaling / platform roles).
   for (const stack of job.stack ?? []) {
-    const token = normalizeText(stack);
-    if (stack.trim() && requiredBlob.includes(token)) lines.push(stack.trim());
+    if (stack.trim()) lines.push(stack.trim());
   }
   return [...new Set(lines)];
 };
+
+const lineFromJdStackArray = (line: string, job: ExtractedJobData): boolean =>
+  (job.stack ?? []).some((s) => normalizeText(s) === normalizeText(line));
 
 const lineIsRequired = (line: string, job: ExtractedJobData): boolean => {
   const norm = normalizeText(line);
@@ -149,7 +158,9 @@ export const analyzeStackMismatch = (
   job: ExtractedJobData,
   claimable: ClaimableStack,
 ): StackMismatchAnalysis => {
-  const requiredLines = extractRequiredSkillLines(job).filter((line) => lineIsRequired(line, job));
+  const requiredLines = extractRequiredSkillLines(job).filter(
+    (line) => lineFromJdStackArray(line, job) || lineIsRequired(line, job),
+  );
   const qualificationBullets = (job.requirements ?? []).filter((r) => !isSoftContext(r)).slice(0, 2);
   const blob = normalizeText(
     [job.title, job.rawText, ...requiredLines, ...(job.requirements ?? [])].join("\n"),
@@ -170,16 +181,27 @@ export const analyzeStackMismatch = (
       if (token.id === "python" && pythonFlexible) continue;
 
       if (token.kind === "core_language") {
-        if (!isCoreLanguageRequirement(token, line, i)) continue;
+        if (!isCoreLanguageRequirement(token, line, i) && !lineFromJdStackArray(line, job)) continue;
         if (jsFrameworkFlexible && token.family === "javascript") continue;
         coreLanguageGaps.push(token.label);
         continue;
       }
 
       if (token.kind === "framework") {
-        if (!isCoreFrameworkRequirement(token, line, i)) continue;
+        const fromStack = lineFromJdStackArray(line, job);
+        if (!isCoreFrameworkRequirement(token, line, i) && !fromStack) continue;
         if (token.claimableId && hasClaimableCoverage(claimable, token.claimableId)) continue;
+        // Core infra stack chips (Terraform/Redis/K8s) listed on the JD stack → tier-1 gap.
+        if (INFRA_CORE_STACK_IDS.has(token.id) && (fromStack || isCoreFrameworkRequirement(token, line, i))) {
+          coreLanguageGaps.push(token.label);
+          continue;
+        }
         if (token.family === "javascript" && candidateCoversFamily("javascript", claimable)) {
+          adjacentFrameworkGaps.push(token.label);
+        } else if (token.family !== "javascript" && !token.claimableId) {
+          // Non-JS framework with no claimable path and required/stack grounding.
+          coreLanguageGaps.push(token.label);
+        } else if (token.family === "javascript" && !candidateCoversFamily("javascript", claimable)) {
           adjacentFrameworkGaps.push(token.label);
         }
       }
@@ -201,11 +223,25 @@ export const analyzeStackMismatch = (
     }
   }
 
-  const uniqueCore = filterGapsAfterDisjunctiveMatch(
+  const uniqueCoreRaw = filterGapsAfterDisjunctiveMatch(
     [...new Set(coreLanguageGaps)],
     evaluateDisjunctiveLanguageRequirement(job, claimable),
   );
-  const jdValidatedCore = filterLanguagesToJdPresence(uniqueCore, job);
+  // Language gaps must appear in JD language set; infra stack chips must appear in JD text/stack.
+  const jdValidatedCore = uniqueCoreRaw.filter((label) => {
+    if (/^(Terraform|Redis|Kubernetes)$/i.test(label)) {
+      const blob = normalizeText(
+        [...(job.stack ?? []), ...(job.requiredSkills ?? []), ...(job.requirements ?? []), job.rawText ?? ""].join(
+          "\n",
+        ),
+      );
+      if (/terraform/i.test(label)) return /\bterraform\b/i.test(blob);
+      if (/redis/i.test(label)) return /\bredis\b/i.test(blob);
+      if (/kubernetes/i.test(label)) return /\bkubernetes\b|\bk8s\b/i.test(blob);
+      return false;
+    }
+    return filterLanguagesToJdPresence([label], job).includes(label);
+  });
   const uniqueAdjacent = [...new Set(adjacentFrameworkGaps)].filter(
     (label) => !jdValidatedCore.includes(label),
   );

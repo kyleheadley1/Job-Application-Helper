@@ -1,0 +1,59 @@
+{
+  "id": "bubble-software-engineer-2-scaling",
+  "anchorNote": "Bubble Software Engineer 2, Scaling — core stack Rust/Terraform/Redis/distributed systems absent from profile; production-scale infra/observability/on-call ownership. Key Risks and Survivability Penalties must agree; stackFit must reflect multi-item core stack gap (not ~30/35).",
+  "extracted": {
+    "company": "Bubble",
+    "companyDisplayName": "Bubble",
+    "title": "Software Engineer 2, Scaling",
+    "location": "New York, NY",
+    "remoteType": "hybrid",
+    "seniority": "Mid Level",
+    "yearsExperience": { "raw": "2+ years", "min": 2 },
+    "companyEmployeeCount": 200,
+    "stack": [
+      "Rust",
+      "Node.js",
+      "TypeScript",
+      "PostgreSQL",
+      "Terraform",
+      "AWS",
+      "Redis",
+      "TimescaleDB",
+      "Distributed systems"
+    ],
+    "requiredSkills": [
+      "Rust",
+      "Node.js",
+      "TypeScript",
+      "Terraform",
+      "Redis",
+      "distributed systems",
+      "observability",
+      "on-call"
+    ],
+    "preferredSkills": [],
+    "domainTags": ["saas", "infrastructure", "scaling"],
+    "responsibilities": [
+      "Build and operate production-scale backend infrastructure for the Scaling team",
+      "Design observability across core services and define SLOs",
+      "Participate in triage and on-call to diagnose and resolve production issues",
+      "Scale cloud infrastructure using Terraform and TypeScript on AWS"
+    ],
+    "requirements": [
+      "Hands-on experience with scalable distributed systems",
+      "Proficiency with Rust, Node.js, and Terraform",
+      "Experience with Redis and production data tiers",
+      "Commitment to on-call ownership and production reliability"
+    ],
+    "rawText": "Bubble\nSoftware Engineer 2, Scaling\nNew York, NY\nHybrid\nAbout the Scaling team\nYou'll focus on scaling, reliability, and infrastructure.\nResponsibilities\nBuild production-scale backend infrastructure\nDesign observability across core services and define SLOs\nParticipate in triage and on-call to diagnose and resolve issues\nScale cloud infrastructure using Terraform and TypeScript\nBasic Qualifications\nHands-on experience with scalable distributed systems\nProficiency with Rust, Node.js, and Terraform\nExperience with Redis and production data tiers\nCommitment to on-call ownership and production reliability\nTech stack\nRust, Node.js, TypeScript, PostgreSQL, Terraform, AWS, Redis, TimescaleDB, Distributed systems"
+  },
+  "storedCategoryScores": {
+    "stackFit": 17,
+    "levelFit": 14,
+    "domainFit": 7,
+    "resumeStoryClarity": 9,
+    "functionalOverlap": 11,
+    "recruiterFriendliness": 11,
+    "careerValue": 7
+  }
+}

@@ -66,6 +66,8 @@ export const userProfile: UserProfile = {
     "Treat explicit citizenship/clearance/degree gates as meaningful",
     "Bias toward landability realism over theoretical capability",
   ],
+  /** ~1.5–2 yrs across Nooxit + OSLabs + residency shipping (early-career). */
+  estimatedProfessionalYears: 1.75,
   requiresSponsorship: false,
   citizenshipStatus: {
     isUSCitizen: true,

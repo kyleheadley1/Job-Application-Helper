@@ -55,12 +55,15 @@ export const recomputeStoredJobScore = (params: {
     evaluateRules(job.extracted, profile, { resumeContexts, activeResumeType }),
     job.extracted,
     profile,
+    resumeText,
   );
 
   const clamped = applyScoringClampLayer({
     score: storedCategoryScores(job.score),
     extracted: job.extracted,
     rules,
+    profile,
+    resumeText,
   });
 
   const capabilityGap = detectCapabilityGap(job.extracted, clamped.score, resumeText);

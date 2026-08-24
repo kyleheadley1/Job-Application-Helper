@@ -1,6 +1,5 @@
 import type { ExtractedJobData } from "../types/job.js";
 import { resolveEmployerScale } from "./employerScale.js";
-import { jdDutiesBlob } from "./jdGroundedRiskNotes.js";
 import {
   isEarlyCareerStructuredLevel,
   resolveStructuredSeniorityLevel,
@@ -19,6 +18,8 @@ export type TitleResponsibilityMismatchEval = {
   hasSupportStructure: boolean;
   earlyStageOrg: boolean;
   highOwnershipLowSupport: boolean;
+  /** Managed / supported team structure (reporting line, XFN team) — not mere mentorship words. */
+  hasManagedTeamStructure: boolean;
   /** Canonical Key Risk line when mismatch is true. */
   mismatchRiskNote?: string;
   /** Canonical Key Risk / survivability note when highOwnershipLowSupport is true. */
@@ -29,19 +30,55 @@ const INDUSTRY_SENIOR_TITLE_RE =
   /\b(forward\s+deployed(?:\s+engineer)?|founding(?:\s+full[-\s]?stack)?\s+engineer|staff(?:\s+engineer)?|principal(?:\s+engineer)?|distinguished(?:\s+engineer)?|engineering\s+manager|tech\s+lead|team\s+lead)\b/i;
 
 const TITLE_EARLY_RE =
-  /\b(junior|associate|entry[-\s]?level|intern|new\s+grad|i\b|1\b)\b/i;
+  /\b(junior|associate|entry[-\s]?level|intern|new\s+grad)\b/i;
 
+/** Title modifiers only — not imperative "Lead features…" in responsibilities. */
 const TITLE_SENIOR_MODIFIER_RE =
-  /\b(senior|sr\.?|staff|principal|lead)\b/i;
+  /\b(senior|sr\.?|staff|principal)\b/i;
 
-const HIGH_AUTONOMY_RE =
-  /\b(you\s+decide\s+what\s+done\s+means|own\s+deployments?\s+end\s+to\s+end|own(?:s|\s+the)?\s+(?:the\s+)?(?:deployments?|cutovers?|migrations?|function|roadmap|technical\s+direction)|define\s+how\s+this\s+function\s+works|no\s+margin\s+for\s+error|full\s+autonomy|end[-\s]?to[-\s]?end\s+ownership|live[-\s]?migration|production\s+cutovers?|decide\s+what\s+done\s+means)\b/i;
+/**
+ * Total / unsupervised ownership — August Law class.
+ * Does NOT include feature-level "lead/own X from design to production" inside a managed team.
+ */
+const TOTAL_UNSUPERVISED_OWNERSHIP_RE =
+  /\b(you\s+decide\s+what\s+done\s+means|decide\s+what\s+done\s+means|own\s+deployments?\s+end\s+to\s+end|own(?:s|\s+the)?\s+(?:the\s+)?(?:deployments?|cutovers?|migrations?|function|roadmap|technical\s+direction)|define\s+how\s+this\s+function\s+works|no\s+margin\s+for\s+error|full\s+autonomy|zero\s*[-–to]+\s*one|0\s*[-–to]+\s*1|live[-\s]?migration|production\s+cutovers?|build\s+from\s+scratch\s+with\s+no\s+support)\b/i;
 
-const SUPPORT_STRUCTURE_RE =
+const FOUNDING_ZERO_TO_ONE_RE =
+  /\b(founding(?:\s+engineer)?|zero\s*[-–to]+\s*one|0\s*[-–to]+\s*1|first\s+engineer|1st\s+engineer)\b/i;
+
+/** Mentorship / ramp language. */
+const MENTORSHIP_SUPPORT_RE =
   /\b(mentor(?:ship|ed|ing)?|onboarding|ramp(?:\s+up)?|buddy\s+system|pair(?:ed|\s+with)|close\s+supervision|structured\s+training|new\s+grad\s+program|junior[-\s]?friendly|learning\s+environment|coaching)\b/i;
+
+/** Explicit reporting line or named supporting / cross-functional team. */
+const REPORTING_LINE_RE =
+  /\b(report(?:s|ing)?\s+to\s+(?:the\s+)?(?:engineering\s+)?manager|reports?\s+to\s+[A-Z][a-z]+|managed\s+by|works?\s+under\s+(?:the\s+)?(?:guidance|direction)\s+of)\b/i;
+
+const CROSS_FUNCTIONAL_TEAM_RE =
+  /\b(cross[-\s]?functional|work(?:s|ing)?\s+with\s+(?:a\s+)?(?:cross[-\s]?functional\s+)?(?:team|partners?)|collaborat(?:e|es|ing)\s+with\s+(?:product|design|qa|pm|engineering)|(?:qa|quality\s+assurance|design(?:ers)?|product\s+managers?|pms?|native\s+mobile|data\s+(?:team|engineers?|scientists?)|backend|frontend)\b[^.\n]{0,80}\b(?:and|,)\b[^.\n]{0,60}\b(?:qa|design|product|pm|mobile|data|engineers?)\b)/i;
+
+const NAMED_TEAM_ROSTER_RE =
+  /\b(qa|design(?:ers)?|product\s+managers?|\bpms?\b|native\s+mobile|data\s+team|engineering\s+manager)\b/i;
 
 const SEVERITY_EARLY_CAREER_EXCEED_RE =
   /\b(may\s+exceed\s+typical\s+early[-\s]?career|beyond\s+entry[-\s]?level|senior[-\s]?level\s+ownership\s+expected|exceeds?\s+(?:typical\s+)?early[-\s]?career|too\s+senior\s+for|ownership\s+(?:bar|scope)\s+(?:likely\s+)?exceeds?|hands[-\s]?on\s+integrations?.{0,80}exceed)\b/i;
+
+/** Flat mid bar (2+/3+ years) without founding/zero-to-one framing. */
+const FLAT_YEARS_BAR_RE =
+  /\b(2\+|3\+|at\s+least\s+2|minimum\s+of\s+2|2\s*[-–]\s*\d+)\s*years?\b/i;
+
+const jobEvidenceBlob = (job: ExtractedJobData): string =>
+  normalizeText(
+    [
+      job.title,
+      ...(job.responsibilities ?? []),
+      ...(job.requirements ?? []),
+      ...(job.requiredSkills ?? []),
+      job.rawText ?? "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  );
 
 export const titleImpliedSeniorityBand = (title?: string | null): SeniorityBand => {
   const t = normalizeText(title ?? "");
@@ -52,34 +89,76 @@ export const titleImpliedSeniorityBand = (title?: string | null): SeniorityBand 
   return 1;
 };
 
+/**
+ * Managed-team / support structure: mentorship OR reporting line OR named XFN team.
+ * Feature ownership inside such a structure is mid-band, not unsupervised senior.
+ */
+export const jdHasManagedTeamStructure = (job: ExtractedJobData): boolean => {
+  const blob = jobEvidenceBlob(job);
+  if (MENTORSHIP_SUPPORT_RE.test(blob)) return true;
+  if (REPORTING_LINE_RE.test(blob)) return true;
+  if (CROSS_FUNCTIONAL_TEAM_RE.test(blob)) return true;
+  // Roster of supporting roles mentioned together with collaboration language.
+  if (
+    NAMED_TEAM_ROSTER_RE.test(blob) &&
+    /\b(collaborat|partner(?:s|ing)?\s+with|work(?:s|ing)?\s+(?:closely\s+)?with|cross[-\s]?functional)\b/i.test(
+      blob,
+    )
+  ) {
+    return true;
+  }
+  return false;
+};
+
+export const jdHasSupportStructureLanguage = (job: ExtractedJobData): boolean =>
+  jdHasManagedTeamStructure(job);
+
+export const jdHasTotalUnsupervisedOwnership = (job: ExtractedJobData): boolean => {
+  const blob = jobEvidenceBlob(job);
+  return TOTAL_UNSUPERVISED_OWNERSHIP_RE.test(blob) || FOUNDING_ZERO_TO_ONE_RE.test(blob);
+};
+
+/**
+ * Strong countervailing signals: managed team + flat years bar + no founding/zero-to-one.
+ * Suppresses mismatch for feature-level "lead/own" verbs.
+ */
+export const jdHasCountervailingStructureSignals = (job: ExtractedJobData): boolean => {
+  const blob = jobEvidenceBlob(job);
+  const managed = jdHasManagedTeamStructure(job);
+  if (!managed) return false;
+  if (FOUNDING_ZERO_TO_ONE_RE.test(blob) || TOTAL_UNSUPERVISED_OWNERSHIP_RE.test(blob)) {
+    return false;
+  }
+  const flatYears =
+    FLAT_YEARS_BAR_RE.test(blob) ||
+    (job.yearsExperience?.min != null &&
+      job.yearsExperience.min >= 2 &&
+      job.yearsExperience.min <= 4);
+  // Reporting line or XFN team alone is enough; flat years strengthens but isn't required
+  // when an explicit manager reporting line exists.
+  if (REPORTING_LINE_RE.test(blob) || CROSS_FUNCTIONAL_TEAM_RE.test(blob)) return true;
+  return flatYears && managed;
+};
+
 export const responsibilityImpliedSeniorityBand = (job: ExtractedJobData): SeniorityBand => {
-  const duties = jdDutiesBlob(job);
-  const raw = normalizeText(job.rawText ?? "");
-  const blob = `${duties}\n${raw}`;
+  const blob = jobEvidenceBlob(job);
   if (!blob.trim()) return 1;
 
-  if (SUPPORT_STRUCTURE_RE.test(blob) && !HIGH_AUTONOMY_RE.test(blob)) return 0;
+  const managed = jdHasManagedTeamStructure(job);
+  const unsupervised = jdHasTotalUnsupervisedOwnership(job);
 
-  const autonomyHits =
-    (blob.match(
-      /\b(own(?:s|\s+the)?|end[-\s]?to[-\s]?end|you\s+decide|full\s+autonomy|no\s+margin\s+for\s+error|live[-\s]?migration|production\s+cutovers?|define\s+how)\b/gi,
-    )?.length ?? 0);
+  // Feature-level lead/own inside a managed team → mid, not senior.
+  if (managed && !unsupervised) return 1;
 
-  if (HIGH_AUTONOMY_RE.test(blob) || autonomyHits >= 3) return 2;
-  if (autonomyHits >= 1 && !SUPPORT_STRUCTURE_RE.test(blob)) return 2;
+  if (unsupervised) return 2;
+
+  if (MENTORSHIP_SUPPORT_RE.test(blob)) return 0;
   if (/\b(collaborate|work\s+with|pair|mentor|guidance|support\s+from)\b/i.test(blob)) return 1;
   return 1;
 };
 
-export const jdHasSupportStructureLanguage = (job: ExtractedJobData): boolean => {
-  const blob = normalizeText(
-    [...(job.responsibilities ?? []), ...(job.requirements ?? []), job.rawText ?? ""].join("\n"),
-  );
-  return SUPPORT_STRUCTURE_RE.test(blob);
-};
-
 export const jdHasHighAutonomyLanguage = (job: ExtractedJobData): boolean =>
-  responsibilityImpliedSeniorityBand(job) >= 2;
+  jdHasTotalUnsupervisedOwnership(job);
 
 export const isEarlyStageHighOwnershipOrg = (job: ExtractedJobData): boolean => {
   const scale = resolveEmployerScale(job);
@@ -97,43 +176,77 @@ export const statedLevelIsEarlyCareer = (job: ExtractedJobData): boolean => {
   const level = resolveStructuredSeniorityLevel(job);
   if (level && isEarlyCareerStructuredLevel(level)) return true;
   const yearsMin = job.yearsExperience?.min;
-  if (yearsMin != null && yearsMin <= 2) return true;
+  // Flat 2+ years alone is a mid bar, not "early-career tagging" for mismatch purposes
+  // unless also junior/associate chrome.
+  if (yearsMin != null && yearsMin <= 1) return true;
   const blob = normalizeText([job.seniority, job.rawText ?? ""].filter(Boolean).join("\n"));
   return /\b(junior|entry[-\s]?level|associate|1[-\s]?2\s*years?|1\+\s*years?)\b/i.test(blob);
 };
 
 /**
  * Title vs responsibility consistency, plus stated junior/years conflicting with
- * senior title or high-autonomy responsibilities.
+ * senior title or unsupervised high-autonomy responsibilities.
+ *
+ * Countervailing managed-team structure suppresses feature-ownership false positives
+ * and keeps Level-fit mismatch aligned with high-ownership/low-support survivability.
  */
 export const evaluateTitleResponsibilitySeniority = (
   job: ExtractedJobData,
 ): TitleResponsibilityMismatchEval => {
   const titleBand = titleImpliedSeniorityBand(job.title);
+  const hasManagedTeamStructure = jdHasManagedTeamStructure(job);
+  const hasSupportStructure = hasManagedTeamStructure;
+  const countervailing = jdHasCountervailingStructureSignals(job);
+  const unsupervised = jdHasTotalUnsupervisedOwnership(job);
   const responsibilityBand = responsibilityImpliedSeniorityBand(job);
   const statedEarlyCareer = statedLevelIsEarlyCareer(job);
-  const highAutonomy = responsibilityBand >= 2;
-  const hasSupportStructure = jdHasSupportStructureLanguage(job);
+  const highAutonomy = unsupervised;
   const earlyStageOrg = isEarlyStageHighOwnershipOrg(job);
-
-  const bandDelta = Math.abs(titleBand - responsibilityBand);
-  const classicMismatch = bandDelta > 1;
-  const statedConflictsWithSeniorSignals =
-    statedEarlyCareer &&
-    Math.max(titleBand, responsibilityBand) >= 2 &&
-    !hasSupportStructure;
-
-  const mismatch = classicMismatch || statedConflictsWithSeniorSignals;
 
   const highOwnershipLowSupport =
     highAutonomy && !hasSupportStructure && earlyStageOrg;
 
+  const bandDelta = Math.abs(titleBand - responsibilityBand);
+  const classicMismatch =
+    bandDelta > 1 &&
+    // Only when the high band is real unsupervised ownership, not feature lead verbs.
+    (responsibilityBand < 2 || unsupervised) &&
+    !countervailing;
+
+  // Senior-coded title (FDE / founding) tagged junior — still a mismatch unless
+  // strong managed-team countervailing AND no unsupervised ownership language.
+  const seniorTitleTaggedEarly =
+    titleBand >= 2 &&
+    statedEarlyCareer &&
+    !countervailing &&
+    (unsupervised || !hasManagedTeamStructure);
+
+  // Associate/junior title + unsupervised ownership (Eulerity class).
+  const earlyTitleUnsupervisedOwnership =
+    titleBand <= 0 && unsupervised && !countervailing;
+
+  // Align with survivability: if support structure exists such that highOwnershipLowSupport
+  // would not fire, do not apply a full Level-fit mismatch from responsibility autonomy alone
+  // for unmodified mid titles.
+  const midTitleFeatureOwnershipOnly =
+    titleBand === 1 && !unsupervised && hasManagedTeamStructure;
+
+  let mismatch =
+    !midTitleFeatureOwnershipOnly &&
+    (classicMismatch || seniorTitleTaggedEarly || earlyTitleUnsupervisedOwnership);
+
+  // Final agreement gate: when managed structure is present and ownership is not
+  // unsupervised/total, never fire mismatch (NYT Reflections class).
+  if (countervailing && !unsupervised) {
+    mismatch = false;
+  }
+
   let mismatchRiskNote: string | undefined;
   if (mismatch) {
-    if (classicMismatch && titleBand <= 0 && responsibilityBand >= 2) {
+    if (earlyTitleUnsupervisedOwnership || (classicMismatch && titleBand <= 0 && responsibilityBand >= 2)) {
       mismatchRiskNote =
         "Title/responsibility mismatch — junior/associate title paired with senior-autonomy responsibilities (end-to-end ownership without stated support structure).";
-    } else if (titleBand >= 2 && statedEarlyCareer) {
+    } else if (seniorTitleTaggedEarly || (titleBand >= 2 && statedEarlyCareer)) {
       mismatchRiskNote =
         "Title/responsibility mismatch — title reads as high-autonomy/senior (e.g. Forward Deployed / founding-style) while the listing is tagged junior or 1–2 years; responsibilities confirm ownership beyond early-career ramp.";
     } else {
@@ -155,6 +268,7 @@ export const evaluateTitleResponsibilitySeniority = (
     hasSupportStructure,
     earlyStageOrg,
     highOwnershipLowSupport,
+    hasManagedTeamStructure,
     mismatchRiskNote,
     highOwnershipLowSupportNote,
   };

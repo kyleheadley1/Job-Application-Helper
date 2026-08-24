@@ -459,6 +459,7 @@ export function polishRisksAndMain(params: {
   max?: number;
   rules?: RuleEvaluation;
   userProfile?: UserProfile;
+  resumeRawText?: string;
 }): { mainRisk: string; risks: string[] } {
   const jdBlob = jobTextBlob(params.extracted);
   const max = params.max ?? 3;
@@ -484,6 +485,18 @@ export function polishRisksAndMain(params: {
     /high ownership,\s*low support/i.test(n),
   );
   for (const n of highOwnNotes) {
+    if (!rawList.some((r) => similarSentence(r, n))) rawList.push(n);
+  }
+  const reinforcedNotes = (params.rules?.notes ?? []).filter((n) =>
+    /experience bar is restated across/i.test(n),
+  );
+  for (const n of reinforcedNotes) {
+    if (!rawList.some((r) => similarSentence(r, n))) rawList.push(n);
+  }
+  const infraOwnNotes = (params.rules?.notes ?? []).filter((n) =>
+    /limited hands-on production-scale/i.test(n),
+  );
+  for (const n of infraOwnNotes) {
     if (!rawList.some((r) => similarSentence(r, n))) rawList.push(n);
   }
   const suggestOwnershipRisk =
@@ -513,6 +526,7 @@ export function polishRisksAndMain(params: {
     extracted: params.extracted,
     userProfile: params.userProfile,
     rules: params.rules,
+    resumeRawText: params.resumeRawText,
   };
   const mainSan = sanitizeVisibleRiskLine(top[0] ?? fallbackMain, ctx);
   const restSan = (top.length > 1 ? top.slice(1) : []).map((r) => sanitizeVisibleRiskLine(r, ctx));
@@ -1750,18 +1764,22 @@ export function polishScoringNarrative(params: {
   extracted: ExtractedJobData;
   userProfile: UserProfile;
   rules: RuleEvaluation;
+  resumeRawText?: string;
 }): ScoringNarrative {
   const travelLine = travelRiskLine(jobTextBlob(params.extracted));
   const visibleCtx: VisibleSanitizeContext = {
     extracted: params.extracted,
     userProfile: params.userProfile,
     rules: params.rules,
+    resumeRawText: params.resumeRawText,
   };
   const riskMax =
     params.rules.credentialHeavyFintechAlgorithm ||
     params.rules.goDistributedDataInfraCandidateGap ||
     params.rules.titleResponsibilityMismatch ||
-    params.rules.highOwnershipLowSupport
+    params.rules.highOwnershipLowSupport ||
+    params.rules.reinforcedExperienceFloor ||
+    params.rules.productionInfraOwnershipGap
       ? 3
       : 2;
   const { mainRisk, risks } = polishRisksAndMain({
@@ -1772,6 +1790,7 @@ export function polishScoringNarrative(params: {
     max: riskMax,
     rules: params.rules,
     userProfile: params.userProfile,
+    resumeRawText: params.resumeRawText,
   });
 
   // Bug 1: severity-flagged Key Risk prose must dock Level fit — not leave Strong Yes intact.

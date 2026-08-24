@@ -78,6 +78,8 @@ export type RuleEvaluation = {
   foundingEngineerStretch?: boolean;
   titleResponsibilityMismatch?: boolean;
   highOwnershipLowSupport?: boolean;
+  reinforcedExperienceFloor?: boolean;
+  productionInfraOwnershipGap?: boolean;
   earlyCareerExceedSeverityRisk?: boolean;
   scoringRiskScoreInconsistency?: boolean;
   credentialHeavyFintechAlgorithm?: boolean;

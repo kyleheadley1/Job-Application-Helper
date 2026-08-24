@@ -59,6 +59,8 @@ export const CALIBRATION_FIXTURES = {
   bisectHostingWebDeveloper: "bisectHostingWebDeveloper.json",
   augustLawForwardDeployed: "augustLawForwardDeployed.json",
   eulerityTitleResponsibilityMismatch: "eulerityTitleResponsibilityMismatch.json",
+  nytReflectionsSupportedFeatureOwnership: "nytReflectionsSupportedFeatureOwnership.json",
+  bubbleSoftwareEngineer2Scaling: "bubbleSoftwareEngineer2Scaling.json",
 } as const;
 
 export type CalibrationFixtureKey = keyof typeof CALIBRATION_FIXTURES;
