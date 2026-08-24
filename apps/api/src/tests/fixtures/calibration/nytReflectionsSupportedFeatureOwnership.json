@@ -1,0 +1,52 @@
+{
+  "id": "nyt-reflections-supported-feature-ownership",
+  "anchorNote": "GUARD — NYT Software Engineer, Reflections: unmodified title, managed XFN team, Preferred-only K8s/CI/CD (not Required stretch), reinforced 2+ years across 8 Basic Qualification lines. Must NOT fire title/responsibility mismatch; Preferred K8s/CI/CD must not appear as significant DevOps stretch; must fire reinforced experience-floor Key Risk + Level-fit dock.",
+  "extracted": {
+    "company": "The New York Times",
+    "companyDisplayName": "The New York Times",
+    "title": "Software Engineer, Reflections",
+    "location": "New York, NY",
+    "remoteType": "hybrid",
+    "seniority": "Mid Level",
+    "yearsExperience": { "raw": "2+ years", "min": 2, "reinforcedLineCount": 8 },
+    "companyEmployeeCount": 10001,
+    "stack": ["TypeScript", "React", "Node.js"],
+    "requiredSkills": ["TypeScript", "React", "JavaScript", "Node.js"],
+    "preferredSkills": ["Kubernetes", "Docker", "CI/CD", "Drone", "Jenkins"],
+    "domainTags": ["news", "media", "publishing"],
+    "skillTags": [
+      { "term": "TypeScript", "sourceQuote": "2+ years of professional experience with modern JavaScript technologies, including React, Node.js, TypeScript", "strength": "REQUIRED" },
+      { "term": "React", "sourceQuote": "2+ years of professional experience with modern JavaScript technologies, including React", "strength": "REQUIRED" },
+      { "term": "Kubernetes", "sourceQuote": "Familiarity with containers and container orchestration systems like Kubernetes, Docker.", "strength": "PREFERRED" },
+      { "term": "Docker", "sourceQuote": "Familiarity with containers and container orchestration systems like Kubernetes, Docker.", "strength": "PREFERRED" },
+      { "term": "CI/CD", "sourceQuote": "Experience with DevOps practices, including CI/CD techniques and tooling (e.g. Drone, Jenkins)", "strength": "PREFERRED" }
+    ],
+    "responsibilities": [
+      "Lead full-stack feature development from design to production",
+      "Report to the Engineering Manager on the Reflections team",
+      "Collaborate with a cross-functional team including QA, design, product managers, native mobile, and data",
+      "Participate in the team's on-call rotation",
+      "Ship reader-facing product improvements with shared ownership across the team"
+    ],
+    "requirements": [
+      "2+ years of experience owning features end-to-end from design through production",
+      "2+ years of experience unblocking teammates and driving technical decisions",
+      "2+ years of experience partnering with cross-functional stakeholders",
+      "2+ years of professional experience with modern JavaScript technologies, including React, Node.js, TypeScript, JavaScript, HTML, and CSS",
+      "2+ years of experience building backend services and working with technologies such as Go, Node.js/Express, GraphQL, and cloud platforms (GCP or AWS)",
+      "2+ years of experience working with data persistence technologies, including relational and/or document databases",
+      "2+ years of experience troubleshooting, debugging, and resolving issues in production environments",
+      "2+ years of experience collaborating with product, design, and QA partners"
+    ],
+    "rawText": "The New York Times\nSoftware Engineer, Reflections\n10,001+ employees\nHybrid — New York, NY\nMid Level\nAbout the team\nYou will report to the Engineering Manager. You will work with a cross-functional team including QA, design, product managers, native mobile, and data.\nResponsibilities\nLead full-stack feature development from design to production\nCollaborate with QA, design, PM, native mobile, and data partners\nParticipate in the team's on-call rotation\nShip reader-facing product improvements\nBasic Qualifications\n2+ years of experience owning features end-to-end from design through production\n2+ years of experience unblocking teammates and driving technical decisions\n2+ years of experience partnering with cross-functional stakeholders\n2+ years of professional experience with modern JavaScript technologies, including React, Node.js, TypeScript, JavaScript, HTML, and CSS\n2+ years of experience building backend services and working with technologies such as Go, Node.js/Express, GraphQL, and cloud platforms (GCP or AWS)\n2+ years of experience working with data persistence technologies, including relational and/or document databases\n2+ years of experience troubleshooting, debugging, and resolving issues in production environments\n2+ years of experience collaborating with product, design, and QA partners\nPreferred Qualifications\nExperience using AI coding tools, especially for agentic workflows\nExperience with DevOps practices, including CI/CD techniques and tooling (e.g. Drone, Jenkins), automated testing and deployments, observability and monitoring.\nFamiliarity with containers and container orchestration systems like Kubernetes, Docker.\nUnderstanding of caching and content delivery."
+  },
+  "storedCategoryScores": {
+    "stackFit": 16,
+    "levelFit": 15,
+    "domainFit": 8,
+    "resumeStoryClarity": 9,
+    "functionalOverlap": 13,
+    "recruiterFriendliness": 11,
+    "careerValue": 8
+  }
+}

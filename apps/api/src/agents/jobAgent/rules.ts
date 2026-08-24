@@ -22,6 +22,11 @@ import { evaluateDisjunctiveLanguageRequirement, filterGapsAfterDisjunctiveMatch
 import { textMentionsGoLanguage } from '../../lib/goLanguage.js';
 import { isFdeBuilderSoftwarePrimaryShape } from '../../lib/fdeBuilderRole.js';
 import { evaluateTitleResponsibilitySeniority } from '../../lib/titleResponsibilitySeniority.js';
+import {
+  detectReinforcedExperienceFloor,
+  estimateCandidateProfessionalYears,
+} from '../../lib/reinforcedExperienceFloor.js';
+import { detectProductionInfraOwnershipGap } from '../../lib/namedCapabilityRiskPenalty.js';
 import { classifyRoleLane, detectBackendProductApiShape } from '../../lib/roleFunctionClassifier.js';
 import { isStartupSmallTeamScale } from '../../lib/employerScale.js';
 import { detectRoleSeniorityOverreach, resolveStructuredSeniorityLevel, seniorityNeedsManualReview } from '../../lib/seniorityGate.js';
@@ -687,6 +692,28 @@ export const evaluateRules = (
     notes.push(titleRespSeniority.highOwnershipLowSupportNote);
   }
 
+  const reinforcedFloor = detectReinforcedExperienceFloor(job);
+  const candidateYears = estimateCandidateProfessionalYears({
+    profile,
+    resumeText: resumeRaw,
+  });
+  const reinforcedExperienceFloor =
+    reinforcedFloor.active &&
+    (candidateYears == null || candidateYears < reinforcedFloor.thresholdYears);
+  if (reinforcedExperienceFloor && reinforcedFloor.riskNote) {
+    notes.push(reinforcedFloor.riskNote);
+  }
+
+  const productionInfraGap = detectProductionInfraOwnershipGap({
+    job,
+    resumeText: resumeRaw,
+    claimable,
+  });
+  const productionInfraOwnershipGap = productionInfraGap.active;
+  if (productionInfraOwnershipGap && productionInfraGap.riskNote) {
+    notes.push(productionInfraGap.riskNote);
+  }
+
   const coreLang = analyzeCoreLanguageRequirement(job, profile, claimable);
   const ventureFundedStartup = isVentureFundedStartupShape(job, combinedText);
   const matureStructuredEmployer =
@@ -797,6 +824,12 @@ export const evaluateRules = (
     foundingEngineerStretch,
     titleResponsibilityMismatch,
     highOwnershipLowSupport,
+    reinforcedExperienceFloor,
+    reinforcedExperienceFloorLineCount: reinforcedFloor.reinforcingLineCount || undefined,
+    reinforcedExperienceFloorThreshold: reinforcedFloor.active
+      ? reinforcedFloor.thresholdYears
+      : undefined,
+    productionInfraOwnershipGap,
     earlyCareerExceedSeverityRisk: false,
     scoringRiskScoreInconsistency: false,
     credentialHeavyFintechAlgorithm,

@@ -5,6 +5,9 @@ import {
   SURVIVABILITY_WEIGHTS,
   type SurvivabilitySubFactorKey,
 } from "../config/capabilitySurvivabilityPolicy.js";
+import {
+  PRODUCTION_INFRA_OWNERSHIP_SURV_PENALTY,
+} from "./namedCapabilityRiskPenalty.js";
 import type { ExtractedJobData } from "../types/job.js";
 import type { RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
 import type { UserProfile } from "../types/userProfile.js";
@@ -262,6 +265,10 @@ export const computeSurvivability = (params: {
 
   if (params.rules.highOwnershipLowSupport) {
     weightedAverage -= HIGH_OWNERSHIP_LOW_SUPPORT_SURV_PENALTY;
+  }
+
+  if (params.rules.productionInfraOwnershipGap) {
+    weightedAverage -= PRODUCTION_INFRA_OWNERSHIP_SURV_PENALTY;
   }
 
   if (

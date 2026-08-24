@@ -11,6 +11,10 @@ import {
   SURVIVABILITY_WEIGHTS,
   type SurvivabilitySubFactorKey,
 } from "../config/capabilitySurvivabilityPolicy.js";
+import {
+  PRODUCTION_INFRA_OWNERSHIP_SURV_PENALTY,
+  textIsNamedCapabilityGapRisk,
+} from "./namedCapabilityRiskPenalty.js";
 import type { ExtractedJobData } from "../types/job.js";
 import type {
   CapabilityBreakdown,
@@ -294,6 +298,20 @@ export const buildSurvivabilityRows = (
     });
   }
 
+  if (rules.productionInfraOwnershipGap) {
+    rows.push({
+      key: "productionInfraOwnershipGap",
+      label: "Production infra / on-call ownership",
+      score: 0,
+      weight: 0,
+      contribution: -PRODUCTION_INFRA_OWNERSHIP_SURV_PENALTY,
+      lever: "upskill",
+      leverLabel: "upskill with real project work",
+      bindingness: "structural",
+      penaltyName: "limited production-scale infrastructure and on-call ownership",
+    });
+  }
+
   return rows.sort((a, b) => a.score - b.score);
 };
 
@@ -378,6 +396,13 @@ export const buildSurvivabilityPenalties = (
 ): SurvivabilityPenalty[] => {
   const penalties: SurvivabilityPenalty[] = [];
   const seen = new Set<string>();
+  const pushUnique = (key: string, penalty: SurvivabilityPenalty) => {
+    const norm = penalty.message.trim().toLowerCase();
+    if (!norm || seen.has(key) || seen.has(norm)) return;
+    seen.add(key);
+    seen.add(norm);
+    penalties.push(penalty);
+  };
 
   if (rules.specializationGap) {
     const gap = rules.specializationGap;
@@ -389,33 +414,99 @@ export const buildSurvivabilityPenalties = (
           : gap.lever === "resume"
             ? "resume"
             : "none";
-    penalties.push({
+    pushUnique("specializationGap", {
       message: `${gap.name} — ${gap.evidence}`,
       lever,
       leverLabel: specializationPenaltyLeverLabel(lever),
     });
-    seen.add("specializationGap");
   }
 
   if (rules.clearanceRequiresExistingPenalty) {
-    penalties.push({
+    pushUnique("clearanceRequiresExisting", {
       message:
         rules.clearanceEligibilityFlag?.reason ??
         "Likely requires existing clearance — verify before applying.",
       lever: "none",
       leverLabel: STRUCTURAL_LEVER_LABEL,
     });
-    seen.add("clearanceRequiresExisting");
+  }
+
+  if (rules.highOwnershipLowSupport) {
+    const note =
+      (rules.notes ?? []).find((n) => /high ownership,\s*low support/i.test(n)) ??
+      "High ownership, low support — end-to-end autonomy with no mentorship language at a small early-stage org.";
+    pushUnique("highOwnershipLowSupport", {
+      message: note,
+      lever: "none",
+      leverLabel: STRUCTURAL_LEVER_LABEL,
+    });
+  }
+
+  if (rules.titleResponsibilityMismatch) {
+    const note =
+      (rules.notes ?? []).find((n) => /title\s*\/\s*responsibility\s+mismatch/i.test(n)) ??
+      "Title/responsibility mismatch — seniority implied by title and responsibilities disagree.";
+    pushUnique("titleResponsibilityMismatch", {
+      message: note,
+      lever: "none",
+      leverLabel: STRUCTURAL_LEVER_LABEL,
+    });
+  }
+
+  if (rules.reinforcedExperienceFloor) {
+    const note =
+      (rules.notes ?? []).find((n) => /experience bar is restated across/i.test(n)) ??
+      "Experience bar is restated across multiple required qualifications — likely a strict floor.";
+    pushUnique("reinforcedExperienceFloor", {
+      message: note,
+      lever: "none",
+      leverLabel: STRUCTURAL_LEVER_LABEL,
+    });
+  }
+
+  if (rules.productionInfraOwnershipGap) {
+    const note =
+      (rules.notes ?? []).find((n) => /limited hands-on production-scale/i.test(n)) ??
+      "Limited hands-on production-scale infrastructure, observability, and on-call ownership compared with listing expectations.";
+    pushUnique("productionInfraOwnershipGap", {
+      message: note,
+      lever: "upskill",
+      leverLabel: "upskill with real project work",
+    });
+  }
+
+  for (const name of rules.namedHardRequirementGaps ?? []) {
+    pushUnique(`namedTool:${name}`, {
+      message: `JD requires named tool/platform ${name} — not evidenced in candidate background.`,
+      lever: "upskill",
+      leverLabel: "upskill with real project work",
+    });
+  }
+
+  if (rules.stackMismatch && (rules.coreLanguageGap?.length ?? 0) > 0) {
+    pushUnique("stackMismatch", {
+      message: `Required core stack gap: ${rules.coreLanguageGap!.join(", ")} — not in claimable stack.`,
+      lever: "resume",
+      leverLabel: "resume framing",
+    });
   }
 
   for (const flag of rules.hardRuleFlags ?? []) {
     if (flagIsHardGate(flag, rules, extracted)) continue;
-    if (seen.has(flag.id)) continue;
-    seen.add(flag.id);
-    penalties.push({
+    pushUnique(flag.id, {
       message: flag.message,
       lever: flagPenaltyLever(flag.id, rules, profile),
       leverLabel: flagPenaltyLeverLabel(flag.id, rules, profile),
+    });
+  }
+
+  // General agreement rule: any named capability-gap Key Risk note must appear here.
+  for (const note of rules.notes ?? []) {
+    if (!textIsNamedCapabilityGapRisk(note)) continue;
+    pushUnique(`note:${note.slice(0, 80)}`, {
+      message: note,
+      lever: "upskill",
+      leverLabel: "upskill with real project work",
     });
   }
 
@@ -567,6 +658,9 @@ export const buildScoreDisplay = (params: {
     }
     if (params.rules.highOwnershipLowSupport) {
       weightedAverage -= HIGH_OWNERSHIP_LOW_SUPPORT_SURV_PENALTY;
+    }
+    if (params.rules.productionInfraOwnershipGap) {
+      weightedAverage -= PRODUCTION_INFRA_OWNERSHIP_SURV_PENALTY;
     }
     weightedAverage = roundSurvivabilityScalar(weightedAverage);
     breakdown = {

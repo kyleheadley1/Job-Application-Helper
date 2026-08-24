@@ -266,6 +266,18 @@ export type RuleEvaluation = {
   /** High-autonomy JD with no mentorship language at a small early-stage org. */
   highOwnershipLowSupport?: boolean;
   /**
+   * Same years bar restated across many independent required quals (4+) —
+   * stricter Level-fit dock + dedicated Key Risk; stacks with title/responsibility mismatch.
+   */
+  reinforcedExperienceFloor?: boolean;
+  reinforcedExperienceFloorLineCount?: number;
+  reinforcedExperienceFloorThreshold?: number;
+  /**
+   * JD requires production-scale infra / observability / on-call ownership the profile lacks.
+   * Must surface in Key Risks AND Survivability Penalties with a nonzero dock.
+   */
+  productionInfraOwnershipGap?: boolean;
+  /**
    * Narrative Key Risk asserts role likely exceeds early-career exposure —
    * must dock levelFit; set when mismatch flag alone did not already cover it.
    */

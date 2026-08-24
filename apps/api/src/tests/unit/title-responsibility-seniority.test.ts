@@ -119,3 +119,34 @@ describe("early-career-exceed severity language", () => {
     ).toBe(true);
   });
 });
+
+describe("title/responsibility seniority — NYT Reflections (supported feature ownership)", () => {
+  const fixture = loadCalibrationFixture("nytReflectionsSupportedFeatureOwnership");
+  const extracted = fixture.extracted;
+
+  it("does not treat Lead feature development as unsupervised senior ownership", () => {
+    const evaled = evaluateTitleResponsibilitySeniority(extracted);
+    expect(evaled.hasManagedTeamStructure).toBe(true);
+    expect(evaled.highAutonomy).toBe(false);
+    expect(evaled.mismatch).toBe(false);
+    expect(evaled.highOwnershipLowSupport).toBe(false);
+    expect(evaled.responsibilityBand).toBeLessThan(2);
+  });
+
+  it("Level fit mismatch and high-ownership/low-support agree — neither fires", () => {
+    const scored = recomputeStoredJobScore({
+      job: fixtureToJobRecord(fixture),
+      resumeContexts: calibrationSweResumeContexts(),
+    });
+    expect(scored.rules.titleResponsibilityMismatch).toBe(false);
+    expect(scored.rules.highOwnershipLowSupport).toBe(false);
+    expect(
+      scored.rules.notes.some((n) => /title\/responsibility mismatch/i.test(n)),
+    ).toBe(false);
+    expect(
+      (scored.score.scoreDisplay?.survivabilityRows ?? []).some(
+        (r) => r.key === "highOwnershipLowSupport",
+      ),
+    ).toBe(false);
+  });
+});

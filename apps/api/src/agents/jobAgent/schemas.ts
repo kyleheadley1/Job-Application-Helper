@@ -48,6 +48,7 @@ export const ExtractedJobDataSchema = z.object({
       raw: z.string().optional(),
       min: z.number().optional(),
       max: z.number().optional(),
+      reinforcedLineCount: z.number().optional(),
     })
     .optional(),
   stack: z.array(z.string()).default([]),
@@ -160,6 +161,10 @@ export const RuleEvaluationSchema = z.object({
   foundingEngineerStretch: z.boolean().optional().default(false),
   titleResponsibilityMismatch: z.boolean().optional().default(false),
   highOwnershipLowSupport: z.boolean().optional().default(false),
+  reinforcedExperienceFloor: z.boolean().optional().default(false),
+  reinforcedExperienceFloorLineCount: z.number().optional(),
+  reinforcedExperienceFloorThreshold: z.number().optional(),
+  productionInfraOwnershipGap: z.boolean().optional().default(false),
   earlyCareerExceedSeverityRisk: z.boolean().optional().default(false),
   scoringRiskScoreInconsistency: z.boolean().optional().default(false),
   credentialHeavyFintechAlgorithm: z.boolean().optional().default(false),

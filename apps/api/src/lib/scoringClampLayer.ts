@@ -22,6 +22,16 @@ import {
   TITLE_RESPONSIBILITY_MISMATCH_LEVEL_FIT_MAX,
   textSignalsEarlyCareerExceedSeverity,
 } from "./titleResponsibilitySeniority.js";
+import {
+  detectReinforcedExperienceFloor,
+  estimateCandidateProfessionalYears,
+  reinforcedFloorLevelFitDock,
+} from "./reinforcedExperienceFloor.js";
+import {
+  PRODUCTION_INFRA_OWNERSHIP_LEVEL_FIT_DOCK,
+} from "./namedCapabilityRiskPenalty.js";
+import type { UserProfile } from "../types/userProfile.js";
+import { userProfile as defaultUserProfile } from "../config/userProfile.js";
 
 const jobBlob = (job: ExtractedJobData): string => structuredFirstJobBlob(job);
 
@@ -223,6 +233,8 @@ export const applyScoringClampLayer = (params: {
   score: ScoreBreakdown;
   extracted: ExtractedJobData;
   rules: RuleEvaluation;
+  profile?: UserProfile;
+  resumeText?: string;
 }): ScoringClampResult => {
   const hardRuleFlags = buildHardRuleFlags(params.extracted, params.rules);
   const financeCtx = detectFinanceClampContext(params.extracted, params.rules);
@@ -308,6 +320,23 @@ export const applyScoringClampLayer = (params: {
     score.recruiterFriendliness = Math.min(score.recruiterFriendliness, 9);
   } else if (earlyCareerExceedSeverityRisk) {
     score.levelFit = Math.min(score.levelFit, EARLY_CAREER_EXCEED_SEVERITY_LEVEL_FIT_MAX);
+  }
+
+  // Reinforced experience floor stacks with (and is distinct from) title/responsibility mismatch.
+  if (rules.reinforcedExperienceFloor) {
+    const floor = detectReinforcedExperienceFloor(params.extracted);
+    const candidateYears = estimateCandidateProfessionalYears({
+      profile: params.profile ?? defaultUserProfile,
+      resumeText: params.resumeText,
+    });
+    const dock = reinforcedFloorLevelFitDock({ floor, candidateYears });
+    if (dock > 0) {
+      score.levelFit = Math.max(0, score.levelFit - dock);
+    }
+  }
+
+  if (rules.productionInfraOwnershipGap) {
+    score.levelFit = Math.max(0, score.levelFit - PRODUCTION_INFRA_OWNERSHIP_LEVEL_FIT_DOCK);
   }
 
   const scoringRiskScoreInconsistency =

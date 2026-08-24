@@ -4,7 +4,7 @@ import { api } from "../api/client";
 import type { TopJobRecord, TopJobsSyncStatus } from "../types/topJob";
 import { ScoreBadge } from "../components/ScoreBadge";
 import { companyDisplayLabel, formatAvailableIn, formatPostedAgo } from "../lib/jobDisplay";
-import { displayRoleTitle } from "../lib/resultSummary";
+import { resolveDisplayTitle } from "../lib/roleTitleDisplay";
 import {
   postedRecencyTooltip,
   readTopJobsSortMode,
@@ -15,12 +15,15 @@ import {
 } from "../lib/topJobsSort";
 
 function companyCell(job: TopJobRecord): string {
-  return (
-    job.extracted.companyDisplayName?.trim() ||
-    job.extracted.listingCompanyName?.trim() ||
-    job.extracted.company ||
-    "Unknown Company"
-  );
+  return companyDisplayLabel(job.extracted) || "Unknown Company";
+}
+
+function roleCell(job: TopJobRecord): string {
+  return resolveDisplayTitle(job.extracted);
+}
+
+function companyKey(job: TopJobRecord): string {
+  return companyCell(job).trim().toLowerCase();
 }
 
 function resumeLabel(job: TopJobRecord): string {
@@ -63,6 +66,20 @@ export function TopJobsPage() {
   }, [sortMode]);
 
   const sortedItems = useMemo(() => sortTopJobs(items, sortMode), [items, sortMode]);
+
+  const multiPostingEmployers = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const j of sortedItems) {
+      const k = companyKey(j);
+      if (!k) continue;
+      counts.set(k, (counts.get(k) ?? 0) + 1);
+    }
+    const multi = new Set<string>();
+    for (const [k, n] of counts) {
+      if (n >= 2) multi.add(k);
+    }
+    return multi;
+  }, [sortedItems]);
 
   const refreshBlocked =
     status !== null && !status.canManualRefresh && !syncing;
@@ -218,9 +235,18 @@ export function TopJobsPage() {
             <tbody>
               {sortedItems.map((job) => (
                 <tr key={job.id}>
-                  <td>{companyCell(job)}</td>
                   <td>
-                    <Link to={`/top-jobs/${job.id}`}>{displayRoleTitle(job.extracted.title)}</Link>
+                    <div className="tracker-company-primary">
+                      <span>{companyCell(job)}</span>
+                      {multiPostingEmployers.has(companyKey(job)) && roleCell(job) ? (
+                        <span className="tracker-role-subtitle" title={roleCell(job)}>
+                          {roleCell(job)}
+                        </span>
+                      ) : null}
+                    </div>
+                  </td>
+                  <td>
+                    <Link to={`/top-jobs/${job.id}`}>{roleCell(job) || "Untitled role"}</Link>
                   </td>
                   <td>
                     <ScoreBadge score={job.score.total} />
@@ -306,7 +332,7 @@ export function TopJobDetailPage() {
     <section className="panel">
       <div className="row spread">
         <h2>
-          {companyDisplayLabel(job.extracted)} — {displayRoleTitle(job.extracted.title)}
+          {companyDisplayLabel(job.extracted)} — {resolveDisplayTitle(job.extracted)}
         </h2>
         <ScoreBadge score={job.score.total} />
       </div>

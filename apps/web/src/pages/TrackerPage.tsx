@@ -10,6 +10,7 @@ import { etDateKey, etRangeKeys, isDateKeyInRange } from "../lib/dateEt";
 import {
   appliedAtIso,
   appliedAtToDateInputValue,
+  companyDisplayLabel,
   hasJdSource,
   isAppliedPipelineStatus,
   salaryAskCompact,
@@ -17,6 +18,7 @@ import {
   trackerDisplayDate,
   tsOnly,
 } from "../lib/jobDisplay";
+import { resolveDisplayTitle } from "../lib/roleTitleDisplay";
 
 const LS_SHOW_EXTRAS = "trackerShowSheetCols";
 const LS_SORT_KEY = "trackerSortKey";
@@ -69,15 +71,19 @@ function isSortableKey(key: string): key is TrackerSortKey {
 
 function companyCell(job: JobRecord): string {
   return (
-    job.extracted.companyDisplayName?.trim() ||
-    job.extracted.listingCompanyName?.trim() ||
-    job.extracted.company ||
+    companyDisplayLabel(job.extracted) ||
     tsOnly(job, "company")
   );
 }
 
 function roleCell(job: JobRecord): string {
-  return job.extracted.title || tsOnly(job, "role");
+  const fromExtracted = resolveDisplayTitle(job.extracted);
+  if (fromExtracted) return fromExtracted;
+  return tsOnly(job, "role");
+}
+
+function companyKey(job: JobRecord): string {
+  return companyCell(job).trim().toLowerCase();
 }
 
 function statusText(job: JobRecord): string {
@@ -369,6 +375,21 @@ export const TrackerPage = () => {
     return copy;
   }, [dateFilteredJobs, sortKey, sortDir]);
 
+  /** Employers with 2+ visible rows — always show role under company so siblings are distinguishable. */
+  const multiPostingEmployers = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const j of sortedJobs) {
+      const k = companyKey(j);
+      if (!k) continue;
+      counts.set(k, (counts.get(k) ?? 0) + 1);
+    }
+    const multi = new Set<string>();
+    for (const [k, n] of counts) {
+      if (n >= 2) multi.add(k);
+    }
+    return multi;
+  }, [sortedJobs]);
+
   const shortlistInView = useMemo(() => {
     if (shortlistOnly) return sortedJobs.length;
     return shortlistTotal;
@@ -439,15 +460,26 @@ export const TrackerPage = () => {
   const renderPrimaryCell = (job: JobRecord, col: PrimaryColumn) => {
     switch (col) {
       case "company":
-        return (
+        {
+          const role = roleCell(job);
+          const showRoleUnderCompany =
+            Boolean(role) && multiPostingEmployers.has(companyKey(job));
+          return (
           <div className="tracker-company-cell">
-            <Link
-              to={`/jobs/${job.id}/detail`}
-              className="tracker-link"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {companyCell(job)}
-            </Link>
+            <div className="tracker-company-primary">
+              <Link
+                to={`/jobs/${job.id}/detail`}
+                className="tracker-link"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {companyCell(job)}
+              </Link>
+              {showRoleUnderCompany ? (
+                <span className="tracker-role-subtitle" title={role}>
+                  {role}
+                </span>
+              ) : null}
+            </div>
             <span
               className={`tracker-row-dot tracker-row-dot-${rowDotTone(job)}`}
               title={`Tracker color: ${rowDotTone(job)}`}
@@ -491,11 +523,12 @@ export const TrackerPage = () => {
               Remove
             </button>
           </div>
-        );
+          );
+        }
       case "role":
         return (
           <span className="cell-lines-2" title={roleCell(job)}>
-            {roleCell(job)}
+            {roleCell(job) || "—"}
           </span>
         );
       case "score":

@@ -55,6 +55,11 @@ export type ExtractedJobData = {
     raw?: string;
     min?: number;
     max?: number;
+    /**
+     * Count of independently-stated required qualification lines that restate
+     * the same (or compatible) years bar. High counts (≥4) = reinforced floor.
+     */
+    reinforcedLineCount?: number;
   };
   stack: string[];
   requiredSkills: string[];

@@ -109,7 +109,27 @@ export const parseCommaTitleCompany = (line: string): { jobTitle: string; compan
   if (!isTitleLikeLine(jobTitle)) return null;
   if (looksLikeLocation(companyName)) return null;
   if (companyName.length > 40) return null;
+  // "Software Engineer, Reflections" / "Software Engineer, AI Platforms" —
+  // team/org qualifiers must stay in the title, not become the company.
+  if (looksLikeTeamOrgQualifier(companyName)) return null;
   return { jobTitle, companyName };
+};
+
+const CORPORATE_COMPANY_RE =
+  /\b(inc\.?|llc|ltd\.?|corp\.?|corporation|company|co\.|technologies|labs?|group|systems|holdings|partners|plc)\b/i;
+
+const KNOWN_EMPLOYER_AFTER_COMMA_RE =
+  /^(google|meta|amazon|apple|netflix|microsoft|uber|stripe|airbnb|spotify|openai|anthropic|ibm|oracle|salesforce|bloomberg)$/i;
+
+/** Team/org unit after a role title comma — not an employer name. */
+export const looksLikeTeamOrgQualifier = (name: string): boolean => {
+  const s = name.trim();
+  if (!s || s.length > 48) return false;
+  if (CORPORATE_COMPANY_RE.test(s)) return false;
+  if (KNOWN_EMPLOYER_AFTER_COMMA_RE.test(s)) return false;
+  if (looksLikeLocation(s)) return false;
+  const words = s.split(/\s+/).filter(Boolean);
+  return words.length >= 1 && words.length <= 4;
 };
 
 export const normalizeLocationPrefixedTitle = (
@@ -192,6 +212,10 @@ export const extractPreScoringMetadata = (rawJobText: string): PreScoringJobMeta
   if (commaFirst) {
     jobTitle = commaFirst.jobTitle;
     companyName = commaFirst.companyName;
+    rawTitleSource = lines[0]!;
+  } else if (lines[0] && isTitleLikeLine(lines[0]!)) {
+    // Preserve team/org in titles like "Software Engineer, Reflections".
+    jobTitle = lines[0]!;
     rawTitleSource = lines[0]!;
   }
 

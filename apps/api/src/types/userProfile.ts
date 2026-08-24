@@ -31,6 +31,11 @@ export type UserProfile = {
   }>;
   recurringStory: string[];
   hardConstraints: string[];
+  /**
+   * Approximate professional YOE for Level-fit / reinforced experience-floor docks.
+   * Do not invent this at score time — keep it as an explicit profile hint.
+   */
+  estimatedProfessionalYears?: number;
   /** When false, JD "no sponsorship" / work-auth language is not treated as a gate for this candidate. */
   requiresSponsorship: boolean;
   citizenshipStatus?: {
