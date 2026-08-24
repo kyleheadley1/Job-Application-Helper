@@ -98,8 +98,11 @@ Soft rule flags (weigh in categories above — NOT re-applied later):
 
 Narrative:
 - risks: strongest blocker in mainRisk + one distinct risks[] line. Priority: stack/language → level → travel/onsite.
+- Never frame Preferred-only / nice-to-have skills (e.g. Kubernetes or CI/CD under Preferred Qualifications) as a "significant stretch" or hard gap. Cite Required/Basic qualifications and Responsibilities for stretch severity; Preferred items are soft notes at most.
+- Before calling a background "weaker" (infra/DevOps/CI/CD/SRE), check the candidate strengths and resume tech lines — if they already show CI/CD (e.g. GitHub Actions), narrow the gap to what is actually missing (e.g. Kubernetes) rather than general DevOps weakness.
 - rationale: exactly 2 bullets — JD-shaped fit, then concrete profile proof. No generic filler.
-- topMatch: one role-specific sentence.
+- topMatch: one role-specific sentence that names the title/team (e.g. Reflections / AI Platforms), not only the employer — concurrent reqs at the same company must be distinguishable.
+- When stating risks, prefer "this Reflections role" / the specific title over vague "this role" / company-only phrasing when the JD includes a team or specialty in the title.
 - Output ONE flat JSON object with ONLY the keys listed in the user message.
 `.trim();
 

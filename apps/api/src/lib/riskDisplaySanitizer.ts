@@ -6,6 +6,7 @@ import {
   suppressAbsentLanguageClaims,
 } from "./jdLanguagePresence.js";
 import { textMentionsGoLanguage } from "./goLanguage.js";
+import { rewritePreferredStrengthRiskLine } from "./riskPreferredStrength.js";
 import type { ExtractedJobData } from "../types/job.js";
 import type { RuleEvaluation } from "../types/scoring.js";
 import type { UserProfile } from "../types/userProfile.js";
@@ -200,6 +201,8 @@ export type VisibleSanitizeContext = {
   extracted: ExtractedJobData;
   userProfile?: UserProfile;
   rules?: RuleEvaluation;
+  /** Resume text for claimable-skill grounding (e.g. CI/CD) before weaker-area claims. */
+  resumeRawText?: string;
 };
 
 export function sanitizeVisibleRiskLine(text: string, ctx: VisibleSanitizeContext): string {
@@ -298,6 +301,11 @@ export function sanitizeVisibleRiskLine(text: string, ctx: VisibleSanitizeContex
       "limited API/database overlap versus Go-first data infrastructure expectations",
     );
   }
+  t = rewritePreferredStrengthRiskLine(t, {
+    extracted: ctx.extracted,
+    userProfile: ctx.userProfile,
+    resumeRawText: ctx.resumeRawText,
+  });
   return cleanupVisibleLineFragments(t);
 }
 
@@ -324,8 +332,9 @@ export function sanitizeRuleNotesForDisplay(
   extracted: ExtractedJobData,
   userProfile: UserProfile | undefined,
   rules: RuleEvaluation,
+  resumeRawText?: string,
 ): string[] {
-  const ctx: VisibleSanitizeContext = { extracted, userProfile, rules };
+  const ctx: VisibleSanitizeContext = { extracted, userProfile, rules, resumeRawText };
   return sanitizeBulletList(notes, ctx);
 }
 
@@ -334,10 +343,17 @@ export function withSanitizedRuleNotes(
   rules: RuleEvaluation,
   extracted: ExtractedJobData,
   userProfile?: UserProfile,
+  resumeRawText?: string,
 ): RuleEvaluation {
   const bounded = applyJdLanguageOutputBoundary(extracted, rules);
   return {
     ...bounded,
-    notes: sanitizeRuleNotesForDisplay(bounded.notes, extracted, userProfile, bounded),
+    notes: sanitizeRuleNotesForDisplay(
+      bounded.notes,
+      extracted,
+      userProfile,
+      bounded,
+      resumeRawText,
+    ),
   };
 }

@@ -1,6 +1,11 @@
 import type { JobRecord } from "../types/job";
 import { companyDisplayLabel } from "./jobDisplay";
 import { sanitizeRoleCardLine } from "./riskDisplaySanitizer";
+import {
+  formatRoleTitle,
+  resolveDisplayTitle,
+  resolveVagueRoleReferences,
+} from "./roleTitleDisplay";
 
 const RISK_CONCEPTS: Array<{ concept: string; re: RegExp }> = [
   { concept: "stack_gap", re: /\b(go|language|stack|framework|tooling|tech gap|experience with|python)\b/i },
@@ -178,7 +183,12 @@ export function selectTopFits(job: JobRecord, n = 2): string[] {
   const slice = out.slice(0, n);
   if (slice.length === 2) slice[1] = dampWhyConsiderSecond(slice[0], slice[1]);
   return slice.map((s) =>
-    sanitizeRoleCardLine(s, companyDisplayLabel(job.extracted), job.extracted, job.rules),
+    sanitizeRoleCardLine(
+      resolveVagueRoleReferences(s, job.extracted),
+      companyDisplayLabel(job.extracted),
+      job.extracted,
+      job.rules,
+    ),
   );
 }
 
@@ -259,7 +269,14 @@ export function buildKeyRisks(job: JobRecord, max = 3): string[] {
   }
   return out
     .slice(0, max)
-    .map((s) => sanitizeRoleCardLine(s, companyDisplayLabel(job.extracted), job.extracted, job.rules))
+    .map((s) =>
+      sanitizeRoleCardLine(
+        resolveVagueRoleReferences(s, job.extracted),
+        companyDisplayLabel(job.extracted),
+        job.extracted,
+        job.rules,
+      ),
+    )
     .filter(Boolean);
 }
 
@@ -319,24 +336,24 @@ export function decisionSummaryLine(job: JobRecord): string {
   const p1 = priorities[0];
   const p2 = priorities[1];
   const genericBase = /\bbackend[-\s]?leaning\b|\bfull[-\s]?stack\b.*\b(ai|llm)\b/i.test(base);
-  if (!genericBase || (!p1 && !p2)) return base;
-
-  const lead = /\b(early[-\s]?career|entry[-\s]?level|junior)\b/i.test(combined)
-    ? "Strong early-career builder fit"
-    : /\b(product|full[-\s]?stack)\b/i.test(combined)
-      ? "Strong product-engineering fit"
-      : "Strong role-shape fit";
-  const details = [p1, p2].filter(Boolean).join(" and ");
-  return details ? `${lead} with clear overlap in ${details}.` : base;
+  let line: string;
+  if (!genericBase || (!p1 && !p2)) {
+    line = base;
+  } else {
+    const lead = /\b(early[-\s]?career|entry[-\s]?level|junior)\b/i.test(combined)
+      ? "Strong early-career builder fit"
+      : /\b(product|full[-\s]?stack)\b/i.test(combined)
+        ? "Strong product-engineering fit"
+        : "Strong role-shape fit";
+    const details = [p1, p2].filter(Boolean).join(" and ");
+    line = details ? `${lead} with clear overlap in ${details}.` : base;
+  }
+  return resolveVagueRoleReferences(line, job.extracted);
 }
 
+/** @deprecated Prefer resolveDisplayTitle — kept for existing imports. */
 export function displayRoleTitle(rawTitle: string): string {
-  const title = rawTitle.trim();
-  if (!title) return title;
-  const looksLikeRoleHeader =
-    /\b(junior|entry[-\s]?level|early[-\s]?career|associate|software|full[-\s]?stack|backend|frontend|product)\b/i.test(
-      title,
-    ) && /\bengineers\b$/i.test(title);
-  if (!looksLikeRoleHeader) return title;
-  return title.replace(/\bEngineers\b$/, "Engineer");
+  return formatRoleTitle(rawTitle);
 }
+
+export { resolveDisplayTitle };

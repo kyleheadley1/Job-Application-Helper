@@ -11,7 +11,7 @@ export type ExtractedSkillTag = {
 };
 
 const REQUIRED_SECTION_RE =
-  /^(requirements?|qualifications?|your experience|must have|minimum qualifications|what you'?ll need|what we'?re looking for|you have|you bring)$/i;
+  /^(requirements?|qualifications?|basic qualifications?|minimum qualifications?|your experience|must have|what you'?ll need|what we'?re looking for|you have|you bring|responsibilities|what you'?ll do|in this role)$/i;
 
 const PREFERRED_SECTION_RE =
   /^(nice to have|considered a plus|bonus|preferred qualifications?|preferred skills?|what'?s a plus|optional)$/i;
@@ -79,6 +79,11 @@ const classifyLineStrength = (line: string, section: TagSourceStrength | null): 
   if (REQUIRED_SECTION_RE.test(trimmed)) return "REQUIRED";
   if (PREFERRED_SECTION_RE.test(trimmed)) return "PREFERRED";
   if (NARRATIVE_SECTION_RE.test(trimmed)) return "NARRATIVE";
+  // Under an explicit Preferred section, do not upgrade "Experience with …" lines to REQUIRED.
+  if (section === "PREFERRED") {
+    if (/\b(must have|required|mandatory)\b/i.test(trimmed)) return "REQUIRED";
+    return "PREFERRED";
+  }
   if (/\b(must have|required|minimum|proficiency in|experience with)\b/i.test(trimmed)) return "REQUIRED";
   if (/\b(nice to have|considered a plus|bonus|preferred|ideally|optional)\b/i.test(trimmed)) {
     return "PREFERRED";

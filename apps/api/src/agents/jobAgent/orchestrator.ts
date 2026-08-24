@@ -107,6 +107,7 @@ export const triageJob = async (input: {
     evaluateRules(extracted, userProfile, { resumeContexts, activeResumeType }),
     extracted,
     userProfile,
+    resumeTextForScore,
   );
   stageMs.rules = Date.now() - rulesStart;
   const scoringStart = Date.now();

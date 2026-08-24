@@ -1,6 +1,6 @@
 import type { ExtractedJobData, JobRecord, TrackerSpreadsheetFields } from "../types/job";
 import { pickDisplayCompanyName } from "./companyDisplaySanitize";
-import { displayRoleTitle } from "./resultSummary";
+import { resolveDisplayTitle } from "./roleTitleDisplay";
 
 type CompanyFields = Pick<
   ExtractedJobData,
@@ -30,13 +30,22 @@ export function agencyDisclosureNote(extracted: CompanyFields): string | null {
   return `Actual employer not disclosed; posting is represented by ${agency}.`;
 }
 
-export function jobHeaderLabel(extracted: Pick<ExtractedJobData, "company" | "title" | "employmentType" | "companyDisplayName" | "listingCompanyName">): string {
+/**
+ * Page/card header: always include title (and team when present), not company alone.
+ * e.g. "The New York Times — Software Engineer — Reflections"
+ */
+export function jobHeaderLabel(
+  extracted: Pick<
+    ExtractedJobData,
+    "company" | "title" | "employmentType" | "companyDisplayName" | "listingCompanyName" | "rawText"
+  >,
+): string {
   const company = companyDisplayLabel(extracted);
-  const title = displayRoleTitle(extracted.title?.trim() ?? "");
+  const title = resolveDisplayTitle(extracted);
   const employment = extracted.employmentType?.trim();
   const roleLabel =
     company && title
-      ? `${company} - ${title}`
+      ? `${company} — ${title}`
       : title
         ? title
         : company
@@ -44,6 +53,19 @@ export function jobHeaderLabel(extracted: Pick<ExtractedJobData, "company" | "ti
           : "Untitled role";
   if (employment) return `${roleLabel} (${employment})`;
   return roleLabel;
+}
+
+/** Compact list label when the same employer has multiple saved postings. */
+export function companyWithRoleSubtitle(
+  extracted: Pick<
+    ExtractedJobData,
+    "company" | "title" | "companyDisplayName" | "listingCompanyName" | "rawText"
+  >,
+): { company: string; role: string } {
+  return {
+    company: companyDisplayLabel(extracted),
+    role: resolveDisplayTitle(extracted),
+  };
 }
 
 /** Relative posted time for Top Jobs (e.g. "2 hours ago", "3 days ago"). */

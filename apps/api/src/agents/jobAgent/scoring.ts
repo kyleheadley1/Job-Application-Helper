@@ -160,6 +160,8 @@ const deterministicFallback = (
     },
     extracted: job,
     rules,
+    profile,
+    resumeText,
   });
   const capabilityGap = detectCapabilityGap(job, clamped.score, resumeText);
   const specializationGap = detectSpecializationGap(job, clamped.score, resumeText);
@@ -239,6 +241,8 @@ const finishScoringFromRawCategories = (params: {
     score: params.rawScore,
     extracted: params.extracted,
     rules: rulesForClamp,
+    profile: params.userProfile,
+    resumeText: params.resumeText,
   });
   const capabilityGap = detectCapabilityGap(params.extracted, clamped.score, params.resumeText);
   const specializationGap = detectSpecializationGap(
@@ -265,6 +269,7 @@ const finishScoringFromRawCategories = (params: {
     extracted: params.extracted,
     userProfile: params.userProfile,
     rules: rulesWithGap,
+    resumeRawText: params.resumeText,
   });
 
   // If narrative polish further docked levelFit, recompute composite so Capability/final match.
