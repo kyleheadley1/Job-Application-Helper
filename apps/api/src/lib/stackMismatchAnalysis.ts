@@ -1,7 +1,8 @@
 import type { ExtractedJobData } from "../types/job.js";
 import { evaluateDisjunctiveLanguageRequirement, filterGapsAfterDisjunctiveMatch, lineDisjunctiveRequirementSatisfied } from "./disjunctiveLanguageRequirement.js";
 import { GO_LANGUAGE_PATTERNS } from "./goLanguage.js";
-import { filterLanguagesToJdPresence } from "./jdLanguagePresence.js";
+import { filterLanguagesToJdPresence, termGroundedInJdRawText } from "./jdLanguagePresence.js";
+import { termIsPreferredOrNarrativeOnly } from "./jdTagProvenance.js";
 import { normalizeText } from "./text.js";
 import type { ClaimableStack } from "./claimableStack.js";
 import { hasClaimableCoverage } from "./claimableStack.js";
@@ -16,7 +17,7 @@ export type StackMismatchAnalysis = {
 };
 
 const SOFT_SKILL_FRAMING =
-  /\b(preferred|nice to have|a plus|bonus|ideally|optional|plus\b|familiarity with|exposure to)\b/i;
+  /\b(preferred|nice[- ]to[- ]haves?|a plus|bonus|ideally|optional|plus\b|familiarity with|exposure to)\b/i;
 
 const JS_FRAMEWORK_FLEXIBLE_CLAUSE =
   /\b(other|modern|relevant)\s+(?:modern\s+)?(?:php\s+and\s+)?(?:java\s*script|javascript|js|typescript|ts)[^.\n]{0,80}(?:frameworks?|stacks?)\s+(?:accepted|welcome|considered|ok)\b/i;
@@ -69,15 +70,30 @@ const matchTokens = (text: string): TechToken[] => {
 const extractRequiredSkillLines = (job: ExtractedJobData): string[] => {
   const lines: string[] = [];
   for (const skill of job.requiredSkills ?? []) {
-    if (skill.trim()) lines.push(skill.trim());
+    if (
+      skill.trim() &&
+      termGroundedInJdRawText(skill, job) &&
+      !termIsPreferredOrNarrativeOnly(skill, job)
+    ) {
+      lines.push(skill.trim());
+    }
   }
   for (const req of job.requirements ?? []) {
-    if (req.trim() && !isSoftContext(req)) lines.push(req.trim());
+    if (req.trim() && !isSoftContext(req) && termGroundedInJdRawText(req, job)) {
+      lines.push(req.trim());
+    }
   }
   // JD stack section is an authoritative core-tech list — count even when not
   // echoed verbatim in Requirements bullets (Bubble Scaling / platform roles).
+  // Prefer/nice-to-have-only chips must not become required core gaps (Cherry Kotlin).
   for (const stack of job.stack ?? []) {
-    if (stack.trim()) lines.push(stack.trim());
+    if (
+      stack.trim() &&
+      termGroundedInJdRawText(stack, job) &&
+      !termIsPreferredOrNarrativeOnly(stack, job)
+    ) {
+      lines.push(stack.trim());
+    }
   }
   return [...new Set(lines)];
 };
@@ -88,11 +104,12 @@ const lineFromJdStackArray = (line: string, job: ExtractedJobData): boolean =>
 const lineIsRequired = (line: string, job: ExtractedJobData): boolean => {
   const norm = normalizeText(line);
   if (isSoftContext(norm)) return false;
+  if (termIsPreferredOrNarrativeOnly(line, job)) return false;
   if ((job.preferredSkills ?? []).some((p) => normalizeText(p) === norm)) return false;
   const raw = job.rawText ?? "";
   const escaped = line.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const softNear = new RegExp(
-    `(preferred|nice to have|a plus|bonus|ideally|optional)[^.\\n]{0,120}${escaped}|${escaped}[^.\\n]{0,120}(preferred|nice to have|a plus|bonus|ideally|optional)`,
+    `(preferred|nice[- ]to[- ]haves?|a plus|bonus|ideally|optional|familiarity with)[^.\\n]{0,120}${escaped}|${escaped}[^.\\n]{0,120}(preferred|nice[- ]to[- ]haves?|a plus|bonus|ideally|optional)`,
     "i",
   );
   if (softNear.test(raw) && !/\b(required|must have|minimum)\b/i.test(norm)) return false;
@@ -227,18 +244,12 @@ export const analyzeStackMismatch = (
     [...new Set(coreLanguageGaps)],
     evaluateDisjunctiveLanguageRequirement(job, claimable),
   );
-  // Language gaps must appear in JD language set; infra stack chips must appear in JD text/stack.
+  // Language gaps must appear in JD language set; infra stack chips must appear in JD rawText.
+  // Preferred/nice-to-have-only languages never become tier-1 core gaps.
   const jdValidatedCore = uniqueCoreRaw.filter((label) => {
+    if (termIsPreferredOrNarrativeOnly(label, job)) return false;
     if (/^(Terraform|Redis|Kubernetes)$/i.test(label)) {
-      const blob = normalizeText(
-        [...(job.stack ?? []), ...(job.requiredSkills ?? []), ...(job.requirements ?? []), job.rawText ?? ""].join(
-          "\n",
-        ),
-      );
-      if (/terraform/i.test(label)) return /\bterraform\b/i.test(blob);
-      if (/redis/i.test(label)) return /\bredis\b/i.test(blob);
-      if (/kubernetes/i.test(label)) return /\bkubernetes\b|\bk8s\b/i.test(blob);
-      return false;
+      return termGroundedInJdRawText(label, job);
     }
     return filterLanguagesToJdPresence([label], job).includes(label);
   });

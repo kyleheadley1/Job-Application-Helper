@@ -1,6 +1,6 @@
 {
   "id": "fleetio-marketplace",
-  "anchorNote": "Fleetio Marketplace — no Figma in JD; and/or Rails/React/TS line satisfied by React+TypeScript; narrative 'good design' must not trigger design portfolio penalty.",
+  "anchorNote": "Fleetio Marketplace — no Figma in JD; and/or Rails/React/TS line satisfied by React+TypeScript; narrative 'good design' must not trigger design portfolio penalty. GUARD: extracted arrays may hallucinate Go — rawText has no Go; risks/penalties/assets must never cite Go.",
   "extracted": {
     "company": "Fleetio",
     "companyDisplayName": "Fleetio",
@@ -8,7 +8,7 @@
     "location": "Remote in USA",
     "remoteType": "remote",
     "seniority": "junior",
-    "stack": ["Figma", "UI/UX Design", "React.js", "TypeScript", "PostgreSQL", "Ruby on Rails", "REST APIs"],
+    "stack": ["Figma", "UI/UX Design", "React.js", "TypeScript", "PostgreSQL", "Ruby on Rails", "REST APIs", "Go"],
     "requiredSkills": [
       "Figma",
       "UI/UX Design",
@@ -19,7 +19,8 @@
       "REST APIs",
       "Software Testing",
       "RDBMS",
-      "Data Modeling"
+      "Data Modeling",
+      "Go"
     ],
     "preferredSkills": ["GraphQL"],
     "domainTags": ["fleet management", "saas"],

@@ -15,6 +15,7 @@ import {
 } from "../../lib/trackerAutoArchive.js";
 import { buildJobExportRow, buildTrackerSpreadsheetFromJob } from "../../tracker/canonicalSpreadsheet.js";
 import { jobsRepository } from "./jobs.repository.js";
+import { capturesRepository } from "../captures/captures.repository.js";
 import { resumeContextService } from "../resume/resumeContext.js";
 import { companyHintFromExtracted, preserveCompanyOnRetriage } from "../../lib/preserveCompanyOnRetriage.js";
 
@@ -49,6 +50,26 @@ export function canConfirmApplied(job: Pick<JobRecord, "recommendation" | "score
 export class JobsService {
   /** Ephemeral scored jobs until user confirms they actually applied. */
   private readonly draftJobs = new Map<string, JobRecord>();
+  /** Draft id -> capture id, for drafts that originated from an extension capture. */
+  private readonly captureIdByDraftId = new Map<string, string>();
+
+  /** In-memory draft, falling back to a persisted extension-capture result. */
+  private async findDraft(id: string): Promise<JobRecord | null> {
+    const draft = this.draftJobs.get(id);
+    if (draft) return draft;
+    const capture = await capturesRepository.findByJobId(id);
+    if (!capture?.result) return null;
+    this.draftJobs.set(id, capture.result);
+    this.captureIdByDraftId.set(id, capture.id);
+    return capture.result;
+  }
+
+  /** Keep capture-backed drafts in Mongo in sync so they survive API restarts. */
+  private async saveDraft(job: JobRecord): Promise<void> {
+    this.draftJobs.set(job.id, job);
+    const captureId = this.captureIdByDraftId.get(job.id);
+    if (captureId) await capturesRepository.update(captureId, { result: job });
+  }
 
   async runTriage(input: {
     url?: string;
@@ -148,14 +169,14 @@ export class JobsService {
       const saved = await jobsRepository.upsertJob(merged);
       return { job: saved, tracked: true };
     }
-    this.draftJobs.set(id, merged);
+    await this.saveDraft(merged);
     return { job: merged, tracked: false };
   }
 
   async getByIdIncludingDraft(id: string): Promise<{ job: JobRecord | null; tracked: boolean }> {
     const tracked = await jobsRepository.getById(id);
     if (tracked) return { job: tracked, tracked: true };
-    const draft = this.draftJobs.get(id) ?? null;
+    const draft = await this.findDraft(id);
     return { job: draft, tracked: false };
   }
 
@@ -229,7 +250,7 @@ export class JobsService {
 
   async generateAssetsForJobId(jobId: string, input?: { force?: boolean }): Promise<JobRecord> {
     const tracked = await jobsRepository.getById(jobId);
-    const draft = tracked ? null : this.draftJobs.get(jobId);
+    const draft = tracked ? null : await this.findDraft(jobId);
     const job = tracked ?? draft;
     if (!job) throw new JobNotFoundError();
     const selectedResumeContext = (await resumeContextService.getContext(job.recommendedResume)) ?? undefined;
@@ -254,7 +275,7 @@ export class JobsService {
         : {}),
       updatedAt: new Date().toISOString(),
     };
-    this.draftJobs.set(jobId, merged);
+    await this.saveDraft(merged);
     return merged;
   }
 
@@ -304,13 +325,15 @@ export class JobsService {
   async removeFromTracker(id: string): Promise<void> {
     const deletedTracked = await jobsRepository.deleteById(id);
     const deletedDraft = this.draftJobs.delete(id);
-    if (!deletedTracked && !deletedDraft) throw new JobNotFoundError();
+    this.captureIdByDraftId.delete(id);
+    const deletedCapture = await capturesRepository.deleteByJobId(id);
+    if (!deletedTracked && !deletedDraft && !deletedCapture) throw new JobNotFoundError();
   }
 
   async confirmApplied(id: string): Promise<JobRecord> {
     const existing = await jobsRepository.getById(id);
     if (existing) return existing;
-    const draft = this.draftJobs.get(id);
+    const draft = await this.findDraft(id);
     if (!draft) throw new JobNotFoundError();
     if (!canConfirmApplied(draft)) {
       throw new JobConfirmNotAllowedError();
@@ -345,6 +368,7 @@ export class JobsService {
 
     const saved = await jobsRepository.upsertJob(toPersist);
     this.draftJobs.delete(id);
+    this.captureIdByDraftId.delete(id);
     return saved;
   }
 }

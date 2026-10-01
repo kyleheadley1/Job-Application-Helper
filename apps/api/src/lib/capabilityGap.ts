@@ -12,6 +12,10 @@ import {
   jdHasNarrativeDesignLanguageOnly,
   tagsAtLeastStrength,
 } from "./jdTagProvenance.js";
+import {
+  findLiteralLeadsWithSourceQuote,
+  languageOnlyInDisjunctiveChoice,
+} from "./disjunctiveLanguageRequirement.js";
 import { normalizeText } from "./text.js";
 
 const structuredBlob = (job: ExtractedJobData): string =>
@@ -84,7 +88,7 @@ const requiredNamesNodeBackend = (requirementsProse: string): boolean =>
 /**
  * Derive backend pillar label from Requirements prose as authoritative.
  * Responsibilities (and especially "including but not limited to" lists) are secondary/non-binding.
- * Never use skill-tag order alone.
+ * Never use skill-tag order alone. Never treat a disjunctive choice-list language as "leads with".
  */
 export const extractJdBackendLabel = (job: ExtractedJobData): string | undefined => {
   const requirementsProse = normalizeText(
@@ -95,13 +99,23 @@ export const extractJdBackendLabel = (job: ExtractedJobData): string | undefined
   );
 
   const fromRequired = labelFromPythonBlob(requirementsProse);
-  if (fromRequired) return fromRequired;
+  if (fromRequired) {
+    // Disjunctive "at least one from Python, Java, C++" must not become "Python leads".
+    if (languageOnlyInDisjunctiveChoice(job, "Python")) return undefined;
+    const base = fromRequired.split("/")[0]!.trim();
+    if (languageOnlyInDisjunctiveChoice(job, base)) return undefined;
+    return fromRequired;
+  }
 
   // Required names Node.js as the backend — do not let Responsibilities example lists
   // (or contaminated skill tags) invent a Python-primary stack.
   if (requiredNamesNodeBackend(requirementsProse)) return undefined;
 
-  return labelFromPythonBlob(responsibilitiesProse);
+  const fromResp = labelFromPythonBlob(responsibilitiesProse);
+  if (fromResp && languageOnlyInDisjunctiveChoice(job, fromResp.split("/")[0]!.trim())) {
+    return undefined;
+  }
+  return fromResp;
 };
 
 export const extractResumeBackendLabel = (resumeText: string): string | undefined => {
@@ -247,6 +261,12 @@ export const detectBackendStackSpecializationGap = (
   const jdSide = extractJdBackendLabel(job);
   if (!jdSide) return undefined;
 
+  const baseLang = jdSide.split("/")[0]!.trim();
+  // Fabrication guard: only emit "leads with" style gaps when JD literally states priority.
+  const sourceQuote = findLiteralLeadsWithSourceQuote(job, baseLang);
+  if (!sourceQuote) return undefined;
+  if (languageOnlyInDisjunctiveChoice(job, baseLang)) return undefined;
+
   const strength = analyzeLanguageRequirementStrength(job, jdSide);
   if (strength === "soft") return undefined;
 
@@ -277,7 +297,7 @@ export const detectBackendStackSpecializationGap = (
   return finalizeGap({
     kind: "backend_stack",
     name: `${jdSide} backend`,
-    evidence: backendGapEvidence(jdSide, resumeSide, hasPython),
+    evidence: `${backendGapEvidence(jdSide, resumeSide, hasPython)} (JD: "${sourceQuote.slice(0, 120)}")`,
     severity,
     lever: severity === "central" ? "upskill" : "resume",
     jdSide,

@@ -26,20 +26,36 @@ export const normalizeRegionLabel = (text: string): string | null => {
   return trimmed.length <= 40 ? trimmed : null;
 };
 
+/**
+ * Title-suffix regions only — known geo labels or "City, ST".
+ * Do not accept arbitrary short tokens ("Mid" from Mid-Level).
+ */
+export const normalizeTitleRegionLabel = (text: string): string | null => {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  for (const { re, label } of REGION_LABELS) {
+    if (re.test(trimmed)) return label;
+  }
+  if (/^[A-Za-z][A-Za-z .'-]+,\s*[A-Z]{2}\b/.test(trimmed)) return trimmed;
+  return null;
+};
+
 export const looksLikeRegion = (text: string): boolean => normalizeRegionLabel(text) !== null;
 
-/** Title suffix: "Software Engineer - Latin America". */
+const looksLikeTitleRegion = (text: string): boolean => normalizeTitleRegionLabel(text) !== null;
+
+/** Title suffix: "Software Engineer - Latin America" (spaced dash only — not Mid-Level). */
 export const extractTitleRegionFromTitle = (title: string): string | null => {
   const trimmed = title.trim();
-  const dash = trimmed.match(/^(.+?)\s*-\s*(.+)$/);
+  const dash = trimmed.match(/^(.+?)\s+-\s+(.+)$/);
   if (!dash) return null;
   const left = dash[1]!.trim();
   const right = dash[2]!.trim();
-  if (isTitleLikeLine(left) && looksLikeRegion(right)) {
-    return normalizeRegionLabel(right);
+  if (isTitleLikeLine(left) && looksLikeTitleRegion(right)) {
+    return normalizeTitleRegionLabel(right);
   }
-  if (looksLikeRegion(left) && isTitleLikeLine(right)) {
-    return normalizeRegionLabel(left);
+  if (looksLikeTitleRegion(left) && isTitleLikeLine(right)) {
+    return normalizeTitleRegionLabel(left);
   }
   return null;
 };

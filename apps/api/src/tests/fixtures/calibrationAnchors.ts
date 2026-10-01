@@ -61,6 +61,9 @@ export const CALIBRATION_FIXTURES = {
   eulerityTitleResponsibilityMismatch: "eulerityTitleResponsibilityMismatch.json",
   nytReflectionsSupportedFeatureOwnership: "nytReflectionsSupportedFeatureOwnership.json",
   bubbleSoftwareEngineer2Scaling: "bubbleSoftwareEngineer2Scaling.json",
+  cherryTechnologiesMidLevel: "cherryTechnologiesMidLevel.json",
+  worldquantFullStackDeveloper: "worldquantFullStackDeveloper.json",
+  wexSde1ResidencyRadiusGate: "wexSde1ResidencyRadiusGate.json",
 } as const;
 
 export type CalibrationFixtureKey = keyof typeof CALIBRATION_FIXTURES;

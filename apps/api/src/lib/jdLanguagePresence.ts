@@ -33,16 +33,43 @@ const structuredJdLines = (job: ExtractedJobData): string[] =>
     ...(job.responsibilities ?? []),
   ].filter(Boolean);
 
-/** Languages present in structured JD fields only (stack/skills/requirements/responsibilities). */
+/**
+ * Languages present in the JD. When rawText exists it is authoritative —
+ * extracted stack/skills arrays can hallucinate (Fleetio/Bubble Go bug).
+ */
 export const extractJdLanguageLabels = (job: ExtractedJobData): Set<string> => {
   const labels = new Set<string>();
-  const blob = normalizeText(structuredJdLines(job).join("\n"));
+  const raw = job.rawText?.trim() ?? "";
+  const blob = normalizeText(raw || structuredJdLines(job).join("\n"));
   for (const entry of JD_LANGUAGE_PATTERNS) {
     if (entry.patterns.some((re) => re.test(blob))) {
       labels.add(entry.label);
     }
   }
   return labels;
+};
+
+/** True when a tech/skill term is literally grounded in JD rawText (when available). */
+export const termGroundedInJdRawText = (term: string, job: ExtractedJobData): boolean => {
+  const raw = job.rawText?.trim() ?? "";
+  if (!raw) return true;
+  const norm = term.trim();
+  if (!norm) return false;
+  // Prefer catalog patterns for known languages.
+  for (const entry of JD_LANGUAGE_PATTERNS) {
+    if (
+      entry.label.toLowerCase() === norm.toLowerCase() ||
+      entry.patterns.some((re) => re.test(norm))
+    ) {
+      return entry.patterns.some((re) => re.test(raw));
+    }
+  }
+  const escaped = norm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (new RegExp(`\\b${escaped}\\b`, "i").test(raw)) return true;
+  // Multi-word / punctuation variants (Node.js, CI/CD).
+  const compact = norm.replace(/[^a-z0-9]+/gi, "").toLowerCase();
+  const rawCompact = raw.replace(/[^a-z0-9]+/gi, "").toLowerCase();
+  return compact.length >= 3 && rawCompact.includes(compact);
 };
 
 export const normalizeGapLabel = (label: string): string => {
@@ -55,7 +82,7 @@ export const normalizeGapLabel = (label: string): string => {
   return t;
 };
 
-/** Keep only gap/penalty languages that appear in the structured JD language set. */
+/** Keep only gap/penalty languages that appear in the JD language set (raw-grounded). */
 export const filterLanguagesToJdPresence = (
   labels: string[],
   job: ExtractedJobData,
@@ -73,29 +100,63 @@ export const languagePresentInJd = (label: string, job: ExtractedJobData): boole
 const ASSERTED_MISSING_LANG =
   /\b(missing|lacks?|without|absent from|not in claimable|required core (?:language|stack) gap|core language mismatch)\b[^.\n]{0,80}\b(go(lang)?|java|python|ruby|php|scala|ocaml|rust|kotlin|swift|c\+\+|c#|golang)\b|\b(go(lang)?|java|python|ruby|php|scala|ocaml|rust|kotlin|swift|c\+\+|c#|golang)\b[^.\n]{0,80}\b(missing|lacks?|not in claimable|outside ts\/node)\b/gi;
 
-/** Drop risk/penalty lines that assert a missing language absent from the JD. */
+/**
+ * Drop or rewrite risk/penalty lines that assert a missing language absent from the JD.
+ * Mixed lists ("Rust, Go") keep only JD-grounded languages.
+ */
 export const suppressAbsentLanguageClaims = (
   text: string,
   job: ExtractedJobData,
 ): string => {
   if (!text.trim()) return text;
   const jdSet = extractJdLanguageLabels(job);
+
+  // Rewrite "Required core language/stack gap: A, B — ..." lists.
+  const listRewrite = text.replace(
+    /(Required core (?:language|stack) gap[:\s(]+)([^—)\n]+)([—)]?)/gi,
+    (full, prefix: string, list: string, suffix: string) => {
+      const cited = list
+        .split(/,\s*/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const grounded = cited.filter((l) => jdSet.has(normalizeGapLabel(l)));
+      if (cited.length === 0) return full;
+      if (grounded.length === 0) return "";
+      if (grounded.length === cited.length) return full;
+      return `${prefix}${grounded.join(", ")}${suffix.startsWith("—") ? " " : ""}${suffix}`;
+    },
+  );
+  if (!listRewrite.trim()) return "";
+
   let suppressed = false;
-  for (const match of text.matchAll(ASSERTED_MISSING_LANG)) {
+  for (const match of listRewrite.matchAll(ASSERTED_MISSING_LANG)) {
     const rawLang = match[2] ?? match[3] ?? match[4];
     if (!rawLang) continue;
     const label = normalizeGapLabel(rawLang);
     if (!jdSet.has(label)) suppressed = true;
   }
-  if (suppressed) return "";
-  const parenLangs = text.match(/\(([^)]+)\)/);
+  if (suppressed) {
+    // If rewrite already removed absent langs from core-gap lists, don't drop the whole line
+    // unless an absent lang still remains.
+    const stillAbsent = [...listRewrite.matchAll(ASSERTED_MISSING_LANG)].some((match) => {
+      const rawLang = match[2] ?? match[3] ?? match[4];
+      if (!rawLang) return false;
+      return !jdSet.has(normalizeGapLabel(rawLang));
+    });
+    if (stillAbsent) return "";
+  }
+
+  const parenLangs = listRewrite.match(/\(([^)]+)\)/);
   if (parenLangs) {
     const inner = parenLangs[1] ?? "";
-    if (/core (?:language|stack)/i.test(text) || /language mismatch/i.test(text)) {
+    if (/core (?:language|stack)/i.test(listRewrite) || /language mismatch/i.test(listRewrite)) {
       const cited = inner.split(/,\s*/).map((s) => s.trim()).filter(Boolean);
       const validated = filterLanguagesToJdPresence(cited, job);
       if (cited.length > 0 && validated.length === 0) return "";
+      if (validated.length > 0 && validated.length < cited.length) {
+        return listRewrite.replace(inner, validated.join(", "));
+      }
     }
   }
-  return text;
+  return listRewrite;
 };

@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Job Application Helper — Capture",
+  "version": "0.1.0",
+  "description": "Capture a job description from the current page and score it with your local Job Application Helper.",
+  "permissions": ["sidePanel", "activeTab", "scripting", "storage", "tabs"],
+  "host_permissions": ["http://localhost:4000/*", "http://127.0.0.1:4000/*"],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "options_page": "options.html",
+  "action": {
+    "default_title": "Open Job Application Helper"
+  }
+}

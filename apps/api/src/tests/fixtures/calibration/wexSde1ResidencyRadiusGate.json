@@ -1,0 +1,35 @@
+{
+  "id": "wex-sde1-residency-radius-gate",
+  "anchorNote": "GUARD: present-tense 'must reside within N miles of [hubs]' without relocation assistance is a Hard Gate (same class as citizenship/clearance), not a soft Key Risk. Brooklyn/NYC candidate fails Portland ME / Boston / Chicago / Dallas / SF Bay / Seattle radius → Apply: Skip.",
+  "extracted": {
+    "company": "Wex",
+    "companyDisplayName": "Wex",
+    "title": "Software Development Engineer 1",
+    "location": "Remote",
+    "remoteType": "remote",
+    "seniority": "junior",
+    "stack": ["Java", "Spring", "AWS", "SQL"],
+    "requiredSkills": ["Java", "Spring", "AWS", "SQL"],
+    "preferredSkills": ["Kubernetes"],
+    "domainTags": ["fintech", "payments"],
+    "responsibilities": [
+      "Design, develop, and maintain backend services",
+      "Collaborate with product and platform teams on payment workflows"
+    ],
+    "requirements": [
+      "1+ years of software development experience",
+      "Proficiency in Java and Spring",
+      "the candidate must reside within 30 miles of Portland, ME; Boston, MA; Chicago, IL; Dallas, TX; the San Francisco Bay Area, CA; or Seattle, WA."
+    ],
+    "rawText": "Software Development Engineer 1\nWex\nRemote\nJunior\nCategory\nSoftware Engineering\nFull Job Posting\nAbout the Role\nWex is hiring a Software Development Engineer 1 to build and maintain backend services on our payments platform.\n\nQualifications\n1+ years of software development experience\nProficiency in Java and Spring\nExperience with AWS and SQL\n\nLocation\nThis is a remote role. To be eligible, the candidate must reside within 30 miles of Portland, ME; Boston, MA; Chicago, IL; Dallas, TX; the San Francisco Bay Area, CA; or Seattle, WA.\n\nBenefits\nMedical, dental, and vision insurance\n401(k) with company match\nPaid time off and parental leave\nLearning and development stipend\n"
+  },
+  "storedCategoryScores": {
+    "stackFit": 14,
+    "levelFit": 16,
+    "domainFit": 7,
+    "resumeStoryClarity": 8,
+    "functionalOverlap": 12,
+    "recruiterFriendliness": 11,
+    "careerValue": 8
+  }
+}

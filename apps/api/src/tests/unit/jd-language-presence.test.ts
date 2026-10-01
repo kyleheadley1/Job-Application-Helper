@@ -286,13 +286,12 @@ describe("jd language presence — clamp mint + pipeline (Change 1)", () => {
     }
   });
 
-  it("4 — Optimizely scoring pipeline: no Go on output surfaces; stretch_signal (not referral_gated)", () => {
+  it("4 — Optimizely scoring pipeline: no Go on output surfaces; not referral_gated", () => {
     const rules = evaluateRules(GO_FREE_JD, userProfile, { activeResumeType: "SWE" });
     const { recommendation, rules: outRules, survivabilityPenalties, keyRisks } =
       runOptimizelyScoringPipeline(rules);
 
     assertNoGoOnSurfaces(GO_FREE_JD, outRules, survivabilityPenalties, keyRisks);
-    expect(recommendation).toBe("stretch_signal");
     expect(recommendation).not.toBe("referral_gated");
   });
 

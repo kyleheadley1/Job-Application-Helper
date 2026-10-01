@@ -69,6 +69,8 @@ export const env = {
     true,
   ),
   rapidApiKey: process.env.RAPIDAPI_KEY,
+  /** Shared secret the Chrome extension sends as `Authorization: Bearer <token>`. */
+  extensionApiToken: process.env.EXTENSION_API_TOKEN?.trim() || undefined,
   topJobsSyncEnabled: parseBooleanEnv(process.env.TOP_JOBS_SYNC_ENABLED, false),
   /** Cron in TOP_JOBS_SYNC_TIMEZONE — default 6:00 AM US Eastern daily. */
   topJobsSyncCron: process.env.TOP_JOBS_SYNC_CRON ?? "0 6 * * *",

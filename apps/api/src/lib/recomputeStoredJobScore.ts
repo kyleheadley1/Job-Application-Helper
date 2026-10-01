@@ -5,6 +5,7 @@ import { userProfile as defaultUserProfile } from "../config/userProfile.js";
 import { detectCapabilityGap, detectSpecializationGap } from "./capabilityGap.js";
 import { computeCompositeScore } from "./compositeScoreModel.js";
 import { applyJdLanguageOutputBoundary } from "./jdLanguageOutputBoundary.js";
+import { sanitizeExtractedTags } from "./jdTagProvenance.js";
 import { guardCompositeRecommendation } from "./recommendationGuard.js";
 import { detectReferralPathway } from "./referralPathway.js";
 import { withSanitizedRuleNotes } from "./riskDisplaySanitizer.js";
@@ -51,23 +52,27 @@ export const recomputeStoredJobScore = (params: {
   const resumeText =
     resumeContexts?.[activeResumeType]?.rawText ?? resumeContexts?.SWE?.rawText;
 
+  // Re-apply preferred/required provenance on every recompute so section-header
+  // fixes (What You Need / Nice-to-Haves) correct stale extracted arrays.
+  const extracted = sanitizeExtractedTags(job.extracted);
+
   const rules = withSanitizedRuleNotes(
-    evaluateRules(job.extracted, profile, { resumeContexts, activeResumeType }),
-    job.extracted,
+    evaluateRules(extracted, profile, { resumeContexts, activeResumeType }),
+    extracted,
     profile,
     resumeText,
   );
 
   const clamped = applyScoringClampLayer({
     score: storedCategoryScores(job.score),
-    extracted: job.extracted,
+    extracted,
     rules,
     profile,
     resumeText,
   });
 
-  const capabilityGap = detectCapabilityGap(job.extracted, clamped.score, resumeText);
-  const specializationGap = detectSpecializationGap(job.extracted, clamped.score, resumeText);
+  const capabilityGap = detectCapabilityGap(extracted, clamped.score, resumeText);
+  const specializationGap = detectSpecializationGap(extracted, clamped.score, resumeText);
   const rulesWithGap: RuleEvaluation = {
     ...clamped.rules,
     capabilityGap,
@@ -77,23 +82,23 @@ export const recomputeStoredJobScore = (params: {
   const composite = computeCompositeScore({
     rawScore: clamped.score,
     rules: rulesWithGap,
-    extracted: job.extracted,
+    extracted,
     profile,
     resumeText,
   });
 
-  const finalRules = applyJdLanguageOutputBoundary(job.extracted, rulesWithGap);
+  const finalRules = applyJdLanguageOutputBoundary(extracted, rulesWithGap);
 
   const referralPathway = detectReferralPathway({
     profile,
-    extracted: job.extracted,
+    extracted,
     resumeText,
   });
 
   const scoreDisplay = buildScoreDisplay({
     score: composite.score,
     rules: finalRules,
-    extracted: job.extracted,
+    extracted,
     profile,
     recommendation: composite.recommendation,
     referralPathwayAvailable: referralPathway.referralPathwayAvailable,
@@ -114,7 +119,7 @@ export const recomputeStoredJobScore = (params: {
   const scoreDisplayFinal = buildScoreDisplay({
     score: composite.score,
     rules: finalRules,
-    extracted: job.extracted,
+    extracted,
     profile,
     recommendation: finalRecommendation,
     referralPathwayAvailable: referralPathway.referralPathwayAvailable,
@@ -137,7 +142,7 @@ export const recomputeStoredJobScore = (params: {
       };
 
   const salaryAsk = computeSalaryAsk({
-    extracted: job.extracted,
+    extracted,
     score: scoreWithDisplay,
     recommendation: finalRecommendation,
     rules: finalRules,

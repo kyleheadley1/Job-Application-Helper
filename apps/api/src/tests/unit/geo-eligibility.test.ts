@@ -5,12 +5,22 @@ import { describe, expect, it } from "vitest";
 import { evaluateRules } from "../../agents/jobAgent/rules.js";
 import { userProfile } from "../../config/userProfile.js";
 import { computeCompositeScore } from "../../lib/compositeScoreModel.js";
-import { evaluateGeoEligibility, deriveCandidateLocation } from "../../lib/geoEligibility.js";
+import {
+  deriveCandidateLocation,
+  evaluateGeoEligibility,
+  extractResidencyRadiusRequirement,
+  jdOffersRelocationSupport,
+} from "../../lib/geoEligibility.js";
 import { extractTitleRegionFromTitle, resolveGeoScope } from "../../lib/geoScope.js";
+import { evaluateHardGates } from "../../lib/hardGates.js";
 import { buildScoreDisplay } from "../../lib/scoreDisplayModel.js";
 import type { ExtractedJobData } from "../../types/job.js";
 import type { RuleEvaluation, ScoreBreakdown } from "../../types/scoring.js";
 import type { UserProfile } from "../../types/userProfile.js";
+import {
+  loadCalibrationFixture,
+  scoreCalibrationAnchor,
+} from "../fixtures/calibrationAnchors.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SWE_RESUME = fs.readFileSync(
@@ -77,6 +87,11 @@ describe("geo scope extraction", () => {
     expect(extractTitleRegionFromTitle("Junior Software Engineer - Latin America")).toBe(
       "Latin America",
     );
+  });
+
+  it("does not treat Mid-Level compound titles as a geo region", () => {
+    expect(extractTitleRegionFromTitle("Mid-Level Software Engineer")).toBeNull();
+    expect(extractTitleRegionFromTitle("Senior Software Engineer")).toBeNull();
   });
 
   it("resolveGeoScope captures title, card, and posting fields", () => {
@@ -206,5 +221,116 @@ describe("candidate location from profile", () => {
     const loc = deriveCandidateLocation(userProfile);
     expect(loc.label).toMatch(/Brooklyn|US/i);
     expect(loc.basedInUS).toBe(true);
+  });
+});
+
+describe("Wex residency-radius hard gate (permanent fixture)", () => {
+  const fixture = loadCalibrationFixture("wexSde1ResidencyRadiusGate");
+  const WEX_JOB = fixture.extracted;
+
+  it("parses present-tense must-reside-within-miles hubs", () => {
+    const req = extractResidencyRadiusRequirement(WEX_JOB);
+    expect(req).not.toBeNull();
+    expect(req!.miles).toBe(30);
+    expect(req!.hubMetroIds).toEqual(
+      expect.arrayContaining([
+        "portland_me",
+        "boston",
+        "chicago",
+        "dallas",
+        "sf_bay",
+        "seattle",
+      ]),
+    );
+    expect(jdOffersRelocationSupport(WEX_JOB)).toBe(false);
+  });
+
+  it("hard-gates Brooklyn/NYC candidate — same path as citizenship/clearance", () => {
+    const geo = evaluateGeoEligibility(WEX_JOB, userProfile);
+    expect(geo.geoExclusionHardGate).toBe(true);
+    expect(geo.geoExclusionReason).toMatch(/30 miles/i);
+    expect(geo.geoExclusionReason).toMatch(/Brooklyn|NY/i);
+
+    const rules = evaluateRules(WEX_JOB, userProfile, { activeResumeType: "SWE" });
+    expect(rules.geoExclusionHardGate).toBe(true);
+    expect(rules.eligibilityFlag).toBeUndefined();
+
+    const gates = evaluateHardGates(rules, WEX_JOB);
+    expect(gates.fired).toBe(true);
+    expect(gates.reasons.some((r) => /reside within 30 miles/i.test(r))).toBe(true);
+
+    const { composite, display } = compositeFor(WEX_JOB, rules);
+    expect(composite.hardGateFired).toBe(true);
+    expect(composite.recommendation).toBe("no");
+    expect(composite.scoreBand).toBe("no");
+    expect(display!.hardGates.length).toBeGreaterThan(0);
+    expect(display!.hardGates[0]).toMatch(/reside within 30 miles/i);
+    expect(display!.hardGates[0]).not.toMatch(/None/i);
+  });
+
+  it("scoreCalibrationAnchor overrides inflated Apply:Yes to Skip", () => {
+    const scored = scoreCalibrationAnchor("wexSde1ResidencyRadiusGate");
+    expect(scored.rules.geoExclusionHardGate).toBe(true);
+    expect(scored.recommendation).toBe("no");
+    expect(scored.score.recommendationLabel).toMatch(/hard gate|skip|do not apply/i);
+    expect(scored.score.scoreDisplay?.hardGates.length).toBeGreaterThan(0);
+    expect(scored.score.scoreDisplay?.hardGates[0]).toMatch(/30 miles/i);
+  });
+
+  it("does not hard-gate when candidate metro is in the hub list", () => {
+    const bostonProfile: UserProfile = {
+      ...userProfile,
+      candidateLocation: {
+        label: "Boston, MA",
+        basedInUS: true,
+        regions: ["United States", "US", "Boston"],
+      },
+      locationPreferences: {
+        ...userProfile.locationPreferences,
+        primary: ["Boston", "Remote"],
+      },
+    };
+    const geo = evaluateGeoEligibility(WEX_JOB, bostonProfile);
+    expect(geo.geoExclusionHardGate).toBe(false);
+  });
+
+  it("softens to verify (not hard gate) when JD offers relocation assistance", () => {
+    const withRelocation: ExtractedJobData = {
+      ...WEX_JOB,
+      rawText: `${WEX_JOB.rawText}\n\nBenefits\nRelocation assistance available for qualified candidates.`,
+    };
+    expect(jdOffersRelocationSupport(withRelocation)).toBe(true);
+    const geo = evaluateGeoEligibility(withRelocation, userProfile);
+    expect(geo.geoExclusionHardGate).toBe(false);
+    expect(geo.eligibilityFlag?.lever).toBe("verify");
+    expect(geo.eligibilityFlag?.reason).toMatch(/relocation/i);
+  });
+});
+
+describe("residency radius vs Latin America region gate parity", () => {
+  it("both fire hardGates and recommendation no for US-based candidate", () => {
+    const latAm: ExtractedJobData = {
+      company: "LatAm Corp",
+      title: "Software Engineer",
+      location: "Remote",
+      remoteType: "remote",
+      stack: ["Python"],
+      requiredSkills: ["Python"],
+      preferredSkills: [],
+      domainTags: [],
+      responsibilities: [],
+      requirements: ["Must be based in Latin America"],
+      rawText: "Candidates must be located in Latin America.",
+    };
+    const wex = loadCalibrationFixture("wexSde1ResidencyRadiusGate").extracted;
+
+    for (const job of [latAm, wex]) {
+      const rules = evaluateRules(job, userProfile, { activeResumeType: "SWE" });
+      expect(rules.geoExclusionHardGate).toBe(true);
+      const { composite, display } = compositeFor(job, rules);
+      expect(composite.hardGateFired).toBe(true);
+      expect(composite.recommendation).toBe("no");
+      expect(display!.hardGates.length).toBeGreaterThan(0);
+    }
   });
 });

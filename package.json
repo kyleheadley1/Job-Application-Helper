@@ -4,12 +4,15 @@
   "private": true,
   "workspaces": [
     "apps/api",
-    "apps/web"
+    "apps/web",
+    "apps/extension"
   ],
   "scripts": {
     "dev": "npm run dev --workspace api",
     "dev:web": "npm run dev --workspace web",
     "build": "npm run build --workspace api && npm run build --workspace web",
+    "build:extension": "npm run build --workspace extension",
+    "dev:extension": "npm run dev --workspace extension",
     "test": "npm run test --workspace api",
     "eval:seed": "tsx scripts/seed-eval.ts",
     "eval:run": "tsx scripts/eval-regression.ts",

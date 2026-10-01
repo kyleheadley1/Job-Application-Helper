@@ -82,7 +82,8 @@ const DISJUNCTIVE_LANGUAGE_CATALOG: Array<{
     id: "cpp",
     label: "C++",
     claimableIds: ["cpp"],
-    patterns: [/\bc\+\+\b/i, /\bc\/c\+\+\b/i],
+    // Avoid \b after ++ (non-word); allow punctuation/end.
+    patterns: [/\bc\+\+(?![a-z0-9])/i, /\bc\/c\+\+/i],
   },
   {
     id: "ruby",
@@ -98,11 +99,18 @@ const DISJUNCTIVE_LANGUAGE_CATALOG: Array<{
   },
 ];
 
-const DISJUNCTIVE_FRAMING =
-  /\b(and\s*\/\s*or|,\s*or\b|at least\s+(?:one|\d+|1)\b|one of|any of|one or more of|such as|e\.g\.|including|among|from the following|proficiency in at least|experience with any of|familiarity with one or more of)\b/i;
+/**
+ * Phrasing that means "satisfying any one listed language fulfills the requirement."
+ * Match on meaning — not only Fleetio-style "X, Y, and/or Z".
+ */
+export const DISJUNCTIVE_FRAMING =
+  /\b(?:and\s*\/\s*or|\/\s*or|\bor\b|at\s+least\s+(?:one|\d+|1)\b|one\s+of(?:\s+the\s+following)?|any(?:\s+one)?\s+of|one\s+or\s+more\s+of|either\b|such\s+as|e\.g\.|including|among|from\s+the\s+following|from\b|proficiency\s+in\s+at\s+least|experience\s+with\s+any\s+of|familiarity\s+with\s+one\s+or\s+more\s+of|general[-\s]?purpose\s+programming\s+language)\b/i;
+
+const CHOICE_LIST_ENUM =
+  /\b([A-Za-z+#./]+(?:\s*[A-Za-z+#./]*)?)(?:\s*,\s*([A-Za-z+#./]+(?:\s*[A-Za-z+#./]*)?)){1,12}(?:\s*,?\s*(?:and|or|and\s*\/\s*or)\s+([A-Za-z+#./]+(?:\s*[A-Za-z+#./]*)?))?/i;
 
 const EXCLUSIVE_REQUIREMENT =
-  /\b(must have|required|professional experience with|strong proficiency in|primary language is|our (?:main|primary) (?:backend )?language)\b/i;
+  /\b(must have|required|professional experience with|strong proficiency in|primary language is|our (?:main|primary) (?:backend )?language|leads? with)\b/i;
 
 export type DisjunctiveLanguageEval = {
   /** JD lists acceptable languages disjunctively and candidate matches ≥1 in the full set. */
@@ -112,55 +120,25 @@ export type DisjunctiveLanguageEval = {
 };
 
 const jobBlob = (job: ExtractedJobData): string =>
-  normalizeText(
-    [
-      job.title,
-      job.rawText ?? "",
-      ...(job.requirements ?? []),
-      ...(job.responsibilities ?? []),
-      ...(job.stack ?? []),
-      ...(job.requiredSkills ?? []),
-    ].join("\n"),
-  );
+  [
+    job.title,
+    job.rawText ?? "",
+    ...(job.requirements ?? []),
+    ...(job.responsibilities ?? []),
+    ...(job.stack ?? []),
+    ...(job.requiredSkills ?? []),
+  ]
+    .filter(Boolean)
+    .join("\n");
 
-const requirementLinesForDisjunctive = (job: ExtractedJobData): string[] => {
-  const lines: string[] = [];
-  for (const req of job.requirements ?? []) {
-    const t = req.trim();
-    if (t) lines.push(t);
-  }
-  for (const skill of job.requiredSkills ?? []) {
-    const t = skill.trim();
-    if (t && !lines.includes(t)) lines.push(t);
-  }
-  for (const line of (job.rawText ?? "").split(/\r?\n/)) {
-    const t = line.trim();
-    if (t && DISJUNCTIVE_FRAMING.test(t) && !lines.some((l) => l === t)) {
-      lines.push(t);
-    }
-  }
-  return lines;
-};
-
-/** Extract spans that look like disjunctive language requirement lists. */
-export const extractDisjunctiveLanguageSpans = (blob: string): string[] => {
-  const spans: string[] = [];
-  const parenLists = blob.match(
-    /(?:at least\s+(?:one|\d+|1)|one of|such as|e\.g\.|including)[^.\n]{0,40}[\(:][^)\]]{5,400}[\)\]]/gi,
-  );
-  if (parenLists) spans.push(...parenLists);
-
-  for (const line of blob.split(/\n/)) {
-    if (DISJUNCTIVE_FRAMING.test(line)) spans.push(line);
-  }
-
-  const serverSideWindows = blob.match(
-    /(?:server[-\s]?side|backend|web)\s+(?:web\s+)?(?:technology|technologies|language|languages)[^.]{0,350}/gi,
-  );
-  if (serverSideWindows) spans.push(...serverSideWindows);
-
-  return [...new Set(spans.map((s) => s.trim()).filter(Boolean))];
-};
+/** Collapse mid-sentence newlines so "at least one …\nfrom Python, Java, and C++" stays one span.
+ * Only join when the next line continues in lowercase — never merge separate Title Case bullets.
+ */
+const coalesceProse = (text: string): string =>
+  text
+    .replace(/\r\n/g, "\n")
+    .replace(/([^\n.:;])\n+(?=[a-z(#])/g, "$1 ")
+    .replace(/\n{2,}/g, "\n");
 
 const languagesInSpan = (span: string): typeof DISJUNCTIVE_LANGUAGE_CATALOG => {
   const found: typeof DISJUNCTIVE_LANGUAGE_CATALOG = [];
@@ -172,8 +150,101 @@ const languagesInSpan = (span: string): typeof DISJUNCTIVE_LANGUAGE_CATALOG => {
   return found;
 };
 
-const candidateCoversLanguage = (lang: (typeof DISJUNCTIVE_LANGUAGE_CATALOG)[number], claimable: ClaimableStack): boolean =>
-  lang.claimableIds.some((id) => hasClaimableCoverage(claimable, id));
+const candidateCoversLanguage = (
+  lang: (typeof DISJUNCTIVE_LANGUAGE_CATALOG)[number],
+  claimable: ClaimableStack,
+): boolean => lang.claimableIds.some((id) => hasClaimableCoverage(claimable, id));
+
+/**
+ * True when a span is a choice-set (any one satisfies), not a conjunction of must-haves.
+ * "Python, Java, and C++" after "at least one … from" is disjunctive; bare "Python and Java required" is not.
+ */
+export const spanLooksDisjunctive = (span: string): boolean => {
+  const t = span.trim();
+  if (!t) return false;
+  const langs = languagesInSpan(t);
+  if (langs.length < 2) return false;
+
+  if (DISJUNCTIVE_FRAMING.test(t)) return true;
+
+  // Explicit and/or or comma-or lists.
+  if (/\band\s*\/\s*or\b/i.test(t) || /,\s*or\b/i.test(t)) return true;
+
+  // "from A, B, and C" / "among A, B, or C" choice enumerations.
+  if (
+    /\b(?:from|among|including|such as|e\.g\.)\b/i.test(t) &&
+    langs.length >= 2 &&
+    (CHOICE_LIST_ENUM.test(t) || /\bor\b/i.test(t))
+  ) {
+    return true;
+  }
+
+  // "A, B, or C" without and/or token.
+  if (/\bor\b/i.test(t) && langs.length >= 2) return true;
+
+  return false;
+};
+
+/** Extract spans that look like disjunctive language requirement lists. */
+export const extractDisjunctiveLanguageSpans = (blob: string): string[] => {
+  const coalesced = coalesceProse(blob);
+  const spans: string[] = [];
+
+  const parenLists = coalesced.match(
+    /(?:at\s+least\s+(?:one|\d+|1)|one\s+of(?:\s+the\s+following)?|any(?:\s+one)?\s+of|such\s+as|e\.g\.|including|from)[^.\n]{0,80}[\(:][^)\]]{5,400}[\)\]]/gi,
+  );
+  if (parenLists) spans.push(...parenLists);
+
+  // Cross-line / long-sentence: at least one … from A, B, and C
+  const atLeastFrom = coalesced.match(
+    /(?:proficiency\s+in\s+)?at\s+least\s+(?:one|\d+|1)\b[^.\n]{0,160}?\bfrom\b[^.\n]{5,220}/gi,
+  );
+  if (atLeastFrom) spans.push(...atLeastFrom);
+
+  const oneOf = coalesced.match(
+    /\b(?:one|any(?:\s+one)?)\s+of(?:\s+the\s+following)?\b[^.\n]{5,220}/gi,
+  );
+  if (oneOf) spans.push(...oneOf);
+
+  for (const line of coalesced.split(/\n/)) {
+    if (spanLooksDisjunctive(line)) spans.push(line);
+    // Sentence splits within a single line only — never flatten newlines across bullets
+    // (BisectHosting: React/Vue/or Nuxt must not absorb a separate PHP Laravel line).
+    for (const sentence of line.split(/(?<=[.;])\s+/)) {
+      const s = sentence.trim();
+      if (s && spanLooksDisjunctive(s) && languagesInSpan(s).length >= 2) {
+        spans.push(s);
+      }
+    }
+  }
+
+  const serverSideWindows = coalesced.match(
+    /(?:server[-\s]?side|backend|web)\s+(?:web\s+)?(?:technology|technologies|language|languages)[^.]{0,350}/gi,
+  );
+  if (serverSideWindows) spans.push(...serverSideWindows);
+
+  return [...new Set(spans.map((s) => s.trim()).filter(Boolean))];
+};
+
+const requirementLinesForDisjunctive = (job: ExtractedJobData): string[] => {
+  const lines: string[] = [];
+  for (const req of job.requirements ?? []) {
+    const t = req.trim();
+    if (t) lines.push(t);
+  }
+  for (const skill of job.requiredSkills ?? []) {
+    const t = skill.trim();
+    if (t && !lines.includes(t)) lines.push(t);
+  }
+  const raw = coalesceProse(job.rawText ?? "");
+  for (const line of raw.split(/\n/)) {
+    const t = line.trim();
+    if (t && spanLooksDisjunctive(t) && !lines.some((l) => l === t)) {
+      lines.push(t);
+    }
+  }
+  return lines;
+};
 
 /**
  * True when the JD accepts any of a listed language set and the candidate claimable stack
@@ -183,17 +254,17 @@ export const evaluateDisjunctiveLanguageRequirement = (
   job: ExtractedJobData,
   claimable: ClaimableStack,
 ): DisjunctiveLanguageEval => {
-  const spans = requirementLinesForDisjunctive(job);
+  const spans = [
+    ...requirementLinesForDisjunctive(job),
+    ...extractDisjunctiveLanguageSpans(jobBlob(job)),
+  ];
 
   let bestAccepted: string[] = [];
 
   for (const span of spans) {
+    if (!spanLooksDisjunctive(span)) continue;
     const langs = languagesInSpan(span);
-    const isDisjunctive =
-      DISJUNCTIVE_FRAMING.test(span) ||
-      (/\bor\b/i.test(span) && langs.length >= 2);
-
-    if (!isDisjunctive || langs.length < 2) continue;
+    if (langs.length < 2) continue;
 
     const labels = langs.map((l) => l.label);
     const candidateMatches = langs.some((l) => candidateCoversLanguage(l, claimable));
@@ -218,22 +289,57 @@ export const evaluateDisjunctiveLanguageRequirement = (
 
 /** Exclusive single-language requirement with no acceptable alternatives in the same clause. */
 export const isExclusiveCoreLanguageRequirement = (blob: string, languageLabel: string): boolean => {
-  const lines = blob.split("\n").filter((l) => new RegExp(`\\b${languageLabel}\\b`, "i").test(l));
+  const coalesced = coalesceProse(blob);
+  const lines = coalesced.split("\n").filter(
+    (l) =>
+      new RegExp(
+        `\\b${languageLabel.replace(/[+]/g, "\\+").replace(/#/g, "\\#")}\\b`,
+        "i",
+      ).test(l) ||
+      (languageLabel === "C++" && /\bc\+\+/i.test(l)),
+  );
   for (const line of lines) {
     const langsInLine = languagesInSpan(line);
-    const hasDisjunctive = DISJUNCTIVE_FRAMING.test(line) || langsInLine.length >= 2;
+    const hasDisjunctive = spanLooksDisjunctive(line) || langsInLine.length >= 2;
     if (EXCLUSIVE_REQUIREMENT.test(line) && !hasDisjunctive) return true;
   }
-  return EXCLUSIVE_REQUIREMENT.test(blob) && !DISJUNCTIVE_FRAMING.test(blob) && languagesInSpan(blob).length <= 1;
+  return (
+    EXCLUSIVE_REQUIREMENT.test(coalesced) &&
+    !spanLooksDisjunctive(coalesced) &&
+    languagesInSpan(coalesced).length <= 1
+  );
 };
 
+/**
+ * True when a language label appears in the JD inside disjunctive choice phrasing
+ * and is not also an exclusive "must have / primary language" claim.
+ */
+export const languageOnlyInDisjunctiveChoice = (
+  job: ExtractedJobData,
+  languageLabel: string,
+): boolean => {
+  const entry = DISJUNCTIVE_LANGUAGE_CATALOG.find(
+    (l) => l.label.toLowerCase() === languageLabel.toLowerCase(),
+  );
+  if (!entry) return false;
+
+  const raw = coalesceProse(jobBlob(job));
+  if (!entry.patterns.some((re) => re.test(raw))) return false;
+
+  if (isExclusiveCoreLanguageRequirement(raw, entry.label)) return false;
+
+  const spans = extractDisjunctiveLanguageSpans(raw);
+  return spans.some(
+    (span) => spanLooksDisjunctive(span) && entry.patterns.some((re) => re.test(span)),
+  );
+};
 
 /** True when a requirement line uses and/or (or similar) and candidate matches ≥1 listed stack item. */
 export const lineDisjunctiveRequirementSatisfied = (
   line: string,
   claimable: ClaimableStack,
 ): boolean => {
-  if (!DISJUNCTIVE_FRAMING.test(line)) return false;
+  if (!spanLooksDisjunctive(line)) return false;
   const langs = languagesInSpan(line);
   if (langs.length < 2) return false;
   return langs.some((l) => candidateCoversLanguage(l, claimable));
@@ -311,3 +417,45 @@ export const filterDisjunctiveContradictingRiskLines = (
   >,
 ): string[] =>
   lines.filter((line) => !riskContradictsSatisfiedDisjunctiveRequirement(line, rules));
+
+/**
+ * Literal JD source quote required before asserting the role "leads with" a language.
+ * Rejects inferred priority from skill-tag order or disjunctive choice lists.
+ */
+export const findLiteralLeadsWithSourceQuote = (
+  job: ExtractedJobData,
+  languageLabel: string,
+): string | null => {
+  const entry = DISJUNCTIVE_LANGUAGE_CATALOG.find(
+    (l) => l.label.toLowerCase() === languageLabel.toLowerCase().split("/")[0]?.trim(),
+  );
+  const langNeedle =
+    entry?.patterns[0] ??
+    new RegExp(`\\b${languageLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
+
+  const LEADS_WITH_LITERAL =
+    /\b(?:leads?\s+with|primary\s+(?:backend\s+)?language|our\s+(?:main|primary)\s+(?:backend\s+)?language|backend\s+(?:is|in|using)|written\s+(?:primarily\s+)?in)\b/i;
+
+  const lines = coalesceProse(
+    [job.rawText ?? "", ...(job.requirements ?? []), ...(job.responsibilities ?? [])].join("\n"),
+  ).split(/\n/);
+
+  for (const line of lines) {
+    if (!langNeedle.test(line)) continue;
+    if (spanLooksDisjunctive(line)) continue;
+    if (languageOnlyInDisjunctiveChoice(job, entry?.label ?? languageLabel)) continue;
+    if (LEADS_WITH_LITERAL.test(line) || EXCLUSIVE_REQUIREMENT.test(line)) {
+      return line.trim().slice(0, 240);
+    }
+    // Exclusive production/backend stack statement (not a choice list).
+    if (
+      /\b(production|backend|required)\b/i.test(line) &&
+      languagesInSpan(line).length >= 1 &&
+      languagesInSpan(line).length <= 2 &&
+      !/\bat\s+least\b|\bone\s+of\b|\bany\s+of\b|\band\s*\/\s*or\b|\bfrom\b/i.test(line)
+    ) {
+      return line.trim().slice(0, 240);
+    }
+  }
+  return null;
+};

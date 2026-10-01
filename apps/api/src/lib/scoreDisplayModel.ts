@@ -15,6 +15,8 @@ import {
   PRODUCTION_INFRA_OWNERSHIP_SURV_PENALTY,
   textIsNamedCapabilityGapRisk,
 } from "./namedCapabilityRiskPenalty.js";
+import { filterLanguageNoteAtBoundary } from "./jdLanguageOutputBoundary.js";
+import { suppressAbsentLanguageClaims } from "./jdLanguagePresence.js";
 import type { ExtractedJobData } from "../types/job.js";
 import type {
   CapabilityBreakdown,
@@ -510,7 +512,16 @@ export const buildSurvivabilityPenalties = (
     });
   }
 
-  return penalties;
+  // Strip hallucinated tech/language cites from every penalty message (rawText-grounded).
+  return penalties
+    .map((p) => {
+      const bounded = filterLanguageNoteAtBoundary(p.message, extracted, rules);
+      if (bounded == null) return null;
+      const cleaned = suppressAbsentLanguageClaims(bounded, extracted);
+      if (!cleaned.trim()) return null;
+      return { ...p, message: cleaned };
+    })
+    .filter((p): p is SurvivabilityPenalty => Boolean(p?.message?.trim()));
 };
 
 export const buildHardGatesList = (

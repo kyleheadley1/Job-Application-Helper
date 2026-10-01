@@ -11,7 +11,13 @@ const ensureIndexes = async (targetDb: Db): Promise<void> => {
   if (indexesEnsured) return;
   const jobs = targetDb.collection("jobs");
   const topJobs = targetDb.collection("top_jobs");
+  const captures = targetDb.collection("job_captures");
   await Promise.all([
+    captures.createIndex({ jdTextHash: 1, createdAt: -1 }),
+    captures.createIndex({ normalizedSourceUrl: 1, createdAt: -1 }),
+    captures.createIndex({ jobId: 1 }),
+    captures.createIndex({ status: 1, createdAt: 1 }),
+    captures.createIndex({ createdAt: -1 }),
     jobs.createIndex(
       { importKey: 1 },
       { unique: true, sparse: true },
