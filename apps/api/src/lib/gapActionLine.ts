@@ -26,8 +26,12 @@ export const composeSpecializationGapActionLine = (
   worthTailoring: boolean,
 ): string => {
   if (gap.kind === "backend_stack" && gap.jdSide && gap.resumeSide) {
-    const core = `${prefix} — role leads with ${gap.jdSide} on the backend; your resume leads with ${gap.resumeSide} — ${leverInstruction(gap.lever)}`;
-    return `${core}.${tailorSuffix(worthTailoring, gap.severity)}`;
+    // "leads with" only when detectBackendStackSpecializationGap already verified a JD quote.
+    if (gap.evidence && /\(JD:/i.test(gap.evidence)) {
+      const core = `${prefix} — role leads with ${gap.jdSide} on the backend; your resume leads with ${gap.resumeSide} — ${leverInstruction(gap.lever)}`;
+      return `${core}.${tailorSuffix(worthTailoring, gap.severity)}`;
+    }
+    return `${prefix} — ${gap.evidence}. ${leverInstruction(gap.lever).charAt(0).toUpperCase()}${leverInstruction(gap.lever).slice(1)}.${tailorSuffix(worthTailoring, gap.severity)}`;
   }
 
   if (gap.kind === "design_portfolio") {

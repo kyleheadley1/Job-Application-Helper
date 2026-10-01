@@ -11,10 +11,13 @@ export type ExtractedSkillTag = {
 };
 
 const REQUIRED_SECTION_RE =
-  /^(requirements?|qualifications?|basic qualifications?|minimum qualifications?|your experience|must have|what you'?ll need|what we'?re looking for|you have|you bring|responsibilities|what you'?ll do|in this role)$/i;
+  /^(requirements?|qualifications?|basic qualifications?|minimum qualifications?|your experience|must[- ]haves?|what you(?:'?ll)? need|what we'?re looking for|responsibilities|what you'?ll do|in this role)\b/i;
+
+/** Short identity headers that must not match body lines like "You have a passion…". */
+const REQUIRED_SHORT_HEADER_RE = /^(you have|you bring)$/i;
 
 const PREFERRED_SECTION_RE =
-  /^(nice to have|considered a plus|bonus|preferred qualifications?|preferred skills?|what'?s a plus|optional)$/i;
+  /^(nice[- ]to[- ]haves?|considered a plus|bonus(?:\s+points)?|preferred qualifications?|preferred skills?|what'?s a plus|optional)\b/i;
 
 const NARRATIVE_SECTION_RE =
   /^(who you are|about the team|about us|who we are|about this role|culture|our values|why join|the role|about the role|what success looks like)$/i;
@@ -75,17 +78,27 @@ const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\
 
 const classifyLineStrength = (line: string, section: TagSourceStrength | null): TagSourceStrength => {
   const trimmed = line.trim();
-  if (SKILL_CHIP_SECTION_RE.test(trimmed)) return "PREFERRED";
-  if (REQUIRED_SECTION_RE.test(trimmed)) return "REQUIRED";
-  if (PREFERRED_SECTION_RE.test(trimmed)) return "PREFERRED";
-  if (NARRATIVE_SECTION_RE.test(trimmed)) return "NARRATIVE";
-  // Under an explicit Preferred section, do not upgrade "Experience with …" lines to REQUIRED.
+  // Strip trailing chrome ("Nice-to-Haves: Familiarity with our stack").
+  const headerProbe = trimmed.replace(/:\s*.*$/, "").trim();
+  if (SKILL_CHIP_SECTION_RE.test(headerProbe) || SKILL_CHIP_SECTION_RE.test(trimmed)) {
+    return "PREFERRED";
+  }
+  if (
+    REQUIRED_SECTION_RE.test(headerProbe) ||
+    REQUIRED_SECTION_RE.test(trimmed) ||
+    REQUIRED_SHORT_HEADER_RE.test(headerProbe)
+  ) {
+    return "REQUIRED";
+  }
+  if (PREFERRED_SECTION_RE.test(headerProbe) || PREFERRED_SECTION_RE.test(trimmed)) return "PREFERRED";
+  if (NARRATIVE_SECTION_RE.test(headerProbe) || NARRATIVE_SECTION_RE.test(trimmed)) return "NARRATIVE";
+  // Under an explicit Preferred section, do not upgrade "Experience with …" / "Familiarity with …" to REQUIRED.
   if (section === "PREFERRED") {
     if (/\b(must have|required|mandatory)\b/i.test(trimmed)) return "REQUIRED";
     return "PREFERRED";
   }
   if (/\b(must have|required|minimum|proficiency in|experience with)\b/i.test(trimmed)) return "REQUIRED";
-  if (/\b(nice to have|considered a plus|bonus|preferred|ideally|optional)\b/i.test(trimmed)) {
+  if (/\b(nice[- ]to[- ]haves?|considered a plus|bonus|preferred|ideally|optional|familiarity with)\b/i.test(trimmed)) {
     return "PREFERRED";
   }
   return section ?? "NARRATIVE";
@@ -104,14 +117,19 @@ export const classifyJdLines = (rawText: string): Array<{ line: string; strength
   for (const rawLine of rawText.split(/\n+/)) {
     const line = rawLine.trim();
     if (!line) continue;
-    const headerStrength = classifyLineStrength(line, null);
-    if (
+    const headerProbe = line.replace(/:\s*.*$/, "").trim();
+    const isHeader =
+      REQUIRED_SECTION_RE.test(headerProbe) ||
       REQUIRED_SECTION_RE.test(line) ||
+      REQUIRED_SHORT_HEADER_RE.test(headerProbe) ||
+      PREFERRED_SECTION_RE.test(headerProbe) ||
       PREFERRED_SECTION_RE.test(line) ||
+      NARRATIVE_SECTION_RE.test(headerProbe) ||
       NARRATIVE_SECTION_RE.test(line) ||
-      SKILL_CHIP_SECTION_RE.test(line)
-    ) {
-      section = headerStrength;
+      SKILL_CHIP_SECTION_RE.test(headerProbe) ||
+      SKILL_CHIP_SECTION_RE.test(line);
+    if (isHeader) {
+      section = classifyLineStrength(line, null);
       out.push({ line, strength: section });
       continue;
     }
@@ -228,13 +246,41 @@ export const sanitizeExtractedTags = (job: ExtractedJobData): ExtractedJobData =
   };
 };
 
+/** Highest provenance strength for a term, or null when absent from JD text. */
+export const termProvenanceStrength = (
+  term: string,
+  job: ExtractedJobData,
+): TagSourceStrength | null => {
+  const tags = job.skillTags?.length ? job.skillTags : buildJdTagProvenance(job);
+  const key = normalizeTerm(term);
+  const hit = tags.find((t) => normalizeTerm(t.term) === key);
+  if (hit) return hit.strength;
+  const raw = job.rawText?.trim() ?? "";
+  if (!raw || !termLiterallyInText(term, raw)) return null;
+  const classified = classifyJdLines(raw);
+  const quote = findSourceQuote(term, classified);
+  return quote?.strength ?? null;
+};
+
+/** True when the term is only preferred/narrative in the JD (never required). */
+export const termIsPreferredOrNarrativeOnly = (term: string, job: ExtractedJobData): boolean => {
+  if ((job.preferredSkills ?? []).some((p) => normalizeTerm(p) === normalizeTerm(term))) {
+    const strength = termProvenanceStrength(term, job);
+    if (strength === "REQUIRED") return false;
+    return true;
+  }
+  const strength = termProvenanceStrength(term, job);
+  return strength === "PREFERRED" || strength === "NARRATIVE";
+};
+
 /** Tags at or above min strength — for scoring / gap detection. */
 export const tagsAtLeastStrength = (
   job: ExtractedJobData,
   minStrength: TagSourceStrength,
-): ExtractedSkillTag[] => (job.skillTags ?? buildJdTagProvenance(job)).filter(
-  (t) => strengthRank(t.strength) >= strengthRank(minStrength),
-);
+): ExtractedSkillTag[] =>
+  (job.skillTags ?? buildJdTagProvenance(job)).filter(
+    (t) => strengthRank(t.strength) >= strengthRank(minStrength),
+  );
 
 /** True when JD has explicit design-tool / portfolio requirements (not narrative UX prose). */
 export const jdHasExplicitDesignToolRequirement = (job: ExtractedJobData): boolean => {

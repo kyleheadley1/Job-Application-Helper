@@ -100,8 +100,25 @@ export const detectStrictFinanceEmployerContext = (combinedText: string, company
   if (NAMED_FINANCE_EMPLOYER.test(c) && !sellsToFinanceCustomers) return true;
 
   if (/\b(quantitative trader|quant researcher|trading firm|market maker)\b/i.test(c)) return true;
+  // Also suppress bare "fintech + lending" for product BNPL / healthcare financing employers.
   if (/\b(fintech)\b/i.test(c) && /\b(lending|core banking|treasury)\b/i.test(c)) {
+    if (
+      /\b(bnpl|buy\s+now\s+pay\s+later|patient\s+financ|healthcare\s+financ|medical\s+financ|consumer\s+financ)\b/i.test(
+        c,
+      )
+    ) {
+      return false;
+    }
     return !sellsToFinanceCustomers;
+  }
+
+  // Product BNPL / healthcare financing is not a bank/trading institution.
+  if (
+    /\b(bnpl|buy\s+now\s+pay\s+later|patient\s+financ|healthcare\s+financ|medical\s+financ|consumer\s+financ)\b/i.test(
+      c,
+    )
+  ) {
+    return false;
   }
 
   if (includesAny(c, STRICT_FINANCE_PHRASES)) {

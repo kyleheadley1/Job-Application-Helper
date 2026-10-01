@@ -9,6 +9,7 @@ import { jobsRepository } from "./services/jobs/jobs.repository.js";
 import { repoRootDir } from "./config/env.js";
 import { resumeContextService } from "./services/resume/resumeContext.js";
 import { startTopJobsScheduler } from "./services/topJobs/topJobsScheduler.js";
+import { capturesService } from "./services/captures/captures.service.js";
 
 const trackerWorkbookPath = (): string =>
   env.trackerSeedWorkbookPath?.trim()
@@ -55,6 +56,7 @@ const start = async (): Promise<void> => {
   await ensureTrackerSeed();
   await preloadResumeContext();
   startTopJobsScheduler();
+  await capturesService.resumeUnfinished();
   const server = app.listen(env.port, () => {
     logger.info("API server started", { port: env.port, env: env.nodeEnv });
   });

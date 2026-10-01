@@ -5,6 +5,7 @@ import {
   filterLanguagesToJdPresence,
   languagePresentInJd,
   normalizeGapLabel,
+  suppressAbsentLanguageClaims,
 } from "./jdLanguagePresence.js";
 import { riskContradictsSatisfiedDisjunctiveRequirement } from "./disjunctiveLanguageRequirement.js";
 
@@ -79,6 +80,13 @@ const extractCitedLanguagesFromNote = (note: string): string[] => {
       .map((s) => s.trim())
       .filter(Boolean);
   }
+  const stackColonMatch = note.match(/Required core stack gap:\s*([^—]+)/i);
+  if (stackColonMatch?.[1]) {
+    return stackColonMatch[1]
+      .split(/,\s*/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
   const parenMatch = note.match(/Required core stack gap\s*\(([^)]+)\)/i);
   if (parenMatch?.[1]) {
     return parenMatch[1]
@@ -93,7 +101,9 @@ const extractCitedLanguagesFromNote = (note: string): string[] => {
   return [];
 };
 
-/** Drop notes that cite missing languages absent from the structured JD. */
+/** Drop notes that cite missing languages absent from the structured JD.
+ * Mixed lists ("Rust, Go") are rewritten to JD-grounded languages only.
+ */
 export const filterLanguageNoteAtBoundary = (
   note: string,
   job: ExtractedJobData,
@@ -104,9 +114,38 @@ export const filterLanguageNoteAtBoundary = (
 ): string | null => {
   if (rules && riskContradictsSatisfiedDisjunctiveRequirement(note, rules)) return null;
   const cited = extractCitedLanguagesFromNote(note);
-  if (cited.length === 0) return note;
-  if (cited.some((l) => !languagePresentInJd(l, job))) return null;
-  return note;
+  let next = note;
+  if (cited.length > 0) {
+    const grounded = cited.filter((l) => languagePresentInJd(l, job));
+    if (grounded.length === 0) return null;
+    if (grounded.length < cited.length) {
+      next = note;
+      next = next.replace(
+        /(Required core language gap:\s*)([^—\n]+)(—?)/i,
+        (_m, prefix: string, _list: string, dash: string) =>
+          `${prefix}${grounded.join(", ")}${dash ? " —" : ""}`.replace(/\s+—$/, " —"),
+      );
+      next = next.replace(
+        /(Required core stack gap:\s*)([^—\n]+)(—?)/i,
+        (_m, prefix: string, _list: string, dash: string) =>
+          `${prefix}${grounded.join(", ")}${dash ? " —" : ""}`.replace(/\s+—$/, " —"),
+      );
+      next = next.replace(
+        /(Required core stack gap\s*\()([^)]+)(\))/i,
+        (_m, prefix: string, _list: string, close: string) =>
+          `${prefix}${grounded.join(", ")}${close}`,
+      );
+      next = next.replace(
+        /(Core language mismatch — role backend \()([^)]+)(\))/i,
+        (_m, prefix: string, _list: string, close: string) =>
+          `${prefix}${grounded.join(", ")}${close}`,
+      );
+      if (next === note) return null;
+      next = next.replace(/\s{2,}/g, " ").trim();
+    }
+  }
+  const suppressed = suppressAbsentLanguageClaims(next, job);
+  return suppressed.trim() ? suppressed : null;
 };
 
 /**

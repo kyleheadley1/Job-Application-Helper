@@ -19,6 +19,11 @@ import {
 } from "./prompts.js";
 import { formatWhyCompanyForSIE, stripPastedJdHeaderFromCoverLetter } from "../../tools/triageStructuredNormalize.js";
 import { toLegacyRecommendation } from "../../lib/recommendationMapping.js";
+import {
+  sanitizeGeneratedAssetList,
+  sanitizeGeneratedAssetText,
+} from "../../lib/riskDisplaySanitizer.js";
+import { termGroundedInJdRawText } from "../../lib/jdLanguagePresence.js";
 
 const legacyRecBand = (rec: JobRecord["recommendation"]): "yes" | "selective_yes" | "no" =>
   toLegacyRecommendation(rec);
@@ -190,7 +195,9 @@ export const buildDeterministicGeneratedAssets = (
   const company = extracted.company;
   const title = extracted.title;
   const guidance = buildCoverLetterGuidance(job, profile);
-  const stackLine = [...extracted.stack, ...extracted.requiredSkills].filter(Boolean).join(", ");
+  const stackLine = [...extracted.stack, ...extracted.requiredSkills]
+    .filter((t) => Boolean(t?.trim()) && termGroundedInJdRawText(t, extracted))
+    .join(", ");
   const resp0 = extracted.responsibilities[0];
   const rawSnippet = extracted.rawText?.trim().slice(0, 320);
   const keyPriorities = guidance.priorities.slice(0, 2).join(" and ").replace(/\.$/, "");
@@ -346,14 +353,20 @@ export const buildDeterministicGeneratedAssets = (
 
   const recruiterReplyDraft = `Thanks for considering my application for ${title} at ${company}. Happy to answer a few scoping questions or share a small work sample that maps to the posting — especially around ${stackLine || "the core responsibilities"}.`;
 
+  const sanitizeCtx = {
+    extracted,
+    userProfile: profile,
+    rules,
+  };
+
   return {
-    coverLetter,
-    whyCompany,
-    talkingPoints: normalizedTalkingPoints,
-    tailoredBulletCandidates,
-    emphasize: emphasize.slice(0, 6),
-    avoidClaiming: avoidClaiming.slice(0, 12),
-    recruiterReplyDraft,
+    coverLetter: sanitizeGeneratedAssetText(coverLetter, sanitizeCtx),
+    whyCompany: sanitizeGeneratedAssetText(whyCompany, sanitizeCtx),
+    talkingPoints: sanitizeGeneratedAssetList(normalizedTalkingPoints, sanitizeCtx),
+    tailoredBulletCandidates: sanitizeGeneratedAssetList(tailoredBulletCandidates, sanitizeCtx),
+    emphasize: sanitizeGeneratedAssetList(emphasize.slice(0, 6), sanitizeCtx),
+    avoidClaiming: sanitizeGeneratedAssetList(avoidClaiming.slice(0, 12), sanitizeCtx),
+    recruiterReplyDraft: sanitizeGeneratedAssetText(recruiterReplyDraft, sanitizeCtx),
   };
 };
 
@@ -439,18 +452,52 @@ export const generateJobAssets = async (params: GenerateJobAssetsParams): Promis
     whyCompany = formatWhyCompanyForSIE(whyCompany);
   }
 
+  const sanitizeCtx = {
+    extracted: job.extracted,
+    userProfile,
+    rules: job.rules,
+  };
+
+  if (typeof coverLetter === "string" && coverLetter.trim()) {
+    coverLetter = sanitizeGeneratedAssetText(coverLetter, sanitizeCtx);
+  }
+  if (typeof whyCompany === "string" && whyCompany.trim()) {
+    whyCompany = sanitizeGeneratedAssetText(whyCompany, sanitizeCtx);
+  }
+
+  const talkingPoints = sanitizeGeneratedAssetList(
+    pick(talk.success, talk.data.talkingPoints, fb.talkingPoints) ?? [],
+    sanitizeCtx,
+  );
+  const tailoredBulletCandidates = sanitizeGeneratedAssetList(
+    pick(bullets.success, bullets.data.tailoredBulletCandidates, fb.tailoredBulletCandidates) ?? [],
+    sanitizeCtx,
+  );
+  const emphasize = sanitizeGeneratedAssetList(
+    pick(strat.success, strat.data.emphasize, fb.emphasize) ?? [],
+    sanitizeCtx,
+  );
+  const avoidClaiming = sanitizeGeneratedAssetList(
+    pick(strat.success, strat.data.avoidClaiming, fb.avoidClaiming) ?? [],
+    sanitizeCtx,
+  );
+  let recruiterReplyDraft = pick(
+    strat.success,
+    strat.data.recruiterReplyDraft ?? fb.recruiterReplyDraft,
+    fb.recruiterReplyDraft,
+  );
+  if (typeof recruiterReplyDraft === "string" && recruiterReplyDraft.trim()) {
+    recruiterReplyDraft = sanitizeGeneratedAssetText(recruiterReplyDraft, sanitizeCtx);
+  }
+
   const generated: GeneratedAssets = {
     coverLetter,
     whyCompany,
-    talkingPoints: pick(talk.success, talk.data.talkingPoints, fb.talkingPoints),
-    tailoredBulletCandidates: pick(bullets.success, bullets.data.tailoredBulletCandidates, fb.tailoredBulletCandidates),
-    emphasize: pick(strat.success, strat.data.emphasize, fb.emphasize),
-    avoidClaiming: pick(strat.success, strat.data.avoidClaiming, fb.avoidClaiming),
-    recruiterReplyDraft: pick(
-      strat.success,
-      strat.data.recruiterReplyDraft ?? fb.recruiterReplyDraft,
-      fb.recruiterReplyDraft,
-    ),
+    talkingPoints,
+    tailoredBulletCandidates,
+    emphasize,
+    avoidClaiming,
+    recruiterReplyDraft,
   };
 
   const debugAssetGeneration: DebugAssetGeneration = {

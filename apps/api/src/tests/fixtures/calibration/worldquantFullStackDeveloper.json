@@ -1,0 +1,36 @@
+{
+  "id": "worldquant-full-stack-developer",
+  "anchorNote": "WorldQuant Full Stack Developer — disjunctive 'at least one … from Python, Java, and C++' satisfied by Python. Must not invent required Java gap or 'role leads with Python' (JD states no priority; Polars is analytics context only). GUARD: multi-line split of at-least-one/from lists must still detect disjunction.",
+  "extracted": {
+    "company": "WorldQuant",
+    "companyDisplayName": "WorldQuant",
+    "title": "Full Stack Developer",
+    "location": "Remote",
+    "remoteType": "remote",
+    "seniority": "Mid Level",
+    "stack": ["Python", "Java", "C++", "React", "TypeScript", "Polars"],
+    "requiredSkills": ["Python", "Java", "C++", "React", "TypeScript"],
+    "preferredSkills": [],
+    "domainTags": ["quant", "fintech", "trading"],
+    "responsibilities": [
+      "Build full-stack product features for internal research and reporting tools",
+      "Use Polars for analytics/reporting pipelines where appropriate",
+      "Collaborate with researchers and platform teams"
+    ],
+    "requirements": [
+      "Proficiency in at least one general purpose programming language from Python, Java, and C++.",
+      "Experience building web UIs with React and TypeScript",
+      "Strong fundamentals in data structures and algorithms"
+    ],
+    "rawText": "WorldQuant\nFull Stack Developer\nRemote\nAbout the role\nBuild full-stack tools for research and reporting.\nWhat You Need\nProficiency in at least one general purpose programming language\nfrom Python, Java, and C++.\nExperience building web UIs with React and TypeScript\nStrong fundamentals in data structures and algorithms\nNice to have\nFamiliarity with Polars for analytics reporting\nResponsibilities\nBuild full-stack product features for internal research and reporting tools\nUse Polars for analytics/reporting pipelines where appropriate\nCollaborate with researchers and platform teams"
+  },
+  "storedCategoryScores": {
+    "stackFit": 16,
+    "levelFit": 14,
+    "domainFit": 6,
+    "resumeStoryClarity": 9,
+    "functionalOverlap": 12,
+    "recruiterFriendliness": 10,
+    "careerValue": 7
+  }
+}

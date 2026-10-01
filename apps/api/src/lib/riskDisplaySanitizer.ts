@@ -1,5 +1,8 @@
 import { applyJdLanguageOutputBoundary } from "./jdLanguageOutputBoundary.js";
-import { riskContradictsSatisfiedDisjunctiveRequirement } from "./disjunctiveLanguageRequirement.js";
+import {
+  findLiteralLeadsWithSourceQuote,
+  riskContradictsSatisfiedDisjunctiveRequirement,
+} from "./disjunctiveLanguageRequirement.js";
 import { riskLineReferencesAbsentJdConcepts } from "./riskJdConceptGrounding.js";
 import {
   languagePresentInJd,
@@ -83,10 +86,12 @@ const STRIP_ORDER: Array<{ canon: TechCanon; patterns: RegExp[] }> = [
 ];
 
 function jobBlobForAllowlist(extracted: ExtractedJobData): string {
+  // Prefer raw JD text — extracted skillTags/arrays can hallucinate tech names.
+  if (extracted.rawText?.trim()) {
+    return normalizeText(extracted.rawText);
+  }
   return normalizeText(
     [
-      // JD-grounded only: do NOT trust generated arrays for tech allowlisting.
-      extracted.rawText ?? "",
       ...(extracted.skillTags ?? []).map((t) => `${t.term} ${t.sourceQuote}`),
     ].join("\n"),
   );
@@ -210,6 +215,14 @@ export function sanitizeVisibleRiskLine(text: string, ctx: VisibleSanitizeContex
   if (ctx.rules && riskContradictsSatisfiedDisjunctiveRequirement(text, ctx.rules)) {
     return "";
   }
+  // Drop fabricated "role leads with X" when JD has no literal priority quote.
+  if (/\brole leads with\b/i.test(text)) {
+    const langMatch = text.match(/\brole leads with\s+([^;,]+?)(?:\s+on the backend)?/i);
+    const claimed = langMatch?.[1]?.trim().split("/")[0]?.trim();
+    if (claimed && !findLiteralLeadsWithSourceQuote(ctx.extracted, claimed)) {
+      return "";
+    }
+  }
   if (riskLineReferencesAbsentJdConcepts(text, ctx.extracted)) {
     return "";
   }
@@ -223,12 +236,16 @@ export function sanitizeVisibleRiskLine(text: string, ctx: VisibleSanitizeContex
   t = stripDisallowedTech(t, allowed);
   const evidenceBlob = normalizeText(
     [
-      ctx.extracted.rawText ?? "",
-      ...(ctx.extracted.stack ?? []),
-      ...(ctx.extracted.requiredSkills ?? []),
-      ...(ctx.extracted.preferredSkills ?? []),
-      ...(ctx.extracted.requirements ?? []),
-      ...(ctx.extracted.responsibilities ?? []),
+      // Prefer raw JD — do not allowlist hallucinated extracted stack/skills chips.
+      ctx.extracted.rawText?.trim()
+        ? ctx.extracted.rawText
+        : [
+            ...(ctx.extracted.stack ?? []),
+            ...(ctx.extracted.requiredSkills ?? []),
+            ...(ctx.extracted.preferredSkills ?? []),
+            ...(ctx.extracted.requirements ?? []),
+            ...(ctx.extracted.responsibilities ?? []),
+          ].join(" "),
       ...(ctx.userProfile?.strengths ?? []),
       ...(ctx.userProfile?.flagshipProjects.flatMap((p) => p.tech) ?? []),
     ].join(" "),
@@ -311,6 +328,43 @@ export function sanitizeVisibleRiskLine(text: string, ctx: VisibleSanitizeContex
 
 export function sanitizeVisibleNarrativeLine(text: string, ctx: VisibleSanitizeContext): string {
   return sanitizeVisibleRiskLine(text, ctx);
+}
+
+/**
+ * Free-text assets (cover letter, why company, talking points): strip ungrounded
+ * tech / absent-language claims without collapsing paragraph structure.
+ */
+export function sanitizeGeneratedAssetText(text: string, ctx: VisibleSanitizeContext): string {
+  if (!text.trim()) return text;
+  const suppressed = suppressAbsentLanguageClaims(text, ctx.extracted);
+  if (!suppressed.trim()) return "";
+  const allowed = buildAllowedTechCanonicalSet({
+    extracted: ctx.extracted,
+    rules: ctx.rules,
+  });
+  return suppressed
+    .split(/(\n{2,})/)
+    .map((chunk) => {
+      if (/^\n+$/.test(chunk)) return chunk;
+      return cleanupVisibleLineFragments(stripDisallowedTech(chunk, allowed));
+    })
+    .join("")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+export function sanitizeGeneratedAssetList(lines: string[], ctx: VisibleSanitizeContext): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of lines) {
+    const s = sanitizeGeneratedAssetText(raw, ctx);
+    if (!s.trim()) continue;
+    const k = normalizeText(s);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(s);
+  }
+  return out;
 }
 
 export function sanitizeBulletList(lines: string[], ctx: VisibleSanitizeContext): string[] {

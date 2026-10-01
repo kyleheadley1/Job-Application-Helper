@@ -45,6 +45,9 @@ const FINANCE_DOMAIN_TAG_RE =
 const QUANT_TRADING_RE =
   /\b(quant(?:itative)?\s+trading|trading\s+firm|market\s+maker|proprietary\s+trading|jane\s+street|citadel|two\s+sigma|hudson\s+river|de\s+shaw)\b/i;
 
+const STAFFING_AGENCY_RE =
+  /\b(staffing(\s+agency|\s+firm)?|recruiting\s+(agency|firm)|talent\s+solutions|tech\s+consulting|jsr\s+tech|staff\s+aug|staff-aug|contract\s+staffing)\b/i;
+
 /** Drop benefits / wellness boilerplate so 401k and "health insurance" cannot open the finance path. */
 const stripBenefitsBoilerplate = (text: string): string =>
   normalizeText(text)
@@ -54,8 +57,9 @@ const stripBenefitsBoilerplate = (text: string): string =>
       " ",
     );
 
-const STAFFING_AGENCY_RE =
-  /\b(consulting|staffing|recruiting|talent\s+solutions|tech\s+consulting|jsr\s+tech|contractor|staff\s+aug|staff-aug)\b/i;
+/** Product BNPL / consumer healthcare financing — not bank/trading/staffing placement. */
+const PRODUCT_BNPL_OR_CONSUMER_FINANCE_RE =
+  /\b(bnpl|buy\s+now\s+pay\s+later|patient\s+financ|healthcare\s+financ|medical\s+financ|consumer\s+financ|point[-\s]?of[-\s]?sale\s+financ|care\s+credit)\b/i;
 
 const HOURLY_W2_RE =
   /\b(hourly|\/hr|per\s+hour|w-?2\s+contract|contract\s+to\s+hire|c2h)\b/i;
@@ -89,7 +93,7 @@ export const detectRoleShapeOutsideLane = (job: ExtractedJobData): boolean => {
 export const detectFinanceClampContext = (
   job: ExtractedJobData,
   rules: RuleEvaluation,
-): { financePenalty: boolean; quantTrading: boolean } => {
+): { financePenalty: boolean; quantTrading: boolean; staffingPlacement: boolean; credentialHeavy: boolean } => {
   const blob = stripBenefitsBoilerplate(jobBlob(job));
   const employerFocused = stripBenefitsBoilerplate(
     normalizeText(
@@ -105,19 +109,33 @@ export const detectFinanceClampContext = (
         .join("\n"),
     ),
   );
+
+  // Product BNPL / healthcare financing employers are not bank/trading/staffing placements.
+  if (PRODUCT_BNPL_OR_CONSUMER_FINANCE_RE.test(blob) || PRODUCT_BNPL_OR_CONSUMER_FINANCE_RE.test(employerFocused)) {
+    const quantTrading = QUANT_TRADING_RE.test(blob);
+    return { financePenalty: quantTrading, quantTrading, staffingPlacement: false, credentialHeavy: false };
+  }
+
   const financeDomain =
     rules.financePenalty ||
     (job.domainTags ?? []).some((t) => FINANCE_DOMAIN_TAG_RE.test(t)) ||
     FINANCE_DOMAIN_RE.test(employerFocused) ||
     FINANCE_DOMAIN_RE.test(blob);
-  if (!financeDomain) return { financePenalty: false, quantTrading: false };
+  if (!financeDomain) {
+    return { financePenalty: false, quantTrading: false, staffingPlacement: false, credentialHeavy: false };
+  }
 
+  // Staffing/placement: agency fields or explicit staffing-agency company — not "consulting with PMs" in duties.
   const staffingPlacement =
     Boolean(job.agencyCompanyName?.trim()) ||
-    Boolean(job.employerCompanyName?.trim() && job.listingCompanyName?.trim() &&
-      normalizeText(job.employerCompanyName!) !== normalizeText(job.listingCompanyName!)) ||
+    Boolean(
+      job.employerCompanyName?.trim() &&
+        job.listingCompanyName?.trim() &&
+        normalizeText(job.employerCompanyName!) !== normalizeText(job.listingCompanyName!),
+    ) ||
     STAFFING_AGENCY_RE.test(normalizeText(job.company ?? "")) ||
-    STAFFING_AGENCY_RE.test(blob);
+    STAFFING_AGENCY_RE.test(normalizeText(job.agencyCompanyName ?? "")) ||
+    /\bstaffing\s+placement\b/i.test(blob);
 
   const credentialHeavy =
     rules.credentialHeavyFintechAlgorithm ||
@@ -125,9 +143,10 @@ export const detectFinanceClampContext = (
     /\b(gaap|series\s+\d+|licensed|cfa|frm|actuarial)\b/i.test(employerFocused);
 
   const quantTrading = QUANT_TRADING_RE.test(blob);
-  const financePenalty = credentialHeavy || staffingPlacement || quantTrading || rules.financePenalty;
+  // Hard finance clamp / placement flag: institution staffing, credentials, or quant — not bare product-fintech tags.
+  const financePenalty = credentialHeavy || staffingPlacement || quantTrading;
 
-  return { financePenalty, quantTrading };
+  return { financePenalty, quantTrading, staffingPlacement, credentialHeavy };
 };
 
 export const detectStaffAugContractRole = (job: ExtractedJobData): boolean => {
@@ -203,7 +222,7 @@ export const buildHardRuleFlags = (
   }
 
   const finance = detectFinanceClampContext(job, rules);
-  if (finance.financePenalty) {
+  if (finance.staffingPlacement || finance.credentialHeavy) {
     push({
       id: "financePenalty",
       message:
@@ -242,6 +261,7 @@ export const applyScoringClampLayer = (params: {
 
   const rules: RuleEvaluation = {
     ...params.rules,
+    // Keep product-fintech rules.financePenalty for soft notes; only escalate clamp when placement/credential/quant.
     financePenalty: financeCtx.financePenalty || params.rules.financePenalty,
     hardRuleFlags,
     roleShapeOutsideLane:

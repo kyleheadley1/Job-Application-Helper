@@ -1,0 +1,52 @@
+{
+  "id": "cherry-technologies-mid-level-swe",
+  "anchorNote": "Cherry Technologies Mid-Level SWE — Kotlin only under Nice-to-Haves (not What You Need). Must not become required core-language gap or 'role backend is Kotlin'. Not a staffing/trading finance placement. Mid-Level title must not fire Remote-USA geo eligibility misfire.",
+  "extracted": {
+    "company": "Cherry Technologies",
+    "companyDisplayName": "Cherry",
+    "title": "Mid-Level Software Engineer",
+    "location": "Remote in USA",
+    "remoteType": "remote",
+    "seniority": "Mid Level",
+    "yearsExperience": { "raw": "3+ years", "min": 3 },
+    "stack": [
+      "TypeScript",
+      "React",
+      "Node.js",
+      "PostgreSQL",
+      "AWS",
+      "Kotlin"
+    ],
+    "requiredSkills": [
+      "TypeScript",
+      "React",
+      "Node.js",
+      "PostgreSQL",
+      "AWS",
+      "Kotlin"
+    ],
+    "preferredSkills": [],
+    "domainTags": ["fintech", "healthcare", "bnpl", "finance"],
+    "responsibilities": [
+      "Build and ship product features for patient healthcare financing workflows",
+      "Collaborate with product and design on consumer BNPL healthcare experiences",
+      "Own services end-to-end with TypeScript/Node on AWS"
+    ],
+    "requirements": [
+      "3+ years of professional software engineering experience",
+      "Strong TypeScript and React fundamentals",
+      "Experience building and operating backend services with Node.js and PostgreSQL",
+      "Familiarity with AWS"
+    ],
+    "rawText": "Cherry Technologies\nMid-Level Software Engineer\nRemote in USA\nAbout Cherry\nCherry is a direct-employer BNPL healthcare financing company helping patients pay for care.\nWe are not a staffing or placement agency.\nWhat You Need\n3+ years of professional software engineering experience\nStrong TypeScript and React fundamentals\nExperience building and operating backend services with Node.js and PostgreSQL\nFamiliarity with AWS\nNice-to-Haves: Familiarity with our stack\nKotlin\nGraphQL\nResponsibilities\nBuild and ship product features for patient healthcare financing workflows\nCollaborate with product and design on consumer BNPL healthcare experiences\nOwn services end-to-end with TypeScript/Node on AWS"
+  },
+  "storedCategoryScores": {
+    "stackFit": 16,
+    "levelFit": 14,
+    "domainFit": 7,
+    "resumeStoryClarity": 9,
+    "functionalOverlap": 12,
+    "recruiterFriendliness": 11,
+    "careerValue": 7
+  }
+}

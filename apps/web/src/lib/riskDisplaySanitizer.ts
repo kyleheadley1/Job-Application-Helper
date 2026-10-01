@@ -67,8 +67,11 @@ const buildAllowedTech = (extracted?: ExtractedJobData): Set<string> => {
   for (const { canon, re } of TECH_PATTERNS) {
     if (re.test(blob)) allowed.add(canon);
   }
-  for (const tag of extracted?.skillTags ?? []) {
-    allowed.add(tag.term.toLowerCase());
+  // Only fall back to skillTags when rawText is missing — tags can hallucinate tech.
+  if (!extracted?.rawText?.trim()) {
+    for (const tag of extracted?.skillTags ?? []) {
+      allowed.add(tag.term.toLowerCase());
+    }
   }
   return allowed;
 };
@@ -90,6 +93,8 @@ const DISJUNCTIVE_GAP_FRAMING =
 const DISJUNCTIVE_POSITIVE_FRAMING =
   /\b(strong|solid|good|clear|align|match|overlap|proficiency in|demonstrated strength)\b/i;
 
+const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const DISJUNCTIVE_LABEL_PATTERNS: Record<string, RegExp[]> = {
   "Ruby on Rails": [/\bruby\s+on\s+rails\b/i, /\brails\b/i, /\bror\b/i, /\bruby\b/i],
   React: [/\breact(?:\.js)?\b/i],
@@ -100,6 +105,18 @@ const DISJUNCTIVE_LABEL_PATTERNS: Record<string, RegExp[]> = {
   Python: [/\bpython\b/i],
   Java: [/\bjava\b(?!script)/i],
   Vue: [/\bvue(?:\.js)?\b/i, /\bnuxt\b/i],
+  "C++": [/\bc\+\+(?![a-z0-9])/i, /\bc\/c\+\+/i],
+  "C#": [/\bc#(?![a-z0-9])/i, /\bcsharp\b/i, /\.net\b/i],
+};
+
+/** Patterns for accepted disjunctive labels — never interpolate raw labels into RegExp. */
+const labelPatternsForRisk = (label: string): RegExp[] => {
+  const known = DISJUNCTIVE_LABEL_PATTERNS[label];
+  if (known) return known;
+  if (/^c\+\+$/i.test(label)) return DISJUNCTIVE_LABEL_PATTERNS["C++"]!;
+  if (/^c#$/i.test(label)) return DISJUNCTIVE_LABEL_PATTERNS["C#"]!;
+  const escaped = escapeRegExp(label);
+  return [new RegExp(`\\b${escaped}\\b`, "i")];
 };
 
 const jdBlobForConceptGrounding = (extracted?: ExtractedJobData): string =>
@@ -144,9 +161,7 @@ const riskContradictsSatisfiedDisjunctive = (
   const t = line.trim();
   if (!t) return false;
   const mentionsAccepted = accepted.some((label) =>
-    (DISJUNCTIVE_LABEL_PATTERNS[label] ?? [new RegExp(`\\b${label}\\b`, "i")]).some((re) =>
-      re.test(t),
-    ),
+    labelPatternsForRisk(label).some((re) => re.test(t)),
   );
   if (!mentionsAccepted) return false;
   if (DISJUNCTIVE_POSITIVE_FRAMING.test(t) && !DISJUNCTIVE_GAP_FRAMING.test(t)) return false;
