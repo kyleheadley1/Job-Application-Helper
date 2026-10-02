@@ -2,7 +2,7 @@ import { Router, type Response } from "express";
 import { z } from "zod";
 import { env } from "../config/env.js";
 import { logger } from "../lib/logger.js";
-import { getGmailApplications } from "../services/gmail/gmailApplications.js";
+import { getGmailApplications, getUpcomingInterviews } from "../services/gmail/gmailApplications.js";
 import {
   gmailAuth,
   GmailNotConfiguredError,
@@ -15,6 +15,9 @@ import {
   AlreadyScoredError,
   confirmCandidate,
   EvaluationNotFoundError,
+  NoStoredJdError,
+  runScoringDiagnostic,
+  toScoringReport,
   getRecoveryRunState,
   loadEvaluations,
   MIN_PASTED_JD_CHARS,
@@ -37,11 +40,12 @@ const ApplicationsQuerySchema = z.object({ days: DaysSchema });
 
 /** Applications with their evaluation summary; refreshes stored outcomes on the way. */
 const applicationsWithEvaluations = async (days: number) => {
-  const applications = await getGmailApplications(days);
+  const [applications, upcoming] = await Promise.all([getGmailApplications(days), getUpcomingInterviews()]);
   const evaluations = await loadEvaluations(applications);
   return {
     applications: withEvaluations(applications, evaluations),
     pendingRecovery: pendingApplications(applications, evaluations).length,
+    upcomingInterviews: upcoming,
   };
 };
 
@@ -172,8 +176,9 @@ gmailRouter.get("/evaluations", async (req, res, next) => {
         sevenDaysAgo: localDay(new Date(Date.now() - 6 * DAY_MS)),
         windowDays: days,
       }),
-      evaluations: evaluations.map(({ jd, recovery, ...rest }) => ({
+      evaluations: evaluations.map(({ jd, recovery, fit, diagnostic: _diagnostic, ...rest }) => ({
         ...rest,
+        fit: fit && { ...fit, detail: undefined },
         recovery: { ...recovery, candidates: recovery.candidates?.map(({ text: _text, ...c }) => c) },
         jd: jd && { title: jd.title, company: jd.company, datePosted: jd.datePosted, chars: jd.text.length },
       })),
@@ -198,8 +203,33 @@ const sendEvaluationError = (res: Response, error: unknown): boolean => {
     res.status(409).json({ error: "already_scored", message: error.message });
     return true;
   }
+  if (error instanceof NoStoredJdError) {
+    res.status(409).json({ error: "no_jd", message: error.message });
+    return true;
+  }
   return false;
 };
+
+gmailRouter.get("/evaluations/:key/scoring", async (req, res, next) => {
+  try {
+    const evaluation = await evaluationsRepository.findByKey(req.params.key);
+    if (!evaluation) throw new EvaluationNotFoundError(`No evaluation for ${req.params.key}`);
+    res.json(toScoringReport(evaluation));
+  } catch (error) {
+    if (sendEvaluationError(res, error)) return;
+    next(error);
+  }
+});
+
+/** Re-score the stored JD for auditing; the original fit score is not changed. */
+gmailRouter.post("/evaluations/:key/diagnose", async (req, res, next) => {
+  try {
+    res.json(toScoringReport(await runScoringDiagnostic(req.params.key)));
+  } catch (error) {
+    if (sendEvaluationError(res, error)) return;
+    next(error);
+  }
+});
 
 gmailRouter.post("/evaluations/:key/confirm", async (req, res, next) => {
   try {

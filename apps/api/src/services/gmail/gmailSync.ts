@@ -3,6 +3,7 @@ import { gmailAuth } from "./gmailAuth.js";
 import { gmailClient } from "./gmailClient.js";
 import { buildSearchQuery, classifyEmailWithLlm, PREFILTER_VERSION, prefilterEmail } from "./gmailClassifier.js";
 import { gmailMessagesRepository } from "./gmailMessages.repository.js";
+import { extractInterviewDetail, INTERVIEW_DETAIL_VERSION } from "./interviewRounds.js";
 
 export const DEFAULT_SYNC_DAYS = 7;
 export const MAX_SYNC_DAYS = 30;
@@ -16,6 +17,28 @@ export type GmailSyncResult = {
   classified: number;
   applicationEmails: number;
   llmFailures: number;
+  /** Interview emails whose round details were extracted, including older emails backfilled this run. */
+  interviewDetails: number;
+};
+
+const BACKFILL_LIMIT = 100;
+
+/** Re-fetch interview emails (any age) whose round details are missing or outdated, and extract them. */
+const backfillInterviewDetails = async (): Promise<number> => {
+  const ids = await gmailMessagesRepository.listInterviewIdsMissingDetail(BACKFILL_LIMIT, INTERVIEW_DETAIL_VERSION);
+  let filled = 0;
+  await runPool(ids, CONCURRENCY, async (id) => {
+    try {
+      const email = await gmailClient.getMessage(id);
+      const { detail, llmSucceeded } = await extractInterviewDetail(email);
+      if (!llmSucceeded) return;
+      await gmailMessagesRepository.setInterviewDetail(id, detail);
+      filled += 1;
+    } catch (error) {
+      logger.warn("Interview round backfill failed", { id, error: String(error) });
+    }
+  });
+  return filled;
 };
 
 const runPool = async <T>(items: T[], limit: number, worker: (item: T) => Promise<void>) => {
@@ -44,6 +67,7 @@ export const syncGmail = async (days = DEFAULT_SYNC_DAYS): Promise<GmailSyncResu
     classified: 0,
     applicationEmails: 0,
     llmFailures: 0,
+    interviewDetails: 0,
   };
 
   await runPool(todo, CONCURRENCY, async (id) => {
@@ -69,8 +93,17 @@ export const syncGmail = async (days = DEFAULT_SYNC_DAYS): Promise<GmailSyncResu
     result.classified += 1;
     if (!llmSucceeded) result.llmFailures += 1;
     if (classification.isApplicationEmail) result.applicationEmails += 1;
+    if (classification.isApplicationEmail && classification.eventType === "interview") {
+      const extracted = await extractInterviewDetail(email);
+      if (extracted.llmSucceeded) {
+        classification.interview = extracted.detail;
+        result.interviewDetails += 1;
+      }
+    }
     await gmailMessagesRepository.upsert({ ...base, classification, llmSucceeded });
   });
+
+  result.interviewDetails += await backfillInterviewDetails();
 
   await gmailAuth.recordSync(new Date().toISOString());
   logger.info("Gmail sync complete", { ...result });

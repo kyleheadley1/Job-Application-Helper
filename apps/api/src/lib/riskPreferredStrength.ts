@@ -9,6 +9,7 @@ import {
   hasClaimableCoverage,
 } from "./claimableStack.js";
 import { normalizeText } from "./text.js";
+import { GO_LANGUAGE_PATTERNS } from "./goLanguage.js";
 
 const cleanupFragments = (text: string): string =>
   text
@@ -47,7 +48,7 @@ const TECH_CITE_PATTERNS: Array<{ key: TechCiteKey; patterns: RegExp[] }> = [
   { key: "cicd", patterns: [/\bci\s*\/\s*cd\b/i, /\bci-cd\b/i, /\bdrone\b/i, /\bjenkins\b/i, /\bgithub\s+actions\b/i] },
   { key: "devops", patterns: [/\bdevops\b/i] },
   { key: "oncall", patterns: [/\bon[-\s]?call\b/i] },
-  { key: "go", patterns: [/\bgolang\b/i, /\bgo\b(?!\s*-)/i] },
+  { key: "go", patterns: GO_LANGUAGE_PATTERNS },
   { key: "graphql", patterns: [/\bgraphql\b/i] },
   { key: "aws", patterns: [/\baws\b/i] },
   { key: "gcp", patterns: [/\bgcp\b/i, /\bgoogle\s+cloud\b/i] },

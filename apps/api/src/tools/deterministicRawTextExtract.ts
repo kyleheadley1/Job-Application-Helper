@@ -22,6 +22,7 @@ import {
   textImpliesNycMetroOrCommutableNj,
 } from "../lib/employerLocationSignals.js";
 import { parseSalaryFromText } from "../lib/salaryConversion.js";
+import { GO_LANGUAGE_RE } from "../lib/goLanguage.js";
 
 export type DeterministicExtractResult = {
   partial: Partial<ExtractedJobData>;
@@ -75,7 +76,7 @@ const STACK_KEYS: Array<{ re: RegExp; label: string }> = [
   { re: /\bkubernetes\b|\bk8s\b/i, label: "Kubernetes" },
   { re: /\baws\b|\bamazon web services\b/i, label: "AWS" },
   { re: /\bpython\b/i, label: "Python" },
-  { re: /\bgo(lang)?\b/i, label: "Go" },
+  { re: GO_LANGUAGE_RE, label: "Go" },
   { re: /\bjava\b/i, label: "Java" },
   { re: /\brest\s+api|restful|api\s+development\b/i, label: "REST APIs" },
   { re: /\bllm\b|\bgenerative\s+ai\b|\bopenai\b|\brag\b/i, label: "LLM / AI applications" },
@@ -275,7 +276,8 @@ export const extractFromRawText = (normalizedText: string, companyHint?: string)
   }
 
   if (!partial.seniority) {
-    if (SENIOR.test(text) || (yMin !== undefined && yMin >= 4)) {
+    // Title only: body text names other people ("senior client engineers", "technical staff").
+    if (SENIOR.test(title ?? lines[0] ?? "") || (yMin !== undefined && yMin >= 5)) {
       partial.seniority = "senior";
       inferredFields.push("seniority");
     } else if (NEW_GRAD.test(lower) || ASSOCIATE_JUNIOR.test(lower)) {

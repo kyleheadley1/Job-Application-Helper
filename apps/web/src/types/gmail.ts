@@ -1,4 +1,4 @@
-import type { JobStatus, ResumeType } from "./job";
+import type { ExtractedJobData, JobStatus, ResumeType, RuleEvaluation, ScoreBreakdown } from "./job";
 
 export type GmailStatus = {
   configured: boolean;
@@ -19,6 +19,19 @@ export type ApplicationEmail = {
   date: string;
   eventType: EmailEventType;
   gmailUrl: string;
+  round?: number;
+};
+
+export type InterviewRound = {
+  number: number;
+  kind: string | null;
+  focus: string | null;
+  interviewers: string | null;
+  startedAt: string;
+  scheduledAt?: string | null;
+  durationMinutes?: number | null;
+  cancelled?: boolean;
+  label: string;
 };
 
 export type GmailApplication = {
@@ -29,6 +42,8 @@ export type GmailApplication = {
   appliedAtKnown?: boolean;
   status: ApplicationStatus;
   furthestStage?: Exclude<ApplicationStatus, "rejected">;
+  interviewRounds?: InterviewRound[];
+  activelyInterviewing?: boolean;
   lastUpdateAt: string;
   emails: ApplicationEmail[];
   trackerJobId?: string;
@@ -82,6 +97,7 @@ export type RubricPoint = {
   fit: number;
   verifiedBy: "auto" | "user";
   furthestStage?: Exclude<ApplicationStatus, "rejected">;
+  furthestRound?: { number: number; label: string };
 };
 
 export type RubricSummary = {
@@ -149,10 +165,50 @@ export type CostSummary = {
   perEmailClassified: number | null;
 };
 
+export type ScoringDetail = {
+  recommendation: string;
+  recommendedResume: string;
+  topMatch: string;
+  mainRisk: string;
+  rationale: string[];
+  risks: string[];
+  resumeRationale: string[];
+  score: ScoreBreakdown & Record<string, unknown>;
+  rules: RuleEvaluation & Record<string, unknown>;
+  extracted: Omit<ExtractedJobData, "rawText">;
+};
+
+export type ScoringReport = {
+  key: string;
+  company: string;
+  role: string | null;
+  fit: {
+    total: number;
+    recommendation: string;
+    scoredAt: string;
+    promptVersion: string;
+    detail?: ScoringDetail;
+  } | null;
+  diagnostic: { runAt: string; promptVersion: string; total: number; detail: ScoringDetail } | null;
+  jd: { text: string; title?: string; url?: string } | null;
+};
+
+export type UpcomingInterview = {
+  key: string;
+  company: string;
+  role: string | null;
+  roundNumber: number;
+  label: string;
+  scheduledAt: string;
+  durationMinutes: number | null;
+  gmailUrl?: string;
+};
+
 export type GmailApplicationsResponse = {
   days: number;
   applications: GmailApplication[];
   pendingRecovery: number;
+  upcomingInterviews?: UpcomingInterview[];
 };
 
 export type RecoveryStart = { queued: number; running: boolean; started: boolean };
@@ -165,7 +221,9 @@ export type GmailSyncResult = {
   classified: number;
   applicationEmails: number;
   llmFailures: number;
+  interviewDetails?: number;
   applications: GmailApplication[];
   pendingRecovery: number;
+  upcomingInterviews?: UpcomingInterview[];
   recovery?: RecoveryStart;
 };

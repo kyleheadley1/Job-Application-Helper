@@ -84,6 +84,8 @@ export const env = {
   gmailClassifyReasoningEffort: (["minimal", "low", "medium", "high"] as const).find(
     (e) => e === (process.env.GMAIL_CLASSIFY_REASONING_EFFORT ?? "minimal"),
   ),
+  /** IANA zone assumed for interview times that an email states without a timezone. */
+  userTimezone: process.env.USER_TIMEZONE?.trim() || Intl.DateTimeFormat().resolvedOptions().timeZone,
   /** USD per 1M tokens; defaults are gpt-5-mini list prices. */
   openAiInputPricePerM: Number(process.env.OPENAI_INPUT_PRICE_PER_M ?? 0.25),
   openAiCachedInputPricePerM: Number(process.env.OPENAI_CACHED_INPUT_PRICE_PER_M ?? 0.025),

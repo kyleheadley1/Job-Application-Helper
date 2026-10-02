@@ -3,6 +3,7 @@ import { env } from "../../config/env.js";
 import { withLlmContext } from "../llm/llmUsage.js";
 import { responsesClient } from "../llm/responsesClient.js";
 import type { ParsedEmail } from "./gmailClient.js";
+import type { InterviewDetail } from "./interviewRounds.js";
 
 export const EMAIL_EVENT_TYPES = [
   "applied",
@@ -20,6 +21,8 @@ export type EmailClassification = {
   role: string | null;
   eventType: EmailEventType;
   confidence: number;
+  /** Interview emails only; missing until round details have been extracted. */
+  interview?: InterviewDetail;
 };
 
 const SEARCH_KEYWORDS = [
@@ -51,12 +54,18 @@ const NOT_APPLICATION_RE =
   /\b(jobs? (?:you may be|you might be) interested in|new jobs? (?:for you|matching|near)|job alert|jobs? recommended for you|recommended jobs|top job picks|is hiring\b|are hiring\b|similar jobs|job matches|weekly digest|daily digest|newsletter|webinar|unsubscribe from (?:job )?alerts|people (?:also )?viewed|who viewed your profile|connection request|endorse)\b/i;
 
 /** Bump when the prefilter keeps more mail, so previously dropped messages are re-checked. */
-export const PREFILTER_VERSION = 2;
+export const PREFILTER_VERSION = 3;
 
-/** Google/Outlook calendar invites ("Invitation: Alex and Jane @ Mon …") carry no application phrases. */
-const CALENDAR_INVITE_RE = /^(?:updated )?invitation:/i;
+/**
+ * Google/Outlook calendar invites ("Invitation: Alex and Jane @ Mon …") carry no application phrases.
+ * Gmail rewrites invites from new senders to "Invitation from an unknown sender: …".
+ */
+const CALENDAR_INVITE_RE = /^(?:updated\s+)?invitation\b[^:]{0,40}:/i;
 const FREEMAIL_SENDER_RE =
   /@(?:gmail|googlemail|yahoo|outlook|hotmail|live|icloud|me|aol|proton(?:mail)?)\.(?:com|me|net)\b/i;
+
+export const isAtsSender = (from: string): boolean => ATS_SENDER_RE.test(from);
+export const isFreemailSender = (from: string): boolean => FREEMAIL_SENDER_RE.test(from);
 
 export type PrefilterResult = { keep: boolean; reason: string };
 

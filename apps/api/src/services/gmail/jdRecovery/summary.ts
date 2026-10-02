@@ -58,6 +58,7 @@ export type RubricPoint = {
   fit: number;
   verifiedBy: "auto" | "user";
   furthestStage?: Exclude<ApplicationStatus, "rejected">;
+  furthestRound?: { number: number; label: string };
 };
 
 export type RubricSummary = {
@@ -88,7 +89,14 @@ export const buildRubricSummary = (evaluations: ApplicationEvaluation[]): Rubric
     const verifiedBy = e.recovery.verifiedBy ?? "auto";
     if (verifiedBy === "user") userVerified += 1;
     const furthestStage = e.outcome.furthestStage;
-    (points[e.outcome.status] ??= []).push({ company: e.company, role: e.role, fit: e.fit.total, verifiedBy, furthestStage });
+    (points[e.outcome.status] ??= []).push({
+      company: e.company,
+      role: e.role,
+      fit: e.fit.total,
+      verifiedBy,
+      furthestStage,
+      ...(e.outcome.furthestRound ? { furthestRound: e.outcome.furthestRound } : {}),
+    });
     if (furthestStage === "interviewing" || furthestStage === "offer") {
       interviewed.sum += e.fit.total;
       interviewed.count += 1;

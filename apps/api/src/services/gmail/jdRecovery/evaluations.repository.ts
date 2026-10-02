@@ -1,5 +1,7 @@
 import { getDb } from "../../../config/mongo.js";
+import type { ExtractedJobData } from "../../../types/job.js";
 import type { StoredResumeType } from "../../../types/resume.js";
+import type { RuleEvaluation, ScoreBreakdown } from "../../../types/scoring.js";
 import type { ApplicationStatus } from "../gmailApplications.js";
 import type { EvidenceSource, MatchLevel } from "./assessJdMatch.js";
 
@@ -42,6 +44,28 @@ export type FitBreakdown = {
   risks?: string[];
 };
 
+/** Everything the scorer produced, so a score can be audited without re-running it. */
+export type ScoringDetail = {
+  recommendation: string;
+  recommendedResume: StoredResumeType;
+  topMatch: string;
+  mainRisk: string;
+  rationale: string[];
+  risks: string[];
+  resumeRationale: string[];
+  score: ScoreBreakdown;
+  rules: RuleEvaluation;
+  extracted: Omit<ExtractedJobData, "rawText">;
+};
+
+/** A fresh scoring run of the stored JD for auditing. Never replaces `fit`. */
+export type ScoringDiagnostic = {
+  runAt: string;
+  promptVersion: string;
+  total: number;
+  detail: ScoringDetail;
+};
+
 export type OutcomeHistoryEntry = { status: ApplicationStatus; at: string };
 
 export type ApplicationEvaluation = {
@@ -81,7 +105,10 @@ export type ApplicationEvaluation = {
     promptVersion: string;
     /** Why the score is what it is; absent on rows scored before breakdowns were stored. */
     breakdown?: FitBreakdown;
+    /** Full scorer output; absent on rows scored before snapshots were stored. */
+    detail?: ScoringDetail;
   };
+  diagnostic?: ScoringDiagnostic;
   /** Gmail status at the moment of scoring; never passed to the scorer. */
   outcomeAtScoring?: ApplicationStatus;
   outcome: {
@@ -89,6 +116,8 @@ export type ApplicationEvaluation = {
     updatedAt: string;
     history: OutcomeHistoryEntry[];
     furthestStage?: Exclude<ApplicationStatus, "rejected">;
+    /** Last interview round reached, e.g. { number: 2, label: "2nd round · technical" }. */
+    furthestRound?: { number: number; label: string };
   };
   createdAt: string;
   updatedAt: string;
@@ -154,6 +183,11 @@ export const evaluationsRepository = {
   },
 
   /** Outcome-only update; never touches the score. */
+  async setDiagnostic(key: string, diagnostic: ScoringDiagnostic): Promise<void> {
+    const col = await this.collection();
+    await col.updateOne({ _id: key }, { $set: { diagnostic, updatedAt: new Date().toISOString() } });
+  },
+
   async updateOutcome(key: string, outcome: ApplicationEvaluation["outcome"]): Promise<void> {
     const col = await this.collection();
     await col.updateOne({ _id: key }, { $set: { outcome, updatedAt: new Date().toISOString() } });

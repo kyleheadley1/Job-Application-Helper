@@ -15,7 +15,7 @@ import type { ExtractedJobData } from "../types/job.js";
 import type { LegacyScoreDimension, RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
 import type { UserProfile } from "../types/userProfile.js";
 import { normalizeText } from "./text.js";
-import { textMentionsGoLanguage } from "./goLanguage.js";
+import { goMentionedAsPreferred, textMentionsGoLanguage } from "./goLanguage.js";
 import {
   sanitizeVisibleNarrativeLine,
   sanitizeVisibleRiskLine,
@@ -818,10 +818,9 @@ export function applyAssociateEntryBackendPlatformCalibration(params: {
       blob,
     );
   const preferredOnlyAdvanced =
-    /\bpreferred[^.\n]{0,160}\b(go|golang|graphql|docker|kubernetes|cloud)\b/i.test(blob) ||
-    /\b(go|golang|graphql|docker|kubernetes|cloud)\b[^.\n]{0,160}\b(preferred|nice to have|plus)\b/i.test(
-      blob,
-    );
+    /\bpreferred[^.\n]{0,160}\b(graphql|docker|kubernetes|cloud)\b/i.test(blob) ||
+    /\b(graphql|docker|kubernetes|cloud)\b[^.\n]{0,160}\b(preferred|nice to have|plus)\b/i.test(blob) ||
+    goMentionedAsPreferred(blob);
   if (!familiarityHeavy && !preferredOnlyAdvanced) return score;
 
   let next = { ...score };

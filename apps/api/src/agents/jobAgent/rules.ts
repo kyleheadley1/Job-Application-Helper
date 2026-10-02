@@ -19,7 +19,7 @@ import {
   jdPythonFlexibleWithJsOrTs,
 } from '../../lib/coreLanguageRequirements.js';
 import { evaluateDisjunctiveLanguageRequirement, filterGapsAfterDisjunctiveMatch } from '../../lib/disjunctiveLanguageRequirement.js';
-import { textMentionsGoLanguage } from '../../lib/goLanguage.js';
+import { goMentionedAsPreferred, textMentionsGoLanguage } from '../../lib/goLanguage.js';
 import { isFdeBuilderSoftwarePrimaryShape } from '../../lib/fdeBuilderRole.js';
 import { evaluateTitleResponsibilitySeniority } from '../../lib/titleResponsibilitySeniority.js';
 import {
@@ -245,7 +245,7 @@ export const evaluateRules = (
   const seniorityOverreach = detectRoleSeniorityOverreach(job);
   if (seniorityNeedsManualReview(job)) {
     notes.push(
-      'Seniority gate deferred for manual review — structured Seniority field missing or conflicts with years parse; do not treat body years alone as a hard gate.',
+      'Seniority gate deferred for manual review — structured Seniority field missing, unbacked by the title/years, or conflicts with years parse; do not treat it as a hard gate.',
     );
   }
 
@@ -427,8 +427,9 @@ export const evaluateRules = (
   const associateEntryRole =
     /\b(associate|entry[-\s]?level|early[-\s]?career|junior|new grad|new graduate)\b/i.test(combinedText);
   const preferredPlatformStackGap =
-    /\b(preferred|nice to have|plus)\b[^.\n]{0,180}\b(go|golang|graphql|docker|kubernetes|cloud)\b/i.test(combinedText) ||
-    /\b(go|golang|graphql|docker|kubernetes|cloud)\b[^.\n]{0,120}\b(preferred|nice to have|plus)\b/i.test(combinedText);
+    /\b(preferred|nice to have|plus)\b[^.\n]{0,180}\b(graphql|docker|kubernetes|cloud)\b/i.test(combinedText) ||
+    /\b(graphql|docker|kubernetes|cloud)\b[^.\n]{0,120}\b(preferred|nice to have|plus)\b/i.test(combinedText) ||
+    goMentionedAsPreferred(combinedText);
 
   const productionOwnershipJd =
     /\b(production ownership|meaningful scope|on[-\s]?call|end[-\s]?to[-\s]?end|own(s|\s+the)?\s+(the\s+)?(features?|roadmap|slice|technical|service|area|product)|technical ownership|operate in production|production systems?|ship(ped|ping)?[^.\n]{0,60}production)\b/i.test(

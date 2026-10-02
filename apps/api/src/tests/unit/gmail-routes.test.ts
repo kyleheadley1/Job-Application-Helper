@@ -3,6 +3,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GmailAuthDoc } from "../../services/gmail/gmailAuth.js";
 import type { ParsedEmail } from "../../services/gmail/gmailClient.js";
 import type { StoredGmailMessage } from "../../services/gmail/gmailMessages.repository.js";
+import { INTERVIEW_DETAIL_VERSION, type InterviewDetail } from "../../services/gmail/interviewRounds.js";
 
 let authDoc: GmailAuthDoc | null = null;
 const messageStore = new Map<string, StoredGmailMessage>();
@@ -63,6 +64,19 @@ vi.mock("../../services/gmail/gmailMessages.repository.js", () => ({
         (m) => m.date >= since && m.classification?.isApplicationEmail,
       ),
     ),
+    listInterviewIdsMissingDetail: vi.fn(async () =>
+      [...messageStore.values()]
+        .filter(
+          (m) =>
+            m.classification?.eventType === "interview" &&
+            m.classification.interview?.version !== INTERVIEW_DETAIL_VERSION,
+        )
+        .map((m) => m.id),
+    ),
+    setInterviewDetail: vi.fn(async (id: string, detail: InterviewDetail) => {
+      const m = messageStore.get(id);
+      if (m?.classification) m.classification.interview = detail;
+    }),
   },
 }));
 
@@ -257,6 +271,40 @@ describe("gmail routes", () => {
 
     const res = await request(app).post("/api/gmail/sync").send({});
     expect(res.body).toMatchObject({ alreadyProcessed: 0, classified: 1, applicationEmails: 1 });
+  });
+
+  it("backfills interview round details for older interview emails of any age", async () => {
+    addEmail({ id: "i1", from: "jane@acme.com", subject: "Next round: technical interview" });
+    messageStore.set("i1", {
+      id: "i1",
+      threadId: "t-i1",
+      date: "2026-01-05T10:00:00.000Z",
+      from: "jane@acme.com",
+      subject: "Next round: technical interview",
+      prefilterPassed: true,
+      prefilterReason: "application_phrase",
+      classification: { isApplicationEmail: true, company: "Acme", role: "Engineer", eventType: "interview", confidence: 0.9 },
+      llmSucceeded: true,
+      processedAt: recent(1),
+    });
+    runStructuredMock.mockResolvedValue({
+      success: true,
+      data: { roundNumber: 2, kind: "technical", interviewers: "Sam Lee", advancesToNextRound: true, scheduledAt: "not a date" },
+    });
+
+    const res = await request(app).post("/api/gmail/sync").send({});
+    expect(res.body).toMatchObject({ interviewDetails: 1 });
+    expect(messageStore.get("i1")!.classification!.interview).toEqual({
+      roundNumber: 2,
+      kind: "technical",
+      focus: null,
+      interviewers: "Sam Lee",
+      advancesToNextRound: true,
+      scheduledAt: null,
+      durationMinutes: null,
+      cancelled: false,
+      version: INTERVIEW_DETAIL_VERSION,
+    });
   });
 
   it("returns 401 and flags needsReconnect when the refresh token is revoked", async () => {

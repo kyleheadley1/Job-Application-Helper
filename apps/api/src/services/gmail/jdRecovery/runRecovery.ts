@@ -53,6 +53,8 @@ import {
   type RecoveryAttempt,
   type RecoveryCandidate,
   type RecoveryStage,
+  type ScoringDetail,
+  type ScoringDiagnostic,
 } from "./evaluations.repository.js";
 import { fetchPosting, PostingFetchError, type FetchedPosting } from "./fetchPosting.js";
 import { inferCandidateStage } from "./recoveryMetrics.js";
@@ -87,17 +89,21 @@ const EVENT_TO_OUTCOME: Partial<Record<EmailEventType, ApplicationStatus>> = {
   offer: "offer",
 };
 
-export const buildOutcome = (app: GmailApplication): ApplicationEvaluation["outcome"] => ({
-  status: app.status,
-  furthestStage: app.furthestStage,
-  updatedAt: app.lastUpdateAt,
-  history: [...app.emails]
-    .reverse()
-    .flatMap((e) => {
-      const status = EVENT_TO_OUTCOME[e.eventType];
-      return status ? [{ status, at: e.date }] : [];
-    }),
-});
+export const buildOutcome = (app: GmailApplication): ApplicationEvaluation["outcome"] => {
+  const lastRound = app.interviewRounds?.at(-1);
+  return {
+    status: app.status,
+    furthestStage: app.furthestStage,
+    ...(lastRound ? { furthestRound: { number: lastRound.number, label: lastRound.label } } : {}),
+    updatedAt: app.lastUpdateAt,
+    history: [...app.emails]
+      .reverse()
+      .flatMap((e) => {
+        const status = EVENT_TO_OUTCOME[e.eventType];
+        return status ? [{ status, at: e.date }] : [];
+      }),
+  };
+};
 
 const CATEGORY_KEYS = [
   "stackFit",
@@ -127,8 +133,65 @@ export const fitFromJob = (job: JobRecord): NonNullable<ApplicationEvaluation["f
       mainRisk: job.mainRisk,
       risks: job.risks?.slice(0, 4),
     },
+    detail: scoringDetailFromJob(job),
   };
 };
+
+export const scoringDetailFromJob = (job: JobRecord): ScoringDetail => {
+  const { rawText: _rawText, ...extracted } = job.extracted;
+  return {
+    recommendation: job.recommendation,
+    recommendedResume: job.recommendedResume,
+    topMatch: job.topMatch,
+    mainRisk: job.mainRisk,
+    rationale: job.rationale ?? [],
+    risks: job.risks ?? [],
+    resumeRationale: job.resumeRationale ?? [],
+    score: job.score,
+    rules: job.rules,
+    extracted,
+  };
+};
+
+export class NoStoredJdError extends Error {
+  constructor(key: string) {
+    super(`No stored job description for ${key}; recover or paste one first.`);
+  }
+}
+
+/** Score the stored JD again for auditing. The result is kept beside `fit`, which stays final. */
+export const runScoringDiagnostic = async (key: string): Promise<ApplicationEvaluation> => {
+  const evaluation = await evaluationsRepository.findByKey(key);
+  if (!evaluation) throw new EvaluationNotFoundError(`No evaluation for ${key}`);
+  if (!evaluation.jd?.text) throw new NoStoredJdError(key);
+  const job = await scoreBlind(evaluation.jd, evaluation.company, key);
+  const diagnostic: ScoringDiagnostic = {
+    runAt: new Date().toISOString(),
+    promptVersion: SCORER_VERSION,
+    total: job.score.total,
+    detail: scoringDetailFromJob(job),
+  };
+  await evaluationsRepository.setDiagnostic(key, diagnostic);
+  return { ...evaluation, diagnostic };
+};
+
+export type ScoringReport = {
+  key: string;
+  company: string;
+  role: string | null;
+  fit: ApplicationEvaluation["fit"] | null;
+  diagnostic: ScoringDiagnostic | null;
+  jd: { text: string; title?: string; url?: string } | null;
+};
+
+export const toScoringReport = (e: ApplicationEvaluation): ScoringReport => ({
+  key: e.key,
+  company: e.company,
+  role: e.role,
+  fit: e.fit ?? null,
+  diagnostic: e.diagnostic ?? null,
+  jd: e.jd ? { text: e.jd.text, title: e.jd.title, url: e.recovery.url } : null,
+});
 
 /** The scorer sees only the recovered JD and a company hint — never email content or outcome. */
 export const scoreBlind = (
@@ -673,7 +736,8 @@ export const refreshOutcomes = async (
     if (
       evaluation.outcome.status === outcome.status &&
       evaluation.outcome.updatedAt === outcome.updatedAt &&
-      evaluation.outcome.furthestStage === outcome.furthestStage
+      evaluation.outcome.furthestStage === outcome.furthestStage &&
+      evaluation.outcome.furthestRound?.label === outcome.furthestRound?.label
     ) {
       continue;
     }
