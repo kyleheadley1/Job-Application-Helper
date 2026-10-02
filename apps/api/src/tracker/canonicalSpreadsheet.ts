@@ -1,6 +1,6 @@
 import type { JobRecord, JobStatus } from '../types/job.js';
 import type { TrackerSpreadsheetFields } from '../types/trackerSpreadsheet.js';
-import type { ResumeType } from '../types/resume.js';
+import type { StoredResumeType } from '../types/resume.js';
 import type { Recommendation, ScoreBreakdown } from '../types/scoring.js';
 import { SCORE_CATEGORY_MAXES } from '../config/scoringPolicy.js';
 import { mapRecommendationFromScore } from '../lib/scoringCaps.js';
@@ -210,8 +210,11 @@ export function mapSpreadsheetStatusToJobStatus(text: string): JobStatus {
   return 'to_review';
 }
 
-export function parseResumeColumn(text: string): ResumeType {
+/** Spreadsheet rows predate BASE/AI, so unlabeled rows keep their historical SWE label. */
+export function parseResumeColumn(text: string): StoredResumeType {
   const t = text.trim().toUpperCase();
+  if (/\bAI\b/.test(t)) return 'AI';
+  if (t.includes('BASE')) return 'BASE';
   if (t.includes('SIE')) return 'SIE';
   if (t.includes('EARLY') || t.includes('NEW GRAD')) return 'EARLY_CAREER';
   return 'SWE';

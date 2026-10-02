@@ -49,7 +49,7 @@ const minimalJob = (): JobRecord => ({
   },
   recommendation: 'selective_yes',
   salaryAsk: { number: 150000 },
-  recommendedResume: 'SWE',
+  recommendedResume: 'BASE',
   resumeRationale: [],
   topMatch: 'TypeScript',
   mainRisk: 'Onsite',

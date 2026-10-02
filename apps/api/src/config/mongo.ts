@@ -12,7 +12,9 @@ const ensureIndexes = async (targetDb: Db): Promise<void> => {
   const jobs = targetDb.collection("jobs");
   const topJobs = targetDb.collection("top_jobs");
   const captures = targetDb.collection("job_captures");
+  const gmailMessages = targetDb.collection("gmail_messages");
   await Promise.all([
+    gmailMessages.createIndex({ date: 1, "classification.isApplicationEmail": 1 }),
     captures.createIndex({ jdTextHash: 1, createdAt: -1 }),
     captures.createIndex({ normalizedSourceUrl: 1, createdAt: -1 }),
     captures.createIndex({ jobId: 1 }),

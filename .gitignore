@@ -13,6 +13,7 @@ apps/api/data/resumes/*
 !apps/api/data/resumes/.gitkeep
 !apps/api/data/resumes/README.md
 apps/data/resumes/
+apps/api/src/tests/fixtures/resumes/
 
 # Local tracker / personal artifacts
 data/job_role_scores_current.xlsx

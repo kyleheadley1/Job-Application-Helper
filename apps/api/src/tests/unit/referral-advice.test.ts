@@ -22,7 +22,7 @@ import type { SurvivabilityBreakdown } from "../../lib/survivabilityScore.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SWE_RESUME = fs.readFileSync(
-  path.resolve(__dirname, "../../../data/resumes/swe_resume.txt"),
+  path.resolve(__dirname, "../fixtures/resumes/swe_resume.txt"),
   "utf8",
 );
 
@@ -67,7 +67,7 @@ const IBM_RAW_SCORE: ScoreBreakdown = {
 
 describe("IBM calibration — referral-blind scoring", () => {
   it("degree full weight; capability ~80; final below prior referral-softened band; strongly_advised referral", () => {
-    const rules = evaluateRules(IBM_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(IBM_JOB, userProfile, { activeResumeType: "BASE" });
     expect(rules.explicitDegreeRisk).toBe(true);
     expect(rules.degreeHasEquivalencyClause).toBeFalsy();
 
@@ -123,7 +123,7 @@ describe("IBM calibration — referral-blind scoring", () => {
 
 describe("referral score isolation", () => {
   const scoreFixture = () => {
-    const rules = evaluateRules(IBM_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(IBM_JOB, userProfile, { activeResumeType: "BASE" });
     const composite = computeCompositeScore({
       rawScore: IBM_RAW_SCORE,
       rules,
@@ -227,7 +227,7 @@ describe("pool-not-routable referral urgency", () => {
 describe("referral always present", () => {
   it("referralAdvice renders on every job with urgency-appropriate prominence", () => {
     const { rules, composite } = (() => {
-      const r = evaluateRules(IBM_JOB, userProfile, { activeResumeType: "SWE" });
+      const r = evaluateRules(IBM_JOB, userProfile, { activeResumeType: "BASE" });
       const c = computeCompositeScore({
         rawScore: IBM_RAW_SCORE,
         rules: r,
@@ -253,7 +253,7 @@ describe("referral always present", () => {
 
 describe("lever tag audit", () => {
   it("no penalty row uses referral lever", () => {
-    const rules = evaluateRules(IBM_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(IBM_JOB, userProfile, { activeResumeType: "BASE" });
     const penalties = buildSurvivabilityPenalties(rules, IBM_JOB);
     for (const penalty of penalties) {
       expect(penalty.lever).not.toBe("referral");

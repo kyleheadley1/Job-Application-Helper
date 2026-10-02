@@ -15,13 +15,13 @@ import type { ResumeContextSet } from "../../types/resumeContext.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SWE_RESUME = fs.readFileSync(
-  path.resolve(__dirname, "../../../data/resumes/swe_resume.txt"),
+  path.resolve(__dirname, "../fixtures/resumes/swe_resume.txt"),
   "utf8",
 );
 
 const mockResumeContexts = (): ResumeContextSet => ({
-  SWE: {
-    type: "SWE",
+  BASE: {
+    type: "BASE",
     sourcePath: "swe_resume.txt",
     sourceKind: "txt",
     loadedAt: new Date().toISOString(),
@@ -261,6 +261,6 @@ describe("resume variant selection", () => {
       userProfile,
       resumeContexts: mockResumeContexts(),
     });
-    expect(result.recommendedResume).toBe("SWE");
+    expect(result.recommendedResume).toBe("BASE");
   });
 });

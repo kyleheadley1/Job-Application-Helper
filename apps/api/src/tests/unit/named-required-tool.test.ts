@@ -87,7 +87,7 @@ describe("named hard-requirement detector", () => {
   });
 
   it("does not fire scary gap when must-have is a skill the resume already has (React)", () => {
-    const resume = calibrationSweResumeContexts().SWE!.rawText;
+    const resume = calibrationSweResumeContexts().BASE!.rawText;
     expect(/\breact\b/i.test(resume)).toBe(true);
     const job = makeJob({
       stack: ["React"],
@@ -99,7 +99,7 @@ describe("named hard-requirement detector", () => {
     expect(detectNamedHardRequirementGaps(job, resume)).toEqual([]);
     const rules = evaluateRules(job, userProfile, {
       resumeContexts: calibrationSweResumeContexts(),
-      activeResumeType: "SWE",
+      activeResumeType: "BASE",
     });
     expect(rules.namedHardRequirementGaps ?? []).toEqual([]);
     expect(rules.notes.some((n) => /named tool\/platform React/i.test(n))).toBe(false);
@@ -117,7 +117,7 @@ describe("named required-tool absent calibration (PCG / TULIP)", () => {
   it("rules surface prominent Key Risk naming TULIP as unmet named requirement", () => {
     const rules = evaluateRules(fixture.extracted, userProfile, {
       resumeContexts: calibrationSweResumeContexts(),
-      activeResumeType: "SWE",
+      activeResumeType: "BASE",
     });
     expect(rules.namedHardRequirementGaps).toContain("TULIP Interfaces");
     expect(rules.notes[0]).toMatch(
@@ -135,7 +135,7 @@ describe("named required-tool absent calibration (PCG / TULIP)", () => {
     const { buildKeyRisks } = await import("../../../../web/src/lib/resultSummary.ts");
     const rules = evaluateRules(fixture.extracted, userProfile, {
       resumeContexts: calibrationSweResumeContexts(),
-      activeResumeType: "SWE",
+      activeResumeType: "BASE",
     });
     const job = {
       ...fixtureToJobRecord(fixture),

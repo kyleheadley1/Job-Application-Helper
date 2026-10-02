@@ -1,4 +1,4 @@
-export type ResumeType = "SWE" | "SIE" | "EARLY_CAREER";
+export type ResumeType = "BASE" | "AI" | "SWE" | "SIE" | "EARLY_CAREER";
 export type Recommendation =
   | "apply_cold"
   | "referral_gated"

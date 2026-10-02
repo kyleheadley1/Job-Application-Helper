@@ -24,7 +24,7 @@ describe("Neon — textually-ungrounded company-category inference", () => {
     const scored = scoreCalibrationAnchor("neonTextuallyUngrounded");
     const rules = evaluateRules(scored.fixture.extracted, userProfile, {
       resumeContexts: calibrationSweResumeContexts(),
-      activeResumeType: "SWE",
+      activeResumeType: "BASE",
     });
     const notes = rules.notes.join(" | ");
     expect(notes).not.toMatch(/Mature production-ownership bar/i);
@@ -47,7 +47,7 @@ describe("Neon — textually-ungrounded company-category inference", () => {
     const scored = scoreCalibrationAnchor("kongAiEnablementUngrounded");
     const rules = evaluateRules(scored.fixture.extracted, userProfile, {
       resumeContexts: calibrationSweResumeContexts(),
-      activeResumeType: "SWE",
+      activeResumeType: "BASE",
     });
     const notes = rules.notes.join(" | ");
 

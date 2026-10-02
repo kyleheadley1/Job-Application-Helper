@@ -1,4 +1,4 @@
-import type { ResumeType } from './resume.js';
+import type { StoredResumeType } from './resume.js';
 import type {
   ExtractedSkillTag,
   Recommendation,
@@ -153,7 +153,7 @@ export type JobRecord = {
   score: ScoreBreakdown;
   recommendation: Recommendation;
   salaryAsk: SalaryAsk;
-  recommendedResume: ResumeType;
+  recommendedResume: StoredResumeType;
   resumeRationale: string[];
   topMatch: string;
   mainRisk: string;
@@ -214,7 +214,7 @@ export type StatusHistoryRecord = {
 export type JobListFilters = {
   status?: JobStatus;
   shortlist?: boolean;
-  resume?: ResumeType;
+  resume?: StoredResumeType;
   recommendation?: Recommendation;
   minScore?: number;
   company?: string;

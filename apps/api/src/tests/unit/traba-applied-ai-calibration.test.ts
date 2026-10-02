@@ -23,7 +23,7 @@ describe("Traba Applied AI calibration", () => {
     expect(earlyCareerLevelVetoesSeniorityGate(TRABA_JOB)).toBe(true);
     expect(detectRoleSeniorityOverreach(TRABA_JOB)).toBe(false);
 
-    const rules = evaluateRules(TRABA_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(TRABA_JOB, userProfile, { activeResumeType: "BASE" });
     expect(rules.seniorityOverreach).toBe(false);
     expect(evaluateHardGates(rules, TRABA_JOB).fired).toBe(false);
     expect(rules.foundingEngineerStretch).toBe(true);
@@ -56,7 +56,7 @@ describe("Traba Applied AI calibration", () => {
     expect(earlyCareerLevelVetoesSeniorityGate(polluted)).toBe(true);
     expect(detectRoleSeniorityOverreach(polluted)).toBe(false);
 
-    const rules = evaluateRules(polluted, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(polluted, userProfile, { activeResumeType: "BASE" });
     expect(rules.seniorityOverreach).toBe(false);
     expect(evaluateHardGates(rules, polluted).fired).toBe(false);
     expect(evaluateHardGates(rules, polluted).reasons).toEqual([]);
@@ -82,7 +82,7 @@ describe("seniority gate guard — junior/mid + years ≤4", () => {
       rawText:
         "Architect core systems. founding team. founding engineer. lead the architecture. own the architecture.",
     };
-    const rules = evaluateRules(polluted, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(polluted, userProfile, { activeResumeType: "BASE" });
     expect(rules.seniorityOverreach).toBe(false);
     expect(evaluateHardGates(rules, polluted).fired).toBe(false);
   });
@@ -99,7 +99,7 @@ describe("Speechify-style Tech Lead — veto must not leak to genuine senior rol
     expect(earlyCareerLevelVetoesSeniorityGate(speechifyLead)).toBe(false);
     expect(detectRoleSeniorityOverreach(speechifyLead)).toBe(true);
 
-    const rules = evaluateRules(speechifyLead, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(speechifyLead, userProfile, { activeResumeType: "BASE" });
     expect(rules.seniorityOverreach).toBe(true);
     const gate = evaluateHardGates(rules, speechifyLead);
     expect(gate.fired).toBe(true);

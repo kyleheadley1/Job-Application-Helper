@@ -29,7 +29,7 @@ const assertNoGoAnywhere = (surfaces: string[]) => {
 
 describe("rawText-grounded tech cites — Fleetio + Bubble regression", () => {
   const resumeContexts = calibrationSweResumeContexts();
-  const claimable = claimableStackFromContexts(resumeContexts, "SWE");
+  const claimable = claimableStackFromContexts(resumeContexts, "BASE");
 
   it("does not treat English 'to go' as the Go language", () => {
     expect(textMentionsGoLanguage("to go")).toBe(false);
@@ -113,7 +113,7 @@ describe("rawText-grounded tech cites — Fleetio + Bubble regression", () => {
     it("never cites Go even if rules are poisoned with a phantom Go gap", () => {
       const base = evaluateRules(fixture.extracted, userProfile, {
         resumeContexts,
-        activeResumeType: "SWE",
+        activeResumeType: "BASE",
       });
       const poisoned = {
         ...base,

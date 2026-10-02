@@ -1,5 +1,5 @@
 import type { ExtractedJobData } from "./job.js";
-import type { ResumeType } from "./resume.js";
+import type { StoredResumeType } from "./resume.js";
 import type { Recommendation, RuleEvaluation, ScoreBreakdown } from "./scoring.js";
 
 export type TopJobSource = "jsearch" | "jobsbase";
@@ -32,7 +32,7 @@ export type TopJobRecord = {
   topMatch: string;
   mainRisk: string;
   rationale: string[];
-  recommendedResume: ResumeType;
+  recommendedResume: StoredResumeType;
   resumeRationale: string[];
   promotedToJobId?: string;
 };

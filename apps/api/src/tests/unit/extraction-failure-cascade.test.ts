@@ -53,7 +53,7 @@ describe("extraction failure cascade (Link/Stripe chrome)", () => {
     expect(seniorityNeedsManualReview(JOB)).toBe(true);
     expect(detectRoleSeniorityOverreach(JOB)).toBe(false);
 
-    const rules = evaluateRules(JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(JOB, userProfile, { activeResumeType: "BASE" });
     expect(rules.seniorityOverreach).toBe(false);
     expect(rules.notes.some((n) => /manual review/i.test(n))).toBe(true);
   });

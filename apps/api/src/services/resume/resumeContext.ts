@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import { PDFParse } from "pdf-parse";
 import { logger } from "../../lib/logger.js";
-import type { ResumeType } from "../../types/resume.js";
+import { RESUME_TYPES, type ResumeType } from "../../types/resume.js";
 import type {
   ResumeClaimSupport,
   ResumeContext,
@@ -50,15 +50,13 @@ const CLAIM_PATTERNS: Array<{ claim: string; re: RegExp }> = [
 ];
 
 const ROLE_SHAPES: Record<ResumeType, ResumeRoleShape[]> = {
-  SWE: ["product_fullstack"],
-  SIE: ["implementation"],
-  EARLY_CAREER: ["early_career"],
+  BASE: ["product_fullstack", "early_career"],
+  AI: ["applied_ai", "product_fullstack"],
 };
 
 const AVOID_USE_CASES: Record<ResumeType, string[]> = {
-  SWE: ["Pure pre-sales implementation narrative as primary story", "Strictly customer-onboarding-only roles without product build"],
-  SIE: ["Deep platform/SRE ownership claims", "Pure product-feature ownership framing with no implementation context"],
-  EARLY_CAREER: ["Senior/staff ownership claims", "Domain-expert-first narrative without foundational framing"],
+  BASE: ["Roles whose core work is LLM/RAG/agent systems (use AI)", "Deep platform/SRE ownership claims"],
+  AI: ["General product/full-stack roles with no AI component", "ML research or model-training roles (no training experience)"],
 };
 
 const clip = (s: string, n: number): string => (s.length <= n ? s : `${s.slice(0, n - 3)}...`);
@@ -131,12 +129,10 @@ const extractEvidenceSnippets = (raw: string, re: RegExp): string[] => {
 const inferThemes = (type: ResumeType, raw: string): string[] => {
   const lower = raw.toLowerCase();
   const seeds =
-    type === "SIE"
-      ? ["integrations", "implementation delivery", "stakeholder communication", "customer onboarding"]
-      : type === "EARLY_CAREER"
-        ? ["learning velocity", "hands-on project shipping", "foundational engineering", "growth readiness"]
-        : ["api-first product engineering", "backend-leaning full-stack", "internal tools", "pragmatic delivery"];
-  if (/\bllm|ai[-\s]?enabled|rag\b/i.test(lower)) seeds.push("ai-enabled workflows");
+    type === "AI"
+      ? ["rag systems", "llm evaluation", "agentic workflows", "ai-enabled product engineering"]
+      : ["api-first product engineering", "backend-leaning full-stack", "internal tools", "pragmatic delivery"];
+  if (type === "BASE" && /\bllm|ai[-\s]?enabled|rag\b/i.test(lower)) seeds.push("ai-enabled workflows");
   return seeds;
 };
 
@@ -221,9 +217,8 @@ export class ResumeContextService {
   }
 
   async getAvailableContexts(): Promise<ResumeContextSet> {
-    const types: ResumeType[] = ["SWE", "SIE", "EARLY_CAREER"];
     const out: ResumeContextSet = {};
-    for (const type of types) {
+    for (const type of RESUME_TYPES) {
       const context = await this.loadOne(type);
       if (context) out[type] = context;
     }

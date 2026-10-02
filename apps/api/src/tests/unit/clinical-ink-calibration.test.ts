@@ -12,7 +12,7 @@ import type { ScoreBreakdown } from "../../types/scoring.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SWE_RESUME = fs.readFileSync(
-  path.resolve(__dirname, "../../../data/resumes/swe_resume.txt"),
+  path.resolve(__dirname, "../fixtures/resumes/swe_resume.txt"),
   "utf8",
 );
 
@@ -59,7 +59,7 @@ describe("Clinical Ink calibration — soft Python preference", () => {
     const gap = detectSpecializationGap(CLINICAL_INK_JOB, CLINICAL_INK_CAPABILITY, SWE_RESUME);
     expect(gap).toBeUndefined();
 
-    const rules = evaluateRules(CLINICAL_INK_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(CLINICAL_INK_JOB, userProfile, { activeResumeType: "BASE" });
     const composite = computeCompositeScore({
       rawScore: CLINICAL_INK_CAPABILITY,
       rules,

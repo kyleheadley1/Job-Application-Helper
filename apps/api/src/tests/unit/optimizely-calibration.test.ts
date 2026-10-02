@@ -19,7 +19,7 @@ import type { ScoreBreakdown } from "../../types/scoring.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SWE_RESUME = fs.readFileSync(
-  path.resolve(__dirname, "../../../data/resumes/swe_resume.txt"),
+  path.resolve(__dirname, "../fixtures/resumes/swe_resume.txt"),
   "utf8",
 );
 
@@ -86,7 +86,7 @@ describe("Optimizely calibration anchor", () => {
     const jdLangs = extractJdLanguageLabels(OPTIMIZELY_JOB);
     expect(jdLangs.has("Go")).toBe(false);
 
-    const rules = evaluateRules(OPTIMIZELY_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(OPTIMIZELY_JOB, userProfile, { activeResumeType: "BASE" });
     expect(rules.coreLanguageGap ?? []).not.toContain("Go");
     expect(filterLanguagesToJdPresence(["Go", "Java"], OPTIMIZELY_JOB)).toEqual([]);
 
@@ -106,7 +106,7 @@ describe("Optimizely calibration anchor", () => {
   });
 
   it("softens degree penalty via equivalency clause and sets structured IAM specialization gap", () => {
-    const rules = evaluateRules(OPTIMIZELY_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(OPTIMIZELY_JOB, userProfile, { activeResumeType: "BASE" });
     expect(rules.degreeHasEquivalencyClause).toBe(true);
     expect(rules.explicitDegreeRisk).toBe(false);
 
@@ -184,7 +184,7 @@ describe("Optimizely calibration anchor", () => {
 
 describe("skip recommendation invariants", () => {
   it("referral pathway does not change guard outcome for non-addressable blockers", () => {
-    const rules = evaluateRules(OPTIMIZELY_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(OPTIMIZELY_JOB, userProfile, { activeResumeType: "BASE" });
     const clamped = applyScoringClampLayer({
       score: OPTIMIZELY_RAW_SCORE,
       extracted: OPTIMIZELY_JOB,

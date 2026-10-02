@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import { ZodError } from "zod";
 import { capturesRouter } from "./routes/captures.routes.js";
+import { gmailRouter } from "./routes/gmail.routes.js";
 import { jobsRouter } from "./routes/jobs.routes.js";
 import { topJobsRouter } from "./routes/topJobs.routes.js";
 import { env } from "./config/env.js";
@@ -21,6 +22,7 @@ app.get("/health", (_req, res) => {
 app.use("/api/jobs", jobsRouter);
 app.use("/api/top-jobs", topJobsRouter);
 app.use("/api/job-captures", capturesRouter);
+app.use("/api/gmail", gmailRouter);
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   if (error instanceof ZodError) {

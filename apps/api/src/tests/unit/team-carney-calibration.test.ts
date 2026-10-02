@@ -16,7 +16,7 @@ import { TEAM_CARNEY_JOB } from "./degree-equivalency.test.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SWE_RESUME = fs.readFileSync(
-  path.resolve(__dirname, "../../../data/resumes/swe_resume.txt"),
+  path.resolve(__dirname, "../fixtures/resumes/swe_resume.txt"),
   "utf8",
 );
 
@@ -34,7 +34,7 @@ const TEAM_CARNEY_RAW: ScoreBreakdown = {
 
 describe("Team Carney degree equivalency calibration", () => {
   it("does not apply structured-employer degree penalty when equivalency is satisfied", () => {
-    const rules = evaluateRules(TEAM_CARNEY_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(TEAM_CARNEY_JOB, userProfile, { activeResumeType: "BASE" });
     expect(rules.degreeEquivalencySatisfied).toBe(true);
     expect(rules.explicitDegreeRisk).toBe(false);
 

@@ -16,17 +16,13 @@ const resolveResumeDir = (): string => {
 export const resumeContextDir = resolveResumeDir();
 
 export const resumeFilePaths: ResumePathMap = {
-  SWE: {
-    txt: path.join(resumeContextDir, "swe_resume.txt"),
-    pdf: path.join(resumeContextDir, "swe_resume.pdf"),
+  BASE: {
+    txt: path.join(resumeContextDir, "base_resume.txt"),
+    pdf: path.join(resumeContextDir, "base_resume.pdf"),
   },
-  SIE: {
-    txt: path.join(resumeContextDir, "sie_resume.txt"),
-    pdf: path.join(resumeContextDir, "sie_resume.pdf"),
-  },
-  EARLY_CAREER: {
-    txt: path.join(resumeContextDir, "early_career_resume.txt"),
-    pdf: path.join(resumeContextDir, "early_career_resume.pdf"),
+  AI: {
+    txt: path.join(resumeContextDir, "ai_resume.txt"),
+    pdf: path.join(resumeContextDir, "ai_resume.pdf"),
   },
 };
 

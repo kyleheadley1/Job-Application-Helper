@@ -3,7 +3,7 @@ import type { JobPostingMetadata } from '../../tools/jobPostingMetadataExtract.j
 import { stripBoardMatchChromeFromText } from '../../tools/jobBoardMatchExtract.js';
 import { SCORING_CANONICAL_POLICY } from '../../config/scoringPolicy.js';
 import type { ExtractedJobData, JobRecord } from '../../types/job.js';
-import type { ResumeType } from '../../types/resume.js';
+import { toActiveResumeType, type StoredResumeType } from '../../types/resume.js';
 import type { ResumeContext } from "../../types/resumeContext.js";
 import type { RuleEvaluation, ScoreBreakdown } from '../../types/scoring.js';
 import type { UserProfile } from '../../types/userProfile.js';
@@ -174,12 +174,11 @@ ${JSON.stringify(params.scoringPolicy, null, 2)}
 `.trim();
 
 export const resumeSelectionSystemPrompt = `
-Choose one resume type: SWE, SIE, or EARLY_CAREER.
+Choose one resume type: BASE or AI.
 Rules:
-- Default to SWE for normal software engineering and AI / ML engineering roles unless the posting is explicitly early-career.
-- EARLY_CAREER only when the JD is clearly junior/new-grad/entry-level/apprenticeship/rotational/emerging-talent (not merely "AI Engineer" without those signals).
-- Do NOT pick SIE from the title "Forward Deployed Engineer" alone. Many FDE roles are builder-first product/software work (internal tooling, growth systems, automation, backend/full-stack, AI workflows). Default those to SWE.
-- Reserve SIE for roles whose core job is external customer implementation, integrations-heavy delivery with enterprise customers, sales engineering, technical consulting, post-sales deployment, or customer onboarding — not internal sales tooling or general product engineering.
+- AI when building LLM, RAG, retrieval/search, agent, or AI-evaluation systems is core to the day-to-day work (AI engineer, applied AI, AI product engineer, or a full-stack role whose product is AI-centric).
+- BASE for general product, full-stack, backend, internal-tools, and junior/associate roles, including roles that only mention AI as a nice-to-have.
+- Do not pick AI for ML research or model-training roles; the candidate has no training/fine-tuning experience.
 - Use role shape and expected recruiter screen; do not choose from title alone.
 - Output valid JSON only.
 `;
@@ -194,7 +193,7 @@ export const buildResumeSelectionPrompt = (params: {
 Select the best resume profile and explain why.
 Return:
 {
-  "recommendedResume": "SWE|SIE|EARLY_CAREER",
+  "recommendedResume": "BASE|AI",
   "confidence": number 0-1,
   "rationale": string[]
 }
@@ -216,7 +215,7 @@ ${JSON.stringify(params.userProfile, null, 2)}
 export const ASSET_EVIDENCE_DIVERSITY = `
 Evidence rotation (important):
 - Use BOTH flagship projects where they add distinct proof — do not repeat the same opening project sentence across paragraphs or bullets unless necessary.
-- Match the angle to this job's shape: integrations / customer delivery / workshops for SIE; product ambiguity + internal tools for SWE; fundamentals + mentorship + learning velocity for EARLY_CAREER.
+- Match the angle to this job's shape: RAG / evals / agent benchmarking for AI-centric roles; shipped full-stack product work, APIs, and internal tools for BASE roles; fundamentals and learning velocity for explicitly junior roles.
 - At most one asset section should lead with the same flagship project name; vary which project anchors bullets vs. cover letter when both are relevant.
 `.trim();
 
@@ -232,25 +231,18 @@ Grounding and honesty (non-negotiable):
 - Prefer short sentences. Avoid em dashes stacked for fake polish.
 `.trim();
 
-export const buildResumeAngleBlock = (resume: ResumeType): string => {
-  if (resume === 'SWE') {
+export const buildResumeAngleBlock = (resume: StoredResumeType): string => {
+  if (toActiveResumeType(resume) === 'AI') {
     return `
-Resume angle: SWE (product engineering).
-Emphasize: backend-leaning full-stack product work, APIs, internal tools, TypeScript/Node/React where profile supports it, shipping product features, pragmatic product tradeoffs.
-Avoid: sounding like pure SRE/infra ownership or design-first craft unless the profile supports it.
-`.trim();
-  }
-  if (resume === 'SIE') {
-    return `
-Resume angle: SIE / implementation-adjacent.
-Emphasize: hands-on implementation, integrations, delivery timelines, cross-functional collaboration, technical onboarding with stakeholders, translating requirements to workable technical plans, bridging technical and business needs.
-Avoid: claiming deep proprietary domain expertise not in the profile.
+Resume angle: AI (AI-enabled application engineering).
+Emphasize: RAG retrieval and grounding, LLM evaluation (golden sets, citation validity), bounded tool-using agents and benchmarking, plus the full-stack TypeScript/Node/React delivery around them.
+Avoid: claiming model training, fine-tuning, ML research, or production scale not in the profile.
 `.trim();
   }
   return `
-Resume angle: EARLY_CAREER.
-Emphasize: strong fundamentals, learning velocity, practical shipping from projects/training, full-stack project work, growth mindset, mentorship-friendly tone.
-Avoid: sounding artificially senior, claiming staff-level scope, or implying long industry tenure.
+Resume angle: BASE (full-stack product engineering).
+Emphasize: shipped full-stack product work, REST APIs, auth, async pipelines, internal tools, AWS and CI/CD; AI work as supporting evidence when relevant.
+Avoid: sounding like pure SRE/infra ownership, artificially senior scope, or long industry tenure.
 `.trim();
 };
 
@@ -284,8 +276,6 @@ export type CoverLetterGuidance = {
 };
 
 function deriveArchetype(job: JobRecord): "implementation" | "product" | "early" {
-  if (job.recommendedResume === "SIE") return "implementation";
-  if (job.recommendedResume === "EARLY_CAREER") return "early";
   const blob = `${job.extracted.title} ${job.extracted.responsibilities.join(" ")} ${job.extracted.requirements.join(" ")}`.toLowerCase();
   if (/(integration|implementation|customer|onboarding|deployment)/.test(blob)) return "implementation";
   if (/(junior|entry|new grad|early career)/.test(blob)) return "early";
@@ -494,11 +484,6 @@ ${JSON.stringify(params.userProfile, null, 2)}
 
 Job + evaluation context:
 ${buildAssetJobContextJson(params.job)}
-${
-  params.job.recommendedResume === 'SIE'
-    ? `\nFor this SIE / implementation-forward angle: keep each sentence short; separate sentences with newline characters inside the JSON string (not one dense block paragraph).\n`
-    : ''
-}
 `.trim();
 
 export const talkingPointsAssetSystemPrompt = `
@@ -543,9 +528,8 @@ ${ASSET_GROUNDING_RULES}
 Contract:
 - 3–5 concise resume-style bullet candidates, not interview talking points.
 - Resume-type-aware:
-  - SWE: APIs, full-stack product features, internal tools, pragmatic technical tradeoffs.
-  - SIE: integrations, implementation delivery, stakeholder translation, onboarding/support.
-  - EARLY_CAREER: hands-on shipped work, fundamentals, growth readiness without senior claims.
+  - BASE: APIs, full-stack product features, internal tools, async pipelines, pragmatic technical tradeoffs.
+  - AI: RAG retrieval and grounding, LLM evals, tool-using agents and benchmarks, with the surrounding full-stack delivery.
 - Tailor to JD priorities and selected evidence angles.
 - Vary lead-ins; do not start every bullet with the same phrasing pattern.
 - Keep honesty constraints; no invented scale/years/scope.

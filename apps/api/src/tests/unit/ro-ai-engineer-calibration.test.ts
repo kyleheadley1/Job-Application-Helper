@@ -23,7 +23,7 @@ import type { ExtractedJobData } from "../../types/job.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SWE_RESUME = fs.readFileSync(
-  path.resolve(__dirname, "../../../data/resumes/swe_resume.txt"),
+  path.resolve(__dirname, "../fixtures/resumes/swe_resume.txt"),
   "utf8",
 );
 
@@ -36,7 +36,7 @@ describe("seniority gate — role level only", () => {
     expect(seniorityFieldSignalsOverreach("Junior, Mid")).toBe(false);
     expect(detectRoleSeniorityOverreach(RO_AI_ENGINEER_JOB)).toBe(false);
 
-    const rules = evaluateRules(RO_AI_ENGINEER_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(RO_AI_ENGINEER_JOB, userProfile, { activeResumeType: "BASE" });
     expect(rules.seniorityOverreach).toBe(false);
     expect(evaluateHardGates(rules, RO_AI_ENGINEER_JOB).fired).toBe(false);
   });
@@ -112,7 +112,7 @@ describe("hard gate display consistency", () => {
       seniority: "Staff",
       yearsExperience: { min: 8, raw: "8+ years" },
     };
-    const rules = evaluateRules(job, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(job, userProfile, { activeResumeType: "BASE" });
     expect(rules.seniorityOverreach).toBe(true);
 
     const composite = computeCompositeScore({

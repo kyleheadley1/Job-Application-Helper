@@ -105,7 +105,7 @@ function cherryHillJobRecord(): JobRecord {
     score: CHERRY_HILL_STORED_SCORE,
     recommendation: "referral_gated",
     salaryAsk: {},
-    recommendedResume: "SWE",
+    recommendedResume: "BASE",
     resumeRationale: [],
     topMatch: "Match",
     mainRisk: "Risk",

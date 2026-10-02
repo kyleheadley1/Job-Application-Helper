@@ -36,7 +36,7 @@ describe('POST /api/jobs/triage', () => {
         /apply_cold|referral_gated|stretch_signal|skip|no|yes|selective_yes/,
       ),
       salaryAsk: expect.any(Object),
-      recommendedResume: expect.stringMatching(/SWE|SIE|EARLY_CAREER/),
+      recommendedResume: expect.stringMatching(/^(BASE|AI)$/),
       resumeRationale: expect.any(Array),
       topMatch: expect.any(String),
       mainRisk: expect.any(String),

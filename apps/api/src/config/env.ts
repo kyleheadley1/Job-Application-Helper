@@ -71,6 +71,16 @@ export const env = {
   rapidApiKey: process.env.RAPIDAPI_KEY,
   /** Shared secret the Chrome extension sends as `Authorization: Bearer <token>`. */
   extensionApiToken: process.env.EXTENSION_API_TOKEN?.trim() || undefined,
+  googleClientId: process.env.GOOGLE_CLIENT_ID?.trim() || undefined,
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET?.trim() || undefined,
+  googleRedirectUri:
+    process.env.GOOGLE_REDIRECT_URI?.trim() || "http://localhost:4000/api/gmail/oauth/callback",
+  /** Where the OAuth callback sends the browser back to (the web app dashboard). */
+  webAppUrl: (process.env.WEB_APP_URL?.trim() || "http://localhost:5173").replace(/\/+$/, ""),
+  serperApiKey: process.env.SERPER_API_KEY?.trim() || undefined,
+  /** Lifetime cap on distinct applications that may use Serper search. */
+  serperMaxJobsTotal: Number(process.env.SERPER_MAX_JOBS_TOTAL ?? 10),
+  jdRecoveryMaxPerRun: Number(process.env.JD_RECOVERY_MAX_PER_RUN ?? 5),
   topJobsSyncEnabled: parseBooleanEnv(process.env.TOP_JOBS_SYNC_ENABLED, false),
   /** Cron in TOP_JOBS_SYNC_TIMEZONE — default 6:00 AM US Eastern daily. */
   topJobsSyncCron: process.env.TOP_JOBS_SYNC_CRON ?? "0 6 * * *",

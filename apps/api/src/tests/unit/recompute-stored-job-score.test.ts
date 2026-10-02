@@ -51,7 +51,7 @@ function minimalJob(extracted: ExtractedJobData, score: ScoreBreakdown): JobReco
     score,
     recommendation: "no",
     salaryAsk: {},
-    recommendedResume: "SWE",
+    recommendedResume: "BASE",
     resumeRationale: [],
     topMatch: "Match",
     mainRisk: "Risk",

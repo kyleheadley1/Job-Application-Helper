@@ -15,7 +15,7 @@ It is designed as an operator assistant, not an autonomous applier.
 - Structured job extraction from pasted text/URL inputs
 - Conservative fit scoring with explicit rule penalties
 - Recommendation bands: `yes`, `selective_yes`, `no`
-- Resume recommendation (`SWE`, `SIE`, `EARLY_CAREER`)
+- Resume recommendation (`BASE` full-stack or `AI`-heavy; older records may show legacy `SWE`/`SIE`/`EARLY_CAREER`)
 - On-demand generation for:
   - cover letter
   - why company

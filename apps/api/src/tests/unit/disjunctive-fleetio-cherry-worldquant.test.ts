@@ -20,7 +20,7 @@ import {
 } from "../fixtures/calibrationAnchors.js";
 import type { ExtractedJobData } from "../../types/job.js";
 
-const claimable = () => claimableStackFromContexts(calibrationSweResumeContexts(), "SWE");
+const claimable = () => claimableStackFromContexts(calibrationSweResumeContexts(), "BASE");
 
 /**
  * Disjunctive language = meaning (any one listed language satisfies), not one keyword pattern.
@@ -101,7 +101,7 @@ describe("disjunctive language — Fleetio + Cherry + WorldQuant", () => {
 
       const rules = evaluateRules(fixture.extracted, userProfile, {
         resumeContexts: calibrationSweResumeContexts(),
-        activeResumeType: "SWE",
+        activeResumeType: "BASE",
       });
       expect(rules.disjunctiveLanguageRequirementSatisfied).toBe(true);
       expect(rules.coreLanguageGap ?? []).not.toContain("Java");
@@ -122,7 +122,7 @@ describe("disjunctive language — Fleetio + Cherry + WorldQuant", () => {
         rules: {
           ...evaluateRules(fixture.extracted, userProfile, {
             resumeContexts: calibrationSweResumeContexts(),
-            activeResumeType: "SWE",
+            activeResumeType: "BASE",
           }),
         },
         max: 3,

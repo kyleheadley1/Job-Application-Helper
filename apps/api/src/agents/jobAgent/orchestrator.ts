@@ -100,7 +100,7 @@ export const triageJob = async (input: {
   const resumePreview = deterministicResumeSelection(extracted, resumeContexts);
   let activeResumeType: ResumeType = resumePreview.recommendedResume;
   let resumeTextForScore =
-    resumeContexts?.[activeResumeType]?.rawText ?? resumeContexts?.SWE?.rawText;
+    resumeContexts?.[activeResumeType]?.rawText ?? resumeContexts?.BASE?.rawText;
 
   const rulesStart = Date.now();
   const rules = withSanitizedRuleNotes(

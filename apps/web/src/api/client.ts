@@ -1,5 +1,11 @@
 import type { JobRecord, JobStatus } from "../types/job";
 import type { TopJobRecord, TopJobsSyncStatus } from "../types/topJob";
+import type {
+  EvaluationsResponse,
+  GmailApplicationsResponse,
+  GmailStatus,
+  GmailSyncResult,
+} from "../types/gmail";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000/api";
 
@@ -106,4 +112,25 @@ export const api = {
       method: "POST",
     }),
   promoteTopJob: (id: string) => request<JobRecord>(`/top-jobs/${id}/promote`, { method: "POST" }),
+  gmailConnectUrl: `${API_BASE}/gmail/oauth/start`,
+  gmailStatus: () => request<GmailStatus>("/gmail/status", { cache: "no-store" }),
+  gmailSync: (days = 7) =>
+    request<GmailSyncResult>("/gmail/sync", {
+      method: "POST",
+      cache: "no-store",
+      body: JSON.stringify({ days }),
+    }),
+  gmailApplications: (days = 7) =>
+    request<GmailApplicationsResponse>(`/gmail/applications?days=${days}`, {
+      cache: "no-store",
+    }),
+  gmailDisconnect: () => request<void>("/gmail/disconnect", { method: "POST" }),
+  gmailEvaluations: (days = 7) =>
+    request<EvaluationsResponse>(`/gmail/evaluations?days=${days}`, { cache: "no-store" }),
+  gmailRunRecovery: (days = 7) =>
+    request<{ queued: number; running: boolean; started: boolean }>("/gmail/evaluations/run", {
+      method: "POST",
+      cache: "no-store",
+      body: JSON.stringify({ days }),
+    }),
 };

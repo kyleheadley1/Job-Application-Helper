@@ -24,7 +24,7 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SWE_RESUME = fs.readFileSync(
-  path.resolve(__dirname, "../../../data/resumes/swe_resume.txt"),
+  path.resolve(__dirname, "../fixtures/resumes/swe_resume.txt"),
   "utf8",
 );
 
@@ -103,7 +103,7 @@ describe("geo scope extraction", () => {
 
 describe("Reflow geo eligibility advisory", () => {
   it("fires soft verify flag; hard gates stay empty; score/band unchanged by flag", () => {
-    const rules = evaluateRules(REFLOW_GEO_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(REFLOW_GEO_JOB, userProfile, { activeResumeType: "BASE" });
     expect(rules.eligibilityFlag).toBeDefined();
     expect(rules.eligibilityFlag?.lever).toBe("verify");
     expect(rules.eligibilityFlag?.severity).toBe("check");
@@ -145,7 +145,7 @@ describe("explicit geographic exclusion", () => {
     const geo = evaluateGeoEligibility(EXPLICIT_JOB, userProfile);
     expect(geo.geoExclusionHardGate).toBe(true);
 
-    const rules = evaluateRules(EXPLICIT_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(EXPLICIT_JOB, userProfile, { activeResumeType: "BASE" });
     expect(rules.geoExclusionHardGate).toBe(true);
     expect(rules.eligibilityFlag).toBeUndefined();
 
@@ -173,7 +173,7 @@ describe("no geo flag when nothing to verify", () => {
   };
 
   it("does not flag US role for US candidate with no title region", () => {
-    const rules = evaluateRules(US_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(US_JOB, userProfile, { activeResumeType: "BASE" });
     expect(rules.eligibilityFlag).toBeUndefined();
     expect(rules.geoExclusionHardGate).toBe(false);
   });
@@ -251,7 +251,7 @@ describe("Wex residency-radius hard gate (permanent fixture)", () => {
     expect(geo.geoExclusionReason).toMatch(/30 miles/i);
     expect(geo.geoExclusionReason).toMatch(/Brooklyn|NY/i);
 
-    const rules = evaluateRules(WEX_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(WEX_JOB, userProfile, { activeResumeType: "BASE" });
     expect(rules.geoExclusionHardGate).toBe(true);
     expect(rules.eligibilityFlag).toBeUndefined();
 
@@ -325,7 +325,7 @@ describe("residency radius vs Latin America region gate parity", () => {
     const wex = loadCalibrationFixture("wexSde1ResidencyRadiusGate").extracted;
 
     for (const job of [latAm, wex]) {
-      const rules = evaluateRules(job, userProfile, { activeResumeType: "SWE" });
+      const rules = evaluateRules(job, userProfile, { activeResumeType: "BASE" });
       expect(rules.geoExclusionHardGate).toBe(true);
       const { composite, display } = compositeFor(job, rules);
       expect(composite.hardGateFired).toBe(true);

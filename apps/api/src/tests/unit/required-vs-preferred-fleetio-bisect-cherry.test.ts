@@ -21,7 +21,7 @@ import {
  * not one-off job patches. Covers Fleetio, BisectHosting, and Cherry Technologies.
  */
 describe("required-vs-preferred extraction — Fleetio + BisectHosting + Cherry", () => {
-  const claimable = claimableStackFromContexts(calibrationSweResumeContexts(), "SWE");
+  const claimable = claimableStackFromContexts(calibrationSweResumeContexts(), "BASE");
 
   describe("section header classification (general)", () => {
     it("recognizes What You Need and Nice-to-Haves: subtitle headers", () => {
@@ -132,7 +132,7 @@ describe("required-vs-preferred extraction — Fleetio + BisectHosting + Cherry"
       expect(extractTitleRegionFromTitle("Mid-Level Software Engineer")).toBeNull();
       const rules = evaluateRules(sanitized, userProfile, {
         resumeContexts: calibrationSweResumeContexts(),
-        activeResumeType: "SWE",
+        activeResumeType: "BASE",
       });
       expect(rules.eligibilityFlag).toBeUndefined();
       expect(rules.eligibilityFlag?.reason ?? "").not.toMatch(/Title scopes to Mid/i);

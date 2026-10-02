@@ -299,11 +299,11 @@ export const evaluateRules = (
       'platform',
     ]);
 
-  const claimable = claimableStackFromContexts(options?.resumeContexts, options?.activeResumeType ?? 'SWE');
-  const resumeType = options?.activeResumeType ?? 'SWE';
+  const claimable = claimableStackFromContexts(options?.resumeContexts, options?.activeResumeType ?? 'BASE');
+  const resumeType = options?.activeResumeType ?? 'BASE';
   const resumeRaw =
     options?.resumeContexts?.[resumeType]?.rawText ??
-    options?.resumeContexts?.SWE?.rawText ??
+    options?.resumeContexts?.BASE?.rawText ??
     '';
   const candidateBackgroundBlob = [
     resumeRaw,

@@ -55,7 +55,7 @@ describe("degree equivalency detection", () => {
   });
 
   it("sets degreeEquivalencySatisfied and clears explicitDegreeRisk for Team Carney", () => {
-    const rules = evaluateRules(TEAM_CARNEY_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(TEAM_CARNEY_JOB, userProfile, { activeResumeType: "BASE" });
     expect(rules.degreeHasEquivalencyClause).toBe(true);
     expect(rules.degreeEquivalencySatisfied).toBe(true);
     expect(rules.explicitDegreeRisk).toBe(false);

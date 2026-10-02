@@ -8,9 +8,11 @@ const STATUS_LABEL: Record<CaptureStatus, string> = {
 };
 
 const RESUME_LABEL: Record<string, string> = {
-  SWE: "SWE resume",
-  SIE: "SIE resume",
+  BASE: "Base resume",
   AI: "AI resume",
+  SWE: "Base resume",
+  SIE: "Base resume",
+  EARLY_CAREER: "Base resume",
 };
 
 const scoreClass = (score: number, hardGate?: string) => {

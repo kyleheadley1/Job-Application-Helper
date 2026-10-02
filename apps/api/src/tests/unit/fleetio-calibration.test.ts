@@ -27,7 +27,7 @@ import type { ExtractedJobData } from "../../types/job.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SWE_RESUME = fs.readFileSync(
-  path.resolve(__dirname, "../../../data/resumes/swe_resume.txt"),
+  path.resolve(__dirname, "../fixtures/resumes/swe_resume.txt"),
   "utf8",
 );
 
@@ -60,7 +60,7 @@ describe("Fleetio Marketplace — tag provenance & disjunctive stack", () => {
   });
 
   it("treats Rails/React/and-or Typescript as disjunctive — satisfied by React + TypeScript", () => {
-    const claimable = claimableStackFromContexts(calibrationSweResumeContexts(), "SWE");
+    const claimable = claimableStackFromContexts(calibrationSweResumeContexts(), "BASE");
     const line = "2+ years experience with Ruby on Rails, React, and/or Typescript";
     expect(lineDisjunctiveRequirementSatisfied(line, claimable)).toBe(true);
 
@@ -165,7 +165,7 @@ describe("and/or disjunctive regression", () => {
       requirements: ["2+ years experience with Ruby on Rails, React, and/or Typescript"],
       rawText: "Qualifications\n2+ years experience with Ruby on Rails, React, and/or Typescript",
     };
-    const claimable = claimableStackFromContexts(calibrationSweResumeContexts(), "SWE");
+    const claimable = claimableStackFromContexts(calibrationSweResumeContexts(), "BASE");
     expect(evaluateDisjunctiveLanguageRequirement(job, claimable).satisfied).toBe(true);
   });
 });

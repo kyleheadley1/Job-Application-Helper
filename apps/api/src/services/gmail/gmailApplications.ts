@@ -1,0 +1,252 @@
+import type { JobRecord, JobStatus } from "../../types/job.js";
+import { jobsRepository } from "../jobs/jobs.repository.js";
+import type { EmailEventType } from "./gmailClassifier.js";
+import { gmailMessagesRepository, type StoredGmailMessage } from "./gmailMessages.repository.js";
+
+export type ApplicationStatus = "applied" | "assessment" | "interviewing" | "rejected" | "offer";
+
+export type ApplicationEmail = {
+  id: string;
+  subject: string;
+  from: string;
+  date: string;
+  eventType: EmailEventType;
+  gmailUrl: string;
+};
+
+export type GmailApplication = {
+  key: string;
+  company: string;
+  role: string | null;
+  appliedAt: string;
+  status: ApplicationStatus;
+  lastUpdateAt: string;
+  emails: ApplicationEmail[];
+  trackerJobId?: string;
+  trackerStatus?: JobStatus;
+  trackerTitle?: string;
+  suggestedStatus?: JobStatus;
+};
+
+const EVENT_TO_STATUS: Record<Exclude<EmailEventType, "other">, ApplicationStatus> = {
+  applied: "applied",
+  rejected: "rejected",
+  interview: "interviewing",
+  assessment: "assessment",
+  offer: "offer",
+};
+
+/** Same-timestamp tie-break: the more advanced/final event wins. */
+const EVENT_WEIGHT: Record<EmailEventType, number> = {
+  other: 0,
+  applied: 1,
+  assessment: 2,
+  interview: 3,
+  rejected: 4,
+  offer: 5,
+};
+
+const COMPANY_SUFFIX_RE =
+  /\b(inc|incorporated|llc|l\.l\.c|ltd|limited|corp|corporation|co|company|plc|gmbh|technologies|technology|labs|group|holdings|hq)\b\.?/g;
+
+export const normalizeCompany = (name: string): string =>
+  name
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/\(.*?\)/g, " ")
+    .replace(COMPANY_SUFFIX_RE, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+const ROLE_STOPWORDS = new Set([
+  "a", "an", "and", "the", "of", "for", "to", "in", "at", "with", "on", "i", "ii", "iii", "1", "2", "3",
+  "remote", "hybrid", "onsite", "us", "usa", "new", "grad", "position", "role",
+]);
+
+const ROLE_SYNONYMS: Record<string, string> = {
+  sr: "senior",
+  jr: "junior",
+  swe: "software engineer",
+  sde: "software development engineer",
+  dev: "developer",
+  eng: "engineer",
+  fullstack: "full stack",
+  "full-stack": "full stack",
+};
+
+export const roleTokens = (role: string): string[] => {
+  const expanded = role
+    .toLowerCase()
+    .replace(/[^a-z0-9+#\- ]+/g, " ")
+    .split(/\s+/)
+    .map((t) => ROLE_SYNONYMS[t] ?? t)
+    .join(" ")
+    .replace(/-/g, " ");
+  return [...new Set(expanded.split(/\s+/).filter((t) => t && !ROLE_STOPWORDS.has(t)))];
+};
+
+export const roleSimilarity = (a: string, b: string): number => {
+  const ta = new Set(roleTokens(a));
+  const tb = new Set(roleTokens(b));
+  if (ta.size === 0 || tb.size === 0) return 0;
+  let shared = 0;
+  for (const t of ta) if (tb.has(t)) shared += 1;
+  return shared / Math.min(ta.size, tb.size);
+};
+
+const ROLE_MATCH_THRESHOLD = 0.6;
+
+const gmailUrl = (threadId: string) => `https://mail.google.com/mail/u/0/#all/${threadId}`;
+
+type Group = {
+  companyKey: string;
+  company: string;
+  role: string | null;
+  messages: StoredGmailMessage[];
+};
+
+const groupMessages = (messages: StoredGmailMessage[]): Group[] => {
+  const byCompany = new Map<string, { company: string; roled: Group[]; unroled: StoredGmailMessage[] }>();
+  for (const m of messages) {
+    const c = m.classification;
+    if (!c?.isApplicationEmail || !c.company) continue;
+    const companyKey = normalizeCompany(c.company);
+    if (!companyKey) continue;
+    const bucket = byCompany.get(companyKey) ?? { company: c.company, roled: [], unroled: [] };
+    byCompany.set(companyKey, bucket);
+    if (!c.role) {
+      bucket.unroled.push(m);
+      continue;
+    }
+    const existing = bucket.roled.find(
+      (g) => g.role && roleSimilarity(g.role, c.role!) >= ROLE_MATCH_THRESHOLD,
+    );
+    if (existing) existing.messages.push(m);
+    else bucket.roled.push({ companyKey, company: c.company, role: c.role, messages: [m] });
+  }
+
+  const groups: Group[] = [];
+  for (const [companyKey, bucket] of byCompany) {
+    if (bucket.unroled.length > 0) {
+      if (bucket.roled.length === 1) bucket.roled[0]!.messages.push(...bucket.unroled);
+      else groups.push({ companyKey, company: bucket.company, role: null, messages: bucket.unroled });
+    }
+    groups.push(...bucket.roled);
+  }
+  return groups;
+};
+
+const toApplication = (group: Group): Omit<GmailApplication, "trackerJobId" | "trackerStatus" | "trackerTitle" | "suggestedStatus"> => {
+  const sorted = [...group.messages].sort(
+    (a, b) =>
+      a.date.localeCompare(b.date) ||
+      EVENT_WEIGHT[a.classification!.eventType] - EVENT_WEIGHT[b.classification!.eventType],
+  );
+  const firstApplied = sorted.find((m) => m.classification!.eventType === "applied");
+  const statusEvents = sorted.filter((m) => m.classification!.eventType !== "other");
+  const latest = statusEvents[statusEvents.length - 1];
+  const status: ApplicationStatus = latest
+    ? EVENT_TO_STATUS[latest.classification!.eventType as Exclude<EmailEventType, "other">]
+    : "applied";
+  return {
+    key: `${group.companyKey}::${group.role ? roleTokens(group.role).join(" ") : ""}`,
+    company: group.company,
+    role: group.role,
+    appliedAt: (firstApplied ?? sorted[0]!).date,
+    status,
+    lastUpdateAt: sorted[sorted.length - 1]!.date,
+    emails: sorted
+      .map((m) => ({
+        id: m.id,
+        subject: m.subject,
+        from: m.from,
+        date: m.date,
+        eventType: m.classification!.eventType,
+        gmailUrl: gmailUrl(m.threadId),
+      }))
+      .reverse(),
+  };
+};
+
+const STATUS_TO_JOB_STATUS: Record<ApplicationStatus, JobStatus> = {
+  applied: "applied",
+  assessment: "assessment",
+  interviewing: "interviewing",
+  rejected: "rejected",
+  offer: "offer",
+};
+
+const PIPELINE_RANK: Partial<Record<JobStatus, number>> = {
+  to_review: 0,
+  skip: 0,
+  lapsed: 1,
+  applied: 1,
+  assessment: 2,
+  interviewing: 3,
+};
+const TERMINAL: JobStatus[] = ["rejected", "closed", "offer"];
+
+/** Suggest a tracker change only when the email moves the role forward (or ends it). */
+export const suggestTrackerStatus = (
+  trackerStatus: JobStatus,
+  emailStatus: ApplicationStatus,
+): JobStatus | undefined => {
+  const suggested = STATUS_TO_JOB_STATUS[emailStatus];
+  if (suggested === trackerStatus || TERMINAL.includes(trackerStatus)) return undefined;
+  if (suggested === "rejected" || suggested === "offer") return suggested;
+  const from = PIPELINE_RANK[trackerStatus] ?? 0;
+  const to = PIPELINE_RANK[suggested] ?? 0;
+  return to > from ? suggested : undefined;
+};
+
+const trackerCompany = (job: JobRecord): string =>
+  normalizeCompany(job.extracted.companyDisplayName || job.extracted.company || "");
+
+export const matchTrackerJob = (
+  app: Pick<GmailApplication, "company" | "role">,
+  jobs: JobRecord[],
+): JobRecord | undefined => {
+  const companyKey = normalizeCompany(app.company);
+  const candidates = jobs.filter((j) => trackerCompany(j) === companyKey);
+  if (candidates.length === 0) return undefined;
+  if (!app.role) return candidates.length === 1 ? candidates[0] : undefined;
+  let best: { job: JobRecord; score: number } | undefined;
+  for (const job of candidates) {
+    const score = roleSimilarity(app.role, job.extracted.title ?? "");
+    if (
+      score >= ROLE_MATCH_THRESHOLD &&
+      (!best || score > best.score || (score === best.score && job.updatedAt > best.job.updatedAt))
+    ) {
+      best = { job, score };
+    }
+  }
+  return best?.job;
+};
+
+export const buildApplications = (
+  messages: StoredGmailMessage[],
+  trackerJobs: JobRecord[],
+): GmailApplication[] =>
+  groupMessages(messages)
+    .map((group) => {
+      const app = toApplication(group);
+      const match = matchTrackerJob(app, trackerJobs);
+      if (!match) return app;
+      return {
+        ...app,
+        trackerJobId: match.id,
+        trackerStatus: match.status,
+        trackerTitle: match.extracted.title,
+        suggestedStatus: suggestTrackerStatus(match.status, app.status),
+      };
+    })
+    .sort((a, b) => b.lastUpdateAt.localeCompare(a.lastUpdateAt));
+
+export const getGmailApplications = async (days: number): Promise<GmailApplication[]> => {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const [messages, jobs] = await Promise.all([
+    gmailMessagesRepository.listApplicationMessagesSince(since),
+    jobsRepository.findAll(),
+  ]);
+  return buildApplications(messages, jobs);
+};

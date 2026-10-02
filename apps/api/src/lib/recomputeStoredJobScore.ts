@@ -13,6 +13,7 @@ import { applyScoringClampLayer } from "./scoringClampLayer.js";
 import { buildScoreDisplay } from "./scoreDisplayModel.js";
 import type { JobRecord } from "../types/job.js";
 import type { ResumeContextSet } from "../types/resumeContext.js";
+import { toActiveResumeType } from "../types/resume.js";
 import type { UserProfile } from "../types/userProfile.js";
 import type { Recommendation, RuleEvaluation, SalaryAsk, ScoreBreakdown } from "../types/scoring.js";
 
@@ -48,9 +49,9 @@ export const recomputeStoredJobScore = (params: {
 }): RecomputedStoredJobScore => {
   const profile = params.profile ?? defaultUserProfile;
   const { job, resumeContexts } = params;
-  const activeResumeType = job.recommendedResume ?? "SWE";
+  const activeResumeType = toActiveResumeType(job.recommendedResume);
   const resumeText =
-    resumeContexts?.[activeResumeType]?.rawText ?? resumeContexts?.SWE?.rawText;
+    resumeContexts?.[activeResumeType]?.rawText ?? resumeContexts?.BASE?.rawText;
 
   // Re-apply preferred/required provenance on every recompute so section-header
   // fixes (What You Need / Nice-to-Haves) correct stale extracted arrays.

@@ -11,7 +11,7 @@ import {
 describe("finance/insurance penalty precision", () => {
   it("SaaS selling to finance/insurance does not get financePenalty (benefits + degree)", () => {
     const fixture = loadCalibrationFixture("saasSellsToFinance");
-    const rules = evaluateRules(fixture.extracted, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(fixture.extracted, userProfile, { activeResumeType: "BASE" });
     expect(rules.financePenalty).toBe(false);
 
     const clamped = applyScoringClampLayer({
@@ -25,7 +25,7 @@ describe("finance/insurance penalty precision", () => {
 
   it("Heritage Bank institution fires financePenalty and caps domainFit", () => {
     const fixture = loadCalibrationFixture("heritageBankInstitution");
-    const rules = evaluateRules(fixture.extracted, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(fixture.extracted, userProfile, { activeResumeType: "BASE" });
     expect(rules.financePenalty).toBe(true);
 
     const clamped = applyScoringClampLayer({
@@ -56,7 +56,7 @@ We sell software to life insurers and commercial banks. Series B SaaS.
         `.trim(),
       },
       userProfile,
-      { activeResumeType: "SWE" },
+      { activeResumeType: "BASE" },
     );
     expect(rules.financePenalty).toBe(false);
   });

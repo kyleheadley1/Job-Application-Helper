@@ -1,6 +1,6 @@
 import type { ResumeType } from "./resume.js";
 
-export type ResumeRoleShape = "product_fullstack" | "implementation" | "early_career";
+export type ResumeRoleShape = "product_fullstack" | "applied_ai" | "early_career";
 
 export type ResumeProjectEvidence = {
   name?: string;

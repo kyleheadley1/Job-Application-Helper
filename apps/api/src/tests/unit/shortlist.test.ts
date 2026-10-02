@@ -63,7 +63,7 @@ const baseJob = (overrides: Partial<JobRecord> = {}): JobRecord => {
     } as JobRecord["score"],
     recommendation: "referral_gated",
     salaryAsk: {},
-    recommendedResume: "SWE",
+    recommendedResume: "BASE",
     resumeRationale: [],
     topMatch: "",
     mainRisk: "",

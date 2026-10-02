@@ -17,6 +17,7 @@ import { buildJobExportRow, buildTrackerSpreadsheetFromJob } from "../../tracker
 import { jobsRepository } from "./jobs.repository.js";
 import { capturesRepository } from "../captures/captures.repository.js";
 import { resumeContextService } from "../resume/resumeContext.js";
+import { toActiveResumeType } from "../../types/resume.js";
 import { companyHintFromExtracted, preserveCompanyOnRetriage } from "../../lib/preserveCompanyOnRetriage.js";
 
 export class JobNotFoundError extends Error {
@@ -253,7 +254,7 @@ export class JobsService {
     const draft = tracked ? null : await this.findDraft(jobId);
     const job = tracked ?? draft;
     if (!job) throw new JobNotFoundError();
-    const selectedResumeContext = (await resumeContextService.getContext(job.recommendedResume)) ?? undefined;
+    const selectedResumeContext = (await resumeContextService.getContext(toActiveResumeType(job.recommendedResume))) ?? undefined;
     const result = await generateJobAssets({ job, userProfile, selectedResumeContext, force: input?.force });
     if (result.skipped) {
       throw new AssetGenerationSkippedError(result.skipReason ?? "Asset generation skipped.");
@@ -285,7 +286,7 @@ export class JobsService {
     force?: boolean;
   }): Promise<JobRecord> {
     const { job, persist, force } = body;
-    const selectedResumeContext = (await resumeContextService.getContext(job.recommendedResume)) ?? undefined;
+    const selectedResumeContext = (await resumeContextService.getContext(toActiveResumeType(job.recommendedResume))) ?? undefined;
     const result = await generateJobAssets({ job, userProfile, selectedResumeContext, force });
     if (result.skipped) {
       throw new AssetGenerationSkippedError(result.skipReason ?? "Asset generation skipped.");

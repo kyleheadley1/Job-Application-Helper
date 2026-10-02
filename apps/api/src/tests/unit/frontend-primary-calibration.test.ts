@@ -24,7 +24,7 @@ import type { ExtractedJobData } from "../../types/job.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SWE_RESUME = fs.readFileSync(
-  path.resolve(__dirname, "../../../data/resumes/swe_resume.txt"),
+  path.resolve(__dirname, "../fixtures/resumes/swe_resume.txt"),
   "utf8",
 );
 
@@ -68,7 +68,7 @@ describe("frontend-primary role — backend edge benched", () => {
       expect.arrayContaining(["rest api", "backend", "api"]),
     );
 
-    const rules = evaluateRules(job, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(job, userProfile, { activeResumeType: "BASE" });
     expect(rules.degreeHasEquivalencyClause).toBe(true);
     expect(rules.degreeEquivalencySatisfied).toBe(true);
     expect(rules.explicitDegreeRisk).toBe(false);

@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SWE_RESUME = fs.readFileSync(
-  path.resolve(__dirname, "../../../data/resumes/swe_resume.txt"),
+  path.resolve(__dirname, "../fixtures/resumes/swe_resume.txt"),
   "utf8",
 );
 
@@ -23,7 +23,7 @@ describe("jdProhibitsGenAI detector", () => {
   it("NYT News Multimodal triggers applicant GenAI restriction", () => {
     const job = loadCalibrationFixture("nytNewsMultimodal").extracted;
     expect(jdProhibitsGenAI(job)).toBe(true);
-    const rules = evaluateRules(job, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(job, userProfile, { activeResumeType: "BASE" });
     expect(rules.jdProhibitsGenAI).toBe(true);
   });
 
@@ -35,13 +35,13 @@ describe("jdProhibitsGenAI detector", () => {
   it("NYT AI Platforms & Products does NOT trigger (product-AI control)", () => {
     const job = loadCalibrationFixture("nytAiPlatformsProducts").extracted;
     expect(jdProhibitsGenAI(job)).toBe(false);
-    const rules = evaluateRules(job, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(job, userProfile, { activeResumeType: "BASE" });
     expect(rules.jdProhibitsGenAI).toBeFalsy();
   });
 
   it("surfaces genAiRestrictionWarning on score display without changing score math", () => {
     const fixture = loadCalibrationFixture("nytNewsMultimodal");
-    const rules = evaluateRules(fixture.extracted, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(fixture.extracted, userProfile, { activeResumeType: "BASE" });
     const clamped = applyScoringClampLayer({
       score: { ...fixture.storedCategoryScores, total: 0 },
       extracted: fixture.extracted,

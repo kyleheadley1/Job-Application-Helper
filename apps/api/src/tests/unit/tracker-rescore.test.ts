@@ -54,7 +54,7 @@ const minimalJob = (over: Partial<JobRecord>): JobRecord =>
     },
     recommendation: "selective_yes",
     salaryAsk: {},
-    recommendedResume: "SWE",
+    recommendedResume: "BASE",
     resumeRationale: [],
     topMatch: "x",
     mainRisk: over.mainRisk ?? "Risk",

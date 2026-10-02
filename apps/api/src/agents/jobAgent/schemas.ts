@@ -2,8 +2,9 @@ import { z } from 'zod';
 import { SCORE_CATEGORY_MAXES } from '../../config/scoringPolicy.js';
 import { TRACKER_EXPORT_HEADERS } from '../../tracker/canonicalSpreadsheet.js';
 import { preprocessExtractionInput } from '../../tools/triageStructuredNormalize.js';
+import { LEGACY_RESUME_TYPES, RESUME_TYPES } from '../../types/resume.js';
 
-export const ResumeTypeSchema = z.enum(['SWE', 'SIE', 'EARLY_CAREER']);
+export const ResumeTypeSchema = z.enum([...RESUME_TYPES, ...LEGACY_RESUME_TYPES]);
 export const RecommendationSchema = z.enum([
   'apply_cold',
   'referral_gated',

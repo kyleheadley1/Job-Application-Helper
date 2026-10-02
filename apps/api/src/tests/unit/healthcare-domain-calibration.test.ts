@@ -12,14 +12,14 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SWE_RESUME = fs.readFileSync(
-  path.resolve(__dirname, "../../../data/resumes/swe_resume.txt"),
+  path.resolve(__dirname, "../fixtures/resumes/swe_resume.txt"),
   "utf8",
 );
 
 describe("healthcare product domain match", () => {
   it("Clinical Ink: healthcareProductEngineering with domainMatch above 0.32", () => {
     const fixture = loadCalibrationFixture("clinicalInkHealthcare");
-    const rules = evaluateRules(fixture.extracted, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(fixture.extracted, userProfile, { activeResumeType: "BASE" });
     expect(rules.healthcareProductEngineering).toBe(true);
     expect(rules.domainMismatch).toBe(false);
 
@@ -38,7 +38,7 @@ describe("healthcare product domain match", () => {
 
   it("Leap: HIPAA/EHR product SWE does not flatten domainMatch to 0.32", () => {
     const fixture = loadCalibrationFixture("leapHealthcareProduct");
-    const rules = evaluateRules(fixture.extracted, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(fixture.extracted, userProfile, { activeResumeType: "BASE" });
     expect(rules.healthcareProductEngineering).toBe(true);
     expect(rules.domainMismatch).toBe(false);
 
@@ -70,7 +70,7 @@ describe("healthcare product domain match", () => {
         rawText: "Medical billing and revenue cycle. HIPAA. Clinical coding.",
       },
       userProfile,
-      { activeResumeType: "SWE" },
+      { activeResumeType: "BASE" },
     );
     expect(rules.domainMismatch).toBe(true);
     expect(rules.healthcareProductEngineering).toBe(false);
