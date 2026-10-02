@@ -165,6 +165,7 @@ const addApp = (opts: {
     role: opts.role,
     appliedAt: day(opts.appliedDay),
     appliedAtKnown: opts.status !== "rejected",
+    appliedAtSource: opts.status !== "rejected" ? "email" : "estimated",
     status: opts.status ?? "applied",
     furthestStage: "applied",
     interviewRounds: [],

@@ -40,6 +40,7 @@ export type GmailApplication = {
   role: string | null;
   appliedAt: string;
   appliedAtKnown?: boolean;
+  appliedAtSource?: "email" | "tracker" | "estimated";
   status: ApplicationStatus;
   furthestStage?: Exclude<ApplicationStatus, "rejected">;
   interviewRounds?: InterviewRound[];
