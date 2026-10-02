@@ -64,7 +64,7 @@ export const classifyJobLink = (url: string): JobLinkKind | undefined => {
   if (host === "jobs.lever.co" && segments.length >= 2) return "lever";
   if (host === "jobs.ashbyhq.com" && segments.length >= 2) return "ashby";
   if (/\.myworkdayjobs\.com$/.test(host) && /\/job\//.test(path)) return "workday";
-  if (/(^|\.)linkedin\.com$/.test(host) && /\/jobs\/view\/\d+/.test(path)) return "linkedin";
+  if (/(^|\.)linkedin\.com$/.test(host) && /\/jobs\/view\/(?:[^/]*-)?\d{6,}/.test(path)) return "linkedin";
   if (/\.icims\.com$/.test(host) && /\/jobs\/\d+/.test(path)) return "icims";
   if (/^(jobs|careers)\.smartrecruiters\.com$/.test(host) && segments.length >= 2) return "smartrecruiters";
   if (
@@ -94,17 +94,32 @@ export const extractJobLinks = (links: string[]): JobLink[] => {
 const REQ_LABELED_RE =
   /\b(?:req(?:uisition)?|job|position|posting)\s*(?:id|#|no\.?|number|code)\s*[:#.-]?\s*([A-Z]{0,4}[-_]?\d{3,}[A-Z0-9-]*)/i;
 const REQ_PREFIXED_RE = /\b(JR[-_]?\d{4,}|REQ[-_]?\d{4,}|R[-_]?\d{5,})\b/;
+/** "Req. 2000087", "Req 2000087", "Requisition: 2000087" (no id/#/no label). */
+const REQ_SHORT_RE = /\breq(?:uisition)?\b\.?\s*[:#-]?\s*([A-Z]{0,4}[-_]?\d{5,}[A-Z0-9-]*)/i;
 const REQ_PARENS_RE = /\((\d{6,8})\)/;
+/** Bare trailing number in a subject like "Software Engineer, 2389186". */
+const REQ_SUBJECT_TRAILING_RE = /,\s*(\d{6,8})\s*$/;
 
 export const extractRequisitionId = (subject: string, body: string): string | undefined => {
   for (const text of [subject, body]) {
-    const labeled = text.match(REQ_LABELED_RE)?.[1];
+    const labeled = text.match(REQ_LABELED_RE)?.[1] ?? text.match(REQ_SHORT_RE)?.[1];
     if (labeled) return labeled.toUpperCase();
     const prefixed = text.match(REQ_PREFIXED_RE)?.[1];
     if (prefixed) return prefixed.toUpperCase();
   }
-  return subject.match(REQ_PARENS_RE)?.[1] ?? body.match(REQ_PARENS_RE)?.[1];
+  return (
+    subject.match(REQ_PARENS_RE)?.[1] ??
+    body.match(REQ_PARENS_RE)?.[1] ??
+    subject.match(REQ_SUBJECT_TRAILING_RE)?.[1]
+  );
 };
+
+/** Drop "(Req. 2000087)" / "(2389186)" / "- JR12345" noise so title matching sees only the title. */
+export const cleanRoleTitle = (role: string): string =>
+  role
+    .replace(/\s*[([]\s*(?:req(?:uisition)?\b\.?\s*(?:id|#|no\.?)?\s*[:#-]?\s*)?[A-Z]{0,4}[-_]?\d{5,}[A-Z0-9-]*\s*[)\]]/gi, "")
+    .replace(/\s*[,\-–|]\s*(?:req(?:uisition)?\b\.?\s*(?:id|#)?\s*[:#-]?\s*)?(?:JR|REQ|R)?[-_]?\d{5,}\s*$/i, "")
+    .trim();
 
 export const INLINE_JD_MIN_CHARS = 1200;
 const JD_HEADINGS: RegExp[] = [

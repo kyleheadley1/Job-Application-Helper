@@ -1,7 +1,7 @@
 import { htmlToPlainText } from "../gmailClient.js";
 import { classifyJobLink, type JobLinkKind } from "./emailEvidence.js";
 
-export type PostingSource = JobLinkKind | "generic";
+export type PostingSource = JobLinkKind | "workable" | "generic";
 
 export type FetchedPosting = {
   url: string;
@@ -249,11 +249,60 @@ const fetchGeneric = async (url: URL): Promise<Omit<FetchedPosting, "url" | "sou
   return { ...ld, title: ld?.title ?? title, text: htmlToPlainText(html) };
 };
 
+/** Spacing between LinkedIn guest requests; the endpoint rate-limits bursts. */
+export const linkedinThrottle = { minGapMs: 1500, lastAt: 0 };
+
+export const linkedinJobId = (url: URL): string | undefined =>
+  url.pathname.match(/\/jobs\/view\/(?:[^/]*-)?(\d{6,})/)?.[1] ?? url.searchParams.get("currentJobId") ?? undefined;
+
+const firstMatchText = (html: string, re: RegExp): string | undefined => {
+  const raw = html.match(re)?.[1];
+  return raw ? htmlToPlainText(raw).trim() || undefined : undefined;
+};
+
+export const parseLinkedInGuestHtml = (html: string): Omit<FetchedPosting, "url" | "source"> => {
+  const title = firstMatchText(html, /<h2[^>]*top-card-layout__title[^>]*>([\s\S]*?)<\/h2>/i);
+  const company = firstMatchText(html, /<a[^>]*topcard__org-name-link[^>]*>([\s\S]*?)<\/a>/i);
+  const description = html.match(/<div[^>]*show-more-less-html__markup[^>]*>([\s\S]*?)<\/div>/i)?.[1];
+  return {
+    title,
+    company,
+    text: [title, company, description ? htmlToText(description) : htmlToPlainText(html)].filter(Boolean).join("\n\n"),
+  };
+};
+
+const fetchLinkedIn = async (url: URL): Promise<Omit<FetchedPosting, "url" | "source">> => {
+  const id = linkedinJobId(url);
+  if (!id) throw new PostingFetchError("unsupported", `No LinkedIn job id in ${url}`);
+  const wait = linkedinThrottle.lastAt + linkedinThrottle.minGapMs - Date.now();
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  linkedinThrottle.lastAt = Date.now();
+  const html = await getHtml(`https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/${id}`);
+  return parseLinkedInGuestHtml(html);
+};
+
 const ADAPTERS: Partial<Record<PostingSource, (url: URL) => Promise<Omit<FetchedPosting, "url" | "source">>>> = {
   greenhouse: fetchGreenhouse,
   lever: fetchLever,
   ashby: fetchAshby,
   workday: fetchWorkday,
+  linkedin: fetchLinkedIn,
+};
+
+/** Shared closed/too-short checks for any recovered posting. */
+export const validatePosting = (
+  result: Omit<FetchedPosting, "url" | "source">,
+  url: string,
+  source: PostingSource,
+): FetchedPosting => {
+  const text = result.text.trim();
+  if (CLOSED_RE.test(text.slice(0, CLOSED_SCAN_CHARS))) {
+    throw new PostingFetchError("closed", `Posting at ${url} looks closed`);
+  }
+  if (text.length < MIN_POSTING_CHARS) {
+    throw new PostingFetchError("too_short", `Posting at ${url} has only ${text.length} chars`);
+  }
+  return { ...result, text, url, source };
 };
 
 /** Fetch one posting through its site adapter; throws PostingFetchError when unusable. */
@@ -266,13 +315,5 @@ export const fetchPosting = async (rawUrl: string): Promise<FetchedPosting> => {
   }
   const source: PostingSource = classifyJobLink(rawUrl) ?? "generic";
   const adapter = ADAPTERS[source] ?? fetchGeneric;
-  const result = await adapter(url);
-  const text = result.text.trim();
-  if (CLOSED_RE.test(text.slice(0, CLOSED_SCAN_CHARS))) {
-    throw new PostingFetchError("closed", `Posting at ${rawUrl} looks closed`);
-  }
-  if (text.length < MIN_POSTING_CHARS) {
-    throw new PostingFetchError("too_short", `Posting at ${rawUrl} has only ${text.length} chars`);
-  }
-  return { ...result, text, url: rawUrl, source };
+  return validatePosting(await adapter(url), rawUrl, source);
 };

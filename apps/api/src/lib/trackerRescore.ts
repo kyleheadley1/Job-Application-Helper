@@ -2,7 +2,7 @@ import type { JobRecord, JobStatus } from "../types/job.js";
 import type { RuleEvaluation } from "../types/scoring.js";
 
 const AI_ROLE_RE =
-  /\b(llm|large language model|rag\b|retrieval[-\s]?augmented|applied ai|generative ai|ai engineer|ml engineer|machine learning engineer|vector\s+(search|embedding|db)|embedding|agentic|ai agents?|ragproject|mcp\b|fine[-\s]?tun|evals?\b)\b/i;
+  /\b(llm|large language model|rag\b|retrieval[-\s]?augmented|applied ai|generative ai|ai engineer|ml engineer|machine learning engineer|vector\s+(search|embedding|db)|embedding|agentic|ai agents?|mcp\b|fine[-\s]?tun|evals?\b)\b/i;
 
 /** JD + title blob for role-shape detection. */
 export function jobAppliedAiBlob(job: Pick<JobRecord, "extracted">): string {

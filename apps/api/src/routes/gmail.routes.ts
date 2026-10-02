@@ -12,15 +12,24 @@ import {
 import { DEFAULT_SYNC_DAYS, MAX_SYNC_DAYS, syncGmail } from "../services/gmail/gmailSync.js";
 import { evaluationsRepository } from "../services/gmail/jdRecovery/evaluations.repository.js";
 import {
+  AlreadyScoredError,
+  confirmCandidate,
+  EvaluationNotFoundError,
   getRecoveryRunState,
+  loadEvaluations,
+  MIN_PASTED_JD_CHARS,
   pendingApplications,
-  refreshOutcomes,
+  scorePastedJd,
   startRecoveryRun,
 } from "../services/gmail/jdRecovery/runRecovery.js";
+import { buildCostSummary, buildRecoveryMetrics } from "../services/gmail/jdRecovery/recoveryMetrics.js";
 import { serperUsageRepository } from "../services/gmail/jdRecovery/serperClient.js";
-import { buildRubricSummary, withEvaluations } from "../services/gmail/jdRecovery/summary.js";
+import { llmUsageRepository, localDay } from "../services/llm/llmUsage.js";
+import { buildRubricSummary, toEvaluationSummary, withEvaluations } from "../services/gmail/jdRecovery/summary.js";
 
 export const gmailRouter = Router();
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const DaysSchema = z.coerce.number().int().min(1).max(MAX_SYNC_DAYS).default(DEFAULT_SYNC_DAYS);
 const SyncBodySchema = z.object({ days: DaysSchema });
@@ -29,8 +38,7 @@ const ApplicationsQuerySchema = z.object({ days: DaysSchema });
 /** Applications with their evaluation summary; refreshes stored outcomes on the way. */
 const applicationsWithEvaluations = async (days: number) => {
   const applications = await getGmailApplications(days);
-  const evaluations = await evaluationsRepository.findByKeys(applications.map((a) => a.key));
-  await refreshOutcomes(applications, evaluations);
+  const evaluations = await loadEvaluations(applications);
   return {
     applications: withEvaluations(applications, evaluations),
     pendingRecovery: pendingApplications(applications, evaluations).length,
@@ -107,8 +115,14 @@ gmailRouter.post("/sync", async (req, res, next) => {
     const { days } = SyncBodySchema.parse(req.body ?? {});
     const result = await syncGmail(days);
     const view = await applicationsWithEvaluations(days);
+    const recovery = await startRecoveryRun(days).catch((error) => {
+      logger.warn("Auto JD recovery did not start", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return { queued: view.pendingRecovery, running: false, started: false };
+    });
     res.setHeader("Cache-Control", "no-store");
-    res.json({ ...result, ...view });
+    res.json({ ...result, ...view, recovery });
   } catch (error) {
     if (sendGmailError(res, error)) return;
     next(error);
@@ -138,22 +152,73 @@ gmailRouter.post("/evaluations/run", async (req, res, next) => {
 gmailRouter.get("/evaluations", async (req, res, next) => {
   try {
     const { days } = ApplicationsQuerySchema.parse(req.query);
-    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-    const [evaluations, usage] = await Promise.all([
+    const since = new Date(Date.now() - days * DAY_MS).toISOString();
+    const sinceDay = localDay(new Date(Date.now() - (days - 1) * DAY_MS));
+    const [evaluations, usage, llmRecords] = await Promise.all([
       evaluationsRepository.listSince(since),
       serperUsageRepository.get(),
+      llmUsageRepository.listSinceDay(sinceDay).catch(() => []),
     ]);
     res.setHeader("Cache-Control", "no-store");
     res.json({
       days,
       run: getRecoveryRunState(),
-      serper: { used: usage.jobKeys.length, cap: usage.cap, configured: Boolean(env.serperApiKey) },
+      serper: { used: usage.queries, cap: usage.cap, configured: Boolean(env.serperApiKey) },
       rubricSummary: buildRubricSummary(evaluations),
-      evaluations: evaluations.map(({ jd, ...rest }) =>
-        jd ? { ...rest, jd: { title: jd.title, company: jd.company, datePosted: jd.datePosted, chars: jd.text.length } } : rest,
-      ),
+      metrics: buildRecoveryMetrics(evaluations, usage),
+      costs: buildCostSummary(llmRecords, {
+        model: env.openAiModel,
+        today: localDay(),
+        sevenDaysAgo: localDay(new Date(Date.now() - 6 * DAY_MS)),
+        windowDays: days,
+      }),
+      evaluations: evaluations.map(({ jd, recovery, ...rest }) => ({
+        ...rest,
+        recovery: { ...recovery, candidates: recovery.candidates?.map(({ text: _text, ...c }) => c) },
+        jd: jd && { title: jd.title, company: jd.company, datePosted: jd.datePosted, chars: jd.text.length },
+      })),
     });
   } catch (error) {
+    next(error);
+  }
+});
+
+const ConfirmBodySchema = z.object({ url: z.string().url() });
+const PasteBodySchema = z.object({
+  text: z.string().trim().min(MIN_PASTED_JD_CHARS).max(50_000),
+  url: z.string().url().optional(),
+});
+
+const sendEvaluationError = (res: Response, error: unknown): boolean => {
+  if (error instanceof EvaluationNotFoundError) {
+    res.status(404).json({ error: "not_found", message: error.message });
+    return true;
+  }
+  if (error instanceof AlreadyScoredError) {
+    res.status(409).json({ error: "already_scored", message: error.message });
+    return true;
+  }
+  return false;
+};
+
+gmailRouter.post("/evaluations/:key/confirm", async (req, res, next) => {
+  try {
+    const { url } = ConfirmBodySchema.parse(req.body ?? {});
+    const evaluation = await confirmCandidate(req.params.key, url);
+    res.json({ evaluation: toEvaluationSummary(evaluation) });
+  } catch (error) {
+    if (sendEvaluationError(res, error)) return;
+    next(error);
+  }
+});
+
+gmailRouter.post("/evaluations/:key/jd", async (req, res, next) => {
+  try {
+    const { text, url } = PasteBodySchema.parse(req.body ?? {});
+    const evaluation = await scorePastedJd(req.params.key, text, url);
+    res.json({ evaluation: toEvaluationSummary(evaluation) });
+  } catch (error) {
+    if (sendEvaluationError(res, error)) return;
     next(error);
   }
 });

@@ -1,8 +1,9 @@
 import { normalizeCompany, roleSimilarity } from "../gmailApplications.js";
 import type { FetchedPosting } from "./fetchPosting.js";
+import { strictTitleSimilarity } from "./titleMatch.js";
 
 export type MatchLevel = "exact" | "high" | "low" | "none";
-export type EvidenceSource = "email_link" | "email_body" | "serper";
+export type EvidenceSource = "email_link" | "email_body" | "ats_board" | "serper" | "manual";
 
 export type JdMatch = { level: MatchLevel; signals: string[]; roleSimilarity: number };
 
@@ -47,10 +48,15 @@ export const assessJdMatch = (input: {
   requisitionId?: string;
   source: EvidenceSource;
   posting: Pick<FetchedPosting, "company" | "title" | "requisitionId" | "url" | "text">;
+  /** ats_board only: the board was confirmed as this company's own. */
+  boardConfirmed?: boolean;
+  /** ats_board only: open jobs on the board whose title is near-identical to the role. */
+  boardTitleMatches?: number;
 }): JdMatch => {
   const { posting } = input;
   const signals: string[] = [];
-  const sameCompany = companyMatches(input.company, posting);
+  const onOwnBoard = input.source === "ats_board" && input.boardConfirmed === true;
+  const sameCompany = onOwnBoard || companyMatches(input.company, posting);
   signals.push(sameCompany ? "company_match" : "company_mismatch");
   const similarity = input.role ? roleSimilarity(input.role, postingTitle(posting)) : 0;
   if (input.role) signals.push(`role_similarity:${similarity.toFixed(2)}`);
@@ -79,6 +85,14 @@ export const assessJdMatch = (input: {
   if (fromEmail) signals.push(input.source);
   if (fromEmail && input.role && similarity >= HIGH_ROLE_SIMILARITY) {
     return { level: "high", signals, roleSimilarity: similarity };
+  }
+  if (onOwnBoard) {
+    signals.push("company_board", `board_title_matches:${input.boardTitleMatches ?? 0}`);
+    const strict = input.role ? strictTitleSimilarity(input.role, postingTitle(posting)) : 0;
+    signals.push(`strict_title_similarity:${strict.toFixed(2)}`);
+    if (strict >= HIGH_ROLE_SIMILARITY && input.boardTitleMatches === 1) {
+      return { level: "high", signals, roleSimilarity: similarity };
+    }
   }
   return { level: "low", signals, roleSimilarity: similarity };
 };

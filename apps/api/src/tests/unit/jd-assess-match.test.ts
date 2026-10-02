@@ -84,3 +84,37 @@ describe("assessJdMatch", () => {
     expect(m.level).toBe("none");
   });
 });
+
+describe("assessJdMatch on company boards", () => {
+  const board = (titleMatches: number, role: string | null = "Software Engineer, New Grad") =>
+    assessJdMatch({
+      company: "Ellipsis Labs",
+      role,
+      source: "ats_board",
+      boardConfirmed: true,
+      boardTitleMatches: titleMatches,
+      posting: posting({ title: "Software Engineer - New Grad", url: "https://jobs.lever.co/ellipsislabs/1" }),
+    });
+
+  it("is high for the only near-identical title on the company's own board", () => {
+    expect(board(1).level).toBe("high");
+    expect(board(1).signals).toContain("company_board");
+  });
+
+  it("is low when several open jobs share the title, or the role is unknown", () => {
+    expect(board(2).level).toBe("low");
+    expect(board(1, null).level).toBe("low");
+  });
+
+  it("is not high on an unconfirmed board", () => {
+    const m = assessJdMatch({
+      company: "Ellipsis Labs",
+      role: "Software Engineer - New Grad",
+      source: "ats_board",
+      boardConfirmed: false,
+      boardTitleMatches: 1,
+      posting: posting({ title: "Software Engineer - New Grad", text: `Ellipsis Labs ${TEXT}` }),
+    });
+    expect(m.level).toBe("low");
+  });
+});

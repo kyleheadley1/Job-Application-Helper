@@ -2,25 +2,70 @@ import { triageJob } from "../../../agents/jobAgent/orchestrator.js";
 import { env } from "../../../config/env.js";
 import { computeJdTextHash } from "../../../lib/jdTextHash.js";
 import { logger } from "../../../lib/logger.js";
+import { withLlmContext } from "../../llm/llmUsage.js";
 import type { JobRecord } from "../../../types/job.js";
 import {
   getGmailApplications,
+  normalizeCompany,
+  roleSimilarity,
   type ApplicationStatus,
   type GmailApplication,
 } from "../gmailApplications.js";
 import type { EmailEventType } from "../gmailClassifier.js";
 import { gmailClient, type ParsedEmail } from "../gmailClient.js";
-import { assessJdMatch, isScoreable, type EvidenceSource, type JdMatch } from "./assessJdMatch.js";
-import { classifyJobLink, collectEmailEvidence, unwrapLink } from "./emailEvidence.js";
+import {
+  assessJdMatch,
+  HIGH_ROLE_SIMILARITY,
+  isScoreable,
+  type EvidenceSource,
+  type JdMatch,
+  type MatchLevel,
+} from "./assessJdMatch.js";
+import {
+  atsBoardsRepository,
+  boardConfirmsCompany,
+  discoverBoards,
+  fetchBoardJob,
+  listBoard,
+  type BoardJob,
+  type BoardListing,
+} from "./atsBoards.js";
+import { boardFromUrl, detectAtsHints, type BoardRef } from "./atsHints.js";
+import {
+  locationInText,
+  normalizeForMatch,
+  normalizeTitle,
+  strictTitleSimilarity,
+  textSimilarity,
+  titleInText,
+} from "./titleMatch.js";
+import {
+  classifyJobLink,
+  cleanRoleTitle,
+  collectEmailEvidence,
+  extractRequisitionId,
+  unwrapLink,
+} from "./emailEvidence.js";
 import {
   evaluationsRepository,
   type ApplicationEvaluation,
+  type BoardCheck,
   type RecoveryAttempt,
+  type RecoveryCandidate,
+  type RecoveryStage,
 } from "./evaluations.repository.js";
 import { fetchPosting, PostingFetchError, type FetchedPosting } from "./fetchPosting.js";
+import { inferCandidateStage } from "./recoveryMetrics.js";
 import { serperClient, serperUsageRepository, type SerperResult, type SerperUsage } from "./serperClient.js";
 
 export const SCORER_VERSION = "jd-recovery-v1:base-ai";
+/** Bump to retry every unscored row with an improved recovery pipeline. */
+export const RECOVERY_VERSION = 4;
+const MAX_DUPLICATE_CHECK = 4;
+const DUPLICATE_JD_SIMILARITY = 0.85;
+const MAX_STORED_CANDIDATES = 5;
+const MAX_CANDIDATE_TEXT = 20_000;
+const MAX_BOARD_CANDIDATES = 3;
 const RECOVERY_BODY_CHARS = 20_000;
 const MAX_EMAIL_LINKS = 5;
 const MAX_SERPER_QUERIES_PER_JOB = 2;
@@ -32,7 +77,7 @@ const MAX_PROCESSED_PER_RUN_FACTOR = 4;
 const AGGREGATOR_HOST_RE =
   /(^|\.)(indeed|glassdoor|ziprecruiter|simplyhired|monster|careerbuilder|builtin|talent|jooble|adzuna|dice|wellfound|levels\.fyi|salary|payscale|comparably)\./i;
 
-type Candidate = { posting: FetchedPosting; source: EvidenceSource; match: JdMatch };
+type Candidate = { posting: FetchedPosting; source: EvidenceSource; match: JdMatch; stage: RecoveryStage };
 
 const EVENT_TO_OUTCOME: Partial<Record<EmailEventType, ApplicationStatus>> = {
   applied: "applied",
@@ -44,6 +89,7 @@ const EVENT_TO_OUTCOME: Partial<Record<EmailEventType, ApplicationStatus>> = {
 
 export const buildOutcome = (app: GmailApplication): ApplicationEvaluation["outcome"] => ({
   status: app.status,
+  furthestStage: app.furthestStage,
   updatedAt: app.lastUpdateAt,
   history: [...app.emails]
     .reverse()
@@ -53,16 +99,55 @@ export const buildOutcome = (app: GmailApplication): ApplicationEvaluation["outc
     }),
 });
 
+const CATEGORY_KEYS = [
+  "stackFit",
+  "levelFit",
+  "domainFit",
+  "resumeStoryClarity",
+  "functionalOverlap",
+  "recruiterFriendliness",
+  "careerValue",
+] as const;
+
+export const fitFromJob = (job: JobRecord): NonNullable<ApplicationEvaluation["fit"]> => {
+  const s = job.score;
+  return {
+    total: s.total,
+    recommendation: job.recommendation,
+    recommendedResume: job.recommendedResume,
+    scoredAt: new Date().toISOString(),
+    promptVersion: SCORER_VERSION,
+    breakdown: {
+      categories: Object.fromEntries(CATEGORY_KEYS.map((k) => [k, s[k]])),
+      capability: s.capability,
+      survivability: s.survivability,
+      gapDock: s.scoreDisplay?.gapDock,
+      hardGates: s.scoreDisplay?.hardGates?.length ? s.scoreDisplay.hardGates : undefined,
+      topMatch: job.topMatch,
+      mainRisk: job.mainRisk,
+      risks: job.risks?.slice(0, 4),
+    },
+  };
+};
+
 /** The scorer sees only the recovered JD and a company hint — never email content or outcome. */
-export const scoreBlind = (posting: Pick<FetchedPosting, "text">, companyHint: string): Promise<JobRecord> =>
-  triageJob({ rawText: posting.text, companyHint, fullPrep: false });
+export const scoreBlind = (
+  posting: Pick<FetchedPosting, "text">,
+  companyHint: string,
+  key?: string,
+): Promise<JobRecord> =>
+  withLlmContext({ feature: "jd_recovery", key }, () =>
+    triageJob({ rawText: posting.text, companyHint, fullPrep: false }),
+  );
+
+export const ATS_SITE_FILTER =
+  "(site:greenhouse.io OR site:lever.co OR site:ashbyhq.com OR site:myworkdayjobs.com OR site:smartrecruiters.com OR site:workable.com)";
 
 export const buildSerperQueries = (company: string, role: string | null, reqId?: string): string[] => {
   const queries: string[] = [];
-  if (reqId) queries.push(`"${company}" "${reqId}"`);
-  if (role) queries.push(`"${company}" "${role}"${reqId ? ` ${reqId}` : ""}`);
-  if (role) queries.push(`"${company}" "${role}" job`);
-  return [...new Set(queries)].slice(0, MAX_SERPER_QUERIES_PER_JOB);
+  if (reqId) queries.push(`"${reqId}" ${company}`);
+  if (role) queries.push(`"${company}" "${role}" ${ATS_SITE_FILTER}`);
+  return queries.slice(0, MAX_SERPER_QUERIES_PER_JOB);
 };
 
 /** ATS and company pages first; aggregator listings dropped. */
@@ -80,7 +165,8 @@ export const rankSerperResults = (results: SerperResult[]): string[] => {
     if (AGGREGATOR_HOST_RE.test(host)) continue;
     if (/linkedin\.com$/.test(host) && !/\/jobs\/view\//.test(url)) continue;
     const kind = classifyJobLink(url);
-    scored.push({ url, rank: kind && kind !== "careers" && kind !== "linkedin" ? 0 : kind ? 1 : 2 });
+    const onBoard = boardFromUrl(url)?.slug;
+    scored.push({ url, rank: onBoard || (kind && kind !== "careers" && kind !== "linkedin") ? 0 : kind ? 1 : 2 });
   }
   return [...new Map(scored.sort((a, b) => a.rank - b.rank).map((s) => [s.url, s])).keys()];
 };
@@ -88,22 +174,65 @@ export const rankSerperResults = (results: SerperResult[]): string[] => {
 const describeError = (error: unknown): string =>
   error instanceof PostingFetchError ? error.reason : error instanceof Error ? error.message.slice(0, 120) : "error";
 
-const better = (a: Candidate | undefined, b: Candidate): Candidate => {
-  const order = { exact: 3, high: 2, low: 1, none: 0 } as const;
-  return !a || order[b.match.level] > order[a.match.level] ? b : a;
-};
+const MATCH_ORDER = { exact: 3, high: 2, low: 1, none: 0 } as const;
 
-export const needsRecovery = (existing: ApplicationEvaluation | undefined, now = Date.now()): boolean => {
+const better = (a: Candidate | undefined, b: Candidate): Candidate =>
+  !a || MATCH_ORDER[b.match.level] > MATCH_ORDER[a.match.level] ? b : a;
+
+export const needsRecovery = (
+  existing: ApplicationEvaluation | undefined,
+  now = Date.now(),
+  serperBudgetLeft = true,
+): boolean => {
   if (!existing) return true;
-  const { status, reason } = existing.recovery;
+  const { status, notes, reason } = existing.recovery;
+  if (status === "scored") return false;
+  if ((existing.recoveryVersion ?? 1) < RECOVERY_VERSION) return true;
   if (status === "fetch_failed") return now - Date.parse(existing.updatedAt) > FETCH_FAILED_RETRY_MS;
-  if (status === "not_found" && reason === "serper_not_configured") return serperClient.isConfigured();
-  return false;
+  const has = (note: string) => reason === note || Boolean(notes?.includes(note));
+  if (!serperClient.isConfigured()) return false;
+  return has("serper_not_configured") || (has("serper_cap_reached") && serperBudgetLeft);
 };
 
 const fetchEmails = async (app: GmailApplication): Promise<ParsedEmail[]> => {
   const results = await Promise.allSettled(app.emails.map((e) => gmailClient.getMessage(e.id, RECOVERY_BODY_CHARS)));
   return results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
+};
+
+/** Most actionable first; `reason` is the first note present. */
+const NOTE_PRIORITY = [
+  "serper_cap_reached",
+  "email_links_failed",
+  "multiple_title_matches",
+  "board_found_no_search",
+  "not_on_board",
+  "no_board_found",
+  "role_unknown",
+  "serper_not_configured",
+  "serper_no_results",
+  "no_search_terms",
+];
+
+const sortNotes = (notes: Set<string>): string[] =>
+  [...notes].sort((a, b) => {
+    const ia = NOTE_PRIORITY.indexOf(a);
+    const ib = NOTE_PRIORITY.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+
+const boardKey = (ref: BoardRef) => `${ref.ats}:${ref.slug.toLowerCase()}`;
+
+export const summarizeBoard = (listing: BoardListing, role: string | null): BoardCheck => {
+  const check: BoardCheck = { board: boardKey(listing.ref), jobs: listing.jobs.length };
+  if (!role) return check;
+  for (const job of listing.jobs) {
+    const similarity = strictTitleSimilarity(role, job.title);
+    if (similarity > 0 && similarity > (check.similarity ?? 0)) {
+      check.closestTitle = job.title;
+      check.similarity = Math.round(similarity * 100) / 100;
+    }
+  }
+  return check;
 };
 
 /** Recover, verify, and (only when verified) blind-score one application. */
@@ -113,35 +242,189 @@ export const recoverApplication = async (
 ): Promise<{ evaluation: ApplicationEvaluation; triaged: boolean }> => {
   const emails = await fetchEmails(app);
   const evidence = collectEmailEvidence(emails);
+  const hints = detectAtsHints(emails);
+  const reqId = evidence.requisitionId ?? (app.role ? extractRequisitionId(app.role, "") : undefined);
   const attempts: RecoveryAttempt[] = [];
+  const notes = new Set<string>();
+  const triedBoards = new Set<string>();
   let best: Candidate | undefined;
   let fetchErrors = 0;
+  let emailLinkErrors = 0;
+  let emailLinkOk = 0;
+  let boardsFound = 0;
+  let confirmedBoards = 0;
   let serperQueries = 0;
-  let notFoundReason: string | undefined;
+  let role = app.role ? cleanRoleTitle(app.role) || app.role : app.role;
+  let recoveredRole: string | undefined;
+  const candidates = new Map<string, RecoveryCandidate>();
+  const boardChecks: BoardCheck[] = [];
+  const emailText = normalizeForMatch(emails.map((e) => `${e.subject}\n${e.body}`).join("\n"));
+  let stage: RecoveryStage = "email";
 
-  const consider = (posting: FetchedPosting, source: EvidenceSource) => {
+  const verified = () => Boolean(best && isScoreable(best.match.level));
+
+  const consider = (
+    posting: FetchedPosting,
+    source: EvidenceSource,
+    board?: { confirmed: boolean; titleMatches: number; signals?: string[]; location?: string },
+  ) => {
     const match = assessJdMatch({
       company: app.company,
-      role: app.role,
-      requisitionId: evidence.requisitionId,
+      role,
+      requisitionId: reqId,
       source,
       posting,
+      boardConfirmed: board?.confirmed,
+      boardTitleMatches: board?.titleMatches,
     });
+    if (board?.signals?.length) match.signals.push(...board.signals);
+    if (recoveredRole) match.signals.push("role_from_email");
     attempts.push({ url: posting.url, source, ok: true, matchLevel: match.level });
-    best = better(best, { posting, source, match });
+    if (posting.url && match.level !== "none" && !candidates.has(posting.url)) {
+      candidates.set(posting.url, {
+        url: posting.url,
+        source,
+        stage,
+        matchLevel: match.level,
+        title: posting.title,
+        company: posting.company,
+        location: board?.location,
+        text: posting.text.slice(0, MAX_CANDIDATE_TEXT),
+      });
+    }
+    best = better(best, { posting, source, match, stage });
   };
 
   const tryUrl = async (url: string, source: EvidenceSource) => {
+    if (attempts.some((a) => a.url === url)) return;
     try {
       consider(await fetchPosting(url), source);
+      if (source === "email_link") emailLinkOk += 1;
     } catch (error) {
       fetchErrors += 1;
+      if (source === "email_link") emailLinkErrors += 1;
       attempts.push({ url, source, ok: false, reason: describeError(error) });
     }
   };
 
-  const verified = () => Boolean(best && isScoreable(best.match.level));
+  const reqOnJob = (job: BoardJob) =>
+    Boolean(
+      reqId &&
+        [job.requisitionId ?? "", job.url, job.text ?? ""].some((h) => h.toUpperCase().includes(reqId.toUpperCase())),
+    );
 
+  /** Single job whose distinct title or location appears in the application email. */
+  const tieBreakFromEmail = (jobs: BoardJob[]): { job: BoardJob; signal: string } | undefined => {
+    const titles = new Set(jobs.map((j) => normalizeTitle(j.title)));
+    if (titles.size > 1) {
+      const byTitle = jobs.filter((j) => titleInText(j.title, emailText));
+      if (new Set(byTitle.map((j) => normalizeTitle(j.title))).size === 1 && byTitle.length === 1) {
+        return { job: byTitle[0]!, signal: "email_title_match" };
+      }
+    }
+    const byLocation = jobs.filter((j) => j.location && locationInText(j.location, emailText));
+    return byLocation.length === 1 ? { job: byLocation[0]!, signal: "email_location_match" } : undefined;
+  };
+
+  const fetchJob = async (listing: BoardListing, job: BoardJob): Promise<FetchedPosting | undefined> => {
+    try {
+      return await fetchBoardJob(listing, job);
+    } catch (error) {
+      attempts.push({ url: job.url, source: "ats_board", ok: false, reason: describeError(error) });
+      return undefined;
+    }
+  };
+
+  /** Pick req-ID and near-identical-title jobs from a board and verify them. */
+  const searchBoard = async (listing: BoardListing, confirmed: boolean) => {
+    triedBoards.add(boardKey(listing.ref));
+    boardsFound += 1;
+    if (confirmed) confirmedBoards += 1;
+    if (confirmed) boardChecks.push(summarizeBoard(listing, role));
+
+    if (!role && confirmed) {
+      const inEmail = listing.jobs.filter((j) => titleInText(j.title, emailText));
+      if (inEmail.length > 0 && new Set(inEmail.map((j) => normalizeTitle(j.title))).size === 1) {
+        role = inEmail[0]!.title;
+        recoveredRole = role;
+      }
+    }
+
+    const byReq = listing.jobs.filter(reqOnJob);
+    for (const job of byReq.slice(0, MAX_BOARD_CANDIDATES)) {
+      if (verified()) return;
+      const posting = await fetchJob(listing, job);
+      if (posting) consider(posting, "ats_board", { confirmed, titleMatches: 1, location: job.location });
+    }
+    if (verified()) return;
+
+    const titleMatches = role
+      ? listing.jobs.filter((j) => strictTitleSimilarity(role!, j.title) >= HIGH_ROLE_SIMILARITY)
+      : [];
+    if (titleMatches.length === 0) {
+      if (byReq.length === 0) notes.add(role || reqId ? "not_on_board" : "role_unknown");
+      return;
+    }
+    if (titleMatches.length === 1) {
+      const job = titleMatches[0]!;
+      const posting = await fetchJob(listing, job);
+      if (posting) consider(posting, "ats_board", { confirmed, titleMatches: 1, location: job.location });
+      return;
+    }
+
+    const pick = tieBreakFromEmail(titleMatches);
+    if (pick) {
+      const posting = await fetchJob(listing, pick.job);
+      if (posting) {
+        consider(posting, "ats_board", { confirmed, titleMatches: 1, signals: [pick.signal], location: pick.job.location });
+        if (verified()) return;
+      }
+    }
+
+    const fetched: Array<{ job: BoardJob; posting: FetchedPosting }> = [];
+    for (const job of titleMatches.slice(0, MAX_DUPLICATE_CHECK)) {
+      const posting = await fetchJob(listing, job);
+      if (posting) fetched.push({ job, posting });
+    }
+    const allSame =
+      titleMatches.length <= MAX_DUPLICATE_CHECK &&
+      fetched.length === titleMatches.length &&
+      fetched.every((f) => textSimilarity(f.posting.text, fetched[0]!.posting.text) >= DUPLICATE_JD_SIMILARITY);
+    if (allSame && fetched[0]) {
+      consider(fetched[0].posting, "ats_board", {
+        confirmed,
+        titleMatches: 1,
+        signals: [`duplicate_postings:${fetched.length}`],
+        location: fetched[0].job.location,
+      });
+      return;
+    }
+    notes.add("multiple_title_matches");
+    for (const f of fetched) {
+      consider(f.posting, "ats_board", { confirmed, titleMatches: titleMatches.length, location: f.job.location });
+    }
+  };
+
+  const boardQuery = (ref: BoardRef) => (ref.ats === "workday" ? (reqId ?? role ?? undefined) : (role ?? undefined));
+
+  const listAndSearch = async (ref: BoardRef, confirm: (l: BoardListing) => boolean) => {
+    if (triedBoards.has(boardKey(ref))) return;
+    triedBoards.add(boardKey(ref));
+    try {
+      let listing = await listBoard(ref, boardQuery(ref));
+      if (ref.ats === "workday" && reqId && role && listing && listing.jobs.length === 0) {
+        listing = await listBoard(ref, role);
+      }
+      if (!listing) return;
+      const confirmed = confirm(listing);
+      if (confirmed) await atsBoardsRepository.put(normalizeCompany(app.company), [ref]).catch(() => undefined);
+      await searchBoard(listing, confirmed);
+    } catch (error) {
+      attempts.push({ url: `board:${boardKey(ref)}`, source: "ats_board", ok: false, reason: describeError(error) });
+    }
+  };
+
+  // 1. The email itself: inline JD, then posting links (LinkedIn via the guest endpoint).
   if (evidence.inlineJd) {
     consider({ url: "", source: "generic", text: evidence.inlineJd.text }, "email_body");
   }
@@ -149,15 +432,44 @@ export const recoverApplication = async (
     if (verified()) break;
     await tryUrl(link.url, "email_link");
   }
+  if (emailLinkErrors > 0 && emailLinkOk === 0) notes.add("email_links_failed");
 
-  if (!verified()) {
-    const queries = buildSerperQueries(app.company, app.role, evidence.requisitionId);
-    const alreadyCounted = usage.jobKeys.includes(app.key);
-    if (!serperClient.isConfigured()) notFoundReason = "serper_not_configured";
-    else if (queries.length === 0) notFoundReason = "no_search_terms";
-    else if (!alreadyCounted && usage.jobKeys.length >= usage.cap) notFoundReason = "serper_cap_reached";
+  // 2. Boards named by the application's own emails.
+  stage = "email_board";
+  for (const ref of hints.boards) {
+    if (verified()) break;
+    await listAndSearch(ref, () => true);
+  }
+
+  // 3. Guessed slugs on the free ATS APIs (cached per company).
+  if (!verified() && boardsFound === 0) {
+    stage = "guessed_board";
+    {
+      const listings = await discoverBoards({
+        company: app.company,
+        query: role ?? reqId,
+        senderRoots: hints.senderRoots,
+        preferAts: hints.atsOnly,
+      }).catch(() => [] as BoardListing[]);
+      for (const listing of listings) {
+        if (verified()) break;
+        if (triedBoards.has(boardKey(listing.ref))) continue;
+        await searchBoard(listing, true);
+      }
+    }
+    if (boardsFound === 0) notes.add("no_board_found");
+  }
+
+  // 4. Serper, only when no company board was found (unknown ATS); hits feed the board search.
+  if (!verified() && confirmedBoards > 0) notes.add("board_found_no_search");
+  if (!verified() && confirmedBoards === 0) {
+    const queries = buildSerperQueries(app.company, role, reqId);
+    if (!serperClient.isConfigured()) notes.add("serper_not_configured");
+    else if (queries.length === 0) notes.add("no_search_terms");
+    else if (usage.queries + queries.length > usage.cap) notes.add("serper_cap_reached");
     else {
-      if (!alreadyCounted) usage.jobKeys.push(app.key);
+      if (!usage.jobKeys.includes(app.key)) usage.jobKeys.push(app.key);
+      let anyResults = false;
       for (const query of queries) {
         if (verified()) break;
         serperQueries += 1;
@@ -168,25 +480,48 @@ export const recoverApplication = async (
           attempts.push({ url: `serper:${query}`, source: "serper", ok: false, reason: describeError(error) });
           continue;
         }
-        for (const url of rankSerperResults(results).slice(0, MAX_SERPER_CANDIDATES)) {
+        const urls = rankSerperResults(results).slice(0, MAX_SERPER_CANDIDATES);
+        if (urls.length) anyResults = true;
+        for (const url of urls) {
           if (verified()) break;
-          await tryUrl(url, "serper");
+          const hint = boardFromUrl(url);
+          if (hint?.slug) {
+            stage = "serper_board";
+            await listAndSearch(hint as BoardRef, (l) =>
+              boardConfirmsCompany(l, app.company, { senderRoots: hints.senderRoots }),
+            );
+          }
+          stage = "serper";
+          if (!verified()) await tryUrl(url, "serper");
         }
       }
       usage.queries += serperQueries;
       await serperUsageRepository.record(app.key, serperQueries);
-      if (!best) notFoundReason = "serper_no_results";
+      if (!anyResults) notes.add("serper_no_results");
     }
   }
 
+  const sortedNotes = sortNotes(notes);
   const now = new Date().toISOString();
   const base: ApplicationEvaluation = {
     key: app.key,
     company: app.company,
     role: app.role,
     appliedAt: app.appliedAt,
-    requisitionId: evidence.requisitionId,
-    recovery: { status: "not_found", attempts, serperQueries },
+    requisitionId: reqId,
+    recoveryVersion: RECOVERY_VERSION,
+    recovery: {
+      status: "not_found",
+      attempts,
+      serperQueries,
+      notes: sortedNotes,
+      verifiedBy: "auto",
+      recoveredRole,
+      candidates: [...candidates.values()]
+        .sort((x, y) => MATCH_ORDER[y.matchLevel] - MATCH_ORDER[x.matchLevel])
+        .slice(0, MAX_STORED_CANDIDATES),
+      boardChecks: boardChecks.length ? boardChecks : undefined,
+    },
     outcome: buildOutcome(app),
     createdAt: now,
     updatedAt: now,
@@ -194,14 +529,15 @@ export const recoverApplication = async (
 
   const chosen = best as Candidate | undefined;
   if (!chosen) {
-    const failedOnly = fetchErrors > 0 && notFoundReason !== "serper_cap_reached";
+    const failedOnly = fetchErrors > 0 && !notes.has("serper_cap_reached");
     base.recovery.status = failedOnly ? "fetch_failed" : "not_found";
     base.recovery.reason =
-      notFoundReason ?? (evidence.jobLinks.length || evidence.inlineJd ? "no_usable_posting" : "no_email_evidence");
+      sortedNotes[0] ?? (evidence.jobLinks.length || evidence.inlineJd ? "no_usable_posting" : "no_email_evidence");
     return { evaluation: base, triaged: false };
   }
 
   base.recovery.source = chosen.source;
+  base.recovery.foundVia = chosen.stage;
   base.recovery.url = chosen.posting.url || undefined;
   base.recovery.match = { level: chosen.match.level, signals: chosen.match.signals };
   base.jd = {
@@ -214,26 +550,114 @@ export const recoverApplication = async (
 
   if (!isScoreable(chosen.match.level)) {
     base.recovery.status = "unverified";
-    base.recovery.reason = notFoundReason;
+    base.recovery.reason = sortedNotes[0];
     return { evaluation: base, triaged: false };
   }
+  base.recovery.notes = [];
+  base.recovery.candidates = undefined;
+  base.recovery.boardChecks = undefined;
 
   try {
-    const job = await scoreBlind(chosen.posting, app.company);
+    const job = await scoreBlind(chosen.posting, app.company, app.key);
     base.recovery.status = "scored";
-    base.fit = {
-      total: job.score.total,
-      recommendation: job.recommendation,
-      recommendedResume: job.recommendedResume,
-      scoredAt: new Date().toISOString(),
-      promptVersion: SCORER_VERSION,
-    };
+    base.fit = fitFromJob(job);
     base.outcomeAtScoring = app.status;
   } catch (error) {
     base.recovery.status = "fetch_failed";
     base.recovery.reason = `triage_failed: ${describeError(error)}`;
   }
   return { evaluation: base, triaged: true };
+};
+
+export class EvaluationNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EvaluationNotFoundError";
+  }
+}
+
+export class AlreadyScoredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AlreadyScoredError";
+  }
+}
+
+export const MIN_PASTED_JD_CHARS = 300;
+
+/** Score a posting the user picked or pasted. Still blind: only the JD text and company go to the scorer. */
+const scoreUserPosting = async (
+  evaluation: ApplicationEvaluation,
+  posting: {
+    text: string;
+    url?: string;
+    title?: string;
+    company?: string;
+    matchLevel: MatchLevel;
+    stage: RecoveryStage;
+  },
+  signal: "user_picked_candidate" | "user_pasted_jd",
+): Promise<ApplicationEvaluation> => {
+  if (evaluation.recovery.status === "scored") {
+    throw new AlreadyScoredError(`${evaluation.key} is already scored; scores are final`);
+  }
+  const job = await scoreBlind(posting, evaluation.company, evaluation.key);
+  const now = new Date().toISOString();
+  const updated: ApplicationEvaluation = {
+    ...evaluation,
+    recovery: {
+      ...evaluation.recovery,
+      status: "scored",
+      reason: undefined,
+      notes: [],
+      source: "manual",
+      foundVia: posting.stage,
+      url: posting.url,
+      verifiedBy: "user",
+      match: { level: posting.matchLevel, signals: [signal] },
+      candidates: undefined,
+    },
+    jd: {
+      text: posting.text,
+      textHash: computeJdTextHash(posting.text),
+      title: posting.title,
+      company: posting.company,
+    },
+    fit: fitFromJob(job),
+    outcomeAtScoring: evaluation.outcome.status,
+    updatedAt: now,
+  };
+  await evaluationsRepository.upsert(updated);
+  return updated;
+};
+
+export const confirmCandidate = async (key: string, url: string): Promise<ApplicationEvaluation> => {
+  const evaluation = await evaluationsRepository.findByKey(key);
+  if (!evaluation) throw new EvaluationNotFoundError(`No evaluation for ${key}`);
+  const candidate = evaluation.recovery.candidates?.find((c) => c.url === url);
+  if (!candidate) throw new EvaluationNotFoundError(`No candidate ${url} for ${key}`);
+  return scoreUserPosting(
+    evaluation,
+    {
+      text: candidate.text,
+      url,
+      title: candidate.title,
+      company: candidate.company,
+      matchLevel: "high",
+      stage: candidate.stage ?? inferCandidateStage(evaluation, candidate),
+    },
+    "user_picked_candidate",
+  );
+};
+
+export const scorePastedJd = async (key: string, text: string, url?: string): Promise<ApplicationEvaluation> => {
+  const evaluation = await evaluationsRepository.findByKey(key);
+  if (!evaluation) throw new EvaluationNotFoundError(`No evaluation for ${key}`);
+  return scoreUserPosting(
+    evaluation,
+    { text: text.trim(), url, matchLevel: "high", stage: "manual" },
+    "user_pasted_jd",
+  );
 };
 
 /** Keep stored outcomes in step with Gmail; never re-scores. */
@@ -246,12 +670,74 @@ export const refreshOutcomes = async (
     const evaluation = existing.get(app.key);
     if (!evaluation) continue;
     const outcome = buildOutcome(app);
-    if (evaluation.outcome.status === outcome.status && evaluation.outcome.updatedAt === outcome.updatedAt) continue;
+    if (
+      evaluation.outcome.status === outcome.status &&
+      evaluation.outcome.updatedAt === outcome.updatedAt &&
+      evaluation.outcome.furthestStage === outcome.furthestStage
+    ) {
+      continue;
+    }
     await evaluationsRepository.updateOutcome(app.key, outcome);
     evaluation.outcome = outcome;
     updated += 1;
   }
   return updated;
+};
+
+const companyKeyOf = (key: string) => key.split("::")[0] ?? key;
+
+const ROLE_CARRY_OVER_SIMILARITY = 0.6;
+
+const sameApplication = (app: GmailApplication, e: ApplicationEvaluation): boolean =>
+  !app.role ||
+  !e.role ||
+  e.appliedAt === app.appliedAt ||
+  roleSimilarity(app.role, e.role) >= ROLE_CARRY_OVER_SIMILARITY;
+
+/**
+ * Application keys are company + role words, so they shift when a later email adds or rewords the
+ * role. Move the old evaluation to the new key instead of recovering (and re-scoring) from scratch.
+ */
+export const adoptRekeyedEvaluations = async (
+  apps: GmailApplication[],
+  existing: Map<string, ApplicationEvaluation>,
+): Promise<number> => {
+  const missing = apps.filter((a) => !existing.has(a.key));
+  if (missing.length === 0) return 0;
+  const liveKeys = new Set(apps.map((a) => a.key));
+  const orphans = (
+    await evaluationsRepository.findByCompanyKeys([...new Set(missing.map((a) => companyKeyOf(a.key)))])
+  ).filter((e) => !liveKeys.has(e.key));
+  const rank = (e: ApplicationEvaluation) => (e.recovery.status === "scored" ? 0 : 1);
+  orphans.sort((a, b) => rank(a) - rank(b));
+
+  let moved = 0;
+  for (const app of missing) {
+    const idx = orphans.findIndex((e) => companyKeyOf(e.key) === companyKeyOf(app.key) && sameApplication(app, e));
+    if (idx < 0) continue;
+    const [orphan] = orphans.splice(idx, 1);
+    const adopted: ApplicationEvaluation = {
+      ...orphan!,
+      key: app.key,
+      role: app.role,
+      appliedAt: app.appliedAt,
+      outcome: buildOutcome(app),
+      updatedAt: new Date().toISOString(),
+    };
+    await evaluationsRepository.rekey(orphan!.key, adopted);
+    existing.set(app.key, adopted);
+    moved += 1;
+  }
+  if (moved) logger.info("Carried evaluations over to re-keyed applications", { moved });
+  return moved;
+};
+
+/** Stored evaluations for these applications, with re-keyed rows adopted and outcomes refreshed. */
+export const loadEvaluations = async (apps: GmailApplication[]): Promise<Map<string, ApplicationEvaluation>> => {
+  const existing = await evaluationsRepository.findByKeys(apps.map((a) => a.key));
+  await adoptRekeyedEvaluations(apps, existing);
+  await refreshOutcomes(apps, existing);
+  return existing;
 };
 
 export type RecoveryRunState = {
@@ -272,7 +758,12 @@ const newestFirst = (apps: GmailApplication[]) => [...apps].sort((a, b) => b.app
 export const pendingApplications = (
   apps: GmailApplication[],
   existing: Map<string, ApplicationEvaluation>,
-): GmailApplication[] => newestFirst(apps).filter((a) => needsRecovery(existing.get(a.key)));
+  serperBudgetLeft = true,
+): GmailApplication[] =>
+  newestFirst(apps).filter((a) => needsRecovery(existing.get(a.key), Date.now(), serperBudgetLeft));
+
+/** Room for at least one more job's worth of Serper queries. */
+const hasSerperBudget = (usage: SerperUsage) => usage.queries + MAX_SERPER_QUERIES_PER_JOB <= usage.cap;
 
 /** One pass over the window, newest applications first. */
 export const runRecovery = async (
@@ -280,10 +771,12 @@ export const runRecovery = async (
   maxPerRun = env.jdRecoveryMaxPerRun,
 ): Promise<{ processed: number; scored: number }> => {
   const apps = await getGmailApplications(days);
-  const existing = await evaluationsRepository.findByKeys(apps.map((a) => a.key));
-  await refreshOutcomes(apps, existing);
-  const todo = pendingApplications(apps, existing).slice(0, maxPerRun * MAX_PROCESSED_PER_RUN_FACTOR);
+  const existing = await loadEvaluations(apps);
   const usage = await serperUsageRepository.get();
+  const todo = pendingApplications(apps, existing, hasSerperBudget(usage)).slice(
+    0,
+    maxPerRun * MAX_PROCESSED_PER_RUN_FACTOR,
+  );
 
   let processed = 0;
   let triaged = 0;
@@ -304,8 +797,9 @@ export const runRecovery = async (
 /** Start a background run unless one is active. */
 export const startRecoveryRun = async (days: number): Promise<{ queued: number; running: boolean; started: boolean }> => {
   const apps = await getGmailApplications(days);
-  const existing = await evaluationsRepository.findByKeys(apps.map((a) => a.key));
-  const queued = pendingApplications(apps, existing).length;
+  const existing = await loadEvaluations(apps);
+  const usage = await serperUsageRepository.get();
+  const queued = pendingApplications(apps, existing, hasSerperBudget(usage)).length;
   if (state.running) return { queued, running: true, started: false };
   if (queued === 0) return { queued, running: false, started: false };
 

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { env } from "../../config/env.js";
+import { withLlmContext } from "../llm/llmUsage.js";
 import { responsesClient } from "../llm/responsesClient.js";
 import type { ParsedEmail } from "./gmailClient.js";
 
@@ -48,6 +50,14 @@ const APPLICATION_PHRASE_RE =
 const NOT_APPLICATION_RE =
   /\b(jobs? (?:you may be|you might be) interested in|new jobs? (?:for you|matching|near)|job alert|jobs? recommended for you|recommended jobs|top job picks|is hiring\b|are hiring\b|similar jobs|job matches|weekly digest|daily digest|newsletter|webinar|unsubscribe from (?:job )?alerts|people (?:also )?viewed|who viewed your profile|connection request|endorse)\b/i;
 
+/** Bump when the prefilter keeps more mail, so previously dropped messages are re-checked. */
+export const PREFILTER_VERSION = 2;
+
+/** Google/Outlook calendar invites ("Invitation: Alex and Jane @ Mon …") carry no application phrases. */
+const CALENDAR_INVITE_RE = /^(?:updated )?invitation:/i;
+const FREEMAIL_SENDER_RE =
+  /@(?:gmail|googlemail|yahoo|outlook|hotmail|live|icloud|me|aol|proton(?:mail)?)\.(?:com|me|net)\b/i;
+
 export type PrefilterResult = { keep: boolean; reason: string };
 
 /** Deterministic, free filter run before any LLM call. */
@@ -65,6 +75,9 @@ export const prefilterEmail = (email: Pick<ParsedEmail, "from" | "subject" | "sn
     return { keep: true, reason: "ats_sender" };
   }
   if (phrase) return { keep: true, reason: "application_phrase" };
+  if (CALENDAR_INVITE_RE.test(email.subject) && !FREEMAIL_SENDER_RE.test(email.from)) {
+    return { keep: true, reason: "calendar_invite" };
+  }
   return { keep: false, reason: "no_application_signal" };
 };
 
@@ -96,6 +109,7 @@ eventType rules:
 - assessment: coding challenge, take-home, online assessment, HackerRank / CodeSignal
 - offer: job offer
 - other: application-related but none of the above
+Calendar invitations: an invite from someone at a company for a call, chat, screen, or interview with the user is an "interview" event even if the word "interview" never appears. The company is the employer named in the invite, or the organization behind the sender's email domain (use its short brand name, e.g. "Acme" for jane@acmelabs.com). Personal or social events are NOT application emails.
 Never guess a company or role that is not supported by the email.`;
 
 const NOT_APPLICATION: EmailClassification = {
@@ -118,12 +132,15 @@ export const classifyEmailWithLlm = async (email: ParsedEmail): Promise<{
     email.body || email.snippet,
   ].join("\n");
 
-  const result = await responsesClient.runStructured({
-    systemPrompt: SYSTEM_PROMPT,
-    userPrompt,
-    schema: ClassificationSchema,
-    fallback: () => ({ ...NOT_APPLICATION }),
-  });
+  const result = await withLlmContext({ feature: "gmail_classify" }, () =>
+    responsesClient.runStructured({
+      systemPrompt: SYSTEM_PROMPT,
+      userPrompt,
+      schema: ClassificationSchema,
+      fallback: () => ({ ...NOT_APPLICATION }),
+      reasoningEffort: env.gmailClassifyReasoningEffort,
+    }),
+  );
   const data = result.data;
   return {
     llmSucceeded: result.success,

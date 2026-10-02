@@ -1,10 +1,12 @@
 import type { JobRecord, JobStatus } from "../types/job";
 import type { TopJobRecord, TopJobsSyncStatus } from "../types/topJob";
 import type {
+  EvaluationSummary,
   EvaluationsResponse,
   GmailApplicationsResponse,
   GmailStatus,
   GmailSyncResult,
+  RecoveryStart,
 } from "../types/gmail";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000/api";
@@ -128,9 +130,19 @@ export const api = {
   gmailEvaluations: (days = 7) =>
     request<EvaluationsResponse>(`/gmail/evaluations?days=${days}`, { cache: "no-store" }),
   gmailRunRecovery: (days = 7) =>
-    request<{ queued: number; running: boolean; started: boolean }>("/gmail/evaluations/run", {
+    request<RecoveryStart>("/gmail/evaluations/run", {
       method: "POST",
       cache: "no-store",
       body: JSON.stringify({ days }),
+    }),
+  gmailConfirmCandidate: (key: string, url: string) =>
+    request<{ evaluation: EvaluationSummary }>(`/gmail/evaluations/${encodeURIComponent(key)}/confirm`, {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    }),
+  gmailPasteJd: (key: string, text: string, url?: string) =>
+    request<{ evaluation: EvaluationSummary }>(`/gmail/evaluations/${encodeURIComponent(key)}/jd`, {
+      method: "POST",
+      body: JSON.stringify({ text, url: url || undefined }),
     }),
 };

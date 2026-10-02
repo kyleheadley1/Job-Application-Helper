@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { extractLinks, type GmailMessagePart } from "../../services/gmail/gmailClient.js";
 import {
+  cleanRoleTitle,
   collectEmailEvidence,
   extractInlineJd,
   extractJobLinks,
@@ -71,8 +72,24 @@ describe("extractRequisitionId", () => {
     expect(extractRequisitionId("Job #: 55123 Software Engineer", "")).toBe("55123");
   });
 
+  it("handles Cisco-style 'Req. 2000087' and a trailing subject number", () => {
+    expect(extractRequisitionId("Software Engineer I (Req. 2000087)", "")).toBe("2000087");
+    expect(extractRequisitionId("Your application: Associate Software Engineer, 2389186", "")).toBe("2389186");
+  });
+
   it("returns undefined when there is no ID", () => {
     expect(extractRequisitionId("Thanks for applying to Acme", "We received your application.")).toBeUndefined();
+    expect(extractRequisitionId("We require 5 years", "Requirements: 3+ years")).toBeUndefined();
+  });
+});
+
+describe("cleanRoleTitle", () => {
+  it("strips requisition noise from role titles", () => {
+    expect(cleanRoleTitle("Software Engineer I (Req. 2000087)")).toBe("Software Engineer I");
+    expect(cleanRoleTitle("Associate Software Engineer (2389186)")).toBe("Associate Software Engineer");
+    expect(cleanRoleTitle("Backend Engineer - JR104233")).toBe("Backend Engineer");
+    expect(cleanRoleTitle("Software Engineer II, Platform")).toBe("Software Engineer II, Platform");
+    expect(cleanRoleTitle("Software Engineer - 2027 New Grads")).toBe("Software Engineer - 2027 New Grads");
   });
 });
 

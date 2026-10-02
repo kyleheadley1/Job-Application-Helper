@@ -16,4 +16,9 @@ apps/data/resumes/
 apps/api/src/tests/fixtures/resumes/
 
 # Local tracker / personal artifacts
-data/job_role_scores_current.xlsx
+/data/
+*.git/
+*.bundle
+*.pdf
+*.docx
+*.xlsx

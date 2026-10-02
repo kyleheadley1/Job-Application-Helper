@@ -62,7 +62,7 @@ export function isNonTraditionalEarlyCareerProfile(profile: UserProfile): boolea
       ...profile.targetRoles,
     ].join(" "),
   );
-  return /\b(nontraditional|bootcamp|bootcamp|career\s+change|early[-\s]career|self[-\s]taught|immersive)\b/i.test(
+  return /\b(nontraditional|bootcamp|career\s+change|early[-\s]career|self[-\s]taught|immersive)\b/i.test(
     blob,
   );
 }
@@ -225,7 +225,7 @@ export const jdHasAppliedAiSystemsOverlap = (blob: string): boolean =>
     blob,
   );
 
-/** Profile supports RAG project / RAG / LLM shipping (per user profile + projects). */
+/** Profile supports RAG / LLM shipping (per user profile + projects). */
 export const profileHasAiToolingEvidence = (profile: UserProfile): boolean => {
   const blob = normalizeText(
     [
@@ -236,7 +236,7 @@ export const profileHasAiToolingEvidence = (profile: UserProfile): boolean => {
       ...profile.flagshipProjects.flatMap((p) => [p.name, p.summary, ...p.tech, ...p.outcomes]),
     ].join(" "),
   );
-  return /\b(rag|llm|ai[-\s]?enabled|generative|vector|embedding|ragproject|workflow|internal tooling.*llm)\b/i.test(
+  return /\b(rag|llm|ai[-\s]?enabled|generative|vector|embedding|workflow|internal tooling.*llm)\b/i.test(
     blob,
   );
 };
@@ -538,9 +538,9 @@ export function polishRisksAndMain(params: {
 
 const PROOF_HINT =
   /\b(shipped|built|implemented|delivered|owned|bootcamp|project|production|internship|experience|profile|flagship|led|scaled)\b/i;
-/** Second bullet must tie to engineering artifacts, not generic praise (embeddings, pipelines, RAG project-style delivery). */
+/** Second bullet must tie to engineering artifacts, not generic praise (embeddings, pipelines, shipped AI delivery). */
 export const CONCRETE_ENGINEERING_PROOF =
-  /\b(embedding|embeddings|vector\s*(search|database|db)?|ingestion|pipeline|pipelines|rag\b|retrieval|semantic|chunk|evals?|evaluations?|agents?|ragproject|openapi|kubernetes|lambda|typescript|node\.?js|rest\s*api)\b/i;
+  /\b(embedding|embeddings|vector\s*(search|database|db)?|ingestion|pipeline|pipelines|rag\b|retrieval|semantic|chunk|evals?|evaluations?|agents?|openapi|kubernetes|lambda|typescript|node\.?js|rest\s*api)\b/i;
 const VAGUE_FIT_RE =
   /\b(solid\s+match|strategic\s+capability|strategic\s+readiness|generic\s+fit|generic\s+overlap)\b/gi;
 

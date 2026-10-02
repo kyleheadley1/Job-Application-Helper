@@ -1,8 +1,8 @@
 /**
  * Install resume PDFs into apps/api/data/resumes and extract the .txt the loader prefers.
  *
- *   npx tsx scripts/extract-resume-text.mts BASE ../../data/Candidate_Resume_Base.pdf
- *   npx tsx scripts/extract-resume-text.mts AI ../../data/Candidate_Resume_AI.pdf
+ *   npx tsx scripts/extract-resume-text.mts BASE /path/to/your-base-resume.pdf
+ *   npx tsx scripts/extract-resume-text.mts AI /path/to/your-ai-resume.pdf
  */
 import fs from "node:fs/promises";
 import path from "node:path";

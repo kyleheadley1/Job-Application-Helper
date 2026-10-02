@@ -822,3 +822,63 @@ tbody .tracker-sticky-left {
   color: #7ee787;
   border: 1px solid #2ea043;
 }
+
+/* ——— Dashboard JD recovery ——— */
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.chip {
+  background: #21262d;
+  border: 1px solid #30363d;
+  color: #f0f6fc;
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.chip.active {
+  border-color: #2f81f7;
+  background: #1f2d44;
+}
+
+.chip strong {
+  margin-left: 0.35rem;
+}
+
+.fitScore {
+  display: inline-block;
+  min-width: 2.4rem;
+  text-align: center;
+  font-weight: 700;
+}
+
+.reviewPanel {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+}
+
+.reviewPanel textarea {
+  width: 100%;
+  min-height: 8rem;
+  font-family: inherit;
+}
+
+.pointChip {
+  display: inline-block;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 0.1rem 0.45rem;
+  margin: 0.15rem 0.3rem 0.15rem 0;
+  font-size: 0.8rem;
+}
+
+.smallText {
+  font-size: 0.8rem;
+}

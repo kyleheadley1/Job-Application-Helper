@@ -38,8 +38,8 @@ export const resumeProfiles: ResumeProfile[] = [
     summaryStyle: "Full-stack engineer building AI-enabled applications: RAG, LLM evals, deterministic grounding, and LangGraph agents.",
     emphasisKeywords: ["RAG", "LLM evaluation", "LangGraph", "agents", "embeddings", "vector search", "Qdrant", "TypeScript"],
     exampleRationale: [
-      "JD centers on LLM/RAG/agent work; AI resume leads with RAG project evals, grounding, and agent benchmarking.",
-      "Evidence is measurable (eval metrics, benchmarks, agent vs RAG benchmark).",
+      "JD centers on LLM/RAG/agent work; AI resume leads with shipped LLM evals, grounding, and agent work.",
+      "Evidence is measurable (eval metrics, benchmarks, before/after results).",
     ],
   },
 ];

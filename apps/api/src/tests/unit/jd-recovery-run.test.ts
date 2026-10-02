@@ -14,6 +14,15 @@ const state = vi.hoisted(() => ({
   evaluations: new Map<string, ApplicationEvaluation>(),
   usage: { jobKeys: [] as string[], queries: 0 },
   cap: 10,
+  boards: new Map<string, unknown>(),
+  discovered: [] as unknown[],
+}));
+
+vi.mock("../../services/gmail/jdRecovery/atsBoards.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../services/gmail/jdRecovery/atsBoards.js")>()),
+  listBoard: vi.fn(async (ref: { ats: string; slug: string }) => state.boards.get(`${ref.ats}:${ref.slug}`) ?? null),
+  discoverBoards: vi.fn(async () => state.discovered),
+  atsBoardsRepository: { get: vi.fn(async () => null), put: vi.fn(async () => undefined) },
 }));
 
 vi.mock("../../services/gmail/gmailApplications.js", async (importOriginal) => ({
@@ -61,6 +70,10 @@ vi.mock("../../services/gmail/jdRecovery/serperClient.js", () => ({
 
 vi.mock("../../services/gmail/jdRecovery/evaluations.repository.js", () => ({
   evaluationsRepository: {
+    findByKey: vi.fn(async (key: string) => {
+      const e = state.evaluations.get(key);
+      return e ? structuredClone(e) : null;
+    }),
     findByKeys: vi.fn(async (keys: string[]) => {
       const out = new Map<string, ApplicationEvaluation>();
       for (const k of keys) {
@@ -70,6 +83,15 @@ vi.mock("../../services/gmail/jdRecovery/evaluations.repository.js", () => ({
       return out;
     }),
     upsert: vi.fn(async (e: ApplicationEvaluation) => {
+      state.evaluations.set(e.key, structuredClone(e));
+    }),
+    findByCompanyKeys: vi.fn(async (companyKeys: string[]) =>
+      [...state.evaluations.values()]
+        .filter((e) => companyKeys.some((c) => e.key.startsWith(`${c}::`)))
+        .map((e) => structuredClone(e)),
+    ),
+    rekey: vi.fn(async (oldKey: string, e: ApplicationEvaluation) => {
+      state.evaluations.delete(oldKey);
       state.evaluations.set(e.key, structuredClone(e));
     }),
     updateOutcome: vi.fn(async (key: string, outcome: ApplicationEvaluation["outcome"]) => {
@@ -89,10 +111,17 @@ vi.mock("../../agents/jobAgent/orchestrator.js", () => ({
 }));
 
 import { triageJob } from "../../agents/jobAgent/orchestrator.js";
+import { discoverBoards, listBoard, type BoardListing } from "../../services/gmail/jdRecovery/atsBoards.js";
 import { serperClient, serperUsageRepository } from "../../services/gmail/jdRecovery/serperClient.js";
 import { evaluationsRepository } from "../../services/gmail/jdRecovery/evaluations.repository.js";
 import {
+  AlreadyScoredError,
+  ATS_SITE_FILTER,
   buildSerperQueries,
+  confirmCandidate,
+  EvaluationNotFoundError,
+  scorePastedJd,
+  RECOVERY_VERSION,
   rankSerperResults,
   recoverApplication,
   runRecovery,
@@ -110,13 +139,14 @@ const addApp = (opts: {
   subject?: string;
   body?: string;
   links?: string[];
+  from?: string;
 }): GmailApplication => {
   const emailId = `e-${opts.key}`;
   state.inbox.set(emailId, {
     id: emailId,
     threadId: `t-${opts.key}`,
     date: day(opts.appliedDay),
-    from: `jobs@${opts.company.toLowerCase().replace(/\W/g, "")}.com`,
+    from: opts.from ?? `jobs@${opts.company.toLowerCase().replace(/\W/g, "")}.com`,
     subject: opts.subject ?? `Thanks for applying to ${opts.company}`,
     snippet: "",
     body: opts.body ?? "We received your application.",
@@ -127,7 +157,9 @@ const addApp = (opts: {
     company: opts.company,
     role: opts.role,
     appliedAt: day(opts.appliedDay),
+    appliedAtKnown: opts.status !== "rejected",
     status: opts.status ?? "applied",
+    furthestStage: "applied",
     lastUpdateAt: day(opts.appliedDay),
     emails: [
       {
@@ -155,6 +187,10 @@ beforeEach(() => {
   state.evaluations.clear();
   state.usage = { jobKeys: [], queries: 0 };
   state.cap = 10;
+  state.boards.clear();
+  state.discovered = [];
+  vi.mocked(listBoard).mockClear();
+  vi.mocked(discoverBoards).mockClear();
   vi.mocked(triageJob).mockClear();
   vi.mocked(serperClient.search).mockClear();
   vi.mocked(serperClient.isConfigured).mockReturnValue(true);
@@ -193,7 +229,7 @@ describe("JD recovery runner", () => {
       subject: "Associate Software Engineer (2389186)",
     });
     const hit = "https://uhg.wd1.myworkdayjobs.com/External/job/MN/Associate-Software-Engineer_2389186";
-    state.serperResults.set('"UnitedHealth Group" "2389186"', [
+    state.serperResults.set('"2389186" UnitedHealth Group', [
       { title: "Indeed", link: "https://www.indeed.com/viewjob?jk=1" },
       { title: "UHG", link: hit },
     ]);
@@ -211,7 +247,7 @@ describe("JD recovery runner", () => {
   it("stores a low-confidence Serper result as unverified with no fit", async () => {
     addApp({ key: "acme::be", company: "Acme", role: "Backend Engineer", appliedDay: 22 });
     const hit = "https://jobs.lever.co/acme/xyz-1";
-    state.serperResults.set('"Acme" "Backend Engineer" job', [{ title: "Acme", link: hit }]);
+    state.serperResults.set(`"Acme" "Backend Engineer" ${ATS_SITE_FILTER}`, [{ title: "Acme", link: hit }]);
     addPosting(hit, { source: "lever", company: "Acme", title: "Backend Engineer" });
 
     await runRecovery(30, 5);
@@ -224,7 +260,7 @@ describe("JD recovery runner", () => {
     expect(vi.mocked(serperClient.search).mock.calls.length).toBeLessThanOrEqual(2);
   });
 
-  it("caps Serper at the 10 most recent jobs that need it, across runs, without double-counting", async () => {
+  it("spends the Serper query budget on the most recent jobs first, across runs", async () => {
     for (let i = 1; i <= 12; i += 1) {
       addApp({ key: `co${i}::se`, company: `Company${i}`, role: "Software Engineer", appliedDay: i });
     }
@@ -233,25 +269,21 @@ describe("JD recovery runner", () => {
 
     const capped = [...state.evaluations.values()].filter((e) => e.recovery.reason === "serper_cap_reached");
     expect(capped.map((e) => e.key).sort()).toEqual(["co1::se", "co2::se"]);
-    expect(state.usage.jobKeys).toHaveLength(10);
+    expect(state.usage.queries).toBe(10);
     expect(state.usage.jobKeys).not.toContain("co1::se");
 
-    const usage = await serperUsageRepository.get();
-    await recoverApplication(state.apps.find((a) => a.key === "co12::se")!, usage);
-    expect(state.usage.jobKeys).toHaveLength(10);
-
-    const blocked = await recoverApplication(state.apps.find((a) => a.key === "co1::se")!, await serperUsageRepository.get());
-    expect(blocked.evaluation.recovery).toMatchObject({ status: "not_found", reason: "serper_cap_reached" });
+    const again = await recoverApplication(state.apps.find((a) => a.key === "co12::se")!, await serperUsageRepository.get());
+    expect(again.evaluation.recovery).toMatchObject({ reason: "serper_cap_reached", serperQueries: 0 });
+    expect(state.usage.queries).toBe(10);
   });
 
   it("records not_found without Serper when no key is configured", async () => {
     vi.mocked(serperClient.isConfigured).mockReturnValue(false);
     addApp({ key: "acme::se", company: "Acme", role: "Software Engineer", appliedDay: 10 });
     await runRecovery(30, 5);
-    expect(state.evaluations.get("acme::se")!.recovery).toMatchObject({
-      status: "not_found",
-      reason: "serper_not_configured",
-    });
+    const r = state.evaluations.get("acme::se")!.recovery;
+    expect(r.status).toBe("not_found");
+    expect(r.notes).toEqual(expect.arrayContaining(["no_board_found", "serper_not_configured"]));
     expect(serperClient.search).not.toHaveBeenCalled();
   });
 
@@ -289,6 +321,323 @@ describe("JD recovery runner", () => {
     expect([...state.evaluations.keys()].sort()).toEqual(["co15::se", "co25::se"]);
   });
 
+  const listing = (
+    ats: BoardListing["ref"]["ats"],
+    slug: string,
+    jobs: Array<{ id: string; title: string; requisitionId?: string; location?: string; text?: string }>,
+    companyName?: string,
+  ): BoardListing => ({
+    ref: { ats, slug },
+    companyName,
+    jobs: jobs.map((j) => ({
+      ...j,
+      url: `https://boards.greenhouse.io/${slug}/jobs/${j.id}`,
+      text: j.text ?? `${j.title}\n${LONG}`,
+    })),
+  });
+
+  const VARIED = Array.from(
+    { length: 120 },
+    (_, i) => `Responsibility ${i}: ship feature area ${i} with the team and measure outcome ${i * 7}.`,
+  ).join(" ");
+  const OTHER = "Own the data warehouse, dbt models, and Airflow pipelines for analytics teams. ".repeat(12);
+
+  it("scores a unique title on a guessed company board before trying Serper", async () => {
+    addApp({ key: "ell::se", company: "Ellipsis Labs", role: "Software Engineer - 2027 New Grads", appliedDay: 28 });
+    state.discovered = [
+      listing("greenhouse", "ellipsislabs", [
+        { id: "1", title: "Software Engineer, 2027 New Grads" },
+        { id: "2", title: "Account Executive" },
+      ]),
+    ];
+
+    await runRecovery(30, 5);
+
+    expect(serperClient.search).not.toHaveBeenCalled();
+    const e = state.evaluations.get("ell::se")!;
+    expect(e.recovery).toMatchObject({ status: "scored", source: "ats_board", match: { level: "high" } });
+    expect(e.recoveryVersion).toBe(RECOVERY_VERSION);
+    expect(triageJob).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves it unverified when several open jobs share the title", async () => {
+    vi.mocked(serperClient.isConfigured).mockReturnValue(false);
+    addApp({ key: "pal::se", company: "Palantir", role: "Software Engineer", appliedDay: 28 });
+    state.discovered = [
+      listing("lever", "palantir", [
+        { id: "1", title: "Software Engineer", text: `Software Engineer\n${LONG}` },
+        { id: "2", title: "Software Engineer", text: `Software Engineer\n${OTHER}` },
+      ]),
+    ];
+
+    await runRecovery(30, 5);
+
+    const e = state.evaluations.get("pal::se")!;
+    expect(e.recovery.status).toBe("unverified");
+    expect(e.recovery.reason).toBe("multiple_title_matches");
+    expect(e.recovery.candidates?.map((c) => c.url)).toHaveLength(2);
+    expect(e.fit).toBeUndefined();
+    expect(triageJob).not.toHaveBeenCalled();
+    expect(serperClient.search).not.toHaveBeenCalled();
+    expect(e.recovery.notes).toContain("board_found_no_search");
+    expect(e.recovery.foundVia).toBe("guessed_board");
+  });
+
+  it("treats the same JD posted once per city as one posting", async () => {
+    addApp({ key: "safe::fs", company: "SafeLease", role: "Full Stack Software Engineer", appliedDay: 28 });
+    state.discovered = [
+      listing("ashby", "safelease", [
+        { id: "1", title: "Full Stack Software Engineer", location: "Austin, TX", text: `Austin, TX\n${VARIED}` },
+        { id: "2", title: "Software Engineer, Full Stack", location: "New York, NY", text: `New York, NY\n${VARIED}` },
+      ]),
+    ];
+
+    await runRecovery(30, 5);
+
+    const e = state.evaluations.get("safe::fs")!;
+    expect(e.recovery).toMatchObject({ status: "scored", match: { level: "high" } });
+    expect(e.recovery.match?.signals).toContain("duplicate_postings:2");
+  });
+
+  it("does not let a broader title match a generic role (strict title similarity)", async () => {
+    vi.mocked(serperClient.isConfigured).mockReturnValue(false);
+    addApp({ key: "jamf::se1", company: "Jamf", role: "Software Engineer I", appliedDay: 28 });
+    state.discovered = [
+      listing("greenhouse", "jamf", [
+        { id: "1", title: "Software Engineer I" },
+        { id: "2", title: "Software Engineer II", text: `Software Engineer II\n${OTHER}` },
+        { id: "3", title: "Senior Software Engineer, Platform", text: `Senior\n${OTHER}` },
+      ]),
+    ];
+
+    await runRecovery(30, 5);
+
+    const e = state.evaluations.get("jamf::se1")!;
+    expect(e.recovery).toMatchObject({ status: "scored", url: "https://boards.greenhouse.io/jamf/jobs/1" });
+  });
+
+  it("breaks a title tie using the location named in the email", async () => {
+    addApp({
+      key: "ramp::fe",
+      company: "Ramp",
+      role: "Software Engineer, Frontend",
+      appliedDay: 28,
+      body: "Thanks for applying to Software Engineer, Frontend in New York, NY.",
+    });
+    state.discovered = [
+      listing("ashby", "ramp", [
+        { id: "1", title: "Software Engineer, Frontend", location: "San Francisco, CA", text: `SF\n${OTHER}` },
+        { id: "2", title: "Software Engineer, Frontend", location: "New York, NY" },
+      ]),
+    ];
+
+    await runRecovery(30, 5);
+
+    const e = state.evaluations.get("ramp::fe")!;
+    expect(e.recovery).toMatchObject({ status: "scored", url: "https://boards.greenhouse.io/ramp/jobs/2" });
+    expect(e.recovery.match?.signals).toContain("email_location_match");
+  });
+
+  it("recovers a missing role from a board title that appears in the email", async () => {
+    addApp({
+      key: "bevel::",
+      company: "Bevel",
+      role: null,
+      appliedDay: 28,
+      subject: "Thanks for applying to Bevel",
+      body: "We received your application for the Founding Full Stack Engineer role.",
+    });
+    state.discovered = [
+      listing("ashby", "bevel", [
+        { id: "1", title: "Founding Full Stack Engineer" },
+        { id: "2", title: "Product Designer", text: `Designer\n${OTHER}` },
+      ]),
+    ];
+
+    await runRecovery(30, 5);
+
+    const e = state.evaluations.get("bevel::")!;
+    expect(e.recovery.recoveredRole).toBe("Founding Full Stack Engineer");
+    expect(e.recovery).toMatchObject({ status: "scored", match: { level: "high" } });
+    expect(e.recovery.match?.signals).toContain("role_from_email");
+  });
+
+  it("uses a Workday board named by a login link in the email and searches by req ID", async () => {
+    addApp({
+      key: "uhg::ase",
+      company: "UnitedHealth Group",
+      role: "Associate Software Engineer",
+      appliedDay: 29,
+      subject: "Associate Software Engineer (2389186)",
+      links: ["https://uhg.wd1.myworkdayjobs.com/en-US/External/login"],
+    });
+    state.boards.set("workday:uhg/External", {
+      ref: { ats: "workday", slug: "uhg/External" },
+      jobs: [
+        {
+          id: "/job/MN/Associate-Software-Engineer_2389186",
+          title: "Associate Software Engineer",
+          url: "https://uhg.wd1.myworkdayjobs.com/External/job/MN/Associate-Software-Engineer_2389186",
+          requisitionId: "2389186",
+          text: `Associate Software Engineer\nRequisition 2389186\n${LONG}`,
+        },
+      ],
+    });
+
+    await runRecovery(30, 5);
+
+    expect(vi.mocked(listBoard).mock.calls[0]).toEqual([
+      expect.objectContaining({ ats: "workday", slug: "uhg/External" }),
+      "2389186",
+    ]);
+    expect(discoverBoards).not.toHaveBeenCalled();
+    expect(serperClient.search).not.toHaveBeenCalled();
+    expect(state.evaluations.get("uhg::ase")!.recovery).toMatchObject({ status: "scored", match: { level: "exact" } });
+  });
+
+  it("feeds a Serper hit into the board search, guarded by the board's company name", async () => {
+    addApp({ key: "tele::se", company: "Teleskope", role: "Software Engineer", appliedDay: 27 });
+    const hit = "https://job-boards.greenhouse.io/teleskope/jobs/77";
+    state.serperResults.set(`"Teleskope" "Software Engineer" ${ATS_SITE_FILTER}`, [{ title: "", link: hit }]);
+    state.boards.set("greenhouse:teleskope", listing("greenhouse", "teleskope", [{ id: "77", title: "Software Engineer" }], "Teleskope"));
+
+    await runRecovery(30, 5);
+
+    expect(discoverBoards).toHaveBeenCalled();
+    expect(state.evaluations.get("tele::se")!.recovery).toMatchObject({
+      status: "scored",
+      source: "ats_board",
+      match: { level: "high" },
+    });
+  });
+
+  it("ignores a Serper-found board whose company name doesn't match", async () => {
+    addApp({ key: "her::se", company: "Herald", role: "Software Engineer", appliedDay: 27 });
+    const hit = "https://job-boards.greenhouse.io/heraldnews/jobs/5";
+    state.serperResults.set(`"Herald" "Software Engineer" ${ATS_SITE_FILTER}`, [{ title: "", link: hit }]);
+    state.boards.set("greenhouse:heraldnews", listing("greenhouse", "heraldnews", [{ id: "5", title: "Software Engineer" }], "Herald News Corp"));
+
+    await runRecovery(30, 5);
+
+    expect(state.evaluations.get("her::se")!.recovery.status).not.toBe("scored");
+    expect(triageJob).not.toHaveBeenCalled();
+  });
+
+  it("records email_links_failed when the email's posting links don't load", async () => {
+    vi.mocked(serperClient.isConfigured).mockReturnValue(false);
+    addApp({
+      key: "kgs::jse",
+      company: "KGS Technology Group",
+      role: "Junior Software Engineer",
+      appliedDay: 26,
+      links: ["https://www.linkedin.com/jobs/view/3912345678"],
+    });
+
+    await runRecovery(30, 5);
+
+    const r = state.evaluations.get("kgs::jse")!.recovery;
+    expect(r).toMatchObject({ status: "fetch_failed", reason: "email_links_failed" });
+    expect(r.attempts[0]).toMatchObject({ url: "https://www.linkedin.com/jobs/view/3912345678", ok: false });
+  });
+
+  it("retries unscored rows from an older pipeline version but never re-scores scored ones", async () => {
+    vi.mocked(serperClient.isConfigured).mockReturnValue(false);
+    const old = (key: string, status: "not_found" | "scored") =>
+      ({
+        key,
+        company: key,
+        role: "Software Engineer",
+        appliedAt: day(10),
+        recovery: { status, reason: "serper_not_configured", attempts: [], serperQueries: 0 },
+        outcome: { status: "applied", updatedAt: day(10), history: [] },
+        createdAt: day(10),
+        updatedAt: new Date().toISOString(),
+      }) as ApplicationEvaluation;
+    addApp({ key: "a::se", company: "Alpha", role: "Software Engineer", appliedDay: 10 });
+    addApp({ key: "b::se", company: "Beta", role: "Software Engineer", appliedDay: 10 });
+    state.evaluations.set("a::se", old("a::se", "not_found"));
+    state.evaluations.set("b::se", old("b::se", "scored"));
+
+    const r = await runRecovery(30, 5);
+
+    expect(r.processed).toBe(1);
+    expect(state.evaluations.get("a::se")!.recoveryVersion).toBe(RECOVERY_VERSION);
+    expect(state.evaluations.get("b::se")!.recoveryVersion).toBeUndefined();
+  });
+
+  it("scores a candidate the user picks, blind, and marks it user-verified", async () => {
+    vi.mocked(serperClient.isConfigured).mockReturnValue(false);
+    addApp({ key: "pal::se", company: "Palantir", role: "Software Engineer", appliedDay: 28, status: "rejected" });
+    state.discovered = [
+      listing("lever", "palantir", [
+        { id: "1", title: "Software Engineer", text: `Software Engineer\n${LONG}` },
+        { id: "2", title: "Software Engineer", text: `Software Engineer\n${OTHER}` },
+      ]),
+    ];
+    await runRecovery(30, 5);
+    const url = state.evaluations.get("pal::se")!.recovery.candidates![1]!.url;
+
+    const e = await confirmCandidate("pal::se", url);
+
+    expect(e.recovery).toMatchObject({ status: "scored", verifiedBy: "user", source: "manual", url });
+    expect(e.recovery.candidates).toBeUndefined();
+    expect(e.fit?.total).toBe(78);
+    const input = vi.mocked(triageJob).mock.calls.at(-1)![0];
+    expect(Object.keys(input).sort()).toEqual(["companyHint", "fullPrep", "rawText"]);
+    expect(JSON.stringify(input)).not.toMatch(/rejected/i);
+    await expect(confirmCandidate("pal::se", "https://nope.example/1")).rejects.toBeInstanceOf(EvaluationNotFoundError);
+  });
+
+  it("scores a pasted JD and never lets a later run overwrite it", async () => {
+    vi.mocked(serperClient.isConfigured).mockReturnValue(false);
+    addApp({ key: "fig::osd", company: "Figma", role: "Open Source Developer", appliedDay: 28 });
+    await runRecovery(30, 5);
+    expect(state.evaluations.get("fig::osd")!.recovery.status).not.toBe("scored");
+
+    const e = await scorePastedJd("fig::osd", LONG, "https://figma.com/careers/1");
+    expect(e.recovery).toMatchObject({ status: "scored", verifiedBy: "user", match: { signals: ["user_pasted_jd"] } });
+
+    vi.mocked(triageJob).mockClear();
+    await runRecovery(30, 5);
+    expect(triageJob).not.toHaveBeenCalled();
+    expect(state.evaluations.get("fig::osd")!.recovery.verifiedBy).toBe("user");
+
+    await expect(scorePastedJd("fig::osd", LONG)).rejects.toBeInstanceOf(AlreadyScoredError);
+    expect(triageJob).not.toHaveBeenCalled();
+  });
+
+  it("carries a score over when the application key changes, without re-scoring", async () => {
+    vi.mocked(serperClient.isConfigured).mockReturnValue(false);
+    addApp({ key: "fig::", company: "Figma", role: null, appliedDay: 28 });
+    await runRecovery(30, 5);
+    await scorePastedJd("fig::", LONG);
+    const scoredFit = state.evaluations.get("fig::")!.fit!.total;
+
+    state.apps.length = 0;
+    addApp({ key: "fig::open source developer", company: "Figma", role: "Open Source Developer", appliedDay: 28, status: "rejected" });
+    vi.mocked(triageJob).mockClear();
+    await runRecovery(30, 5);
+
+    expect(triageJob).not.toHaveBeenCalled();
+    expect(state.evaluations.has("fig::")).toBe(false);
+    const moved = state.evaluations.get("fig::open source developer")!;
+    expect(moved.fit!.total).toBe(scoredFit);
+    expect(moved.outcome.status).toBe("rejected");
+  });
+
+  it("does not adopt a sibling evaluation for a different role at the same company", async () => {
+    vi.mocked(serperClient.isConfigured).mockReturnValue(false);
+    addApp({ key: "fig::designer", company: "Figma", role: "Product Designer", appliedDay: 27 });
+    await runRecovery(30, 5);
+    await scorePastedJd("fig::designer", LONG);
+
+    state.apps.length = 0;
+    addApp({ key: "fig::backend engineer", company: "Figma", role: "Backend Engineer", appliedDay: 28 });
+    await runRecovery(30, 5);
+    expect(state.evaluations.has("fig::designer")).toBe(true);
+    expect(state.evaluations.get("fig::backend engineer")!.recovery.status).not.toBe("scored");
+  });
+
   it("summarizes mean fit by outcome from scored rows only", () => {
     const base = { recovery: { attempts: [], serperQueries: 0 } } as unknown as ApplicationEvaluation;
     const mk = (status: "scored" | "unverified", outcome: "rejected" | "interviewing", total?: number) =>
@@ -302,14 +651,16 @@ describe("JD recovery runner", () => {
     expect(s.rows.find((r) => r.outcome === "rejected")).toEqual({ outcome: "rejected", count: 2, meanFit: 65 });
     expect(s.rows.find((r) => r.outcome === "interviewing")?.meanFit).toBe(85);
     expect(s.byRecoveryStatus).toMatchObject({ scored: 3, unverified: 1 });
+    expect(s.points.rejected?.map((p) => p.fit)).toEqual([70, 60]);
+    expect(s.userVerified).toBe(0);
   });
 });
 
 describe("Serper helpers", () => {
   it("builds at most two queries, req ID first", () => {
     expect(buildSerperQueries("UnitedHealth Group", "Associate Software Engineer", "2389186")).toEqual([
-      '"UnitedHealth Group" "2389186"',
-      '"UnitedHealth Group" "Associate Software Engineer" 2389186',
+      '"2389186" UnitedHealth Group',
+      `"UnitedHealth Group" "Associate Software Engineer" ${ATS_SITE_FILTER}`,
     ]);
     expect(buildSerperQueries("Acme", null)).toEqual([]);
   });

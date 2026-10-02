@@ -1,13 +1,23 @@
 import { ZodSchema } from "zod";
 import { env } from "../../config/env.js";
 import { logger } from "../../lib/logger.js";
+import { recordLlmUsage, type OpenAiUsage } from "./llmUsage.js";
+
+export type ReasoningEffort = "minimal" | "low" | "medium" | "high";
 
 type StructuredRequest<T> = {
   systemPrompt: string;
   userPrompt: string;
   schema: ZodSchema<T>;
   fallback: () => T;
+  /** Only sent to reasoning models; hidden reasoning is billed as output and dominates cost. */
+  reasoningEffort?: ReasoningEffort;
 };
+
+const supportsReasoning = (model: string) => /^(gpt-5|o\d)/i.test(model);
+
+const isReasoningParamError = (status: number, payload: unknown) =>
+  status === 400 && /reasoning/i.test(JSON.stringify((payload as { error?: unknown })?.error ?? ""));
 
 const tryParseJson = (value: string): unknown => {
   try {
@@ -97,9 +107,8 @@ export class ResponsesClient {
       return { success: false, data: fallbackData, diagnostics };
     }
 
-    let response: Response;
-    try {
-      response = await fetch("https://api.openai.com/v1/responses", {
+    const send = (effort?: ReasoningEffort) =>
+      fetch("https://api.openai.com/v1/responses", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -113,8 +122,22 @@ export class ResponsesClient {
             { role: "user", content: request.userPrompt },
           ],
           text: { format: { type: "json_object" } },
+          ...(effort ? { reasoning: { effort } } : {}),
         }),
       });
+    const effort =
+      request.reasoningEffort && supportsReasoning(env.openAiModel) ? request.reasoningEffort : undefined;
+
+    let response: Response;
+    try {
+      response = await send(effort);
+      if (effort && response.status === 400) {
+        const errorBody = await response.clone().json().catch(() => null);
+        if (isReasoningParamError(response.status, errorBody)) {
+          logger.warn("Model rejected reasoning effort; retrying without it", { model: env.openAiModel, effort });
+          response = await send();
+        }
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const diagnostics = diag({
@@ -139,6 +162,10 @@ export class ResponsesClient {
       });
       logger.warn("OpenAI structured call failed — response body not JSON", { diagnostics });
       return { success: false, data: fallbackData, diagnostics };
+    }
+
+    if (payload && typeof payload === "object" && "usage" in payload) {
+      recordLlmUsage(env.openAiModel, (payload as { usage?: OpenAiUsage }).usage);
     }
 
     if (!response.ok) {
