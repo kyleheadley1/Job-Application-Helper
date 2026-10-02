@@ -238,7 +238,7 @@ export const promoteTopJobToTracker = async (topJobId: string): Promise<JobRecor
       recommendation: topJob.recommendation,
       rules: topJob.rules,
     }),
-    recommendedResume: topJob.recommendedResume ?? "EARLY_CAREER",
+    recommendedResume: topJob.recommendedResume ?? "BASE",
     resumeRationale: topJob.resumeRationale ?? [],
     topMatch: topJob.topMatch,
     mainRisk: topJob.mainRisk,

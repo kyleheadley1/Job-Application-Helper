@@ -77,7 +77,7 @@ describe("top jobs routes", () => {
         topMatch: "TypeScript fit",
         mainRisk: "None major",
         rationale: ["Good fit"],
-        recommendedResume: "SWE",
+        recommendedResume: "BASE",
         resumeRationale: ["Strong TypeScript overlap"],
       },
     ]);

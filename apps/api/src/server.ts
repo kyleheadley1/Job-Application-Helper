@@ -8,6 +8,7 @@ import { runAllApplicationsImport } from "./tracker/runAllApplicationsImport.js"
 import { jobsRepository } from "./services/jobs/jobs.repository.js";
 import { repoRootDir } from "./config/env.js";
 import { resumeContextService } from "./services/resume/resumeContext.js";
+import { RESUME_TYPES } from "./types/resume.js";
 import { startTopJobsScheduler } from "./services/topJobs/topJobsScheduler.js";
 import { capturesService } from "./services/captures/captures.service.js";
 
@@ -47,8 +48,15 @@ const preloadResumeContext = async (): Promise<void> => {
   const contexts = await resumeContextService.getAvailableContexts();
   logger.info("Resume context preloaded on startup", {
     loadedTypes: Object.keys(contexts),
+    resumes: Object.fromEntries(
+      Object.values(contexts).map((c) => [c.type, { file: path.basename(c.sourcePath), chars: c.rawText.length }]),
+    ),
     elapsedMs: Date.now() - started,
   });
+  const missing = RESUME_TYPES.filter((t) => !contexts[t]);
+  if (missing.length > 0) {
+    logger.warn("Resume files missing; scoring for these types falls back to BASE", { missing });
+  }
 };
 
 const start = async (): Promise<void> => {

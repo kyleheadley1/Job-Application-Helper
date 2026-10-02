@@ -43,7 +43,7 @@ const RAW_SCORE: ScoreBreakdown = {
 };
 
 const compositeFixture = () => {
-  const rules = evaluateRules(BASE_JOB, userProfile, { activeResumeType: "SWE" });
+  const rules = evaluateRules(BASE_JOB, userProfile, { activeResumeType: "BASE" });
   const clamped = applyScoringClampLayer({
     score: RAW_SCORE,
     extracted: BASE_JOB,
@@ -83,7 +83,7 @@ describe("scoreDisplayModel", () => {
 
   it("degree gate flag is a survivability penalty, not a hard gate", () => {
     const rules = {
-      ...evaluateRules(BASE_JOB, userProfile, { activeResumeType: "SWE" }),
+      ...evaluateRules(BASE_JOB, userProfile, { activeResumeType: "BASE" }),
       explicitDegreeRisk: true,
       matureStructuredEmployer: true,
     };
@@ -125,7 +125,7 @@ describe("scoreDisplayModel", () => {
       requirements: ["10+ years experience"],
       rawText: "Staff engineer with 10+ years. Must be senior/staff level.",
     };
-    const rules = evaluateRules(job, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(job, userProfile, { activeResumeType: "BASE" });
     expect(rules.seniorityOverreach).toBe(true);
     const composite = computeCompositeScore({
       rawScore: RAW_SCORE,

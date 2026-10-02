@@ -20,7 +20,7 @@ import type { ScoreBreakdown } from "../../types/scoring.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SWE_RESUME = fs.readFileSync(
-  path.resolve(__dirname, "../../../data/resumes/swe_resume.txt"),
+  path.resolve(__dirname, "../fixtures/resumes/swe_resume.txt"),
   "utf8",
 );
 
@@ -39,7 +39,7 @@ const rulesWithGap = (
   job: ExtractedJobData,
   gap: NonNullable<ReturnType<typeof detectSpecializationGap>>,
 ) => {
-  const rules = evaluateRules(job, userProfile, { activeResumeType: "SWE" });
+  const rules = evaluateRules(job, userProfile, { activeResumeType: "BASE" });
   return {
     ...rules,
     specializationGap: gap,
@@ -148,7 +148,7 @@ describe("contextual backend language in action line", () => {
     const gap = detectSpecializationGap(goJob, CAPABILITY_SCORE, SWE_RESUME);
     expect(gap).toBeUndefined();
 
-    const rules = evaluateRules(goJob, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(goJob, userProfile, { activeResumeType: "BASE" });
     const composite = computeCompositeScore({
       rawScore: CAPABILITY_SCORE,
       rules,

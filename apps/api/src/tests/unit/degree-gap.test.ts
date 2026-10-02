@@ -22,7 +22,7 @@ import type { RuleEvaluation, ScoreBreakdown } from "../../types/scoring.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SWE_RESUME = fs.readFileSync(
-  path.resolve(__dirname, "../../../data/resumes/swe_resume.txt"),
+  path.resolve(__dirname, "../fixtures/resumes/swe_resume.txt"),
   "utf8",
 );
 
@@ -104,13 +104,13 @@ const credentialAndDegreeLevers = (
 
 describe("degree dock tiers", () => {
   it("no degree mentioned → dock 0", () => {
-    const rules = evaluateRules(NO_DEGREE_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(NO_DEGREE_JOB, userProfile, { activeResumeType: "BASE" });
     expect(resolveDegreeGapTier(rules, userProfile)).toBe("none");
     expect(computeDegreeGapDock(rules, userProfile)).toBe(0);
   });
 
   it("neutral JD (no degree language) uses neutral credential lever label, not NONE", () => {
-    const rules = evaluateRules(NO_DEGREE_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(NO_DEGREE_JOB, userProfile, { activeResumeType: "BASE" });
     const composite = computeCompositeScore({
       rawScore: IBM_RAW,
       rules,
@@ -127,7 +127,7 @@ describe("degree dock tiers", () => {
   });
 
   it("equivalency clause → soft tier only", () => {
-    const rules = evaluateRules(OPTIMIZELY_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(OPTIMIZELY_JOB, userProfile, { activeResumeType: "BASE" });
     expect(rules.degreeHasEquivalencyClause).toBe(true);
     expect(rules.explicitDegreeRisk).toBe(false);
     expect(resolveDegreeGapTier(rules, userProfile)).toBe("soft");
@@ -136,7 +136,7 @@ describe("degree dock tiers", () => {
   });
 
   it("unconditional degree at structured employer → high tier", () => {
-    const rules = evaluateRules(IBM_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(IBM_JOB, userProfile, { activeResumeType: "BASE" });
     expect(rules.explicitDegreeRisk).toBe(true);
     expect(rules.degreeHasEquivalencyClause).toBeFalsy();
     expect(rules.matureStructuredEmployer).toBe(true);
@@ -147,7 +147,7 @@ describe("degree dock tiers", () => {
 
 describe("IBM degree gate consistency", () => {
   it("credential row and degree penalty share none_in_loop; high dock; final below prior ~73", () => {
-    const rules = evaluateRules(IBM_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(IBM_JOB, userProfile, { activeResumeType: "BASE" });
     const clamped = applyScoringClampLayer({ score: IBM_RAW, extracted: IBM_JOB, rules });
     const composite = computeCompositeScore({
       rawScore: clamped.score,
@@ -188,7 +188,7 @@ describe("IBM degree gate consistency", () => {
 
 describe("single degree dock in derivation", () => {
   it("gapDock includes degree dock once inside composite derivation", () => {
-    const rules = evaluateRules(IBM_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(IBM_JOB, userProfile, { activeResumeType: "BASE" });
     const dock = computeGapDock(rules, userProfile);
     expect(dock).toBe(DEGREE_DOCK_BY_TIER.high);
 
@@ -213,7 +213,7 @@ describe("single degree dock in derivation", () => {
 
 describe("credential rows never use resume framing for degree gaps", () => {
   it("no credential/degree row renders resume/framing for unconditional IBM gate", () => {
-    const rules = evaluateRules(IBM_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(IBM_JOB, userProfile, { activeResumeType: "BASE" });
     const penalties = buildSurvivabilityPenalties(rules, IBM_JOB);
     const degreeLike = penalties.filter((p) => p.message.match(/degree/i));
     for (const penalty of degreeLike) {

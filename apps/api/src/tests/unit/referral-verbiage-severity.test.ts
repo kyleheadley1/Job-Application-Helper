@@ -86,7 +86,7 @@ describe("referral verbiage — required stack/language mismatch escalation", ()
     const preferred = evaluateRules(
       scoreCalibrationAnchor("preferredOnlyGapVerbiage").fixture.extracted,
       userProfile,
-      { resumeContexts: calibrationSweResumeContexts(), activeResumeType: "SWE" },
+      { resumeContexts: calibrationSweResumeContexts(), activeResumeType: "BASE" },
     );
     expect(hasRequiredStackLanguageMismatch(preferred)).toBe(false);
   });

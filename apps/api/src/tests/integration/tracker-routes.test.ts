@@ -183,7 +183,7 @@ describe("tracker routes", () => {
     ]);
     expect(row.Company).toEqual(expect.any(String));
     expect(row["Latest Score"]).toEqual(expect.any(String));
-    expect(row.Resume).toMatch(/SWE|SIE|EARLY_CAREER/);
+    expect(row.Resume).toMatch(/^(BASE|AI|SWE|SIE|EARLY_CAREER)$/);
   });
 
   it("GET /api/jobs/export?format=csv returns CSV", async () => {

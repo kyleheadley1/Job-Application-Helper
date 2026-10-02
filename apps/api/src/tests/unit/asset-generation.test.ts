@@ -56,7 +56,7 @@ const makeJob = (overrides: Partial<JobRecord> & { recommendation?: Recommendati
   score: { ...scoreOk },
   recommendation: overrides.recommendation ?? "selective_yes",
   salaryAsk: {},
-  recommendedResume: overrides.recommendedResume ?? "SWE",
+  recommendedResume: overrides.recommendedResume ?? "BASE",
   resumeRationale: ["Heuristic"],
   topMatch: "Backend-leaning product engineering",
   mainRisk: "Recruiter screen realism",
@@ -120,19 +120,18 @@ describe("asset generation orchestrator", () => {
   });
 
   it("resume types shift deterministic talking-point emphasis", () => {
-    const swe = buildDeterministicGeneratedAssets(makeJob({ recommendedResume: "SWE" }), userProfile);
-    const sie = buildDeterministicGeneratedAssets(makeJob({ recommendedResume: "SIE" }), userProfile);
-    const early = buildDeterministicGeneratedAssets(makeJob({ recommendedResume: "EARLY_CAREER" }), userProfile);
-    const sweBlob = (swe.talkingPoints ?? []).join(" ").toLowerCase();
-    const sieBlob = (sie.talkingPoints ?? []).join(" ").toLowerCase();
-    const earlyBlob = (early.talkingPoints ?? []).join(" ").toLowerCase();
-    expect(sweBlob).toMatch(/api|full-stack|shipped/);
-    expect(sieBlob).toMatch(/integration|onboarding|implementation/);
-    expect(earlyBlob).toMatch(/early-career|training-backed|feedback/);
+    const base = buildDeterministicGeneratedAssets(makeJob({ recommendedResume: "BASE" }), userProfile);
+    const ai = buildDeterministicGeneratedAssets(makeJob({ recommendedResume: "AI" }), userProfile);
+    const legacy = buildDeterministicGeneratedAssets(makeJob({ recommendedResume: "SIE" }), userProfile);
+    const baseBlob = (base.talkingPoints ?? []).join(" ").toLowerCase();
+    const aiBlob = (ai.talkingPoints ?? []).join(" ").toLowerCase();
+    expect(baseBlob).toMatch(/api|full-stack|shipped/);
+    expect(aiBlob).toMatch(/rag|golden set|langgraph/);
+    expect(legacy.talkingPoints).toEqual(base.talkingPoints);
   });
 
-  it("EARLY_CAREER deterministic tone avoids senior posturing", () => {
-    const g = buildDeterministicGeneratedAssets(makeJob({ recommendedResume: "EARLY_CAREER" }), userProfile);
+  it("deterministic tone avoids senior posturing", () => {
+    const g = buildDeterministicGeneratedAssets(makeJob({ recommendedResume: "BASE" }), userProfile);
     const tp = (g.talkingPoints ?? []).join(" ").toLowerCase();
     expect(tp).not.toMatch(/\bstaff engineer\b|\b10\+ years\b/);
   });
@@ -193,7 +192,7 @@ describe("asset generation orchestrator", () => {
           requirements: ["Product collaboration", "Iterative delivery"],
           rawText: "Product role with internal tooling and full-stack shipping",
         },
-        recommendedResume: "SWE",
+        recommendedResume: "BASE",
       }),
       userProfile,
     );
@@ -288,17 +287,12 @@ describe("asset generation orchestrator", () => {
   });
 
   it("bullet candidates differ materially by resume type", () => {
-    const swe = buildDeterministicGeneratedAssets(makeJob({ recommendedResume: "SWE" }), userProfile);
-    const sie = buildDeterministicGeneratedAssets(makeJob({ recommendedResume: "SIE" }), userProfile);
-    const early = buildDeterministicGeneratedAssets(
-      makeJob({ recommendedResume: "EARLY_CAREER" }),
-      userProfile,
-    );
-    const sweBlob = (swe.tailoredBulletCandidates ?? []).join(" ").toLowerCase();
-    const sieBlob = (sie.tailoredBulletCandidates ?? []).join(" ").toLowerCase();
-    const earlyBlob = (early.tailoredBulletCandidates ?? []).join(" ").toLowerCase();
-    expect(sweBlob).toMatch(/api|product|internal tooling/);
-    expect(sieBlob).toMatch(/integration|implementation|stakeholder/);
-    expect(earlyBlob).toMatch(/fundamental|ramping|full-stack/);
+    const base = buildDeterministicGeneratedAssets(makeJob({ recommendedResume: "BASE" }), userProfile);
+    const ai = buildDeterministicGeneratedAssets(makeJob({ recommendedResume: "AI" }), userProfile);
+    const baseBlob = (base.tailoredBulletCandidates ?? []).join(" ").toLowerCase();
+    const aiBlob = (ai.tailoredBulletCandidates ?? []).join(" ").toLowerCase();
+    expect(baseBlob).toMatch(/api|product|internal tooling/);
+    expect(aiBlob).toMatch(/rag|evaluation|grounded/);
+    expect(aiBlob).not.toEqual(baseBlob);
   });
 });

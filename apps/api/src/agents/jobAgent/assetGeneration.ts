@@ -17,7 +17,8 @@ import {
   talkingPointsAssetSystemPrompt,
   whyCompanyAssetSystemPrompt,
 } from "./prompts.js";
-import { formatWhyCompanyForSIE, stripPastedJdHeaderFromCoverLetter } from "../../tools/triageStructuredNormalize.js";
+import { stripPastedJdHeaderFromCoverLetter } from "../../tools/triageStructuredNormalize.js";
+import { toActiveResumeType } from "../../types/resume.js";
 import { toLegacyRecommendation } from "../../lib/recommendationMapping.js";
 import {
   sanitizeGeneratedAssetList,
@@ -191,7 +192,8 @@ export const buildDeterministicGeneratedAssets = (
   profile: UserProfile,
   selectedResumeContext?: ResumeContext,
 ): GeneratedAssets => {
-  const { extracted, recommendedResume, rules, mainRisk } = job;
+  const { extracted, rules, mainRisk } = job;
+  const recommendedResume = toActiveResumeType(job.recommendedResume);
   const company = extracted.company;
   const title = extracted.title;
   const guidance = buildCoverLetterGuidance(job, profile);
@@ -236,25 +238,15 @@ export const buildDeterministicGeneratedAssets = (
   ].join(" ");
 
   const talkingPoints: string[] = [];
-  if (recommendedResume === "SIE") {
+  if (recommendedResume === "AI") {
     talkingPoints.push(
-      "I can walk through how I'd structure an integration or onboarding slice with clear milestones and delivery risk management.",
+      "I built and maintain a RAG codebase assistant, and I measure it: a 50-question golden set took citation validity from under 50% to 100%.",
     );
     talkingPoints.push(
-      "I translate ambiguous stakeholder requests into concrete technical plans and then execute against those plans.",
+      "I benchmarked a bounded LangGraph agent against fixed RAG and can explain the recall, cost, and latency tradeoffs.",
     );
     talkingPoints.push(
-      "For this role, my fit is strongest where implementation delivery and cross-functional communication overlap.",
-    );
-  } else if (recommendedResume === "EARLY_CAREER") {
-    talkingPoints.push(
-      "I'm early-career with a strong hands-on foundation, and I do best in roles with tight feedback loops and practical shipping.",
-    );
-    talkingPoints.push(
-      "I've shipped full-stack project work where clear scoping and readable implementation mattered as much as feature speed.",
-    );
-    talkingPoints.push(
-      "For this role, I'd bring strong fundamentals and a high learning velocity while staying transparent about ramp areas.",
+      "For this role, the fit is strongest where AI features need solid full-stack delivery and honest evaluation around them.",
     );
   } else {
     talkingPoints.push(
@@ -282,29 +274,22 @@ export const buildDeterministicGeneratedAssets = (
   const normalizedTalkingPoints = uniqueKeepOrder(talkingPoints).slice(0, isSkipRec(job.recommendation) ? 3 : 5);
 
   const bulletLeads =
-    recommendedResume === "SIE"
-      ? ["Delivered", "Implemented", "Translated", "Coordinated", "Drove"]
-      : recommendedResume === "EARLY_CAREER"
-        ? ["Built", "Shipped", "Implemented", "Contributed to", "Developed"]
-        : ["Built", "Shipped", "Implemented", "Designed", "Collaborated on"];
+    recommendedResume === "AI"
+      ? ["Built", "Implemented", "Benchmarked", "Designed", "Shipped"]
+      : ["Built", "Shipped", "Implemented", "Designed", "Collaborated on"];
   const baseBullets = (resumeEvidence.length ? resumeEvidence : guidance.selectedProjectSummaries).map((summary, idx) =>
     withLeadVerb(bulletLeads[idx % bulletLeads.length], summary),
   );
   const roleBullets =
-    recommendedResume === "SIE"
+    recommendedResume === "AI"
       ? [
-          "Owned integration-focused implementation slices and kept technical/stakeholder communication aligned through delivery.",
-          "Turned ambiguous implementation requirements into executable plans with clear dependencies and checkpoints.",
+          "Built RAG retrieval with embeddings, vector search, and reranking that returns source-grounded, cited answers.",
+          "Built an LLM evaluation harness that measures correctness, citation validity, latency, and cost against fixed baselines.",
         ]
-      : recommendedResume === "EARLY_CAREER"
-        ? [
-            "Built practical full-stack features with clear implementation tradeoffs and iterative feedback loops.",
-            "Applied strong engineering fundamentals while ramping quickly in new domains and toolchains.",
-          ]
-        : [
-            "Built API-first product features and internal tooling with a backend-leaning full-stack approach.",
-            "Collaborated with stakeholders to scope and ship pragmatic increments tied to product needs.",
-          ];
+      : [
+          "Built API-first product features and internal tooling with a backend-leaning full-stack approach.",
+          "Collaborated with stakeholders to scope and ship pragmatic increments tied to product needs.",
+        ];
   const tailoredBulletCandidates = uniqueKeepOrder([...baseBullets, ...roleBullets]).slice(0, isSkipRec(job.recommendation) ? 3 : 5);
 
   const emphasize: string[] = [
@@ -448,9 +433,6 @@ export const generateJobAssets = async (params: GenerateJobAssetsParams): Promis
   }
 
   let whyCompany = pick(why.success, why.data.whyCompany, fb.whyCompany);
-  if (typeof whyCompany === "string" && whyCompany.trim() && job.recommendedResume === "SIE") {
-    whyCompany = formatWhyCompanyForSIE(whyCompany);
-  }
 
   const sanitizeCtx = {
     extracted: job.extracted,

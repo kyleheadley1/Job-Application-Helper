@@ -326,7 +326,7 @@ export const scoreJob = async (params: {
   scoringCategoriesReused?: boolean;
 }> => {
   const resumeText =
-    params.resumeText ?? params.resumeContexts?.SWE?.rawText;
+    params.resumeText ?? params.resumeContexts?.BASE?.rawText;
 
   if (params.preservedScoring) {
     const rawScore = {

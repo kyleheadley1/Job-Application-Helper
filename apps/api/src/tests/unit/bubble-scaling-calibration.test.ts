@@ -13,8 +13,8 @@ import {
 
 describe("Bubble Software Engineer 2, Scaling", () => {
   const fixture = loadCalibrationFixture("bubbleSoftwareEngineer2Scaling");
-  const claimable = claimableStackFromContexts(calibrationSweResumeContexts(), "SWE");
-  const resumeText = calibrationSweResumeContexts().SWE!.rawText;
+  const claimable = claimableStackFromContexts(calibrationSweResumeContexts(), "BASE");
+  const resumeText = calibrationSweResumeContexts().BASE!.rawText;
 
   it("treats Rust/Terraform/Redis from JD stack as core stack gaps", () => {
     const mismatch = analyzeStackMismatch(fixture.extracted, claimable);

@@ -10,15 +10,10 @@ import { responsesClient } from "../../services/llm/responsesClient.js";
 import { buildResumeSelectionPrompt, resumeSelectionSystemPrompt } from "./prompts.js";
 import { normalizeText } from "../../lib/text.js";
 import { logger } from "../../lib/logger.js";
-import {
-  countStrongSieRoleDescriptorHits,
-  fdeSweAlternateSieNote,
-  hasBuilderFirstSoftwareContext,
-  isFdeBuilderSoftwarePrimaryShape,
-} from "../../lib/fdeBuilderRole.js";
+import { RESUME_TYPES } from "../../types/resume.js";
 
 const ResumeSelectionSchema = z.object({
-  recommendedResume: z.enum(["SWE", "SIE", "EARLY_CAREER"]),
+  recommendedResume: z.enum(RESUME_TYPES),
   confidence: z.number().min(0).max(1),
   rationale: z.array(z.string()).default([]),
 });
@@ -31,171 +26,58 @@ export const deterministicResumeSelection = (
   job: ExtractedJobData,
   resumeContexts?: ResumeContextSet,
 ): ResumeSelection & { ambiguous: boolean } => {
-  const text = normalizeText(
+  const title = normalizeText(job.title ?? "");
+  const body = normalizeText(
     [
-      job.title,
       job.rawText ?? "",
       (job.requirements ?? []).join(" "),
       (job.responsibilities ?? []).join(" "),
+      (job.stack ?? []).join(" "),
+      (job.requiredSkills ?? []).join(" "),
+      (job.preferredSkills ?? []).join(" "),
     ].join(" "),
   );
-  /** Do not treat title-only "Forward Deployed" or generic "implementation" as SIE; see countStrongSieRoleDescriptorHits. */
-  const negatedNewGrad = /\b(no|not)\s+new\s+grad\b/i.test(text);
-  const explicitEarlyPipeline =
-    !negatedNewGrad &&
-    /\b(new\s+grad(?:uate)?|recent\s+graduate|0\s*[-–]\s*1\s+years?|entry\s+pipeline|campus\s+(?:hire|recruiting)|rotational\s+program|rotation\s+program|early\s+career\s+program|university\s+graduate|engineering\s+residency|intern(?:ship)?\s+program|apprentice(?:ship)?\s+program|software\s+engineer\s+i\b|swe\s+i\b)\b/i.test(
-      text,
-    );
-  const earlySignals = [
-    "new grad",
-    "new graduate",
-    "recent graduate",
-    "rotational program",
-    "rotation program",
-    "early career program",
-    "campus hire",
-    "software engineer i",
-    "swe i",
-    "intern",
-    "apprentice",
-    "0-1 years",
-    "0–1 years",
-  ];
-  const sweSignals = [
-    "software engineer",
-    "full-stack",
-    "backend",
-    "api",
-    "product engineer",
-    "builder",
-    "ai engineer",
-    "machine learning engineer",
-    "applied ai",
-    "internal tooling",
-    "internal tools",
-    "growth systems",
-    "automation",
-    "growth engineer",
-  ];
-  const juniorBuilderSignals = [
-    "junior",
-    "entry-level",
-    "entry level",
-    "early-career",
-    "early career",
-    "associate software",
-    "associate engineer",
-    "product engineer",
-    "full-stack",
-    "internal tools",
-  ];
 
-  const strongSieHits = countStrongSieRoleDescriptorHits(text);
-  const fdeBuilderPrimary = isFdeBuilderSoftwarePrimaryShape(job);
-  const juniorTitleOnly = /\bjunior\b/i.test(text) && !explicitEarlyPipeline;
-  const productionWorkSignals =
-    /\b(production|shipped|ship(ped|ping)?|ownership|on[-\s]?call|end[-\s]?to[-\s]?end)\b/i.test(text);
-  const earlyHits = explicitEarlyPipeline
-    ? earlySignals.filter((needle) => text.includes(needle)).length + 2
-    : earlySignals.filter((needle) => text.includes(needle)).length;
-  const sweHits = sweSignals.filter((needle) => text.includes(needle)).length;
-  const juniorBuilderHits = juniorBuilderSignals.filter((needle) => text.includes(needle)).length;
+  const titleIsAi = AI_TITLE_RE.test(title);
+  const aiHits = AI_CORE_SIGNALS.filter((re) => re.test(body)).length;
 
-  const metaScoreByType: Record<ResumeType, number> = { SWE: 0, SIE: 0, EARLY_CAREER: 0 };
-  if (resumeContexts) {
-    const stackAndNeeds = normalizeText(
-      [
-        ...(job.stack ?? []),
-        ...(job.requiredSkills ?? []),
-        ...(job.preferredSkills ?? []),
-        ...(job.responsibilities ?? []),
-        ...(job.requirements ?? []),
-      ].join(" "),
-    );
-    const words = new Set(stackAndNeeds.split(/\s+/).filter(Boolean));
-    const types: ResumeType[] = ["SWE", "SIE", "EARLY_CAREER"];
-    for (const type of types) {
-      const ctx = resumeContexts[type];
-      if (!ctx?.metadata?.keywords) continue;
-      const keywordOverlap = ctx.metadata.keywords.filter((k) => words.has(k)).length;
-      const themeOverlap = ctx.metadata.strongestThemes.filter((t) => stackAndNeeds.includes(normalizeText(t))).length;
-      metaScoreByType[type] = keywordOverlap + themeOverlap * 2;
-    }
+  let aiScore = aiHits + (titleIsAi ? 4 : 0);
+  if (resumeContexts?.AI?.metadata && resumeContexts.BASE?.metadata) {
+    const words = new Set(body.split(/\s+/).filter(Boolean));
+    const overlap = (type: ResumeType) =>
+      resumeContexts[type]!.metadata.keywords.filter((k) => words.has(k)).length;
+    aiScore += Math.sign(overlap("AI") - overlap("BASE"));
   }
 
-  const combinedByType: Record<ResumeType, number> = {
-    SWE: metaScoreByType.SWE * 2 + sweHits,
-    SIE: metaScoreByType.SIE * 2 + strongSieHits,
-    EARLY_CAREER: metaScoreByType.EARLY_CAREER * 2 + earlyHits,
-  };
-
-  // SWE-first for general product / AI engineering; only boost EARLY_CAREER when explicit pipeline language matches.
-  if (
-    /\b(ai engineer|machine learning engineer|software engineer|full[- ]stack|backend engineer)\b/i.test(text) &&
-    !explicitEarlyPipeline
-  ) {
-    combinedByType.SWE += 3;
-  }
-  if (
-    /\b(rotational program|rotation program|campus hire|campus recruiting|early career program)\b/i.test(text) &&
-    explicitEarlyPipeline
-  ) {
-    combinedByType.EARLY_CAREER += 5;
-  }
-  if (juniorBuilderHits > 0 && strongSieHits < 2 && explicitEarlyPipeline) {
-    combinedByType.SWE += 2;
-    combinedByType.EARLY_CAREER += 2;
-    combinedByType.SIE -= 2;
-  } else if (juniorBuilderHits > 0 && strongSieHits < 2 && !explicitEarlyPipeline) {
-    combinedByType.SWE += 4;
-    combinedByType.EARLY_CAREER = Math.min(combinedByType.EARLY_CAREER, 0);
-  }
-
-  if (juniorTitleOnly && productionWorkSignals) {
-    combinedByType.SWE += 10;
-    combinedByType.EARLY_CAREER = 0;
-    combinedByType.SIE = Math.min(combinedByType.SIE, 0);
-  }
-
-  if (fdeBuilderPrimary) {
-    combinedByType.SWE += 5;
-    combinedByType.SIE -= 4;
-    if (hasBuilderFirstSoftwareContext(text)) {
-      combinedByType.SWE += 2;
-    }
-  }
-
-  if (strongSieHits >= 2 && /customer[-\s]?facing|onboarding|implementation|integration/.test(text)) {
-    combinedByType.SIE += 2;
-  }
-  const ordered = (Object.entries(combinedByType) as Array<[ResumeType, number]>).sort((a, b) => b[1] - a[1]);
-
-  if (juniorTitleOnly && productionWorkSignals) {
-    const profile = resumeProfiles.find((r) => r.type === "SWE");
-    return {
-      recommendedResume: "SWE",
-      confidence: 0.88,
-      rationale: profile?.exampleRationale ?? ["Junior title with production scope — use SWE variant, not early-career framing."],
-      ambiguous: false,
-    };
-  }
-
-  const ambiguous = Math.abs((ordered[0]?.[1] ?? 0) - (ordered[1]?.[1] ?? 0)) <= 1;
-  const recommendedResume: ResumeType = ordered[0]?.[0] ?? "SWE";
-
+  const recommendedResume: ResumeType = aiScore >= AI_THRESHOLD ? "AI" : "BASE";
+  const ambiguous = aiScore === AI_THRESHOLD - 1 || aiScore === AI_THRESHOLD;
   const profile = resumeProfiles.find((r) => r.type === recommendedResume);
-  const baseRationale = profile?.exampleRationale ?? ["Resume selected from stable role-shape heuristics."];
-  const rationale =
-    recommendedResume === "SWE" && fdeBuilderPrimary
-      ? [...baseRationale, fdeSweAlternateSieNote]
-      : baseRationale;
   return {
     recommendedResume,
     confidence: ambiguous ? 0.62 : 0.84,
-    rationale,
+    rationale: profile?.exampleRationale ?? ["Resume selected from stable role-shape heuristics."],
     ambiguous,
   };
 };
+
+const AI_TITLE_RE =
+  /\b(ai|a\.i\.|ml|llm|genai|gen ai|generative ai|machine learning|applied ai|ai\/ml|agentic|agents?)\b/i;
+
+/** Distinct signals that AI work is core to the role, not a nice-to-have mention. */
+const AI_CORE_SIGNALS: RegExp[] = [
+  /\bllms?\b|\blarge language models?\b/i,
+  /\brag\b|\bretrieval[-\s]augmented\b/i,
+  /\bembeddings?\b|\bvector (search|database|db|store)s?\b/i,
+  /\bagentic\b|\bai agents?\b|\btool[-\s]using agents?\b|\blanggraph\b|\blangchain\b/i,
+  /\b(llm|model|ai) evals?\b|\bevaluations? (harness|framework)s?\b|\bevals\b/i,
+  /\bprompt engineering\b|\bprompting\b/i,
+  /\bopenai\b|\banthropic\b|\bclaude\b|\bgpt-?\d/i,
+  /\bgenerative ai\b|\bgenai\b/i,
+  /\bmachine learning\b|\bml (systems|pipelines|models)\b/i,
+];
+
+/** title (+4) plus ~1 core signal, or 3+ core signals without an AI title. */
+const AI_THRESHOLD = 3;
 
 export const selectResume = async (params: {
   extracted: ExtractedJobData;

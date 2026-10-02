@@ -111,7 +111,7 @@ const scoredJob = (overrides: Partial<JobRecord> = {}): JobRecord =>
     },
     recommendation: "apply_cold",
     salaryAsk: {},
-    recommendedResume: "SWE",
+    recommendedResume: "BASE",
     resumeRationale: [],
     topMatch: "TypeScript product work",
     mainRisk: "Pool may be crowded",
@@ -194,7 +194,7 @@ describe("/api/job-captures", () => {
       company: "Acme",
       title: "Software Engineer",
       scoreTotal: 76,
-      recommendedResume: "SWE",
+      recommendedResume: "BASE",
     });
     expect(triageJobMock).toHaveBeenCalledWith(
       expect.objectContaining({ rawText: JD_TEXT.trim() }),

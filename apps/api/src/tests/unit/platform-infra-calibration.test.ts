@@ -20,7 +20,7 @@ import type { ExtractedJobData } from "../../types/job.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SWE_RESUME = fs.readFileSync(
-  path.resolve(__dirname, "../../../data/resumes/swe_resume.txt"),
+  path.resolve(__dirname, "../fixtures/resumes/swe_resume.txt"),
   "utf8",
 );
 
@@ -38,7 +38,7 @@ describe("platform/infra role — StubHub Core Compute", () => {
     expect(coverage.tier).not.toBe("strong");
     expect(coverage.note).toMatch(/platform\/infra/i);
 
-    const rules = evaluateRules(job, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(job, userProfile, { activeResumeType: "BASE" });
     const clamped = applyScoringClampLayer({
       score: { ...fixture.storedCategoryScores, total: 0 },
       extracted: job,

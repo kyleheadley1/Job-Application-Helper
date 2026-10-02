@@ -120,7 +120,7 @@ describe("sanitizeStoredJobRecord", () => {
       score: sanitizeScoreBreakdown({ ...baseScore(), capability: 70, total: 70 }),
       recommendation: "apply_cold",
       salaryAsk: {},
-      recommendedResume: "SWE",
+      recommendedResume: "BASE",
       resumeRationale: [],
       topMatch: "match",
       mainRisk: "risk",

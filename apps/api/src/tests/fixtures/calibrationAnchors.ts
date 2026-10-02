@@ -95,12 +95,12 @@ export type ScoredCalibrationAnchor = RecomputedStoredJobScore & {
 };
 
 const SWE_RESUME = fs.readFileSync(
-  path.resolve(__dirname, "../../../data/resumes/swe_resume.txt"),
+  path.resolve(__dirname, "./resumes/swe_resume.txt"),
   "utf8",
 );
 
 export const calibrationSweResumeContexts = (): ResumeContextSet => ({
-  SWE: { rawText: SWE_RESUME, type: "SWE" },
+  BASE: { rawText: SWE_RESUME, type: "BASE" },
 });
 
 export const loadCalibrationFixture = (
@@ -133,7 +133,7 @@ export const fixtureToJobRecord = (fixture: CalibrationAnchorFixture): JobRecord
   score: { ...fixture.storedCategoryScores, total: 0 } satisfies ScoreBreakdown,
   recommendation: "referral_gated",
   salaryAsk: {},
-  recommendedResume: "SWE",
+  recommendedResume: "BASE",
   resumeRationale: [],
   topMatch: "",
   mainRisk: "",

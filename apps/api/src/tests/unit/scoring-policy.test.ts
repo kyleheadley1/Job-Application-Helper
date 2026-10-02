@@ -84,7 +84,7 @@ describe("scoring policy behavior", () => {
       },
       recommendation: "apply_cold",
       salaryAsk: {},
-      recommendedResume: "SWE",
+      recommendedResume: "BASE",
       resumeRationale: [],
       topMatch: "",
       mainRisk: "",

@@ -27,7 +27,7 @@ function companyKey(job: TopJobRecord): string {
 }
 
 function resumeLabel(job: TopJobRecord): string {
-  return job.recommendedResume ?? "EARLY_CAREER";
+  return job.recommendedResume ?? "BASE";
 }
 
 export function TopJobsPage() {

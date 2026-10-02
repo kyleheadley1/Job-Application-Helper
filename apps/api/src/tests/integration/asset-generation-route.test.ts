@@ -68,7 +68,7 @@ describe("asset generation routes", () => {
     expect(gen.body.generated.tailoredBulletCandidates?.length).toBeGreaterThanOrEqual(3);
     expect(gen.body.generated.emphasize?.length).toBeGreaterThanOrEqual(1);
     expect(gen.body.generated.avoidClaiming?.length).toBeGreaterThanOrEqual(1);
-    expect(gen.body.recommendedResume).toBe("SWE");
+    expect(gen.body.recommendedResume).toBe("BASE");
 
     const sweBlob = [
       gen.body.generated.coverLetter,
@@ -98,7 +98,7 @@ describe("asset generation routes", () => {
     const job = triage.body;
     const res = await request(app).post("/api/jobs/generate-assets").send({ job, persist: false });
     expect(res.status).toBe(200);
-    expect(res.body.recommendedResume).toBe("SIE");
+    expect(res.body.recommendedResume).toMatch(/^(BASE|AI)$/);
     const blob = [
       res.body.generated.coverLetter,
       ...(res.body.generated.talkingPoints ?? []),

@@ -18,7 +18,7 @@ import type { UserProfile } from "../../types/userProfile.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SWE_RESUME = fs.readFileSync(
-  path.resolve(__dirname, "../../../data/resumes/swe_resume.txt"),
+  path.resolve(__dirname, "../fixtures/resumes/swe_resume.txt"),
   "utf8",
 );
 
@@ -149,7 +149,7 @@ describe("clearance timing classification", () => {
 
 describe("Tria Federal — citizen + sponsorable clearance", () => {
   it("passes citizenship, soft clearance flag, no hard gates, apply band", () => {
-    const rules = evaluateRules(TRIA_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(TRIA_JOB, userProfile, { activeResumeType: "BASE" });
     expect(rules.citizenshipMismatch).toBe(false);
     expect(rules.clearanceMismatch).toBe(false);
     expect(rules.clearanceEligibilityFlag).toBeDefined();
@@ -183,7 +183,7 @@ describe("citizenship hard gate", () => {
     expect(result.citizenshipMismatch).toBe(true);
     expect(result.clearanceEligibilityFlag).toBeUndefined();
 
-    const rules = evaluateRules(TRIA_JOB, nonCitizen, { activeResumeType: "SWE" });
+    const rules = evaluateRules(TRIA_JOB, nonCitizen, { activeResumeType: "BASE" });
     const gates = evaluateHardGates(rules, TRIA_JOB);
     expect(gates.fired).toBe(true);
     expect(gates.reasons.some((r) => /citizenship/i.test(r))).toBe(true);
@@ -197,7 +197,7 @@ describe("citizenship hard gate", () => {
 
 describe("active clearance hard gate", () => {
   it("hard gates when active clearance required and candidate lacks one", () => {
-    const rules = evaluateRules(ACTIVE_CLEARANCE_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(ACTIVE_CLEARANCE_JOB, userProfile, { activeResumeType: "BASE" });
     expect(rules.clearanceMismatch).toBe(true);
     expect(rules.clearanceEligibilityFlag).toBeUndefined();
 
@@ -209,7 +209,7 @@ describe("active clearance hard gate", () => {
 
 describe("bare clearance required — hire-now branch", () => {
   it("Noctua: verify flag, survivability dock, no hard gate", () => {
-    const rules = evaluateRules(NOCTUA_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(NOCTUA_JOB, userProfile, { activeResumeType: "BASE" });
     expect(rules.clearanceMismatch).toBe(false);
     expect(rules.clearanceRequiresExistingPenalty).toBe(true);
     expect(rules.clearanceEligibilityFlag?.reason).toMatch(/existing clearance/i);
@@ -244,7 +244,7 @@ describe("bare clearance required — hire-now branch", () => {
 
 describe("clearance soft flag score isolation", () => {
   it("does not change capability, survivability, dock, final, or band", () => {
-    const rules = evaluateRules(TRIA_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(TRIA_JOB, userProfile, { activeResumeType: "BASE" });
     const withFlag = buildScoreDisplay({
       score: compositeFor(TRIA_JOB, rules).score,
       rules,

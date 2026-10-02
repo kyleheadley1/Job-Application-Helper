@@ -85,7 +85,7 @@ const splitResumeSections = (raw: string): { skillsSection: string; experienceSe
 /** Derive claimable skills from resume text; experience bullets outweigh skills-list-only mentions. */
 export const deriveClaimableStackFromText = (
   resumeRawText: string,
-  resumeType: ResumeType = "SWE",
+  resumeType: ResumeType = "BASE",
 ): ClaimableStack => {
   const { skillsSection, experienceSection } = splitResumeSections(resumeRawText);
   const skills: ClaimableSkill[] = [];
@@ -105,9 +105,9 @@ export const deriveClaimableStackFromText = (
 
 export const claimableStackFromContexts = (
   resumeContexts: ResumeContextSet | undefined,
-  activeResumeType: ResumeType = "SWE",
+  activeResumeType: ResumeType = "BASE",
 ): ClaimableStack => {
-  const ctx = resumeContexts?.[activeResumeType] ?? resumeContexts?.SWE;
+  const ctx = resumeContexts?.[activeResumeType] ?? resumeContexts?.BASE;
   if (ctx?.rawText?.trim()) {
     return deriveClaimableStackFromText(ctx.rawText, activeResumeType);
   }

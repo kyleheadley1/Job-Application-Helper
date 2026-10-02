@@ -20,7 +20,7 @@ import { loadCalibrationFixture } from "../fixtures/calibrationAnchors.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SWE_RESUME = fs.readFileSync(
-  path.resolve(__dirname, "../../../data/resumes/swe_resume.txt"),
+  path.resolve(__dirname, "../fixtures/resumes/swe_resume.txt"),
   "utf8",
 );
 
@@ -61,7 +61,7 @@ describe("Precisely equivalent-work-experience clause", () => {
   });
 
   it("suppresses -14 degree gate and lifts credentialSignal into the 70s", () => {
-    const rules = evaluateRules(JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(JOB, userProfile, { activeResumeType: "BASE" });
     expect(rules.degreeHasEquivalencyClause).toBe(true);
     expect(rules.degreeEquivalencySatisfied).toBe(true);
     expect(rules.explicitDegreeRisk).toBe(false);
@@ -119,7 +119,7 @@ describe("Precisely equivalent-work-experience clause", () => {
         ibm.degreeRequirement?.raw ?? "",
       ),
     ).toBe(false);
-    const rules = evaluateRules(ibm, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(ibm, userProfile, { activeResumeType: "BASE" });
     expect(rules.degreeHasEquivalencyClause).toBeFalsy();
     expect(rules.explicitDegreeRisk).toBe(true);
   });

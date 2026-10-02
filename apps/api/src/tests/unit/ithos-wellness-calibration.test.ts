@@ -17,7 +17,7 @@ import type { ExtractedJobData } from "../../types/job.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SWE_RESUME = fs.readFileSync(
-  path.resolve(__dirname, "../../../data/resumes/swe_resume.txt"),
+  path.resolve(__dirname, "../fixtures/resumes/swe_resume.txt"),
   "utf8",
 );
 
@@ -29,7 +29,7 @@ describe("Ithos Wellness degree-positive calibration", () => {
     expect(jdIsDegreePositive(ITHOS_JOB)).toBe(true);
     expect(profileHasPortfolio(userProfile, SWE_RESUME)).toBe(true);
 
-    const rules = evaluateRules(ITHOS_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(ITHOS_JOB, userProfile, { activeResumeType: "BASE" });
     expect(rules.jdDegreePositive).toBe(true);
     expect(rules.earlyCareerFriendlyRole).toBe(true);
 
@@ -74,7 +74,7 @@ describe("degree-positive regression guards", () => {
   it("IBM hard degree gate is not treated as degree-positive", () => {
     const ibm = loadCalibrationFixture("ibmDegreeGate").extracted;
     expect(jdIsDegreePositive(ibm)).toBe(false);
-    const rules = evaluateRules(ibm, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(ibm, userProfile, { activeResumeType: "BASE" });
     expect(rules.explicitDegreeRisk).toBe(true);
     expect(rules.jdDegreePositive).toBeFalsy();
   });
@@ -97,7 +97,7 @@ describe("degree-positive regression guards", () => {
       rawText:
         "Technical Implementation Analyst. Practical experience matters more than a specific degree. Early-career builders welcome if you can show the work. Requirements docs and QA test plans.",
     };
-    const rules = evaluateRules(pathpoint, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(pathpoint, userProfile, { activeResumeType: "BASE" });
     expect(rules.jdDegreePositive).toBe(true);
 
     const raw = {

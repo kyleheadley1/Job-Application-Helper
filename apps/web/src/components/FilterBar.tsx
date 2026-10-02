@@ -63,9 +63,11 @@ export const FilterBar = ({
       Resume
       <select value={resume} onChange={(e) => onResumeChange(e.target.value)}>
         <option value="">All</option>
-        <option value="SWE">SWE</option>
-        <option value="SIE">SIE</option>
-        <option value="EARLY_CAREER">EARLY_CAREER</option>
+        <option value="BASE">BASE</option>
+        <option value="AI">AI</option>
+        <option value="SWE">SWE (legacy)</option>
+        <option value="SIE">SIE (legacy)</option>
+        <option value="EARLY_CAREER">EARLY_CAREER (legacy)</option>
       </select>
     </label>
     <label>

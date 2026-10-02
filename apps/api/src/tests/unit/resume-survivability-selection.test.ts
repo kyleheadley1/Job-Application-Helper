@@ -17,19 +17,25 @@ import { recomputeStoredJobScore } from "../../lib/recomputeStoredJobScore.js";
 import type { ResumeContext } from "../../types/resumeContext.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const RESUME_DIR = path.resolve(__dirname, "../../../data/resumes");
+const FIXTURE_RESUME_DIR = path.resolve(__dirname, "../fixtures/resumes");
 
-const earlyCareerContext = (): ResumeContext => ({
-  type: "EARLY_CAREER",
-  sourcePath: "early_career_resume.txt",
+/** Synthetic AI resume whose only metric is an estimate, so it scores differently from the BASE fixture. */
+const AI_FIXTURE_TEXT = `Jane Doe
+Full-stack engineer building RAG and LLM evaluation tooling.
+- Built a golden-set evaluation harness that cut manual review time by ~30% (est.).
+- Built LangGraph tool-using agents with retries, timeouts, and tracing.`;
+
+const aiContext = (): ResumeContext => ({
+  type: "AI",
+  sourcePath: "ai_fixture.txt",
   sourceKind: "txt",
   loadedAt: new Date().toISOString(),
-  rawText: fs.readFileSync(path.join(RESUME_DIR, "early_career_resume.txt"), "utf8"),
+  rawText: AI_FIXTURE_TEXT,
   metadata: {
     strongestThemes: [],
     projectEvidence: [],
     keywords: [],
-    bestFitRoleShapes: ["early_career"],
+    bestFitRoleShapes: ["applied_ai"],
     avoidUseCases: [],
     claimSupport: [],
   },
@@ -40,9 +46,9 @@ describe("resume survivability selection consistency", () => {
     expect(scoreImpactMetricQuality("~30% (est.)")).toBe(0.52);
     expect(scoreImpactMetricQuality("by ~30% (est.).")).toBe(0.52);
     expect(scoreImpactMetricQuality("used by 10+ internal users")).toBe(0.32);
-    expect(scoreImpactMetricQuality(earlyCareerContext().rawText)).toBe(0.52);
+    expect(scoreImpactMetricQuality(aiContext().rawText)).toBe(0.52);
     expect(
-      scoreImpactMetricQuality(fs.readFileSync(path.join(RESUME_DIR, "swe_resume.txt"), "utf8")),
+      scoreImpactMetricQuality(fs.readFileSync(path.join(FIXTURE_RESUME_DIR, "swe_resume.txt"), "utf8")),
     ).toBe(0.32);
   });
 
@@ -50,17 +56,17 @@ describe("resume survivability selection consistency", () => {
     const fixture = loadCalibrationFixture("resumeSurvivabilitySelectionConsistency");
     const resumeContexts = {
       ...calibrationSweResumeContexts(),
-      EARLY_CAREER: earlyCareerContext(),
+      AI: aiContext(),
     };
 
-    const earlyText = resumeContexts.EARLY_CAREER!.rawText;
-    const sweText = resumeContexts.SWE!.rawText;
-    expect(scoreImpactMetricQuality(earlyText)).toBe(0.52);
+    const aiText = resumeContexts.AI!.rawText;
+    const sweText = resumeContexts.BASE!.rawText;
+    expect(scoreImpactMetricQuality(aiText)).toBe(0.52);
     expect(scoreImpactMetricQuality(sweText)).toBe(0.32);
 
-    for (const resumeType of ["EARLY_CAREER", "SWE"] as const) {
+    for (const resumeType of ["AI", "BASE"] as const) {
       const resumeText = resumeContexts[resumeType]!.rawText;
-      const expectedImpact = resumeType === "EARLY_CAREER" ? 0.52 : 0.32;
+      const expectedImpact = resumeType === "AI" ? 0.52 : 0.32;
 
       const rules = evaluateRules(fixture.extracted, userProfile, {
         resumeContexts,
@@ -90,6 +96,6 @@ describe("resume survivability selection consistency", () => {
 
     // Preview runs before scoring in orchestrator; it must not crash and must return a concrete type.
     const preview = deterministicResumeSelection(fixture.extracted, resumeContexts);
-    expect(["SWE", "EARLY_CAREER", "SIE"]).toContain(preview.recommendedResume);
+    expect(["BASE", "AI"]).toContain(preview.recommendedResume);
   });
 });

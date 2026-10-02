@@ -47,7 +47,7 @@ const makeRecord = (): JobRecord => {
     },
     recommendation: "selective_yes",
     salaryAsk: { number: 150000 },
-    recommendedResume: "SWE",
+    recommendedResume: "BASE",
     resumeRationale: ["API-heavy product role"],
     topMatch: "TypeScript backend overlap",
     mainRisk: "None major",

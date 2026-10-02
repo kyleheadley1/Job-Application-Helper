@@ -44,7 +44,7 @@ const baseRules = (): RuleEvaluation => ({
 describe("preferred-strength Key Risk sanitization (NYT Reflections)", () => {
   const fixture = loadCalibrationFixture("nytReflectionsSupportedFeatureOwnership");
   const extracted = fixture.extracted;
-  const resumeRawText = calibrationSweResumeContexts().SWE!.rawText;
+  const resumeRawText = calibrationSweResumeContexts().BASE!.rawText;
 
   it("tags Kubernetes and CI/CD as Preferred-only from the JD", () => {
     expect(resolveJdTechStrength(extracted, "kubernetes")).toBe("PREFERRED");

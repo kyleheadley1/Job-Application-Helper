@@ -20,7 +20,7 @@ import type { HardRuleFlag, RuleEvaluation, ScoreBreakdown, SurvivabilityPenalty
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SWE_RESUME = fs.readFileSync(
-  path.resolve(__dirname, "../../../data/resumes/swe_resume.txt"),
+  path.resolve(__dirname, "../fixtures/resumes/swe_resume.txt"),
   "utf8",
 );
 
@@ -219,7 +219,7 @@ describe("jd language presence — output boundary (Change 2)", () => {
     const labels = extractJdLanguageLabels(job);
     expect(labels.has("Go")).toBe(false);
 
-    const rules = evaluateRules(job, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(job, userProfile, { activeResumeType: "BASE" });
     expect(rules.coreLanguageGap ?? []).not.toContain("Go");
     expect(rules.stackMismatch).toBe(false);
     expect(coreLanguageMismatchMessage(["Go"])).toMatch(/Go/);
@@ -273,7 +273,7 @@ describe("jd language presence — output boundary (Change 2)", () => {
 describe("jd language presence — clamp mint + pipeline (Change 1)", () => {
   it("3 — buildHardRuleFlags does not mint Go coreLanguageMismatch for Go-free Optimizely JD", () => {
     const rules = phantomGoStackRules(
-      evaluateRules(GO_FREE_JD, userProfile, { activeResumeType: "SWE" }),
+      evaluateRules(GO_FREE_JD, userProfile, { activeResumeType: "BASE" }),
     );
 
     const flags = buildHardRuleFlags(GO_FREE_JD, rules);
@@ -287,7 +287,7 @@ describe("jd language presence — clamp mint + pipeline (Change 1)", () => {
   });
 
   it("4 — Optimizely scoring pipeline: no Go on output surfaces; not referral_gated", () => {
-    const rules = evaluateRules(GO_FREE_JD, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(GO_FREE_JD, userProfile, { activeResumeType: "BASE" });
     const { recommendation, rules: outRules, survivabilityPenalties, keyRisks } =
       runOptimizelyScoringPipeline(rules);
 
@@ -297,7 +297,7 @@ describe("jd language presence — clamp mint + pipeline (Change 1)", () => {
 
   it("4b — phantom Go upstream leak is stripped before user-facing output", () => {
     const rules = phantomGoStackRules(
-      evaluateRules(GO_FREE_JD, userProfile, { activeResumeType: "SWE" }),
+      evaluateRules(GO_FREE_JD, userProfile, { activeResumeType: "BASE" }),
     );
     const { recommendation, rules: outRules, survivabilityPenalties, keyRisks } =
       runOptimizelyScoringPipeline(rules);

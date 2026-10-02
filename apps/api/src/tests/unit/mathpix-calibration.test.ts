@@ -13,7 +13,7 @@ import type { ScoreBreakdown } from "../../types/scoring.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SWE_RESUME = fs.readFileSync(
-  path.resolve(__dirname, "../../../data/resumes/swe_resume.txt"),
+  path.resolve(__dirname, "../fixtures/resumes/swe_resume.txt"),
   "utf8",
 );
 
@@ -59,7 +59,7 @@ const MATHPIX_CAPABILITY_SCORE: ScoreBreakdown = {
 
 describe("Mathpix calibration anchor", () => {
   it("76 + (~−4) − 5 = ~67; no pool term; headline If quick; referral is subtext", () => {
-    const rules = evaluateRules(MATHPIX_JOB, userProfile, { activeResumeType: "SWE" });
+    const rules = evaluateRules(MATHPIX_JOB, userProfile, { activeResumeType: "BASE" });
     const specializationGap = detectSpecializationGap(
       MATHPIX_JOB,
       MATHPIX_CAPABILITY_SCORE,

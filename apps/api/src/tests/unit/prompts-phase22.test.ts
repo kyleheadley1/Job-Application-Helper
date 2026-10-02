@@ -87,19 +87,17 @@ describe("Phase 2.2 prompts", () => {
   });
 
   it("cover letter user prompt includes evidence diversity block", () => {
-    const job = minimalJob({ recommendedResume: "SWE" });
+    const job = minimalJob({ recommendedResume: "BASE" });
     const p = buildCoverLetterAssetUserPrompt({ job, userProfile });
     expect(p).toContain(ASSET_EVIDENCE_DIVERSITY.slice(0, 40));
   });
 
-  it("whyCompany user prompt adds SIE scanability instructions only for SIE", () => {
-    const sie = buildWhyCompanyAssetUserPrompt({ job: minimalJob({ recommendedResume: "SIE" }), userProfile });
-    expect(sie).toContain("SIE / implementation-forward");
-    const swe = buildWhyCompanyAssetUserPrompt({
-      job: minimalJob({ recommendedResume: "SWE" }),
-      userProfile,
-    });
-    expect(swe).not.toContain("SIE / implementation-forward");
+  it("whyCompany user prompt uses the AI angle only for AI, and legacy types fall back to BASE", () => {
+    const ai = buildWhyCompanyAssetUserPrompt({ job: minimalJob({ recommendedResume: "AI" }), userProfile });
+    expect(ai).toContain("Resume angle: AI");
+    const legacy = buildWhyCompanyAssetUserPrompt({ job: minimalJob({ recommendedResume: "SIE" }), userProfile });
+    expect(legacy).toContain("Resume angle: BASE");
+    expect(legacy).not.toContain("implementation-forward");
   });
 
   it("cover letter prompt for recommendation no adds candid stretch tone", () => {
@@ -114,7 +112,7 @@ describe("Phase 2.2 prompts", () => {
     const sie = buildCoverLetterGuidance(minimalJob({ recommendedResume: "SIE" }), userProfile);
     const swe = buildCoverLetterGuidance(
       minimalJob({
-        recommendedResume: "SWE",
+        recommendedResume: "BASE",
         extracted: {
           company: "ProductCo",
           title: "Full-Stack Engineer",
@@ -134,7 +132,7 @@ describe("Phase 2.2 prompts", () => {
 
   it("cover letter prompt includes explicit textbox length contract", () => {
     const p = buildCoverLetterAssetUserPrompt({
-      job: minimalJob({ recommendedResume: "SWE" }),
+      job: minimalJob({ recommendedResume: "BASE" }),
       userProfile,
     });
     expect(p).toContain("Cover-letter guidance:");

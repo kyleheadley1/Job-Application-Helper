@@ -16,7 +16,7 @@ import {
 describe("BisectHosting Web Developer calibration", () => {
   const fixture = loadCalibrationFixture("bisectHostingWebDeveloper");
   const extracted = fixture.extracted;
-  const claimable = claimableStackFromContexts(calibrationSweResumeContexts(), "SWE");
+  const claimable = claimableStackFromContexts(calibrationSweResumeContexts(), "BASE");
 
   it("detects PHP/Laravel as standalone required gap — not folded into React/Vue/Nuxt disjunctive line", () => {
     const stack = analyzeStackMismatch(extracted, claimable);

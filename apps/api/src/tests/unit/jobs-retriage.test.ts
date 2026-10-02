@@ -74,7 +74,7 @@ const triageResult = (overrides: Partial<JobRecord> = {}): JobRecord => ({
   score: score85,
   recommendation: "yes",
   salaryAsk: {},
-  recommendedResume: "SWE",
+  recommendedResume: "BASE",
   resumeRationale: [],
   topMatch: "Fresh match",
   mainRisk: "Fresh risk",
