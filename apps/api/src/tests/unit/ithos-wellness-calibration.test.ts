@@ -63,7 +63,6 @@ describe("Ithos Wellness degree-positive calibration", () => {
     expect(credentialRow?.bindingness).toBe("favorable");
     expect(display?.degreePositiveNote).toMatch(/Degree-positive JD/i);
     expect(display?.contractCaveat).toBe(buildContractCaveat(ITHOS_JOB));
-    expect(display?.referralUrgency).toBe("optional");
     expect(display?.actionLine).toMatch(/Portfolio-first screen/i);
     expect(display?.final).toBeGreaterThanOrEqual(82);
     expect(display?.final).toBeLessThanOrEqual(84);

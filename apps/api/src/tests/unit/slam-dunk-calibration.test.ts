@@ -66,7 +66,7 @@ const IF_QUICK_SCORE: ScoreBreakdown = {
 };
 
 describe("slam-dunk calibration anchor", () => {
-  it("high capability + clean survivability → Strong yes", () => {
+  it("high capability + clean survivability → Strong apply", () => {
     const composite = computeCompositeScore({
       rawScore: SLAM_DUNK_SCORE,
       rules: cleanRules(),
@@ -86,13 +86,13 @@ describe("slam-dunk calibration anchor", () => {
       recommendation: composite.recommendation,
     });
 
-    expect(display?.bandHeadline).toBe("Strong yes");
+    expect(display?.bandHeadline).toBe("Strong apply");
     expect(display?.worthTailoring).toBe(true);
   });
 });
 
 describe("if-quick apply-edge fixture", () => {
-  it("apply band but capability < 70 → If quick, not Yes", () => {
+  it("apply band but capability < 70 → Apply without tailoring", () => {
     const composite = computeCompositeScore({
       rawScore: IF_QUICK_SCORE,
       rules: cleanRules(),
@@ -102,7 +102,7 @@ describe("if-quick apply-edge fixture", () => {
     });
 
     expect(composite.score.capability).toBeLessThan(70);
-    expect(composite.score.total).toBeGreaterThanOrEqual(58);
+    expect(composite.score.total).toBeGreaterThanOrEqual(65);
     expect(composite.scoreBand).toBe("apply");
     expect(computeWorthTailoring(composite.score.total, composite.scoreBand)).toBe(false);
 
@@ -113,28 +113,33 @@ describe("if-quick apply-edge fixture", () => {
       recommendation: composite.recommendation,
     });
 
-    expect(display?.bandHeadline).toBe("If quick");
+    expect(display?.bandHeadline).toBe("Apply");
     expect(display?.worthTailoring).toBe(false);
   });
 });
 
 describe("band thresholds", () => {
-  it("pins cutoffs: 84→apply, 85→strong_apply, 57→skip, 58→apply", () => {
-    expect(resolveScoreBand(84)).toBe("apply");
-    expect(resolveScoreBand(85)).toBe("strong_apply");
-    expect(resolveScoreBand(57)).toBe("skip");
-    expect(resolveScoreBand(58)).toBe("apply");
-    expect(resolveBandHeadline("apply", 72)).toBe("Yes");
-    expect(resolveBandHeadline("apply", 65)).toBe("If quick");
+  it("pins cutoffs: 80→strong_apply, 65→apply, 50→stretch, 49→weak", () => {
+    expect(resolveScoreBand(79)).toBe("apply");
+    expect(resolveScoreBand(80)).toBe("strong_apply");
+    expect(resolveScoreBand(64)).toBe("stretch");
+    expect(resolveScoreBand(65)).toBe("apply");
+    expect(resolveScoreBand(50)).toBe("stretch");
+    expect(resolveScoreBand(49)).toBe("weak");
+    expect(resolveScoreBand(90, true)).toBe("weak");
+    expect(resolveBandHeadline("strong_apply")).toBe("Strong apply");
+    expect(resolveBandHeadline("apply")).toBe("Apply");
+    expect(resolveBandHeadline("stretch")).toBe("Apply but weak (stretch)");
+    expect(resolveBandHeadline("weak")).toBe("Weak");
   });
 });
 
 describe("tailor decoupling", () => {
-  it("final 72 / apply band → worthTailoring true; final 55 / skip → false", () => {
+  it("final 72 / apply band → worthTailoring true; final 55 / stretch → false", () => {
     expect(computeWorthTailoring(72, "apply")).toBe(true);
-    expect(computeWorthTailoring(55, "apply")).toBe(false);
-    expect(computeWorthTailoring(72, "skip")).toBe(false);
+    expect(computeWorthTailoring(55, "stretch")).toBe(false);
+    expect(computeWorthTailoring(72, "weak")).toBe(false);
     expect(resolveScoreBand(72)).toBe("apply");
-    expect(resolveBandHeadline("apply", 72)).toBe("Yes");
+    expect(resolveBandHeadline("apply", 72)).toBe("Apply");
   });
 });

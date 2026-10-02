@@ -45,7 +45,7 @@ const makeRecord = (): JobRecord => {
       careerValue: 8,
       total: 76,
     },
-    recommendation: "selective_yes",
+    recommendation: "stretch",
     salaryAsk: { number: 150000 },
     recommendedResume: "BASE",
     resumeRationale: ["API-heavy product role"],
@@ -64,7 +64,7 @@ const makeRecord = (): JobRecord => {
     status: "to_review",
     createdAt: now,
     updatedAt: now,
-    scoreHistory: [{ scoredAt: now, score: { stackFit: 20, levelFit: 10, domainFit: 8, resumeStoryClarity: 12, functionalOverlap: 8, recruiterFriendliness: 10, careerValue: 8, total: 76 }, recommendation: "selective_yes" }],
+    scoreHistory: [{ scoredAt: now, score: { stackFit: 20, levelFit: 10, domainFit: 8, resumeStoryClarity: 12, functionalOverlap: 8, recruiterFriendliness: 10, careerValue: 8, total: 76 }, recommendation: "stretch" }],
     statusHistory: [],
   };
 };

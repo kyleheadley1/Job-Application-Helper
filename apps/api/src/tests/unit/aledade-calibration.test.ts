@@ -41,7 +41,7 @@ const mockResumeContexts = (): ResumeContextSet => ({
   },
 });
 
-/** Ground truth: strong stack match but BS hard-required — referral_gated, not skip. */
+/** Ground truth: strong stack match but BS hard-required — degree dock lands it in the stretch tier, not weak. */
 const ALEDADE_JOB: ExtractedJobData = {
   company: "Aledade",
   title: "Software Engineer I",
@@ -101,7 +101,7 @@ describe("disjunctive language requirements", () => {
 });
 
 describe("Aledade calibration anchor", () => {
-  it("no false core-language gate; stack match; referral_gated with pathway display-only", () => {
+  it("no false core-language gate; stack match; stretch tier with pathway display-only", () => {
     const rules = evaluateRules(ALEDADE_JOB, userProfile, {
       resumeContexts: mockResumeContexts(),
     });
@@ -144,8 +144,7 @@ describe("Aledade calibration anchor", () => {
       resumeText: SWE_RESUME,
     });
 
-    expect(composite.recommendation).toBe("referral_gated");
-    expect(composite.recommendation).not.toBe("skip");
+    expect(composite.recommendation).toBe("stretch");
     expect(composite.score.capability).toBeGreaterThanOrEqual(75);
     expect(composite.score.capability).toBeLessThanOrEqual(82);
 
@@ -158,14 +157,11 @@ describe("Aledade calibration anchor", () => {
       rules: clamped.rules,
       extracted: ALEDADE_JOB,
       recommendation: composite.recommendation,
-      referralPathwayAvailable: pathway.referralPathwayAvailable,
-      referralPathwayNotes: pathway.referralPathwayNotes,
     });
 
-    expect(display?.dominantLever?.lever).not.toBe("referral");
-    expect(display?.actionLine).toMatch(/tailored|Strong shot|Worth applying/i);
-    expect(display?.referralAdvice).toMatch(/Etana Kopin/i);
-    expect(display?.referralUrgency).toMatch(/strongly_advised|advised/);
+    expect(display?.bandHeadline).toBe("Apply but weak (stretch)");
+    expect(display?.actionLine).toMatch(/^Apply but weak \(stretch\) — /);
+    expect(display?.actionLine).not.toMatch(/referral/i);
 
     const credentialRow = display?.survivabilityRows.find((r) => r.key === "credentialSignal");
     expect(credentialRow?.lever).toBe("none_in_loop");
@@ -204,14 +200,11 @@ describe("Aledade calibration anchor", () => {
         rules: clamped.rules,
         extracted: ALEDADE_JOB,
         recommendation: composite.recommendation,
-        referralPathwayAvailable: pathway.referralPathwayAvailable,
-        referralPathwayNotes: pathway.referralPathwayNotes,
       });
     });
 
     for (const jittered of jitteredLines) {
-      expect(jittered?.actionLine).toMatch(/tailored|Strong shot|Worth applying/i);
-      expect(jittered?.referralAdvice).toMatch(/Etana Kopin/i);
+      expect(jittered?.actionLine).toBe(display?.actionLine);
       expect(jittered?.actionLine).not.toMatch(/impact metric quality/i);
     }
   });

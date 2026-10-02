@@ -2,13 +2,15 @@ import { randomUUID } from 'crypto';
 import { userProfile } from '../../config/userProfile.js';
 import {
   getTrackerColor,
+  TRACKER_ACTION_BY_RECOMMENDATION,
+  TRACKER_HARD_GATE_ACTION,
+  TRACKER_PRIORITY_BY_RECOMMENDATION,
 } from '../../config/scoringPolicy.js';
 import { evaluateShortlist } from '../../lib/shortlist.js';
 import type { JobRecord } from '../../types/job.js';
 import { buildTrackerSpreadsheetFromJob } from '../../tracker/canonicalSpreadsheet.js';
 import { detectReferralPathway } from '../../lib/referralPathway.js';
 import { buildScoreDisplay } from '../../lib/scoreDisplayModel.js';
-import { guardCompositeRecommendation } from '../../lib/recommendationGuard.js';
 import { RECOMMENDATION_LABELS } from '../../config/capabilitySurvivabilityPolicy.js';
 import { evaluateRules } from './rules.js';
 import { scoreJob } from './scoring.js';
@@ -174,23 +176,7 @@ export const triageJob = async (input: {
     resumeText: finalResumeText,
   });
 
-  const scoreDisplay = buildScoreDisplay({
-    score: scoredScore,
-    rules: scoredRulesFinal,
-    extracted,
-    profile: userProfile,
-    recommendation: scoredRecommendation,
-    referralPathwayAvailable: referralPathway.referralPathwayAvailable,
-    referralPathwayNotes: referralPathway.referralPathwayNotes,
-  });
-
-  const finalRecommendation = guardCompositeRecommendation({
-    recommendation: scoredRecommendation,
-    capability: scoredScore.capability ?? 0,
-    survivability: scoredScore.survivability ?? 0,
-    rules: scoredRulesFinal,
-    survivabilityPenalties: scoreDisplay?.survivabilityPenalties ?? [],
-  });
+  const finalRecommendation = scoredRecommendation;
 
   const scoreDisplayFinal = buildScoreDisplay({
     score: scoredScore,
@@ -198,8 +184,6 @@ export const triageJob = async (input: {
     extracted,
     profile: userProfile,
     recommendation: finalRecommendation,
-    referralPathwayAvailable: referralPathway.referralPathwayAvailable,
-    referralPathwayNotes: referralPathway.referralPathwayNotes,
   });
 
   const scoreWithDisplay = scoreDisplayFinal
@@ -264,22 +248,10 @@ export const triageJob = async (input: {
       missingCriticalFields: listMissingCriticalFields(extracted),
     },
     tracker: {
-      priority:
-        finalRecommendation === 'apply_cold'
-          ? 'high'
-          : finalRecommendation === 'referral_gated' || finalRecommendation === 'stretch_signal'
-            ? 'medium'
-            : 'low',
-      recommendedAction:
-        finalRecommendation === 'apply_cold'
-          ? 'Apply with urgency'
-          : finalRecommendation === 'referral_gated'
-            ? 'Pursue via referral or heavily tailored apply'
-            : finalRecommendation === 'stretch_signal'
-              ? 'Apply selectively — signal-dependent'
-              : finalRecommendation === 'skip'
-                ? 'Skip unless special reason'
-                : 'Do not apply — hard gate',
+      priority: TRACKER_PRIORITY_BY_RECOMMENDATION[finalRecommendation],
+      recommendedAction: scoreDisplayFinal?.hardGates.length
+        ? TRACKER_HARD_GATE_ACTION
+        : TRACKER_ACTION_BY_RECOMMENDATION[finalRecommendation],
       statusOutcome: finalRecommendation,
       color: getTrackerColor('to_review', scoreWithDisplay.total),
     },

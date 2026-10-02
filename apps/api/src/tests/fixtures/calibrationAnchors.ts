@@ -131,7 +131,7 @@ export const fixtureToJobRecord = (fixture: CalibrationAnchorFixture): JobRecord
     notes: [],
   },
   score: { ...fixture.storedCategoryScores, total: 0 } satisfies ScoreBreakdown,
-  recommendation: "referral_gated",
+  recommendation: "apply",
   salaryAsk: {},
   recommendedResume: "BASE",
   resumeRationale: [],

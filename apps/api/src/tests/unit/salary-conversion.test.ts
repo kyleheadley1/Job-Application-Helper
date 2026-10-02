@@ -104,7 +104,7 @@ describe("computeSalaryAsk hourly JD", () => {
         rawText: "Compensation: $45/hr - $55/hr. Remote.",
       },
       score: scoreParts({ stackFit: 14, levelFit: 16, total: 72 }),
-      recommendation: "selective_yes",
+      recommendation: "stretch",
       rules: baseRules(),
     });
 

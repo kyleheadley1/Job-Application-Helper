@@ -16,13 +16,13 @@ const scoreTotal = (total: number): ScoreBreakdown =>
 
 describe("canConfirmApplied", () => {
   it("allows confirm for non-no recommendations", () => {
-    expect(canConfirmApplied({ recommendation: "yes", score: scoreTotal(10) })).toBe(true);
-    expect(canConfirmApplied({ recommendation: "selective_yes", score: scoreTotal(10) })).toBe(true);
+    expect(canConfirmApplied({ recommendation: "apply", score: scoreTotal(10) })).toBe(true);
+    expect(canConfirmApplied({ recommendation: "stretch", score: scoreTotal(10) })).toBe(true);
   });
 
   it("allows confirm for recommendation no at low and high scores", () => {
-    expect(canConfirmApplied({ recommendation: "no", score: scoreTotal(51) })).toBe(true);
-    expect(canConfirmApplied({ recommendation: "no", score: scoreTotal(50) })).toBe(true);
-    expect(canConfirmApplied({ recommendation: "no", score: scoreTotal(32) })).toBe(true);
+    expect(canConfirmApplied({ recommendation: "weak", score: scoreTotal(51) })).toBe(true);
+    expect(canConfirmApplied({ recommendation: "weak", score: scoreTotal(50) })).toBe(true);
+    expect(canConfirmApplied({ recommendation: "weak", score: scoreTotal(32) })).toBe(true);
   });
 });

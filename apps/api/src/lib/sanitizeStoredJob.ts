@@ -1,6 +1,13 @@
+import { RECOMMENDATION_LABELS } from "../config/capabilitySurvivabilityPolicy.js";
 import type { JobRecord } from "../types/job.js";
-import type { RuleEvaluation, ScoreBreakdown, ScoreDisplay } from "../types/scoring.js";
+import {
+  RECOMMENDATIONS,
+  type RuleEvaluation,
+  type ScoreBreakdown,
+  type ScoreDisplay,
+} from "../types/scoring.js";
 import type { CertificationBoostMeta } from "./certificationBoost.js";
+import { recommendationForScore } from "./compositeScoring.js";
 import { clampScoreToCategoryMaxes, sumScoreBreakdown } from "./scoringCaps.js";
 
 const SPECIALIZATION_GAP_KINDS = new Set([
@@ -38,11 +45,19 @@ const sanitizeSurvivabilityBreakdown = (score: ScoreBreakdown): ScoreBreakdown =
   };
 };
 
-/** Drop cached scoreDisplay rows missing fields added after they were persisted. */
+/** Drop cached scoreDisplay rows persisted before the score-tier recommendation model. */
 const sanitizeScoreDisplay = (display: ScoreDisplay | undefined): ScoreDisplay | undefined => {
   if (!display) return undefined;
-  if (!display.referralAdvice || !display.referralUrgency) return undefined;
+  if (!(RECOMMENDATIONS as readonly string[]).includes(display.scoreBand)) return undefined;
   return display;
+};
+
+const LABELS = new Set<string>(Object.values(RECOMMENDATION_LABELS));
+
+const sanitizeRecommendationLabel = (score: ScoreBreakdown): ScoreBreakdown => {
+  if (score.recommendationLabel && LABELS.has(score.recommendationLabel)) return score;
+  if (!Number.isFinite(score.total)) return score;
+  return { ...score, recommendationLabel: RECOMMENDATION_LABELS[recommendationForScore(score.total)] };
 };
 
 /** Keep legacy totals compatible with ScoreBreakdownSchema superRefine after category clamp. */
@@ -59,6 +74,7 @@ export const sanitizeScoreBreakdown = (score: ScoreBreakdown): ScoreBreakdown =>
   let next = clampScoreToCategoryMaxes(score);
   next = sanitizeSurvivabilityBreakdown(next);
   next = reconcileLegacyTotal(next);
+  next = sanitizeRecommendationLabel(next);
   return {
     ...next,
     scoreDisplay: sanitizeScoreDisplay(next.scoreDisplay),

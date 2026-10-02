@@ -56,7 +56,7 @@ const minimalJob = (overrides: Partial<JobRecord>): JobRecord =>
       careerValue: 7,
       total: 61,
     },
-    recommendation: "selective_yes",
+    recommendation: "stretch",
     salaryAsk: {},
     recommendedResume: "SIE",
     resumeRationale: [],
@@ -102,7 +102,7 @@ describe("Phase 2.2 prompts", () => {
 
   it("cover letter prompt for recommendation no adds candid stretch tone", () => {
     const p = buildCoverLetterAssetUserPrompt({
-      job: minimalJob({ recommendation: "no" }),
+      job: minimalJob({ recommendation: "weak" }),
       userProfile,
     });
     expect(p).toContain("Tone band: no");

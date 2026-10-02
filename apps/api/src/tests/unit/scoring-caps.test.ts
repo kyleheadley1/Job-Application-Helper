@@ -7,7 +7,7 @@ import {
   resolveRecommendation,
   sumScoreBreakdown,
 } from "../../lib/scoringCaps.js";
-import { computeCompositeScore, resolveCompositeRecommendation } from "../../lib/compositeScoreModel.js";
+import { computeCompositeScore } from "../../lib/compositeScoreModel.js";
 import { userProfile } from "../../config/userProfile.js";
 import type { ExtractedJobData } from "../../types/job.js";
 import type { RuleEvaluation, ScoreBreakdown } from "../../types/scoring.js";
@@ -76,7 +76,8 @@ describe("scoring caps and composite model", () => {
       extracted: makeJob(),
       profile: userProfile,
     });
-    expect(composite.recommendation).toBe("no");
+    expect(composite.recommendation).toBe("weak");
+    expect(composite.hardGateFired).toBe(true);
     expect(composite.score.total).toBe(25);
   });
 
@@ -120,16 +121,15 @@ describe("scoring caps and composite model", () => {
   });
 
   it("maps recommendations from composite final score heuristics", () => {
-    expect(mapRecommendationFromScore(75)).toBe("apply_cold");
-    expect(mapRecommendationFromScore(55)).toBe("referral_gated");
-    expect(mapRecommendationFromScore(40)).toBe("stretch_signal");
-    expect(mapRecommendationFromScore(25)).toBe("skip");
+    expect(mapRecommendationFromScore(80)).toBe("strong_apply");
+    expect(mapRecommendationFromScore(65)).toBe("apply");
+    expect(mapRecommendationFromScore(50)).toBe("stretch");
+    expect(mapRecommendationFromScore(25)).toBe("weak");
   });
 
-  it("2x2 matrix resolves referral_gated for strong capability + low survivability", () => {
-    expect(resolveCompositeRecommendation(78, 0.4)).toBe("referral_gated");
-    expect(resolveCompositeRecommendation(78, 0.6)).toBe("apply_cold");
-    expect(resolveRecommendation(32, cleanRules(), 8, 78, 0.4)).toBe("referral_gated");
+  it("recommendation ignores capability/survivability split — score tier only", () => {
+    expect(resolveRecommendation(32, cleanRules())).toBe("weak");
+    expect(resolveRecommendation(78, cleanRules())).toBe("apply");
   });
 
   it("hasHardGateNote detects gate flags", () => {

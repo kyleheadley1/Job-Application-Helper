@@ -5,7 +5,7 @@ import {
   LEGACY_CAPABILITY_SOURCE_MAXES,
   resolveSubFactorBindingness,
   resolveSubFactorPenaltyName,
-  SCORE_BAND_LABELS,
+  RECOMMENDATION_LABELS,
   SURVIVABILITY_SUB_FACTOR_META,
   SURVIVABILITY_TUNING,
   SURVIVABILITY_WEIGHTS,
@@ -78,7 +78,7 @@ import {
   selectDominantLever,
 } from "./strategicLever.js";
 import { composeSpecializationGapActionLine } from "./gapActionLine.js";
-import { deriveReferralAdvice, hasRequiredStackLanguageMismatch } from "./referralAdvice.js";
+import { hasRequiredStackLanguageMismatch } from "./requiredStackMismatch.js";
 import { certificationCredentialLeverLabel } from "./certificationBoost.js";
 import { computePoolFriendliness } from "./poolFriendliness.js";
 import {
@@ -530,7 +530,7 @@ export const buildHardGatesList = (
   recommendation: Recommendation,
   hardGateReasons?: string[],
 ): string[] => {
-  if (recommendation === "no" && hardGateReasons?.length) {
+  if (recommendation === "weak" && hardGateReasons?.length) {
     return hardGateReasons;
   }
   const gate = evaluateHardGates(rules, extracted);
@@ -558,66 +558,49 @@ export const deriveActionLine = (params: {
   const { scoreBand, worthTailoring, rules } = params;
   const gap = rules.specializationGap;
   const gapWorthy = specializationGapHeadlineWorthy(gap);
+  const label = RECOMMENDATION_LABELS[scoreBand];
 
-  if (
-    rules.jdDegreePositive &&
-    scoreBand !== "no" &&
-    scoreBand !== "skip"
-  ) {
-    return "Portfolio-first screen — cold apply has real odds; lead with shipped work (portfolio projects, GitHub). Referral helpful, not gating.";
+  if (params.hardGates?.length) {
+    const reason = params.hardGates[0]!;
+    const lead = /^[A-Z][a-z]/.test(reason) ? reason.charAt(0).toLowerCase() : reason.charAt(0);
+    return `${label} — hard gate: ${lead}${reason.slice(1)}`;
   }
 
-  if (scoreBand === "no") {
-    const reason = params.hardGates?.[0] ?? "hard gate fired";
-    return `Do not apply — ${reason.charAt(0).toLowerCase()}${reason.slice(1)}`;
+  if (rules.jdDegreePositive && scoreBand !== "weak") {
+    return `${label} — portfolio-first screen; lead with shipped work (portfolio projects, GitHub).`;
   }
 
-  if (scoreBand === "strong_apply") {
+  if (scoreBand === "strong_apply" || scoreBand === "apply") {
     if (gapWorthy && gap) {
-      return composeSpecializationGapActionLine("Clearly in the ballpark", gap, worthTailoring);
+      return composeSpecializationGapActionLine(label, gap, worthTailoring);
     }
     if (worthTailoring) {
-      return "Clearly in the ballpark — worth a tailored resume + cover letter.";
+      return `${label} — worth a tailored resume + cover letter.`;
     }
-    return "Clearly in the ballpark — slam-dunk fit.";
+    return `${label} — light touch or as-is.`;
   }
 
-  if (scoreBand === "apply") {
-    if (gapWorthy && gap) {
-      const prefix = worthTailoring ? "Strong shot" : "Worth applying";
-      return composeSpecializationGapActionLine(prefix, gap, worthTailoring);
-    }
-    if (worthTailoring) {
-      return "Worth applying — a tailored resume + cover letter.";
-    }
-    return SCORE_BAND_LABELS.apply;
+  if (gapWorthy && gap) {
+    return composeSpecializationGapActionLine(label, gap, false);
   }
-
-  if (scoreBand === "skip") {
-    if (gapWorthy && gap) {
-      return composeSpecializationGapActionLine("Stretch", gap, false);
-    }
-    // Same required-language signal as Key Risks + referralAdvice — do not fall
-    // through to selectDominantLever (e.g. employer recognizability) when the
-    // hard gate is already a core-language / stack mismatch.
-    if (hasRequiredStackLanguageMismatch(rules)) {
-      const langs = (rules.coreLanguageGap ?? []).filter(Boolean);
-      const reason = langs.length
-        ? `required core-language gap (${langs.join(", ")})`
-        : "required core-language / stack gap";
-      return `Not worth the effort — ${reason}.`;
-    }
-    if (rules.capabilityGap) {
-      return `Not worth the effort — ${rules.capabilityGap.reason}.`;
-    }
-    const dominant =
-      params.dominantLever ??
-      selectDominantLever(params.survivabilityRows, params.rules);
-    const reason = dominant?.penaltyName ?? structuralReason(params.survivabilityRows);
-    return `Not worth the effort — ${reason}.`;
+  // Same required-language signal as Key Risks — do not fall through to
+  // selectDominantLever (e.g. employer recognizability) when the binding
+  // problem is already a core-language / stack mismatch.
+  if (hasRequiredStackLanguageMismatch(rules)) {
+    const langs = (rules.coreLanguageGap ?? []).filter(Boolean);
+    const reason = langs.length
+      ? `required core-language gap (${langs.join(", ")})`
+      : "required core-language / stack gap";
+    return `${label} — ${reason}.`;
   }
-
-  return "";
+  if (rules.capabilityGap) {
+    return `${label} — ${rules.capabilityGap.reason}.`;
+  }
+  const dominant =
+    params.dominantLever ??
+    selectDominantLever(params.survivabilityRows, params.rules);
+  const reason = dominant?.penaltyName ?? structuralReason(params.survivabilityRows);
+  return `${label} — ${reason}.`;
 };
 
 export const buildScoreDisplay = (params: {
@@ -626,8 +609,6 @@ export const buildScoreDisplay = (params: {
   extracted: ExtractedJobData;
   profile?: UserProfile;
   recommendation: Recommendation;
-  referralPathwayAvailable?: boolean;
-  referralPathwayNotes?: string;
   hardGateReasons?: string[];
   trackerPostedAt?: string;
   jobCreatedAt?: string;
@@ -722,14 +703,6 @@ export const buildScoreDisplay = (params: {
     dominantLever,
   });
 
-  const referral = deriveReferralAdvice({
-    survivabilityBreakdown: breakdown,
-    referralPathwayAvailable: params.referralPathwayAvailable,
-    referralPathwayNotes: params.referralPathwayNotes,
-    jdDegreePositive: params.rules.jdDegreePositive,
-    requiredStackLanguageMismatch: hasRequiredStackLanguageMismatch(params.rules),
-  });
-
   const degreePositiveNote = params.rules.jdDegreePositive
     ? "Degree-positive JD: employer welcomes non-degree / 'show the work' — credential drag neutralized."
     : undefined;
@@ -772,8 +745,6 @@ export const buildScoreDisplay = (params: {
     survivabilityPenalties,
     dominantLever,
     actionLine,
-    referralAdvice: referral.advice,
-    referralUrgency: referral.urgency,
     degreePositiveNote,
     contractCaveat,
     genAiRestrictionWarning,

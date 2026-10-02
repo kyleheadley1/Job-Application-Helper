@@ -42,12 +42,16 @@ export const COMPOSITE_SCORING = {
   /** Floor/ceiling on survivability adjustment applied to final. */
   SURV_ADJ_MIN: -18,
   SURV_ADJ_MAX: 8,
-  /** Final ≥ this → strong_apply band (slam-dunk confidence). */
-  STRONG_APPLY: 85,
-  /** Final ≥ this → apply band; below → skip. */
-  APPLY_LOW: 58,
-  /** Final ≥ this → worth tailoring (Yes vs If quick within apply band). */
+  /** Final ≥ this → Strong apply. */
+  STRONG_APPLY: 80,
+  /** Final ≥ this → Apply. */
+  APPLY_LOW: 65,
+  /** Final ≥ this → Apply but weak (stretch); below → Weak. */
+  STRETCH_LOW: 50,
+  /** Final ≥ this → worth a tailored resume + cover letter. */
   TAILOR_CAPABILITY: 70,
+  /** Final dock when only the title/label reads senior and the JD asks nothing beyond the profile. */
+  SENIORITY_STRETCH_DOCK: 8,
   /** Mild final dock for contract roles (stability / career-value). */
   CONTRACT_FINAL_DOCK: 1,
 } as const;
@@ -136,7 +140,7 @@ export const POOL_FRIENDLINESS = {
   MAX: 0.9,
   /** pool ≥ this → favorable lever label */
   FAVORABLE_MIN: 0.62,
-  /** pool < this → crowded pool / referral lever */
+  /** pool < this → crowded pool */
   CROWDED_MAX: 0.45,
   NICHE_EMPLOYER_MAX: 0.45,
   BRAND_EMPLOYER_MIN: 0.7,
@@ -160,16 +164,9 @@ export const POOL_FRIENDLINESS = {
   LEVER_LABELS: {
     favorable: "favorable listing shape — works in your favor",
     neutral: "neutral pool",
-    crowded: "crowded pool — referral is the counter",
+    crowded: "crowded pool — structural, can't fix",
   },
 } as const;
-
-export const SCORE_BAND_LABELS: Record<"strong_apply" | "apply" | "skip" | "no", string> = {
-  strong_apply: "Clearly in the ballpark — slam-dunk fit",
-  apply: "Worth applying — light touch or as-is",
-  skip: "Not worth the effort",
-  no: "Hard gate — do not apply",
-};
 
 export const SURVIVABILITY_WEIGHTS = {
   employerRecognizability: 0.22,
@@ -281,8 +278,7 @@ export const SURVIVABILITY_SUB_FACTOR_META: Record<
   },
 };
 
-import type { Recommendation } from "../types/scoring.js";
-import type { RuleEvaluation } from "../types/scoring.js";
+import type { BandHeadline, Recommendation, RuleEvaluation } from "../types/scoring.js";
 
 /** Credential-dense pools treat employer recognizability as binding. */
 export const isCredentialDensePool = (rules: RuleEvaluation): boolean =>
@@ -313,12 +309,9 @@ export const resolveSubFactorPenaltyName = (
   return SURVIVABILITY_SUB_FACTOR_META[key].label.toLowerCase();
 };
 
-export const RECOMMENDATION_LABELS: Record<Recommendation, string> = {
-  apply_cold: "Strong fit, good screen odds",
-  referral_gated: "Strong fit, low cold-apply odds — get a referral / tailor resume / nail the essay",
-  stretch_signal: "Stretch on skills; signal may carry you",
-  skip: "Weak fit and weak odds",
-  no: "Hard gate — do not apply",
-  yes: "Strong fit, good screen odds",
-  selective_yes: "Strong fit, low cold-apply odds — get a referral / tailor resume / nail the essay",
+export const RECOMMENDATION_LABELS: Record<Recommendation, BandHeadline> = {
+  strong_apply: "Strong apply",
+  apply: "Apply",
+  stretch: "Apply but weak (stretch)",
+  weak: "Weak",
 };

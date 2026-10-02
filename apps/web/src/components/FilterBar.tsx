@@ -74,9 +74,10 @@ export const FilterBar = ({
       Recommendation
       <select value={recommendation} onChange={(e) => onRecommendationChange(e.target.value)}>
         <option value="">All</option>
-        <option value="yes">yes</option>
-        <option value="selective_yes">selective_yes</option>
-        <option value="no">no</option>
+        <option value="strong_apply">Strong apply</option>
+        <option value="apply">Apply</option>
+        <option value="stretch">Apply but weak (stretch)</option>
+        <option value="weak">Weak</option>
       </select>
     </label>
     <label>

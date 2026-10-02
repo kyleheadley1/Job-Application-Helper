@@ -13,7 +13,6 @@ import {
 import { outputCitesAbsentLanguage } from "../../lib/jdLanguageOutputBoundary.js";
 import { applyScoringClampLayer } from "../../lib/scoringClampLayer.js";
 import { buildScoreDisplay } from "../../lib/scoreDisplayModel.js";
-import { guardCompositeRecommendation, skipReasonIsValid } from "../../lib/recommendationGuard.js";
 import type { ExtractedJobData } from "../../types/job.js";
 import type { ScoreBreakdown } from "../../types/scoring.js";
 
@@ -148,7 +147,6 @@ describe("Optimizely calibration anchor", () => {
       rules: rulesWithGap,
       extracted: OPTIMIZELY_JOB,
       recommendation: composite.recommendation,
-      referralPathwayAvailable: false,
     });
 
     expect(display?.survivabilityPenalties.some((p) => p.message.match(/enterprise IAM/i))).toBe(
@@ -156,72 +154,8 @@ describe("Optimizely calibration anchor", () => {
     );
     expect(display?.dominantLever?.penaltyName).toMatch(/enterprise IAM/i);
 
-    const finalRec = guardCompositeRecommendation({
-      recommendation: composite.recommendation,
-      capability: composite.score.capability ?? 0,
-      survivability: composite.score.survivability ?? 0,
-      rules: rulesWithGap,
-      survivabilityPenalties: display?.survivabilityPenalties ?? [],
-    });
-
-    if (finalRec === "skip") {
-      expect(display?.actionLine).toMatch(/enterprise IAM/i);
-      expect(display?.actionLine).not.toMatch(/degree requirement/i);
-      expect(
-        skipReasonIsValid({
-          recommendation: "skip",
-          statedReason: display?.actionLine ?? "",
-          rules: rulesWithGap,
-          survivabilityPenalties: display?.survivabilityPenalties ?? [],
-        }),
-      ).toBe(true);
-    } else {
-      expect(["stretch_signal", "referral_gated"]).toContain(finalRec);
-      expect(finalRec).not.toBe("referral_gated");
-    }
-  });
-});
-
-describe("skip recommendation invariants", () => {
-  it("referral pathway does not change guard outcome for non-addressable blockers", () => {
-    const rules = evaluateRules(OPTIMIZELY_JOB, userProfile, { activeResumeType: "BASE" });
-    const clamped = applyScoringClampLayer({
-      score: OPTIMIZELY_RAW_SCORE,
-      extracted: OPTIMIZELY_JOB,
-      rules,
-    });
-
-    const compositeNoGap = computeCompositeScore({
-      rawScore: clamped.score,
-      rules: { ...clamped.rules, specializationGap: undefined, capabilityGap: undefined },
-      extracted: OPTIMIZELY_JOB,
-      profile: userProfile,
-      resumeText: SWE_RESUME,
-    });
-
-    const penalties = buildScoreDisplay({
-      score: compositeNoGap.score,
-      rules: { ...clamped.rules, specializationGap: undefined, capabilityGap: undefined },
-      extracted: OPTIMIZELY_JOB,
-      recommendation: "skip",
-      referralPathwayAvailable: true,
-      referralPathwayNotes: "Connection via Etana Kopin",
-    })?.survivabilityPenalties ?? [];
-
-    const withPathway = guardCompositeRecommendation({
-      recommendation: "skip",
-      capability: compositeNoGap.score.capability ?? 0,
-      survivability: compositeNoGap.score.survivability ?? 0,
-      rules: { ...clamped.rules, specializationGap: undefined, capabilityGap: undefined },
-      survivabilityPenalties: penalties,
-    });
-    const withoutPathway = guardCompositeRecommendation({
-      recommendation: "skip",
-      capability: compositeNoGap.score.capability ?? 0,
-      survivability: compositeNoGap.score.survivability ?? 0,
-      rules: { ...clamped.rules, specializationGap: undefined, capabilityGap: undefined },
-      survivabilityPenalties: penalties,
-    });
-    expect(withPathway).toBe(withoutPathway);
+    expect(["stretch", "weak"]).toContain(composite.recommendation);
+    expect(display?.actionLine).toMatch(/enterprise IAM/i);
+    expect(display?.actionLine).not.toMatch(/degree requirement/i);
   });
 });

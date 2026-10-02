@@ -67,7 +67,7 @@ describe("computeSalaryAsk", () => {
     const ask = computeSalaryAsk({
       extracted: { ...baseJob(), salary: { min: 150_000, max: 200_000 } },
       score: scoreParts({ stackFit: 7, levelFit: 5, total: 40 }),
-      recommendation: "no",
+      recommendation: "weak",
       rules: { ...baseRules(), credentialHeavyFintechAlgorithm: true },
     });
     expect(ask.number).toBeUndefined();
@@ -79,7 +79,7 @@ describe("computeSalaryAsk", () => {
     const ask = computeSalaryAsk({
       extracted: { ...baseJob(), salary: { min: 140_000, max: 180_000 } },
       score: scoreParts({ stackFit: 8, levelFit: 6, total: 52 }),
-      recommendation: "no",
+      recommendation: "weak",
       rules: { ...baseRules(), goDistributedDataInfraCandidateGap: true },
     });
     expect(ask.number).toBeUndefined();
@@ -89,7 +89,7 @@ describe("computeSalaryAsk", () => {
     const ask = computeSalaryAsk({
       extracted: baseJob(),
       score: scoreParts({ stackFit: 17, levelFit: 9, total: 76 }),
-      recommendation: "yes",
+      recommendation: "apply",
       rules: baseRules(),
     });
     expect(ask.number).toBe(190_000);
@@ -103,7 +103,7 @@ describe("computeSalaryAsk", () => {
     const ask = computeSalaryAsk({
       extracted: baseJob(),
       score: scoreParts({ stackFit: 19, levelFit: 11, total: 80 }),
-      recommendation: "yes",
+      recommendation: "apply",
       rules: baseRules(),
     });
     expect(ask.number).toBe(190_000);
@@ -113,7 +113,7 @@ describe("computeSalaryAsk", () => {
     const ask = computeSalaryAsk({
       extracted: baseJob(),
       score: scoreParts({ stackFit: 22, levelFit: 10, total: 85 }),
-      recommendation: "yes",
+      recommendation: "apply",
       rules: baseRules(),
     });
     expect(ask.number).toBeGreaterThanOrEqual(200_000);
@@ -123,7 +123,7 @@ describe("computeSalaryAsk", () => {
     const ask = computeSalaryAsk({
       extracted: baseJob(),
       score: scoreParts({ stackFit: 13, levelFit: 9, total: 73 }),
-      recommendation: "selective_yes",
+      recommendation: "stretch",
       rules: {
         ...baseRules(),
         matureStructuredEmployer: true,
@@ -138,7 +138,7 @@ describe("computeSalaryAsk", () => {
     const ask = computeSalaryAsk({
       extracted: { ...baseJob(), salary: { min: 150_000, max: 260_000 } },
       score: scoreParts({ stackFit: 17, levelFit: 9, total: 72 }),
-      recommendation: "selective_yes",
+      recommendation: "stretch",
       rules: baseRules(),
     });
     expect(ask.number).toBeGreaterThanOrEqual(120_000);
@@ -160,7 +160,7 @@ describe("computeSalaryAsk", () => {
         rawText: "Remote (US). Seed startup. LLM and generative AI. Entry friendly.",
       },
       score: scoreParts({ stackFit: 16, levelFit: 10, total: 72 }),
-      recommendation: "selective_yes",
+      recommendation: "stretch",
       rules: { ...baseRules(), earlyCareerFriendlyRole: true },
     });
     expect(ask.number).toBe(130_000);
@@ -186,7 +186,7 @@ describe("computeSalaryAsk", () => {
         careerValue: 9,
         total: 79,
       }),
-      recommendation: "yes",
+      recommendation: "apply",
       rules: baseRules(),
     });
     expect(ask.number).toBe(110_000);
@@ -207,7 +207,7 @@ describe("computeSalaryAsk", () => {
         rawText: "Series A startup, 11-50 employees.",
       },
       score: scoreParts({ stackFit: 22, levelFit: 8, total: 78 }),
-      recommendation: "yes",
+      recommendation: "apply",
       rules: { ...baseRules(), foundingEngineerStretch: true },
     });
     expect(ask.number).toBe(155_000);

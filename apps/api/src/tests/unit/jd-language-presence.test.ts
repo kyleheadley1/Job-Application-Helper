@@ -12,7 +12,6 @@ import {
   outputCitesAbsentLanguage,
 } from "../../lib/jdLanguageOutputBoundary.js";
 import { extractJdLanguageLabels } from "../../lib/jdLanguagePresence.js";
-import { guardCompositeRecommendation } from "../../lib/recommendationGuard.js";
 import { applyScoringClampLayer, buildHardRuleFlags } from "../../lib/scoringClampLayer.js";
 import { buildScoreDisplay } from "../../lib/scoreDisplayModel.js";
 import type { ExtractedJobData } from "../../types/job.js";
@@ -170,15 +169,8 @@ const runOptimizelyScoringPipeline = (rules: RuleEvaluation) => {
     rules: rulesWithGap,
     extracted: GO_FREE_JD,
     recommendation: composite.recommendation,
-    referralPathwayAvailable: false,
   });
-  const recommendation = guardCompositeRecommendation({
-    recommendation: composite.recommendation,
-    capability: composite.score.capability ?? 0,
-    survivability: composite.score.survivability ?? 0,
-    rules: rulesWithGap,
-    survivabilityPenalties: display?.survivabilityPenalties ?? [],
-  });
+  const recommendation = composite.recommendation;
   const keyRisks = [
     ...(rulesWithGap.hardRuleNotes ?? []),
     ...(rulesWithGap.notes ?? []),
@@ -286,13 +278,13 @@ describe("jd language presence — clamp mint + pipeline (Change 1)", () => {
     }
   });
 
-  it("4 — Optimizely scoring pipeline: no Go on output surfaces; not referral_gated", () => {
+  it("4 — Optimizely scoring pipeline: no Go on output surfaces; not an apply tier", () => {
     const rules = evaluateRules(GO_FREE_JD, userProfile, { activeResumeType: "BASE" });
     const { recommendation, rules: outRules, survivabilityPenalties, keyRisks } =
       runOptimizelyScoringPipeline(rules);
 
     assertNoGoOnSurfaces(GO_FREE_JD, outRules, survivabilityPenalties, keyRisks);
-    expect(recommendation).not.toBe("referral_gated");
+    expect(["stretch", "weak"]).toContain(recommendation);
   });
 
   it("4b — phantom Go upstream leak is stripped before user-facing output", () => {
@@ -306,7 +298,6 @@ describe("jd language presence — clamp mint + pipeline (Change 1)", () => {
     expect(outRules.hardRuleFlags?.some((f) => f.id === "coreLanguageMismatch")).toBe(
       false,
     );
-    expect(recommendation).not.toBe("referral_gated");
-    expect(["stretch_signal", "skip"]).toContain(recommendation);
+    expect(["stretch", "weak"]).toContain(recommendation);
   });
 });

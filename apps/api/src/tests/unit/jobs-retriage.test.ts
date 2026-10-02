@@ -72,7 +72,7 @@ const triageResult = (overrides: Partial<JobRecord> = {}): JobRecord => ({
   },
   rules: baseRules(),
   score: score85,
-  recommendation: "yes",
+  recommendation: "apply",
   salaryAsk: {},
   recommendedResume: "BASE",
   resumeRationale: [],
@@ -91,7 +91,7 @@ const triageResult = (overrides: Partial<JobRecord> = {}): JobRecord => ({
   status: "to_review",
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-02T00:00:00.000Z",
-  scoreHistory: [{ scoredAt: "2026-01-02T00:00:00.000Z", score: score85, recommendation: "yes" }],
+  scoreHistory: [{ scoredAt: "2026-01-02T00:00:00.000Z", score: score85, recommendation: "apply" }],
   ...overrides,
 });
 
@@ -108,10 +108,10 @@ describe("jobsService.runRetriage", () => {
         triageResult({
           id: "draft-1",
           score: score62,
-          recommendation: "selective_yes",
+          recommendation: "stretch",
           topMatch: "Old match",
           generated: { coverLetter: "old letter" },
-          scoreHistory: [{ scoredAt: "2026-01-01T00:00:00.000Z", score: score62, recommendation: "selective_yes" }],
+          scoreHistory: [{ scoredAt: "2026-01-01T00:00:00.000Z", score: score62, recommendation: "stretch" }],
         }),
       )
       .mockResolvedValueOnce(
@@ -160,11 +160,11 @@ describe("jobsService.runRetriage", () => {
       triageResult({
         id: "tracked-1",
         score: score62,
-        recommendation: "selective_yes",
+        recommendation: "stretch",
         status: "applied",
         generated: { coverLetter: "old" },
         trackerSpreadsheet: { latestScore: "62" },
-        scoreHistory: [{ scoredAt: "2026-01-01T00:00:00.000Z", score: score62, recommendation: "selective_yes" }],
+        scoreHistory: [{ scoredAt: "2026-01-01T00:00:00.000Z", score: score62, recommendation: "stretch" }],
       }),
     );
     vi.mocked(jobsRepository.upsertJob).mockImplementation(async (record) => record);

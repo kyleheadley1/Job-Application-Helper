@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { goMentionedAsPreferred, textMentionsGoLanguage } from "../../lib/goLanguage.js";
 import {
+  assessRoleSeniority,
   detectRoleSeniorityOverreach,
   seniorityFieldUncorroborated,
   seniorityNeedsManualReview,
@@ -65,7 +66,7 @@ describe("deterministic extraction on a Surge-like JD", () => {
 });
 
 describe("seniority gate needs corroboration for a senior field", () => {
-  const base: ExtractedJobData = {
+  const base = {
     company: "Surge",
     title: "Software Engineer, Coding Evaluation & Training Data",
     stack: [],
@@ -85,11 +86,65 @@ describe("seniority gate needs corroboration for a senior field", () => {
     expect(detectRoleSeniorityOverreach(base)).toBe(false);
   });
 
-  it("still gates when the posting backs it up", () => {
-    expect(detectRoleSeniorityOverreach({ ...base, title: "Senior Software Engineer" })).toBe(true);
+  it("still gates when the posting asks for 5+ years", () => {
     expect(detectRoleSeniorityOverreach({ ...base, yearsExperience: { raw: "6+ years", min: 6 } })).toBe(true);
+  });
+});
+
+describe("senior title alone is a stretch, not a hard gate", () => {
+  const principal = {
+    company: "DataCamp",
+    title: "Principal AI Engineer - AI Creator",
+    stack: [],
+    requiredSkills: [],
+    preferredSkills: [],
+    domainTags: [],
+    responsibilities: ["Build and evolve the core AI tutoring system, including prompt architectures."],
+    requirements: [
+      "1+ years building complex LLM-based systems, with strong prompt engineering intuition.",
+      "Communicates clearly across mediums and enjoys mentoring and collaborating in small, high-ownership teams.",
+    ],
+    seniority: "senior",
+    yearsExperience: { raw: "1+ years", min: 1 },
+    rawText: "Principal AI Engineer - AI Creator\n1+ years building complex LLM-based systems.",
+  };
+
+  it("Principal title with 1+ years and no senior asks → stretch", () => {
+    expect(assessRoleSeniority(principal)).toBe("stretch");
+    expect(detectRoleSeniorityOverreach(principal)).toBe(false);
+  });
+
+  it("explicit Seniority label with low years → stretch", () => {
+    const labeled = {
+      ...principal,
+      title: "Software Engineer",
+      rawText: "Seniority\nSenior Level\n2+ years",
+      yearsExperience: { raw: "2+ years", min: 2 },
+    };
+    expect(assessRoleSeniority(labeled)).toBe("stretch");
+  });
+
+  it.each([
+    ["5+ years", { yearsExperience: { raw: "7+ years", min: 7 } }],
+    ["senior-depth asks", { requirements: ["Own capacity planning and performance tuning for core services"] }],
+    ["people leadership", { requirements: ["Manage a team of 6 engineers with direct reports"] }],
+    ["years leading", { requirements: ["3+ years of experience leading engineering teams"] }],
+  ])("Principal title + %s → overreach", (_label, extra) => {
+    expect(assessRoleSeniority({ ...principal, ...extra } as ExtractedJobData)).toBe("overreach");
+  });
+
+  it("reads years from Required text when the years field is empty; ranges use the lower bound", () => {
+    const noYears = { ...principal, yearsExperience: undefined };
+    const withReq = (requirements: string[]) => ({ ...noYears, requirements }) as ExtractedJobData;
+    expect(assessRoleSeniority(withReq(["10+ years experience"]))).toBe("overreach");
+    expect(assessRoleSeniority(withReq(["2–6+ years of professional software engineering experience"]))).toBe(
+      "stretch",
+    );
+  });
+
+  it("clean title, no years, no label → none", () => {
     expect(
-      detectRoleSeniorityOverreach({ ...base, rawText: `Seniority\nSenior Level\n${SURGE_LIKE_JD}` }),
-    ).toBe(true);
+      assessRoleSeniority({ ...principal, title: "AI Engineer", seniority: undefined, yearsExperience: undefined }),
+    ).toBe("none");
   });
 });

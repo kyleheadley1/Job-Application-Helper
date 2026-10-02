@@ -61,7 +61,7 @@ const baseJob = (overrides: Partial<JobRecord> = {}): JobRecord => {
         hardGates: [],
       },
     } as JobRecord["score"],
-    recommendation: "referral_gated",
+    recommendation: "apply",
     salaryAsk: {},
     recommendedResume: "BASE",
     resumeRationale: [],
@@ -113,7 +113,7 @@ describe("evaluateShortlist", () => {
 
     const crowdedEval = evaluateShortlist(crowded);
     expect(crowdedEval.onShortlist).toBe(true);
-    expect(crowdedEval.tag).toBe("high fit / crowded pool — referral recommended");
+    expect(crowdedEval.tag).toBe("high fit / crowded pool");
     expect(crowdedEval.sortGroup).toBe(1);
 
     expect(compareShortlistJobs(favorable, crowded)).toBeLessThan(0);
@@ -178,7 +178,7 @@ describe("evaluateShortlist", () => {
     const eval_ = evaluateShortlist(staleReferral);
     expect(eval_.onShortlist).toBe(true);
     expect(eval_.freshnessTier).toBe("stale_referral");
-    expect(eval_.tag).toBe("stale — referral path open");
+    expect(eval_.tag).toBe("stale — you have a named connection there");
   });
 
   it("excludes referral-path jobs beyond stale + extension window", () => {

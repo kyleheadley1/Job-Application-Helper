@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { evaluateRules } from '../agents/jobAgent/rules.js';
 import { withSanitizedRuleNotes } from '../lib/riskDisplaySanitizer.js';
-import { getTrackerColor } from '../config/scoringPolicy.js';
+import { getTrackerColor, TRACKER_ACTION_BY_RECOMMENDATION } from '../config/scoringPolicy.js';
 import { evaluateShortlist } from '../lib/shortlist.js';
 import { userProfile } from '../config/userProfile.js';
 import type { ExtractedJobData, JobRecord, JobStatus } from '../types/job.js';
@@ -81,12 +81,7 @@ function defaultTrackerPriority(scoreTotal: number): string {
 }
 
 function defaultRecommendedAction(rec: JobRecord['recommendation']): string {
-  if (rec === 'apply_cold' || rec === 'yes') return 'Apply with urgency';
-  if (rec === 'referral_gated' || rec === 'stretch_signal' || rec === 'selective_yes') {
-    return 'Apply selectively with caveats';
-  }
-  if (rec === 'no') return 'Do not apply — hard gate';
-  return 'Skip unless special reason';
+  return TRACKER_ACTION_BY_RECOMMENDATION[rec];
 }
 
 /** Build a persisted job from one “All Applications” row (cells + column map). */

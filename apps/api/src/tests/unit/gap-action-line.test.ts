@@ -103,7 +103,7 @@ Build production Python/Django backends. Strong Django REST framework experience
     expect(line).toMatch(/via resume|tailored resume/i);
     expect(actionLineHasDuplicateFragments(line)).toBe(false);
     expect(line).toMatch(
-      /(?:Strong shot|Worth applying) — role leads with Python\/Django on the backend; your resume leads with Node — reframe backend experience via resume\./i,
+      /(?:Strong apply|Apply) — role leads with Python\/Django on the backend; your resume leads with Node — reframe backend experience via resume\./i,
     );
   });
 });

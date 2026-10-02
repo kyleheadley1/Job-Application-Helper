@@ -174,13 +174,10 @@ describe("IBM degree gate consistency", () => {
       rules: clamped.rules,
       extracted: IBM_JOB,
       recommendation: composite.recommendation,
-      referralPathwayAvailable: true,
-      referralPathwayNotes: "Connection via Alex Chen",
     });
 
     expect(display?.gapDock).toBeGreaterThanOrEqual(DEGREE_DOCK_BY_TIER.high);
     expect(display?.final).toBeLessThan(73);
-    expect(display?.referralUrgency).toBe("strongly_advised");
     expect(display?.scoreDerivation).toMatch(/ − \d+ = /);
     expect(display?.scoreDerivation).not.toMatch(/pool|credential/i);
   });

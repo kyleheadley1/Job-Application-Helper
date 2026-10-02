@@ -1,10 +1,11 @@
 import { z } from 'zod';
 import { scoringPolicy, SCORE_CATEGORY_MAXES } from '../../config/scoringPolicy.js';
 import type { ExtractedJobData } from '../../types/job.js';
-import type {
-  Recommendation,
-  RuleEvaluation,
-  ScoreBreakdown,
+import {
+  RECOMMENDATIONS,
+  type Recommendation,
+  type RuleEvaluation,
+  type ScoreBreakdown,
 } from '../../types/scoring.js';
 import type { UserProfile } from '../../types/userProfile.js';
 import { normalizeText } from '../../lib/text.js';
@@ -35,9 +36,7 @@ const categorySchema = z.object({
 
 const ScoringOutputSchema = z.object({
   score: categorySchema,
-  recommendation: z
-    .enum(['apply_cold', 'referral_gated', 'stretch_signal', 'skip', 'no', 'yes', 'selective_yes'])
-    .optional(),
+  recommendation: z.enum(RECOMMENDATIONS).optional(),
   topMatch: z.string(),
   mainRisk: z.string(),
   rationale: z.array(z.string()).default([]),
@@ -214,6 +213,19 @@ export type PreservedScoringSnapshot = {
   narrative: Pick<ScoringResult, 'topMatch' | 'mainRisk' | 'risks' | 'rationale'>;
 };
 
+const llmCategoriesOf = (s: ScoreBreakdown): NonNullable<ScoreBreakdown['llmCategories']> => ({
+  stackFit: s.stackFit,
+  levelFit: s.levelFit,
+  domainFit: s.domainFit,
+  resumeStoryClarity: s.resumeStoryClarity,
+  functionalOverlap: s.functionalOverlap,
+  recruiterFriendliness: s.recruiterFriendliness,
+  careerValue: s.careerValue,
+});
+
+const withLlmCategories = <T extends object>(score: T, raw: ScoreBreakdown): T =>
+  Object.assign({}, score, { llmCategories: llmCategoriesOf(raw) });
+
 const finishScoringFromRawCategories = (params: {
   rawScore: ScoreBreakdown;
   extracted: ExtractedJobData;
@@ -289,10 +301,7 @@ const finishScoringFromRawCategories = (params: {
   return {
     scoring: {
       ...params.narrative,
-      score: {
-        ...composite.score,
-        // Keep polished total alignment if composite already incorporates docked levelFit
-      },
+      score: withLlmCategories(composite.score, params.rawScore),
       topMatch: polished.topMatch,
       mainRisk: polished.mainRisk,
       risks: polished.risks,

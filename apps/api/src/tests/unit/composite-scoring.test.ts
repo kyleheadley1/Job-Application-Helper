@@ -92,19 +92,21 @@ describe("additive composite scoring", () => {
 });
 
 describe("band headline label mapping", () => {
-  it("85+→Strong yes; 82→Yes; apply-edge→If quick; 55→Skip", () => {
+  it("80+→Strong apply; 65–79→Apply; 50–64→Apply but weak (stretch); <50→Weak", () => {
     expect(resolveScoreBand(85)).toBe("strong_apply");
-    expect(resolveBandHeadline("strong_apply", 87)).toBe("Strong yes");
+    expect(resolveBandHeadline("strong_apply", 87)).toBe("Strong apply");
 
-    expect(resolveScoreBand(82)).toBe("apply");
-    expect(computeWorthTailoring(82, "apply")).toBe(true);
-    expect(resolveBandHeadline("apply", 82)).toBe("Yes");
+    expect(resolveScoreBand(78)).toBe("apply");
+    expect(computeWorthTailoring(78, "apply")).toBe(true);
+    expect(resolveBandHeadline("apply", 78)).toBe("Apply");
 
-    expect(resolveScoreBand(62)).toBe("apply");
-    expect(computeWorthTailoring(65, "apply")).toBe(false);
-    expect(resolveBandHeadline("apply", 65)).toBe("If quick");
+    expect(resolveScoreBand(66)).toBe("apply");
+    expect(computeWorthTailoring(66, "apply")).toBe(false);
 
-    expect(resolveScoreBand(55)).toBe("skip");
-    expect(resolveBandHeadline("skip", 55)).toBe("Skip");
+    expect(resolveScoreBand(55)).toBe("stretch");
+    expect(resolveBandHeadline("stretch", 55)).toBe("Apply but weak (stretch)");
+
+    expect(resolveScoreBand(45)).toBe("weak");
+    expect(resolveBandHeadline("weak", 45)).toBe("Weak");
   });
 });

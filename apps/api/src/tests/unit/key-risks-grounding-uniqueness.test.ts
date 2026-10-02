@@ -72,11 +72,13 @@ describe("Fun + Luminos seniority + Key Risks grounding", () => {
       }),
     );
 
-    expect(oldComposite.recommendation).toBe("no");
-    expect(oldAsks).toEqual(
-      Array(5).fill({ number: 95_000, rangeMin: 85_000, rangeMax: 105_000 }),
-    );
-    expect(newScored.recommendation).not.toBe("no");
+    // A Lead/Staff label with 2–5 years and generic Required text is now a title stretch
+    // (soft dock), not a hard gate, so even the old parse no longer hard-gates.
+    expect(oldRules.seniorityOverreach).toBe(false);
+    expect(oldRules.seniorityStretch).toBe(true);
+    expect(oldComposite.hardGateFired).toBe(false);
+    expect(new Set(oldAsks.map((a) => a.number)).size).toBe(1);
+    expect(newScored.score.total).toBeGreaterThan(25);
     expect(newAsks).toEqual(
       Array(5).fill({ number: 105_000, rangeMin: 95_000, rangeMax: 115_000 }),
     );

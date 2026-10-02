@@ -29,7 +29,9 @@ import {
 import { detectProductionInfraOwnershipGap } from '../../lib/namedCapabilityRiskPenalty.js';
 import { classifyRoleLane, detectBackendProductApiShape } from '../../lib/roleFunctionClassifier.js';
 import { isStartupSmallTeamScale } from '../../lib/employerScale.js';
-import { detectRoleSeniorityOverreach, resolveStructuredSeniorityLevel, seniorityNeedsManualReview } from '../../lib/seniorityGate.js';
+import { assessRoleSeniority, resolveStructuredSeniorityLevel, seniorityNeedsManualReview } from '../../lib/seniorityGate.js';
+import { COMPOSITE_SCORING } from '../../config/capabilitySurvivabilityPolicy.js';
+import { computeExperienceGap, levelFitCeilingForSeniorityDock } from '../../lib/experienceGap.js';
 import {
   citeBackendApiSpan,
   citeFintechDomainSpan,
@@ -242,7 +244,9 @@ export const evaluateRules = (
 
   const earlyCareerFriendlyRole = earlyCareerShape && !strictNewGradPipeline;
 
-  const seniorityOverreach = detectRoleSeniorityOverreach(job);
+  const seniorityAssessment = assessRoleSeniority(job);
+  const seniorityOverreach = seniorityAssessment === 'overreach';
+  const seniorityStretch = seniorityAssessment === 'stretch';
   if (seniorityNeedsManualReview(job)) {
     notes.push(
       'Seniority gate deferred for manual review — structured Seniority field missing, unbacked by the title/years, or conflicts with years parse; do not treat it as a hard gate.',
@@ -255,10 +259,15 @@ export const evaluateRules = (
     );
   const nycOrNjViableInText =
     textImpliesNycMetroOrCommutableNj(combinedText) && !primaryNonNycMetroInLocationLine;
+  const locationIsPreference =
+    /\b(preferred|preference|flexible|open to remote|remote (?:ok|considered|possible|friendly))\b/i.test(
+      job.location ?? '',
+    ) || /\b(?:based in|located in|location)\b[^.\n]{0,80}\b(?:preferred|flexible)\b/i.test(job.rawText ?? '');
   const locationMismatch =
     (job.remoteType === 'onsite' || job.remoteType === 'hybrid') &&
     job.locationIsCommutable === false &&
-    !nycOrNjViableInText;
+    !nycOrNjViableInText &&
+    !locationIsPreference;
 
   const jdSignalsVisaSponsorshipConstraint =
     includesAny(normalizeText(job.visaRequirement ?? ''), [
@@ -541,6 +550,11 @@ export const evaluateRules = (
         ? `JD Required cites "${depthCite}"${titleBit}, which may exceed the early-career profile for recruiter screen.`
         : `JD seniority (${band})${titleBit} may exceed the early-career profile for recruiter screen.`,
     );
+  } else if (seniorityStretch) {
+    penaltyVector.seniority = COMPOSITE_SCORING.SENIORITY_STRETCH_DOCK;
+    notes.push(
+      `Title${job.title?.trim() ? ` "${job.title.trim()}"` : ''      } reads senior, but the JD asks for no 5+ years, senior-depth, or people-leadership experience — ambitious stretch (level fit capped at ${levelFitCeilingForSeniorityDock(COMPOSITE_SCORING.SENIORITY_STRETCH_DOCK)}/20), not a hard gate.`,
+    );
   }
   if (locationMismatch) {
     penaltyVector.location = scoringPolicy.hardPenalties.locationMismatch;
@@ -704,6 +718,10 @@ export const evaluateRules = (
   if (reinforcedExperienceFloor && reinforcedFloor.riskNote) {
     notes.push(reinforcedFloor.riskNote);
   }
+  const experienceGap = computeExperienceGap(job, profile, {
+    floorAlreadyDocked: reinforcedExperienceFloor,
+  });
+  if (experienceGap) penaltyVector.experience = experienceGap.dock;
 
   const productionInfraGap = detectProductionInfraOwnershipGap({
     job,
@@ -801,6 +819,8 @@ export const evaluateRules = (
     earlyCareerFriendlyRole,
     newGradPenalty: strictNewGradPipeline,
     seniorityOverreach,
+    seniorityStretch,
+    experienceGap,
     locationMismatch,
     visaMismatch,
     citizenshipMismatch,

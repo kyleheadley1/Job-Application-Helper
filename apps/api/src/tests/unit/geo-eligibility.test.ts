@@ -114,8 +114,7 @@ describe("Reflow geo eligibility advisory", () => {
     const { composite, display } = compositeFor(REFLOW_GEO_JOB, rules);
     expect(display!.hardGates).toEqual([]);
     expect(display!.eligibilityAdvisory?.reason).toBe(rules.eligibilityFlag?.reason);
-    expect(composite.recommendation).not.toBe("no");
-    expect(composite.scoreBand).not.toBe("no");
+    expect(composite.hardGateFired).toBe(false);
 
     const rulesWithoutFlag: RuleEvaluation = { ...rules, eligibilityFlag: undefined };
     const baseline = compositeFor(REFLOW_GEO_JOB, rulesWithoutFlag);
@@ -151,7 +150,7 @@ describe("explicit geographic exclusion", () => {
 
     const { composite, display } = compositeFor(EXPLICIT_JOB, rules);
     expect(composite.hardGateFired).toBe(true);
-    expect(composite.recommendation).toBe("no");
+    expect(composite.recommendation).toBe("weak");
     expect(display!.hardGates.length).toBeGreaterThan(0);
     expect(display!.hardGates[0]).toMatch(/Latin America/i);
   });
@@ -261,18 +260,19 @@ describe("Wex residency-radius hard gate (permanent fixture)", () => {
 
     const { composite, display } = compositeFor(WEX_JOB, rules);
     expect(composite.hardGateFired).toBe(true);
-    expect(composite.recommendation).toBe("no");
-    expect(composite.scoreBand).toBe("no");
+    expect(composite.recommendation).toBe("weak");
+    expect(composite.hardGateFired).toBe(true);
     expect(display!.hardGates.length).toBeGreaterThan(0);
     expect(display!.hardGates[0]).toMatch(/reside within 30 miles/i);
     expect(display!.hardGates[0]).not.toMatch(/None/i);
   });
 
-  it("scoreCalibrationAnchor overrides inflated Apply:Yes to Skip", () => {
+  it("scoreCalibrationAnchor overrides inflated Apply to Weak (hard gate)", () => {
     const scored = scoreCalibrationAnchor("wexSde1ResidencyRadiusGate");
     expect(scored.rules.geoExclusionHardGate).toBe(true);
-    expect(scored.recommendation).toBe("no");
-    expect(scored.score.recommendationLabel).toMatch(/hard gate|skip|do not apply/i);
+    expect(scored.recommendation).toBe("weak");
+    expect(scored.score.recommendationLabel).toBe("Weak");
+    expect(scored.score.scoreDisplay?.actionLine).toMatch(/^Weak — hard gate: /);
     expect(scored.score.scoreDisplay?.hardGates.length).toBeGreaterThan(0);
     expect(scored.score.scoreDisplay?.hardGates[0]).toMatch(/30 miles/i);
   });
@@ -308,7 +308,7 @@ describe("Wex residency-radius hard gate (permanent fixture)", () => {
 });
 
 describe("residency radius vs Latin America region gate parity", () => {
-  it("both fire hardGates and recommendation no for US-based candidate", () => {
+  it("both fire hardGates and recommendation weak for US-based candidate", () => {
     const latAm: ExtractedJobData = {
       company: "LatAm Corp",
       title: "Software Engineer",
@@ -329,7 +329,7 @@ describe("residency radius vs Latin America region gate parity", () => {
       expect(rules.geoExclusionHardGate).toBe(true);
       const { composite, display } = compositeFor(job, rules);
       expect(composite.hardGateFired).toBe(true);
-      expect(composite.recommendation).toBe("no");
+      expect(composite.recommendation).toBe("weak");
       expect(display!.hardGates.length).toBeGreaterThan(0);
     }
   });

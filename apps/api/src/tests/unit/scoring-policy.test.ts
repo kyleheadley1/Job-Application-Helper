@@ -4,7 +4,6 @@ import {
   resolveRecommendation,
   hasHardGateNote,
 } from "../../lib/scoringCaps.js";
-import { resolveCompositeRecommendation } from "../../lib/compositeScoreModel.js";
 import type { RuleEvaluation } from "../../types/scoring.js";
 import { getTrackerColor, SCORE_CATEGORY_MAXES } from "../../config/scoringPolicy.js";
 import { evaluateShortlist } from "../../lib/shortlist.js";
@@ -41,23 +40,16 @@ describe("scoring policy behavior", () => {
     });
   });
 
-  it("maps recommendations by composite final score bands", () => {
-    expect(mapRecommendationFromScore(75)).toBe("apply_cold");
-    expect(mapRecommendationFromScore(55)).toBe("referral_gated");
-    expect(mapRecommendationFromScore(40)).toBe("stretch_signal");
-    expect(mapRecommendationFromScore(25)).toBe("skip");
+  it("maps recommendations by composite final score tiers", () => {
+    expect(mapRecommendationFromScore(84)).toBe("strong_apply");
+    expect(mapRecommendationFromScore(75)).toBe("apply");
+    expect(mapRecommendationFromScore(55)).toBe("stretch");
+    expect(mapRecommendationFromScore(40)).toBe("weak");
   });
 
-  it("2x2 matrix separates capability from survivability", () => {
-    expect(resolveCompositeRecommendation(75, 0.6)).toBe("apply_cold");
-    expect(resolveCompositeRecommendation(75, 0.4)).toBe("referral_gated");
-    expect(resolveCompositeRecommendation(60, 0.6)).toBe("stretch_signal");
-    expect(resolveCompositeRecommendation(60, 0.4)).toBe("skip");
-  });
-
-  it("resolveRecommendation uses capability/survivability when provided", () => {
-    expect(resolveRecommendation(32, cleanRules(), 8, 78, 0.4)).toBe("referral_gated");
-    expect(resolveRecommendation(48, cleanRules(), 8, 78, 0.62)).toBe("apply_cold");
+  it("resolveRecommendation is the score tier; hard-gate rules force weak", () => {
+    expect(resolveRecommendation(72, cleanRules())).toBe("apply");
+    expect(resolveRecommendation(72, { ...cleanRules(), visaMismatch: true })).toBe("weak");
   });
 
   it("hasHardGateNote detects gate flags", () => {
@@ -82,7 +74,7 @@ describe("scoring policy behavior", () => {
         scoreDisplay: { final: 84, hardGates: [] },
         survivabilityBreakdown: { poolFriendliness: 0.65 },
       },
-      recommendation: "apply_cold",
+      recommendation: "apply",
       salaryAsk: {},
       recommendedResume: "BASE",
       resumeRationale: [],

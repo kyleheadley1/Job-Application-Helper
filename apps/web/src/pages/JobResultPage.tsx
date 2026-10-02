@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import { api } from "../api/client";
-import type { JobRecord } from "../types/job";
+import { RECOMMENDATION_LABELS, type JobRecord } from "../types/job";
 import { ScoreBadge } from "../components/ScoreBadge";
 import { StatusBadge } from "../components/StatusBadge";
 import { JsonPanel } from "../components/JsonPanel";
@@ -247,7 +247,7 @@ export const JobResultPage = () => {
         <article className="card">
           <h3>Decision</h3>
           <p className="decisionRecommendation">
-            Apply: {scoreDisplay?.bandHeadline ?? "—"}
+            {scoreDisplay?.bandHeadline ?? RECOMMENDATION_LABELS[job.recommendation] ?? "—"}
           </p>
           {scoreDisplay?.actionLine ? (
             <p className="actionLine">{scoreDisplay.actionLine}</p>
@@ -255,11 +255,6 @@ export const JobResultPage = () => {
           {scoreDisplay?.applyNowUrgencyNote ? (
             <p className="applyNowUrgency">
               Apply now: {scoreDisplay.applyNowUrgencyNote}
-            </p>
-          ) : null}
-          {scoreDisplay?.referralAdvice ? (
-            <p className={`referralAdvice referralAdvice--${scoreDisplay.referralUrgency}`}>
-              ↳ {scoreDisplay.referralAdvice}
             </p>
           ) : null}
           {scoreDisplay?.eligibilityAdvisories?.length

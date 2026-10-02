@@ -52,7 +52,7 @@ const minimalJob = (over: Partial<JobRecord>): JobRecord =>
       careerValue: 7,
       total: 61,
     },
-    recommendation: "selective_yes",
+    recommendation: "stretch",
     salaryAsk: {},
     recommendedResume: "BASE",
     resumeRationale: [],

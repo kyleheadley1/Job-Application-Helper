@@ -166,7 +166,7 @@ const resolvePoolLever = (score: number): Pick<
   }
   if (score < POOL_FRIENDLINESS.CROWDED_MAX) {
     return {
-      lever: "referral",
+      lever: "none",
       leverLabel: POOL_FRIENDLINESS.LEVER_LABELS.crowded,
       bindingness: "structural",
     };

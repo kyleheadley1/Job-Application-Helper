@@ -6,8 +6,6 @@ export const CERT_MATCH_THRESHOLD = 2;
 export const CERT_BOOST_ACTIVE = 0.15;
 export const CERT_BOOST_LAPSED = 0.1;
 export const CREDENTIAL_SIGNAL_CAP = 0.75;
-export const CREDENTIAL_REFERRAL_SOFTEN_THRESHOLD = 0.5;
-
 export type CertificationBoostMeta = {
   certName: string;
   status: UserCertification["status"];

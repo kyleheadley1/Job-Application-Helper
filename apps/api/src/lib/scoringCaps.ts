@@ -3,7 +3,8 @@ import type { ExtractedJobData } from "../types/job.js";
 import type { Recommendation, RuleEvaluation, ScoreBreakdown } from "../types/scoring.js";
 import type { UserProfile } from "../types/userProfile.js";
 import { userProfile as defaultUserProfile } from "../config/userProfile.js";
-import { computeCompositeScore, resolveCompositeRecommendation } from "./compositeScoreModel.js";
+import { computeCompositeScore } from "./compositeScoreModel.js";
+import { normalizeRecommendation, recommendationForScore } from "./compositeScoring.js";
 
 /** Sum of legacy seven category scores (audit only — not the final model). */
 export const sumScoreBreakdown = (s: ScoreBreakdown): number =>
@@ -36,18 +37,23 @@ const clampCategory = (score: ScoreBreakdown): ScoreBreakdown => ({
 export const clampScoreToCategoryMaxes = (score: ScoreBreakdown): ScoreBreakdown =>
   clampCategory(score);
 
-/** Normalize persisted jobs scored under pre-realignment category caps. */
+/** Normalize persisted jobs scored under pre-realignment category caps and pre-tier recommendations. */
 export const normalizeStoredJobScores = <T extends {
   score: ScoreBreakdown;
+  recommendation?: Recommendation;
   scoreHistory?: Array<{ score: ScoreBreakdown; scoredAt: string; recommendation: Recommendation }>;
 }>(
   job: T,
 ): T => ({
   ...job,
   score: clampScoreToCategoryMaxes(job.score),
+  ...(job.recommendation !== undefined
+    ? { recommendation: normalizeRecommendation(job.recommendation, job.score?.total) }
+    : {}),
   scoreHistory: job.scoreHistory?.map((entry) => ({
     ...entry,
     score: clampScoreToCategoryMaxes(entry.score),
+    recommendation: normalizeRecommendation(entry.recommendation, entry.score?.total),
   })),
 });
 
@@ -93,30 +99,18 @@ export const hasHardGateNote = (rules: RuleEvaluation): boolean =>
     rules.locationMismatch,
   );
 
-/** Resolve recommendation from composite axes when available, else heuristic from total. */
+/** Recommendation is the score tier of the capped total; hard-gate rules force weak. */
 export const resolveRecommendation = (
   cappedTotal: number,
   rules: RuleEvaluation,
-  _careerValue: number,
-  capability?: number,
-  survivability?: number,
+  _careerValue?: number,
 ): Recommendation => {
-  if (capability != null && survivability != null) {
-    return resolveCompositeRecommendation(capability, survivability);
-  }
-  if (rules.explicitCoreLanguageMismatch || rules.visaMismatch || rules.citizenshipMismatch) {
-    return "no";
-  }
-  if (cappedTotal >= 70) return "apply_cold";
-  if (cappedTotal >= 50) return "referral_gated";
-  if (cappedTotal >= 35) return "stretch_signal";
-  return "skip";
+  const hardGate = Boolean(
+    rules.explicitCoreLanguageMismatch || rules.visaMismatch || rules.citizenshipMismatch,
+  );
+  return recommendationForScore(cappedTotal, hardGate);
 };
 
-/** Heuristic band mapping for imported spreadsheet totals. */
-export const mapRecommendationFromScore = (total: number): Recommendation => {
-  if (total >= 70) return "apply_cold";
-  if (total >= 50) return "referral_gated";
-  if (total >= 35) return "stretch_signal";
-  return "skip";
-};
+/** Score-tier mapping for imported spreadsheet totals. */
+export const mapRecommendationFromScore = (total: number): Recommendation =>
+  recommendationForScore(total);

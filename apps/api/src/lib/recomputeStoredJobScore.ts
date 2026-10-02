@@ -6,7 +6,6 @@ import { detectCapabilityGap, detectSpecializationGap } from "./capabilityGap.js
 import { computeCompositeScore } from "./compositeScoreModel.js";
 import { applyJdLanguageOutputBoundary } from "./jdLanguageOutputBoundary.js";
 import { sanitizeExtractedTags } from "./jdTagProvenance.js";
-import { guardCompositeRecommendation } from "./recommendationGuard.js";
 import { detectReferralPathway } from "./referralPathway.js";
 import { withSanitizedRuleNotes } from "./riskDisplaySanitizer.js";
 import { applyScoringClampLayer } from "./scoringClampLayer.js";
@@ -64,8 +63,12 @@ export const recomputeStoredJobScore = (params: {
     resumeText,
   );
 
+  // Prefer pre-clamp LLM categories: stored post-clamp categories would take subtractive docks twice.
+  const rawCategories = job.score.llmCategories
+    ? { ...job.score.llmCategories, total: 0 }
+    : storedCategoryScores(job.score);
   const clamped = applyScoringClampLayer({
-    score: storedCategoryScores(job.score),
+    score: rawCategories,
     extracted,
     rules,
     profile,
@@ -96,26 +99,7 @@ export const recomputeStoredJobScore = (params: {
     resumeText,
   });
 
-  const scoreDisplay = buildScoreDisplay({
-    score: composite.score,
-    rules: finalRules,
-    extracted,
-    profile,
-    recommendation: composite.recommendation,
-    referralPathwayAvailable: referralPathway.referralPathwayAvailable,
-    referralPathwayNotes: referralPathway.referralPathwayNotes,
-    hardGateReasons: composite.hardGateReasons,
-    trackerPostedAt: job.tracker?.postedAt,
-    jobCreatedAt: job.createdAt,
-  });
-
-  const finalRecommendation = guardCompositeRecommendation({
-    recommendation: composite.recommendation,
-    capability: composite.score.capability ?? 0,
-    survivability: composite.score.survivability ?? 0,
-    rules: finalRules,
-    survivabilityPenalties: scoreDisplay?.survivabilityPenalties ?? [],
-  });
+  const finalRecommendation = composite.recommendation;
 
   const scoreDisplayFinal = buildScoreDisplay({
     score: composite.score,
@@ -123,23 +107,23 @@ export const recomputeStoredJobScore = (params: {
     extracted,
     profile,
     recommendation: finalRecommendation,
-    referralPathwayAvailable: referralPathway.referralPathwayAvailable,
-    referralPathwayNotes: referralPathway.referralPathwayNotes,
     hardGateReasons: composite.hardGateReasons,
     trackerPostedAt: job.tracker?.postedAt,
     jobCreatedAt: job.createdAt,
   });
 
+  const llmCategories = job.score.llmCategories;
   const scoreWithDisplay: ScoreBreakdown = scoreDisplayFinal
     ? {
         ...composite.score,
+        llmCategories,
         scoreDisplay: scoreDisplayFinal,
         recommendationLabel: scoreDisplayFinal.bandHeadline,
       }
     : {
         ...composite.score,
-        recommendationLabel:
-          RECOMMENDATION_LABELS[finalRecommendation] ?? composite.recommendationLabel,
+        llmCategories,
+        recommendationLabel: RECOMMENDATION_LABELS[finalRecommendation],
       };
 
   const salaryAsk = computeSalaryAsk({

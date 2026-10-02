@@ -34,8 +34,8 @@ describe("calibration anchors", () => {
 
     expect(
       scored.poolFriendlinessLever,
-      "ANCHOR 1 (Cherry Hill): poolFriendliness lever is referral — favorable pool should not render as crowded cattle-call",
-    ).not.toBe("referral");
+      "ANCHOR 1 (Cherry Hill): poolFriendliness should be favorable, not a crowded cattle-call",
+    ).not.toMatch(/crowded/);
 
     expect(
       score.capability,
@@ -93,7 +93,7 @@ describe("calibration anchors", () => {
     ).toBeLessThanOrEqual(80);
   });
 
-  it("ANCHOR 3 (Civis): remote cattle-call shape — crowded pool, referral lever, niche bonus skipped", () => {
+  it("ANCHOR 3 (Civis): remote cattle-call shape — crowded pool, structural lever, niche bonus skipped", () => {
     const scored = scoreCalibrationAnchor("civisCattleCall");
     const cherry = scoreCalibrationAnchor("cherryHill");
 
@@ -108,8 +108,8 @@ describe("calibration anchors", () => {
 
     expect(
       scored.poolFriendlinessLever,
-      "ANCHOR 3 (Civis): poolFriendliness lever is not referral — crowded cattle-call shape regressed",
-    ).toBe("referral");
+      "ANCHOR 3 (Civis): poolFriendliness lever is not structural — crowded cattle-call shape regressed",
+    ).toBe("none");
 
     expect(
       scored.poolAdjustments,

@@ -64,11 +64,10 @@ export type ScoringPolicy = {
 export const scoringPolicy: ScoringPolicy = {
   weights: { ...SCORE_CATEGORY_MAXES },
   scoreBands: [
-    { min: 85, max: 100, label: "excellent fit / top target" },
-    { min: 78, max: 84, label: "strong target" },
-    { min: 70, max: 77, label: "viable with meaningful caveats" },
-    { min: 60, max: 69, label: "stretch — needs clear upside" },
-    { min: 0, max: 59, label: "usually skip" },
+    { min: 80, max: 100, label: "Strong apply" },
+    { min: 65, max: 79, label: "Apply" },
+    { min: 50, max: 64, label: "Apply but weak (stretch)" },
+    { min: 0, max: 49, label: "Weak" },
   ],
   hardPenalties: {
     degreeRequiredTraditional: 16,
@@ -85,16 +84,32 @@ export const scoringPolicy: ScoringPolicy = {
     startupFounderMismatch: 8,
   },
   recommendationMapping: [
-    { min: 70, max: 100, recommendation: "apply_cold" as Recommendation, note: "strong fit, good screen odds" },
-    { min: 50, max: 69, recommendation: "referral_gated" as Recommendation, note: "strong fit, low cold-apply odds" },
-    { min: 35, max: 49, recommendation: "stretch_signal" as Recommendation, note: "stretch on skills" },
-    { min: 0, max: 34, recommendation: "skip" as Recommendation, note: "weak fit and weak odds" },
+    { min: 80, max: 100, recommendation: "strong_apply", note: "Strong apply" },
+    { min: 65, max: 79, recommendation: "apply", note: "Apply" },
+    { min: 50, max: 64, recommendation: "stretch", note: "Apply but weak (stretch)" },
+    { min: 0, max: 49, recommendation: "weak", note: "Weak" },
   ],
   shortlist: {
     minScore: 78,
     blockedStatuses: ["rejected", "closed", "applied", "lapsed"] as JobStatus[],
   },
 };
+
+export const TRACKER_PRIORITY_BY_RECOMMENDATION: Record<Recommendation, "high" | "medium" | "low"> = {
+  strong_apply: "high",
+  apply: "high",
+  stretch: "medium",
+  weak: "low",
+};
+
+export const TRACKER_ACTION_BY_RECOMMENDATION: Record<Recommendation, string> = {
+  strong_apply: "Strong apply — tailor resume + cover letter",
+  apply: "Apply",
+  stretch: "Apply but weak (stretch) — apply if quick",
+  weak: "Weak — skip unless special reason",
+};
+
+export const TRACKER_HARD_GATE_ACTION = "Weak — hard gate, do not apply";
 
 export const getTrackerColor = (status: JobStatus, score: number): "green" | "yellow" | "red" | "blue" => {
   if (status === "rejected" || status === "closed" || status === "lapsed") return "red";

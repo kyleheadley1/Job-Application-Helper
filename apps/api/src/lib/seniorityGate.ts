@@ -1,6 +1,6 @@
 import type { ExtractedJobData } from "../types/job.js";
 import type { RuleEvaluation } from "../types/scoring.js";
-import { jdSignalsSeniorDepthRequirements } from "./jdGroundedRiskNotes.js";
+import { jdDutiesBlob, jdSignalsSeniorDepthRequirements } from "./jdGroundedRiskNotes.js";
 import { normalizeText } from "./text.js";
 import { logger } from "./logger.js";
 
@@ -190,13 +190,18 @@ export const explainSeniorityGateTrigger = (
     };
   }
 
-  if (roleTitleSignalsSeniority(job.title)) {
+  if (titleOrLabelSignalsSeniority(job)) {
+    const stretch = !jdDemandsSeniorExperience(job);
+    const source = roleTitleSignalsSeniority(job.title) ? "title" : "seniorityField";
+    const detail = source === "title" ? (job.title ?? "") : (readLabeledSeniorityValue(job) ?? "");
     return {
       ...base,
-      wouldFire: true,
+      wouldFire: !stretch,
       vetoed: false,
-      triggerSource: "title",
-      triggerDetail: job.title ?? "",
+      triggerSource: source,
+      triggerDetail: stretch
+        ? `${detail} — title/label only, JD asks for nothing beyond the profile: stretch dock, no gate`
+        : detail,
       needsManualReview: false,
     };
   }
@@ -297,28 +302,68 @@ export const effectiveSeniorityFieldForGate = (job: ExtractedJobData): string | 
   return job.seniority ?? (resolved || null);
 };
 
-/**
- * Hard seniority gate — PRIMARY evidence: title (noun), structured level, yearsExperience.min
- * when structured seniority is present and consistent.
- *
- * When a multi-band tag includes Mid/Junior (early-career veto), still overreach if
- * Required/requiredSkills text is specifically senior-depth (Luminos guard).
- *
- * Fail safe (no gate + manual review) when:
- * - structured seniority is empty and only body years would fire, OR
- * - early-career chrome conflicts with years ≥5 (polluted year parse).
- */
-export const detectRoleSeniorityOverreach = (job: ExtractedJobData): boolean => {
-  if (earlyCareerLevelVetoesSeniorityGate(job)) {
-    return jdSignalsSeniorDepthRequirements(job);
+/** Required/responsibility asks that only an experienced hire meets (people leadership, years leading). */
+const SENIOR_EXPERIENCE_ASK_RE =
+  /\b(direct reports|people management|people manager|manag(?:e|ing) (?:a |the )?team of|lead(?:ing)? (?:a |the )?team of \d+|proven track record of (?:leading|managing)|extensive (?:industry |professional )?experience|\d+\+?\s*years?[^.\n]{0,40}\b(?:leading|leadership|managing|people management|as a (?:tech|team) lead)|set(?:ting)? technical (?:direction|strategy) (?:for|across) (?:the )?(?:org|organization|company|multiple teams))\b/i;
+
+export const jdAsksForSeniorExperience = (job: ExtractedJobData): boolean =>
+  SENIOR_EXPERIENCE_ASK_RE.test(jdDutiesBlob(job));
+
+/** "N+ years …experience" in Required/Responsibilities; a range counts by its lower bound. */
+const REQUIRED_YEARS_RE =
+  /(?:\b(\d{1,2})\s*[–-]\s*)?\b(\d{1,2})\s*\+?\s*(?:years?|yrs)\b[^.\n]{0,40}\b(?:experience|engineering|software|industry|professional|building|developing)\b/gi;
+
+export const requiredYearsRangeInDuties = (job: ExtractedJobData): { min: number; max?: number } | null => {
+  let best: { min: number; max?: number } | null = null;
+  for (const m of jdDutiesBlob(job).matchAll(REQUIRED_YEARS_RE)) {
+    const range = m[1]
+      ? { min: Number.parseInt(m[1], 10), max: Number.parseInt(m[2]!, 10) }
+      : { min: Number.parseInt(m[2]!, 10) };
+    if (!best || range.min < best.min) best = range;
   }
-  if (roleTitleSignalsSeniority(job.title)) return true;
-  if (seniorityNeedsManualReview(job)) return false;
-  const seniorityField = effectiveSeniorityFieldForGate(job);
-  return (
-    yearsExperienceSignalsOverreach(job.yearsExperience?.min) ||
-    seniorityFieldSignalsOverreach(seniorityField)
-  );
+  return best;
 };
+
+export const requiredYearsInDuties = (job: ExtractedJobData): number | null =>
+  requiredYearsRangeInDuties(job)?.min ?? null;
+
+/** Experience the JD actually demands beyond an early-career profile. */
+export const jdDemandsSeniorExperience = (job: ExtractedJobData): boolean =>
+  yearsExperienceSignalsOverreach(job.yearsExperience?.min ?? requiredYearsInDuties(job)) ||
+  jdSignalsSeniorDepthRequirements(job) ||
+  jdAsksForSeniorExperience(job);
+
+const titleOrLabelSignalsSeniority = (job: ExtractedJobData): boolean =>
+  roleTitleSignalsSeniority(job.title) || seniorityFieldSignalsOverreach(readLabeledSeniorityValue(job));
+
+/**
+ * - "overreach": the posting obviously wants more experience (5+ years, senior-depth or
+ *   people-leadership asks) → hard gate.
+ * - "stretch": only the title/Seniority label reads senior/staff/principal and the JD asks
+ *   for nothing beyond the profile (e.g. "Principal AI Engineer", 1+ years) → soft dock.
+ * - "none": no seniority signal, early-career veto, or an inferred label with nothing to back it.
+ *
+ * Multi-band Mid/Junior tags still overreach on senior-depth Required text (Luminos guard).
+ * Fail safe (no gate + manual review) when structured seniority is empty and only body years
+ * would fire, or early-career chrome conflicts with years ≥5.
+ */
+export type SeniorityAssessment = "none" | "stretch" | "overreach";
+
+export const assessRoleSeniority = (job: ExtractedJobData): SeniorityAssessment => {
+  if (earlyCareerLevelVetoesSeniorityGate(job)) {
+    return jdSignalsSeniorDepthRequirements(job) ? "overreach" : "none";
+  }
+  if (titleOrLabelSignalsSeniority(job)) {
+    return jdDemandsSeniorExperience(job) ? "overreach" : "stretch";
+  }
+  if (seniorityNeedsManualReview(job)) return "none";
+  return yearsExperienceSignalsOverreach(job.yearsExperience?.min) ? "overreach" : "none";
+};
+
+export const detectRoleSeniorityOverreach = (job: ExtractedJobData): boolean =>
+  assessRoleSeniority(job) === "overreach";
+
+export const detectRoleSeniorityStretch = (job: ExtractedJobData): boolean =>
+  assessRoleSeniority(job) === "stretch";
 
 export { EARLY_METADATA_SENIORITY_VALUE_RE, jdSignalsSeniorDepthRequirements };

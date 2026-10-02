@@ -103,7 +103,7 @@ function cherryHillJobRecord(): JobRecord {
     extracted: CHERRY_HILL_PROGRAMS_JOB,
     rules: cleanRules(),
     score: CHERRY_HILL_STORED_SCORE,
-    recommendation: "referral_gated",
+    recommendation: "apply",
     salaryAsk: {},
     recommendedResume: "BASE",
     resumeRationale: [],
@@ -115,7 +115,7 @@ function cherryHillJobRecord(): JobRecord {
     tracker: {
       priority: "medium",
       recommendedAction: "Apply",
-      statusOutcome: "referral_gated",
+      statusOutcome: "apply",
       shortlist: false,
       color: "gray",
     },
@@ -204,7 +204,7 @@ describe("cattle-call control (recognizable startup, not FAANG brand list)", () 
     expect(scoreListingEmployerRecognizability(CATTLE_CALL_CONTROL_JOB)).toBe(0.3);
     expect(pool.score).toBeGreaterThanOrEqual(0.33);
     expect(pool.score).toBeLessThanOrEqual(0.42);
-    expect(pool.lever).toBe("referral");
+    expect(pool.lever).toBe("none");
   });
 
   it("Cherry Hill Programs and cattle-call control diverge strongly", () => {
@@ -235,7 +235,7 @@ describe("pool friendliness display", () => {
       },
       rules: cleanRules(),
       extracted: CHERRY_HILL_PROGRAMS_JOB,
-      recommendation: "referral_gated",
+      recommendation: "apply",
     });
     const poolRow = display?.survivabilityRows.find((r) => r.key === "poolFriendliness");
     expect(poolRow?.bindingness).toBe("favorable");

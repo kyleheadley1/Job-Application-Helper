@@ -49,7 +49,7 @@ function minimalJob(extracted: ExtractedJobData, score: ScoreBreakdown): JobReco
     extracted,
     rules: { notes: [], hardRuleNotes: [] },
     score,
-    recommendation: "no",
+    recommendation: "weak",
     salaryAsk: {},
     recommendedResume: "BASE",
     resumeRationale: [],
@@ -92,9 +92,9 @@ describe("recomputeStoredJobScore", () => {
 
     const gate = evaluateHardGates(next.rules, TRIA_JOB);
     expect(gate.fired).toBe(false);
-    expect(next.recommendation).not.toBe("no");
+    expect(next.score.scoreDisplay?.hardGates ?? []).toEqual([]);
     expect(next.score.total).toBeGreaterThan(0);
-    expect(next.score.scoreDisplay?.referralAdvice).toBeDefined();
+    expect(next.score.scoreDisplay?.actionLine).not.toMatch(/referral/i);
   });
 
   it("rebuilds composite total from stored categories (not prior total)", () => {

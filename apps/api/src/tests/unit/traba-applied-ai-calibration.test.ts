@@ -44,11 +44,9 @@ describe("Traba Applied AI calibration", () => {
     const display = scored.score.scoreDisplay!;
     expect(display.final).toBe(scored.score.total);
     expect(display.final).toBeGreaterThanOrEqual(74);
-    expect(display.scoreBand).not.toBe("no");
-    expect(display.scoreBand).not.toBe("skip");
-    expect(display.bandHeadline).not.toBe("Skip");
-    expect(display.actionLine.toLowerCase()).not.toMatch(/^do not apply|^not worth the effort/);
-    expect(display.referralUrgency).toMatch(/strongly_advised|advised|optional/);
+    expect(display.hardGates).toEqual([]);
+    expect(["apply", "strong_apply"]).toContain(display.scoreBand);
+    expect(display.actionLine).toMatch(/^(Apply|Strong apply) — /);
   });
 
   it("vetoes gate when body polluted seniority=senior but rawText header has Mid Level", () => {

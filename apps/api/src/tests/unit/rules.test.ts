@@ -16,6 +16,29 @@ const makeJob = (overrides: Partial<ExtractedJobData>): ExtractedJobData => ({
   ...overrides,
 });
 
+describe("location preference vs requirement", () => {
+  const onsiteSf = {
+    remoteType: "onsite" as const,
+    locationIsCommutable: false,
+    location: "San Francisco",
+    rawText: "Software Engineer\nWork from our San Francisco office.",
+  };
+
+  it("hard-gates a required non-commutable onsite location", () => {
+    expect(evaluateRules(makeJob(onsiteSf), userProfile).locationMismatch).toBe(true);
+  });
+
+  it("does not gate a location marked preferred", () => {
+    expect(
+      evaluateRules(makeJob({ ...onsiteSf, location: "San Francisco (preferred)" }), userProfile).locationMismatch,
+    ).toBe(false);
+    expect(
+      evaluateRules(makeJob({ ...onsiteSf, rawText: "Software Engineer\nBased in San Francisco (preferred)" }), userProfile)
+        .locationMismatch,
+    ).toBe(false);
+  });
+});
+
 describe("rule engine", () => {
   it("flags explicit degree risks", () => {
     const rules = evaluateRules(

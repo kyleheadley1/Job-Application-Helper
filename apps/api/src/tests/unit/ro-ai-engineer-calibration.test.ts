@@ -93,13 +93,8 @@ describe("Ro AI Engineer calibration", () => {
     const display = result.score.scoreDisplay!;
     expect(display.final).toBe(result.score.total);
     expect(display.hardGates).toEqual([]);
-    expect(display.scoreBand).not.toBe("no");
-    expect(display.scoreBand).not.toBe("skip");
-    expect(display.bandHeadline).not.toBe("Skip");
-    expect(display.actionLine.toLowerCase()).not.toMatch(/^do not apply|^not worth/);
-    expect(display.actionLine.toLowerCase()).toMatch(/worth applying|ballpark|strong shot/);
-    expect(display.referralUrgency).toMatch(/strongly_advised|advised|optional/);
-    expect(display.referralAdvice.toLowerCase()).not.toMatch(/do not apply/);
+    expect(["apply", "strong_apply"]).toContain(display.scoreBand);
+    expect(display.actionLine).toMatch(/^(Apply|Strong apply) — /);
     expect(display.actionLine.toLowerCase()).toMatch(/python|node|backend|resume/);
   });
 });
@@ -137,7 +132,7 @@ describe("hard gate display consistency", () => {
 
     expect(display!.final).toBe(composite.score.total);
     expect(display!.final).toBe(25);
-    expect(display!.scoreBand).toBe("no");
-    expect(display!.actionLine.toLowerCase()).toMatch(/do not apply/);
+    expect(display!.scoreBand).toBe("weak");
+    expect(display!.actionLine).toMatch(/^Weak — hard gate: /);
   });
 });
