@@ -8,12 +8,8 @@ import type {
   RuleEvaluation,
   ScoreBand,
   ScoreBreakdown,
-  SpecializationGap,
 } from "../types/scoring.js";
 import type { UserProfile } from "../types/userProfile.js";
-import {
-  specializationGapIsNonAddressable,
-} from "./capabilityGap.js";
 import {
   computeFinalComposite,
   computeGapDock,
@@ -58,55 +54,6 @@ export const computeCapability = (rawScore: ScoreBreakdown): number => {
 
 export type { CapabilityBreakdown };
 export { computeCapabilityBreakdown, buildFullCapabilityBreakdown };
-
-/** Legacy 2×2 matrix — retained for guards and calibration helpers. */
-export const resolveCompositeRecommendation = (
-  capability: number,
-  survivability: number,
-): Recommendation => {
-  const strongCap = capability >= SURVIVABILITY_TUNING.strongCapabilityThreshold;
-  const goodOdds = survivability >= SURVIVABILITY_TUNING.goodOddsThreshold;
-  if (strongCap && goodOdds) return "apply_cold";
-  if (strongCap && !goodOdds) return "referral_gated";
-  if (!strongCap && goodOdds) return "stretch_signal";
-  return "skip";
-};
-
-export const resolveBandRecommendation = (
-  band: ScoreBand,
-  capability: number,
-  survivability: number,
-  gap: SpecializationGap | undefined,
-): Recommendation => {
-  if (band === "no") return "no";
-  if (gap?.severity === "central" && gap.lever !== "resume") {
-    return band === "skip" ? "skip" : "stretch_signal";
-  }
-  if (band === "strong_apply") {
-    return survivability >= SURVIVABILITY_TUNING.goodOddsThreshold
-      ? "apply_cold"
-      : "referral_gated";
-  }
-  if (band === "apply") {
-    if (capability >= SURVIVABILITY_TUNING.strongCapabilityThreshold) {
-      return "referral_gated";
-    }
-    return "stretch_signal";
-  }
-  return "skip";
-};
-
-export const adjustRecommendationForSpecializationGap = (
-  recommendation: Recommendation,
-  gap: SpecializationGap | undefined,
-): Recommendation => {
-  if (!gap || !specializationGapIsNonAddressable(gap)) return recommendation;
-  if (recommendation === "referral_gated" || recommendation === "apply_cold") {
-    return "stretch_signal";
-  }
-  if (recommendation === "skip" && gap.severity === "central") return "skip";
-  return recommendation;
-};
 
 export type CompositeScoreResult = {
   score: ScoreBreakdown;
@@ -156,11 +103,11 @@ export const computeCompositeScore = (params: {
         survivabilityBreakdown: toPersistedSurvivabilityBreakdown(survivabilityResult),
         certificationBoost: survivabilityResult.certificationBoost,
         total: SURVIVABILITY_TUNING.hardGateScoreFloor,
-        recommendationLabel: RECOMMENDATION_LABELS.no,
+        recommendationLabel: RECOMMENDATION_LABELS.weak,
       },
-      recommendation: "no",
-      recommendationLabel: RECOMMENDATION_LABELS.no,
-      scoreBand: "no",
+      recommendation: "weak",
+      recommendationLabel: RECOMMENDATION_LABELS.weak,
+      scoreBand: "weak",
       hardGateFired: true,
       hardGateReasons: gate.reasons,
     };
@@ -192,15 +139,7 @@ export const computeCompositeScore = (params: {
   const scoreBand = resolveScoreBand(composite.final);
   const worthTailoring = computeWorthTailoring(composite.final, scoreBand);
   const bandHeadline = resolveBandHeadline(scoreBand, composite.final);
-  const recommendation = adjustRecommendationForSpecializationGap(
-    resolveBandRecommendation(
-      scoreBand,
-      capability,
-      survivabilityResult.multiplier,
-      params.rules.specializationGap,
-    ),
-    params.rules.specializationGap,
-  );
+  const recommendation: Recommendation = scoreBand;
 
   return {
     score: {

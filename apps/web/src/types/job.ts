@@ -1,12 +1,12 @@
 export type ResumeType = "BASE" | "AI" | "SWE" | "SIE" | "EARLY_CAREER";
-export type Recommendation =
-  | "apply_cold"
-  | "referral_gated"
-  | "stretch_signal"
-  | "skip"
-  | "no"
-  | "yes"
-  | "selective_yes";
+export type Recommendation = "strong_apply" | "apply" | "stretch" | "weak";
+
+export const RECOMMENDATION_LABELS: Record<Recommendation, string> = {
+  strong_apply: "Strong apply",
+  apply: "Apply",
+  stretch: "Apply but weak (stretch)",
+  weak: "Weak",
+};
 export type JobStatus =
   | "to_review"
   | "applied"
@@ -157,8 +157,6 @@ export type StrategicLeverSelection = {
   isCollapsedReferral: boolean;
 };
 
-export type ReferralUrgency = "strongly_advised" | "advised" | "optional";
-
 export type EligibilityFlag = {
   reason: string;
   evidence: string;
@@ -179,16 +177,14 @@ export type ScoreDisplay = {
   survAdjustment: number;
   gapDock: number;
   scoreDerivation: string;
-  scoreBand: "strong_apply" | "apply" | "skip" | "no";
-  bandHeadline: "Strong yes" | "Yes" | "If quick" | "Skip";
+  scoreBand: Recommendation;
+  bandHeadline: "Strong apply" | "Apply" | "Apply but weak (stretch)" | "Weak";
   worthTailoring: boolean;
   survivabilityRows: SurvivabilityDisplayRow[];
   hardGates: string[];
   survivabilityPenalties: SurvivabilityPenalty[];
   dominantLever?: StrategicLeverSelection;
   actionLine: string;
-  referralAdvice: string;
-  referralUrgency: ReferralUrgency;
   credentialBoostNote?: string;
   poolFriendlinessNote?: string;
   degreePositiveNote?: string;

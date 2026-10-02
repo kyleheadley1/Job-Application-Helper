@@ -31,6 +31,7 @@ import {
   PRODUCTION_INFRA_OWNERSHIP_LEVEL_FIT_DOCK,
 } from "./namedCapabilityRiskPenalty.js";
 import type { UserProfile } from "../types/userProfile.js";
+import { levelFitCeilingForSeniorityDock, seniorityLevelFitDock } from "./experienceGap.js";
 import { userProfile as defaultUserProfile } from "../config/userProfile.js";
 
 const jobBlob = (job: ExtractedJobData): string => structuredFirstJobBlob(job);
@@ -353,6 +354,11 @@ export const applyScoringClampLayer = (params: {
     if (dock > 0) {
       score.levelFit = Math.max(0, score.levelFit - dock);
     }
+  }
+
+  const seniorityDock = seniorityLevelFitDock(rules);
+  if (seniorityDock > 0) {
+    score.levelFit = Math.min(score.levelFit, levelFitCeilingForSeniorityDock(seniorityDock));
   }
 
   if (rules.productionInfraOwnershipGap) {

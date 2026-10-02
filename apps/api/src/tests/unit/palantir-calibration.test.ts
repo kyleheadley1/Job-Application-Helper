@@ -10,7 +10,6 @@ import {
 import { computeCompositeScore, computeCapabilityBreakdown } from "../../lib/compositeScoreModel.js";
 import { applyScoringClampLayer } from "../../lib/scoringClampLayer.js";
 import { buildScoreDisplay } from "../../lib/scoreDisplayModel.js";
-import { guardCompositeRecommendation } from "../../lib/recommendationGuard.js";
 import type { ExtractedJobData } from "../../types/job.js";
 import type { ScoreBreakdown } from "../../types/scoring.js";
 
@@ -95,15 +94,14 @@ describe("Palantir Web Design Engineer calibration", () => {
     expect(composite.score.capability).toBeLessThanOrEqual(72);
     expect(composite.score.total).toBeLessThan(65);
     expect(composite.scoreBand).not.toBe("strong_apply");
-    expect(["apply", "skip"]).toContain(composite.scoreBand);
-    expect(composite.recommendation).toBe("skip");
+    expect(["stretch", "weak"]).toContain(composite.scoreBand);
+    expect(composite.recommendation).toBe(composite.scoreBand);
 
     const display = buildScoreDisplay({
       score: composite.score,
       rules: rulesWithGap,
       extracted: PALANTIR_JOB,
       recommendation: composite.recommendation,
-      referralPathwayAvailable: false,
     });
 
     expect(display?.gapDock).toBeGreaterThanOrEqual(12);
@@ -115,20 +113,9 @@ describe("Palantir Web Design Engineer calibration", () => {
     expect(display?.actionLine).toMatch(/design\/figma/i);
     expect(display?.actionLine).toMatch(/portfolio/i);
     expect(display?.actionLine).not.toMatch(/credential signal/i);
-    expect(display?.actionLine).not.toMatch(/referral routes around/i);
-    expect(display?.referralAdvice).toMatch(/substantially help|would help here/i);
-    expect(display?.referralUrgency).toMatch(/strongly_advised|advised/);
-    expect(display?.bandHeadline).not.toBe("Strong yes");
-    expect(["Skip", "Yes", "If quick"]).toContain(display?.bandHeadline);
+    expect(display?.actionLine).not.toMatch(/referral/i);
+    expect(["Weak", "Apply but weak (stretch)"]).toContain(display?.bandHeadline);
     expect(display?.scoreDerivation).toMatch(/− \d+/);
 
-    const guarded = guardCompositeRecommendation({
-      recommendation: composite.recommendation,
-      capability: composite.score.capability ?? 0,
-      survivability: composite.score.survivability ?? 0,
-      rules: rulesWithGap,
-      survivabilityPenalties: display?.survivabilityPenalties ?? [],
-    });
-    expect(guarded).toBe("skip");
   });
 });

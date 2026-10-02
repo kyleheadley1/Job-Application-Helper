@@ -1,4 +1,5 @@
-import { isApplyRecommendation, toLegacyRecommendation } from "../../lib/recommendationMapping.js";
+import { SURVIVABILITY_TUNING } from "../../config/capabilitySurvivabilityPolicy.js";
+import { toLegacyRecommendation } from "../../lib/recommendationMapping.js";
 import type { ExtractedJobData } from "../../types/job.js";
 import type { Recommendation, RuleEvaluation, SalaryAsk, ScoreBreakdown } from "../../types/scoring.js";
 import { normalizeText } from "../../lib/text.js";
@@ -32,13 +33,15 @@ export const computeSalaryAsk = (params: {
 }): SalaryAsk => {
   const { extracted: job, score, recommendation, rules } = params;
   const legacyRec = toLegacyRecommendation(recommendation);
+  const hardGated =
+    recommendation === "weak" && score.total <= SURVIVABILITY_TUNING.hardGateScoreFloor;
   const posted = resolvePostedSalary(job);
   const postedMin = posted.min;
   const postedMax = posted.max;
 
   if (
     (rules.credentialHeavyFintechAlgorithm || rules.goDistributedDataInfraCandidateGap) &&
-    recommendation === "no"
+    recommendation === "weak"
   ) {
     return {};
   }
@@ -84,7 +87,7 @@ export const computeSalaryAsk = (params: {
       rules.infraCoreRole !== true &&
       rules.matureStructuredEmployer === true &&
       postedMin >= 170_000 &&
-      recommendation !== "no" &&
+      !hardGated &&
       score.total < 82
     ) {
       const conservativeMid = Math.round(postedMin + band * 0.24);
@@ -94,21 +97,21 @@ export const computeSalaryAsk = (params: {
     /** Wide $150k+ bands: never anchor below $120k for viable fits (does not override mature-language caps above). */
     if (
       postedMin >= 150_000 &&
-      recommendation !== "no" &&
+      !hardGated &&
       score.total >= 65 &&
       !rules.stackMismatch
     ) {
       ask = Math.max(ask, 120_000);
     }
     // For narrower/modest posted bands, strong fits can anchor near the top.
-    if (score.total >= 78 && band <= 150_000 && postedMax < 150_000 && recommendation !== "no") {
+    if (score.total >= 78 && band <= 150_000 && postedMax < 150_000 && !hardGated) {
       ask = postedMax;
-    } else if (score.total >= 78 && band <= 90_000 && recommendation !== "no" && postedMax < 150_000) {
+    } else if (score.total >= 78 && band <= 90_000 && !hardGated && postedMax < 150_000) {
       ask = Math.max(ask, Math.round(postedMin + band * 0.88));
     } else if (
       score.total >= 70 &&
       score.total <= 77 &&
-      recommendation !== "no" &&
+      !hardGated &&
       postedMax < 150_000 &&
       band <= 90_000
     ) {
@@ -155,7 +158,7 @@ export const computeSalaryAsk = (params: {
     const mid = 127_500;
     return { number: roundToNearest5k(mid), rangeMin: 120_000, rangeMax: 135_000 };
   }
-  if (rules.foundingEngineerStretch && recommendation !== "no") {
+  if (rules.foundingEngineerStretch && !hardGated) {
     return { number: 155_000, rangeMin: 150_000, rangeMax: 160_000 };
   }
 
@@ -172,7 +175,7 @@ export const computeSalaryAsk = (params: {
     }
   }
   if (rules.financePenalty || rules.traditionalCompanyPenalty) base -= 5000;
-  if (recommendation === "no") base -= 10000;
+  if (hardGated) base -= 10000;
   if (score.total >= 80 && legacyRec === "yes") base += 5000;
 
   const spread = score.total >= 80 ? 12000 : 10000;

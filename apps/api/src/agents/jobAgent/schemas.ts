@@ -3,18 +3,14 @@ import { SCORE_CATEGORY_MAXES } from '../../config/scoringPolicy.js';
 import { TRACKER_EXPORT_HEADERS } from '../../tracker/canonicalSpreadsheet.js';
 import { preprocessExtractionInput } from '../../tools/triageStructuredNormalize.js';
 import { LEGACY_RESUME_TYPES, RESUME_TYPES } from '../../types/resume.js';
+import { normalizeRecommendation } from '../../lib/compositeScoring.js';
+import { RECOMMENDATIONS } from '../../types/scoring.js';
 
 export const ResumeTypeSchema = z.enum([...RESUME_TYPES, ...LEGACY_RESUME_TYPES]);
-export const RecommendationSchema = z.enum([
-  'apply_cold',
-  'referral_gated',
-  'stretch_signal',
-  'skip',
-  'no',
-  /** @deprecated legacy persisted values */
-  'yes',
-  'selective_yes',
-]);
+export const RecommendationSchema = z.preprocess(
+  (raw) => normalizeRecommendation(raw),
+  z.enum(RECOMMENDATIONS),
+);
 export const JobStatusSchema = z.enum([
   'to_review',
   'applied',
@@ -138,6 +134,8 @@ export const RuleEvaluationSchema = z.object({
   earlyCareerFriendlyRole: z.boolean(),
   newGradPenalty: z.boolean(),
   seniorityOverreach: z.boolean(),
+  seniorityStretch: z.boolean().optional(),
+  experienceGap: z.object({ dock: z.number(), reason: z.string() }).optional(),
   locationMismatch: z.boolean(),
   visaMismatch: z.boolean(),
   citizenshipMismatch: z.boolean(),
@@ -309,8 +307,8 @@ export const ScoreDisplaySchema = z.object({
   survAdjustment: z.number(),
   gapDock: z.number(),
   scoreDerivation: z.string(),
-  scoreBand: z.enum(["strong_apply", "apply", "skip", "no"]),
-  bandHeadline: z.enum(["Strong yes", "Yes", "If quick", "Skip"]),
+  scoreBand: z.enum(RECOMMENDATIONS),
+  bandHeadline: z.enum(["Strong apply", "Apply", "Apply but weak (stretch)", "Weak"]),
   worthTailoring: z.boolean(),
   survivabilityRows: z.array(SurvivabilityDisplayRowSchema),
   hardGates: z.array(z.string()),
@@ -323,8 +321,6 @@ export const ScoreDisplaySchema = z.object({
   ),
   dominantLever: StrategicLeverSelectionSchema.optional(),
   actionLine: z.string(),
-  referralAdvice: z.string(),
-  referralUrgency: z.enum(["strongly_advised", "advised", "optional"]),
   credentialBoostNote: z.string().optional(),
   poolFriendlinessNote: z.string().optional(),
   eligibilityAdvisory: z

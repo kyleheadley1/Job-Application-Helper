@@ -90,7 +90,7 @@ describe("DeepScribe calibration anchor", () => {
       recommendation: composite.recommendation,
     });
 
-    expect(composite.recommendation).not.toBe("apply_cold");
+    expect(composite.recommendation).not.toBe("strong_apply");
     expect(composite.score.capability).toBeGreaterThanOrEqual(75);
     expect(composite.score.capability).toBeLessThanOrEqual(84);
     // Weak cold-apply odds: below named production thresholds (never a bare 0.5).
@@ -101,7 +101,7 @@ describe("DeepScribe calibration anchor", () => {
     expect(composite.score.total).toBeLessThan(80);
     expect(composite.scoreBand).toBe("apply");
     expect(composite.scoreBand).not.toBe("strong_apply");
-    expect(display?.bandHeadline).toBe("Yes");
+    expect(display?.bandHeadline).toBe("Apply");
     expect(display?.scoreDerivation).not.toMatch(/pool/i);
     expect(derivationHasOnlyLegitimateTerms(display!.scoreDerivation)).toBe(true);
   });

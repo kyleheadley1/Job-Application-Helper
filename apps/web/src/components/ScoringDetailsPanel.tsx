@@ -49,7 +49,13 @@ const firedRules = (rules: Record<string, unknown>): FiredRule[] => {
     else if (typeof value === "string" && value) out.push({ key, value, favorable });
     else if (typeof value === "number" && value) out.push({ key, value: String(value), favorable });
     else if (value && typeof value === "object" && !Array.isArray(value)) {
-      out.push({ key, value: JSON.stringify(value), favorable });
+      const { reason, evidence, dock } = value as { reason?: unknown; evidence?: unknown; dock?: unknown };
+      const text = typeof reason === "string" ? reason : typeof evidence === "string" ? evidence : null;
+      out.push({
+        key,
+        value: text ? `${typeof dock === "number" ? `−${dock}: ` : ""}${text}` : JSON.stringify(value),
+        favorable,
+      });
     }
   }
   return out.sort((a, b) => Number(a.favorable) - Number(b.favorable));
@@ -96,10 +102,8 @@ function DetailView({ detail }: { detail: ScoringDetail }) {
           <div style={{ fontSize: "1.2rem" }}>{fmt(display?.gapDock, 1)}</div>
         </div>
         <div>
-          <div className="muted smallText">Band / recommendation</div>
-          <div style={{ fontSize: "1.2rem" }}>
-            {display?.bandHeadline ?? "—"} · {detail.recommendation}
-          </div>
+          <div className="muted smallText">Recommendation</div>
+          <div style={{ fontSize: "1.2rem" }}>{display?.bandHeadline ?? detail.recommendation ?? "—"}</div>
         </div>
       </div>
 

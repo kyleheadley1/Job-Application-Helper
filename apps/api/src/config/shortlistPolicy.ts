@@ -22,8 +22,8 @@ export const shortlistPolicy = {
 } as const;
 
 export const SHORTLIST_TAG = {
-  highFitCrowdedPool: "high fit / crowded pool — referral recommended",
-  staleReferralOpen: "stale — referral path open",
+  highFitCrowdedPool: "high fit / crowded pool",
+  staleReferralOpen: "stale — you have a named connection there",
 } as const;
 
 export const FRESHNESS_TIER = {

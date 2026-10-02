@@ -4,9 +4,6 @@ import {
   SURVIVABILITY_TUNING,
   SURVIVABILITY_WEIGHTS,
 } from "../../config/capabilitySurvivabilityPolicy.js";
-import {
-  resolveCompositeRecommendation,
-} from "../../lib/compositeScoreModel.js";
 import { roundSurvivabilityScalar } from "../../lib/survivabilityScore.js";
 import {
   loadCalibrationFixture,
@@ -56,9 +53,6 @@ describe("DeepScribe survivability boundary", () => {
     expect(scored.score.capability).toBeGreaterThanOrEqual(
       SURVIVABILITY_TUNING.strongCapabilityThreshold,
     );
-    expect(
-      resolveCompositeRecommendation(scored.score.capability!, surv),
-    ).toBe("referral_gated");
 
     expect(fixture.anchorNote).toMatch(/stale\/arbitrary placeholder/i);
     expect(fixture.anchorNote).toMatch(/already correct/i);

@@ -1,8 +1,13 @@
-import { COMPOSITE_SCORING } from "../config/capabilitySurvivabilityPolicy.js";
-import type { BandHeadline, RuleEvaluation, ScoreBand } from "../types/scoring.js";
+import { COMPOSITE_SCORING, RECOMMENDATION_LABELS } from "../config/capabilitySurvivabilityPolicy.js";
+import {
+  RECOMMENDATIONS,
+  type BandHeadline,
+  type Recommendation,
+  type RuleEvaluation,
+  type ScoreBand,
+} from "../types/scoring.js";
 import type { UserProfile } from "../types/userProfile.js";
 import { computeDegreeGapDock } from "./degreeGap.js";
-
 export type CompositeParts = {
   capability: number;
   survivability: number;
@@ -78,20 +83,40 @@ export const computeWorthTailoring = (
   final: number,
   scoreBand: ScoreBand = "apply",
 ): boolean => {
-  if (scoreBand === "skip" || scoreBand === "no") return false;
+  if (scoreBand === "weak") return false;
   return final >= COMPOSITE_SCORING.TAILOR_CAPABILITY;
 };
 
+/** The recommendation is the score tier — nothing else moves it. Hard gates land in weak via the score cap. */
 export const resolveScoreBand = (final: number, hardGate = false): ScoreBand => {
-  if (hardGate) return "no";
+  if (hardGate) return "weak";
   if (final >= COMPOSITE_SCORING.STRONG_APPLY) return "strong_apply";
   if (final >= COMPOSITE_SCORING.APPLY_LOW) return "apply";
-  return "skip";
+  if (final >= COMPOSITE_SCORING.STRETCH_LOW) return "stretch";
+  return "weak";
 };
 
-export const resolveBandHeadline = (scoreBand: ScoreBand, final: number): BandHeadline => {
-  if (scoreBand === "no" || scoreBand === "skip") return "Skip";
-  if (scoreBand === "strong_apply") return "Strong yes";
-  if (final >= COMPOSITE_SCORING.TAILOR_CAPABILITY) return "Yes";
-  return "If quick";
+export const recommendationForScore = (final: number, hardGate = false): Recommendation =>
+  resolveScoreBand(final, hardGate);
+
+export const resolveBandHeadline = (scoreBand: ScoreBand, _final?: number): BandHeadline =>
+  RECOMMENDATION_LABELS[scoreBand];
+
+/** Map any persisted value (including pre-tier legacy values) onto the score-tier scale. */
+export const normalizeRecommendation = (raw: unknown, total?: number): Recommendation => {
+  if (typeof total === "number" && Number.isFinite(total)) return recommendationForScore(total);
+  if (typeof raw === "string" && (RECOMMENDATIONS as readonly string[]).includes(raw)) {
+    return raw as Recommendation;
+  }
+  switch (raw) {
+    case "apply_cold":
+    case "yes":
+    case "referral_gated":
+    case "selective_yes":
+      return "apply";
+    case "stretch_signal":
+      return "stretch";
+    default:
+      return "weak";
+  }
 };

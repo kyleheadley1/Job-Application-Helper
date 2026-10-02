@@ -60,7 +60,7 @@ describe("triage from raw pasted text (no structured hand-build)", () => {
     expect(job.rules.citizenshipMismatch).toBe(false);
     expect(job.rules.locationMismatch).toBe(true);
 
-    expect(job.recommendation).toBe("no");
+    expect(job.recommendation).toBe("weak");
     expect(job.score.total).toBeLessThan(70);
     expect(job.tracker.shortlist).toBe(false);
 
@@ -86,7 +86,7 @@ describe("triage from raw pasted text (no structured hand-build)", () => {
     expect(good.score.total - bad.score.total).toBeGreaterThanOrEqual(10);
     expect((good.score.capability ?? 0) - (bad.score.capability ?? 0)).toBeGreaterThanOrEqual(15);
     expect(good.score.total).toBeGreaterThan(bad.score.total);
-    expect(["apply_cold", "referral_gated", "stretch_signal", "yes", "selective_yes"]).toContain(
+    expect(["strong_apply", "apply", "stretch"]).toContain(
       good.recommendation,
     );
   });
@@ -123,7 +123,7 @@ describe("raw-text score separation regressions", () => {
     expect((startup.score.capability ?? 0) - (bank.score.capability ?? 0)).toBeGreaterThanOrEqual(15);
     expect(early.score.total).toBeGreaterThan(bank.score.total);
 
-    expect(bank.recommendation).toBe("no");
+    expect(bank.recommendation).toBe("weak");
     expect(bank.tracker.shortlist).toBe(false);
 
     expect(startup.recommendedResume).toBe("BASE");

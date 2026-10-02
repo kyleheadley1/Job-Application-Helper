@@ -37,7 +37,7 @@ export const composeSpecializationGapActionLine = (
   if (gap.kind === "design_portfolio") {
     const pillar = gap.jdSide ?? gap.name;
     if (gap.severity === "central") {
-      return `${prefix} — ${pillar} is central and your evidence is ${gap.resumeSide ?? "engineering-side"}; a referral won't close it. Build portfolio evidence first.`;
+      return `${prefix} — ${pillar} is central and your evidence is ${gap.resumeSide ?? "engineering-side"}. Build portfolio evidence first.`;
     }
     const core = `${prefix} — ${pillar} is load-bearing but your evidence is ${gap.resumeSide ?? "engineering-side"}; build portfolio evidence via resume framing`;
     return `${core}.${tailorSuffix(worthTailoring, gap.severity)}`;
@@ -46,7 +46,7 @@ export const composeSpecializationGapActionLine = (
   if (gap.kind === "enterprise_iam") {
     const pillar = gap.jdSide ?? gap.name;
     if (gap.severity === "central") {
-      return `${prefix} — ${pillar} is central and your evidence is ${gap.resumeSide ?? "OAuth-only"}; a referral won't close it. ${leverInstruction(gap.lever).charAt(0).toUpperCase()}${leverInstruction(gap.lever).slice(1)}.`;
+      return `${prefix} — ${pillar} is central and your evidence is ${gap.resumeSide ?? "OAuth-only"}. ${leverInstruction(gap.lever).charAt(0).toUpperCase()}${leverInstruction(gap.lever).slice(1)}.`;
     }
     return `${prefix} — ${gap.evidence}. ${leverInstruction(gap.lever).charAt(0).toUpperCase()}${leverInstruction(gap.lever).slice(1)}.`;
   }

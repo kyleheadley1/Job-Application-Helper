@@ -156,8 +156,8 @@ describe("adjacent role-function classifier", () => {
     expect(composite.score.roleFunctionCapNote).toMatch(/outside core SWE lane/i);
     expect(display?.final ?? 0).toBeGreaterThanOrEqual(55);
     expect(display?.final ?? 0).toBeLessThanOrEqual(69);
-    expect(["stretch_signal", "skip"]).toContain(composite.recommendation);
-    expect(display?.bandHeadline).not.toBe("Yes");
+    expect(["stretch", "apply"]).toContain(composite.recommendation);
+    expect(display?.bandHeadline).not.toBe("Strong apply");
   });
 
   it("treats SIE-primary solutions roles as adjacent when not builder-first", () => {
@@ -183,7 +183,7 @@ describe("adjacent role-function classifier", () => {
     expect(composite.score.capabilityBreakdown?.functionalOverlap).toBeLessThanOrEqual(20);
     expect(display?.final ?? 0).toBeGreaterThanOrEqual(55);
     expect(display?.final ?? 0).toBeLessThanOrEqual(69);
-    expect(["stretch_signal", "skip"]).toContain(composite.recommendation);
+    expect(["stretch", "apply"]).toContain(composite.recommendation);
   });
 
   it("caps Scalence implementation analyst role — final lands in the 60s", () => {
@@ -196,7 +196,7 @@ describe("adjacent role-function classifier", () => {
     expect(composite.score.capabilityBreakdown?.functionalOverlap).toBeLessThanOrEqual(20);
     expect(display?.final ?? 0).toBeGreaterThanOrEqual(55);
     expect(display?.final ?? 0).toBeLessThanOrEqual(69);
-    expect(["stretch_signal", "skip"]).toContain(composite.recommendation);
+    expect(["stretch", "apply"]).toContain(composite.recommendation);
   });
 
   it("guards: product SWE anchors stay uncapped by adjacent-role classifier", async () => {

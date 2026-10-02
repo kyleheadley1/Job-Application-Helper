@@ -1,21 +1,18 @@
 import type { LegacyRecommendation, Recommendation } from "../types/scoring.js";
 
 export const toLegacyRecommendation = (rec: Recommendation): LegacyRecommendation => {
-  if (rec === "yes" || rec === "selective_yes") return rec;
   switch (rec) {
-    case "apply_cold":
+    case "strong_apply":
+    case "apply":
       return "yes";
-    case "referral_gated":
-    case "stretch_signal":
+    case "stretch":
       return "selective_yes";
-    case "skip":
-    case "no":
+    case "weak":
       return "no";
   }
 };
 
-export const isPositiveRecommendation = (rec: Recommendation): boolean =>
-  rec === "apply_cold" || rec === "referral_gated" || rec === "stretch_signal";
+export const isPositiveRecommendation = (rec: Recommendation): boolean => rec !== "weak";
 
 export const isApplyRecommendation = (rec: Recommendation): boolean =>
-  rec === "apply_cold" || rec === "referral_gated";
+  rec === "strong_apply" || rec === "apply";

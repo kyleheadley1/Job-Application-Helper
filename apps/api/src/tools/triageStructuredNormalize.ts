@@ -5,6 +5,7 @@
  */
 
 import { SCORE_CATEGORY_MAXES } from '../config/scoringPolicy.js';
+import { normalizeRecommendation } from '../lib/compositeScoring.js';
 import type { Recommendation } from '../types/scoring.js';
 
 const SCORE_KEYS = [
@@ -313,21 +314,8 @@ const coerceMainRiskString = (raw: unknown): string => {
   return "Recruiter screen realism risk (unspecified).";
 };
 
-const coerceRecommendation = (raw: unknown): Recommendation => {
-  const values = [
-    "apply_cold",
-    "referral_gated",
-    "stretch_signal",
-    "skip",
-    "no",
-    "yes",
-    "selective_yes",
-  ] as const;
-  if (typeof raw === "string" && (values as readonly string[]).includes(raw)) {
-    return raw as Recommendation;
-  }
-  return "referral_gated";
-};
+/** Model recommendation is advisory only — the final recommendation is the score tier. */
+const coerceRecommendation = (raw: unknown): Recommendation => normalizeRecommendation(raw);
 
 /** Preprocess raw model JSON before `ScoringOutputSchema` parse. */
 export const preprocessScoringInput = (raw: unknown): unknown => {

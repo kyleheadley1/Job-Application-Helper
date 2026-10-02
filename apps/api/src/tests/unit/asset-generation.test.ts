@@ -54,7 +54,7 @@ const makeJob = (overrides: Partial<JobRecord> & { recommendation?: Recommendati
   },
   rules: { ...emptyRules },
   score: { ...scoreOk },
-  recommendation: overrides.recommendation ?? "selective_yes",
+  recommendation: overrides.recommendation ?? "stretch",
   salaryAsk: {},
   recommendedResume: overrides.recommendedResume ?? "BASE",
   resumeRationale: ["Heuristic"],
@@ -72,14 +72,14 @@ const makeJob = (overrides: Partial<JobRecord> & { recommendation?: Recommendati
 
 describe("asset generation orchestrator", () => {
   it("skips when recommendation is no and force is false", async () => {
-    const job = makeJob({ recommendation: "no" });
+    const job = makeJob({ recommendation: "weak" });
     const r = await generateJobAssets({ job, userProfile, force: false });
     expect(r.skipped).toBe(true);
     expect(r.generated).toEqual({});
   });
 
   it("does not skip when recommendation is no but force is true", async () => {
-    const job = makeJob({ recommendation: "no" });
+    const job = makeJob({ recommendation: "weak" });
     const r = await generateJobAssets({ job, userProfile, force: true });
     expect(r.skipped).toBeFalsy();
     expect(r.generated.coverLetter?.length).toBeGreaterThan(20);
@@ -90,7 +90,7 @@ describe("asset generation orchestrator", () => {
   });
 
   it("deterministic pack avoids invented tenure and uses profile-only tech", () => {
-    const job = makeJob({ recommendation: "selective_yes" });
+    const job = makeJob({ recommendation: "stretch" });
     const g = buildDeterministicGeneratedAssets(job, userProfile);
     const blob = JSON.stringify(g).toLowerCase();
     expect(blob).not.toMatch(/\b1\d\+ years\b/);
@@ -137,14 +137,14 @@ describe("asset generation orchestrator", () => {
   });
 
   it("deterministic cover letter stays textbox-sized by default", () => {
-    const g = buildDeterministicGeneratedAssets(makeJob({ recommendation: "yes" }), userProfile);
+    const g = buildDeterministicGeneratedAssets(makeJob({ recommendation: "apply" }), userProfile);
     const words = (g.coverLetter ?? "").trim().split(/\s+/).filter(Boolean).length;
     expect(words).toBeLessThanOrEqual(200);
     expect(words).toBeGreaterThanOrEqual(90);
   });
 
   it("deterministic cover letter is concise multi-paragraph textbox format", () => {
-    const g = buildDeterministicGeneratedAssets(makeJob({ recommendation: "selective_yes" }), userProfile);
+    const g = buildDeterministicGeneratedAssets(makeJob({ recommendation: "stretch" }), userProfile);
     const paras = (g.coverLetter ?? "").split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
     expect(paras.length).toBeGreaterThanOrEqual(2);
     expect(paras.length).toBeLessThanOrEqual(3);
@@ -154,7 +154,7 @@ describe("asset generation orchestrator", () => {
   it("selective_yes caveat language remains subordinate in final paragraph flow", () => {
     const g = buildDeterministicGeneratedAssets(
       makeJob({
-        recommendation: "selective_yes",
+        recommendation: "stretch",
         extracted: {
           company: "ScaleCo",
           title: "Junior Software Engineer",
@@ -218,8 +218,8 @@ describe("asset generation orchestrator", () => {
   });
 
   it("recommendation bands produce more restrained forced-no cover letter", () => {
-    const yes = buildDeterministicGeneratedAssets(makeJob({ recommendation: "yes" }), userProfile);
-    const no = buildDeterministicGeneratedAssets(makeJob({ recommendation: "no" }), userProfile);
+    const yes = buildDeterministicGeneratedAssets(makeJob({ recommendation: "apply" }), userProfile);
+    const no = buildDeterministicGeneratedAssets(makeJob({ recommendation: "weak" }), userProfile);
     expect((no.coverLetter ?? "").toLowerCase()).toMatch(/stretch|may be a stretch|ramping/);
     expect((yes.coverLetter ?? "").toLowerCase()).not.toMatch(/may be a stretch/);
   });
@@ -230,12 +230,12 @@ describe("asset generation orchestrator", () => {
       (s.match(/\black\b/gi)?.length ?? 0) +
       (s.match(/\bmissing\b/gi)?.length ?? 0) +
       (s.match(/\bno bachelor'?s\b/gi)?.length ?? 0);
-    const yes = buildDeterministicGeneratedAssets(makeJob({ recommendation: "yes" }), userProfile);
+    const yes = buildDeterministicGeneratedAssets(makeJob({ recommendation: "apply" }), userProfile);
     const selective = buildDeterministicGeneratedAssets(
-      makeJob({ recommendation: "selective_yes" }),
+      makeJob({ recommendation: "stretch" }),
       userProfile,
     );
-    const forcedNo = buildDeterministicGeneratedAssets(makeJob({ recommendation: "no" }), userProfile);
+    const forcedNo = buildDeterministicGeneratedAssets(makeJob({ recommendation: "weak" }), userProfile);
     expect(caveatHits(yes.coverLetter ?? "")).toBeLessThanOrEqual(1);
     expect(caveatHits(selective.coverLetter ?? "")).toBeLessThanOrEqual(2);
     expect((forcedNo.coverLetter ?? "").toLowerCase()).not.toMatch(/i should not apply|i am not qualified|reject me/);
@@ -243,7 +243,7 @@ describe("asset generation orchestrator", () => {
 
   it("selective_yes cover letter stays role-focused without foregrounding stack-gap caveats", () => {
     const job = makeJob({
-      recommendation: "selective_yes",
+      recommendation: "stretch",
       extracted: {
         company: "BuilderCo",
         title: "Junior Full-Stack Engineer",

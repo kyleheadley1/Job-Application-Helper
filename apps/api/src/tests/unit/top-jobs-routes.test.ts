@@ -73,7 +73,7 @@ describe("top jobs routes", () => {
           careerValue: 8,
           total: 82,
         },
-        recommendation: "yes",
+        recommendation: "apply",
         topMatch: "TypeScript fit",
         mainRisk: "None major",
         rationale: ["Good fit"],

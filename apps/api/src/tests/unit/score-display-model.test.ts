@@ -133,7 +133,8 @@ describe("scoreDisplayModel", () => {
       extracted: job,
       profile: userProfile,
     });
-    expect(composite.recommendation).toBe("no");
+    expect(composite.recommendation).toBe("weak");
+    expect(composite.hardGateFired).toBe(true);
     const display = buildScoreDisplay({
       score: composite.score,
       rules,
@@ -147,20 +148,17 @@ describe("scoreDisplayModel", () => {
     ).toBe(false);
   });
 
-  it("buildScoreDisplay surfaces referral as secondary under band headline", () => {
+  it("buildScoreDisplay leads the action line with the score-tier label and no referral language", () => {
     const { composite, rules } = compositeFixture();
     const display = buildScoreDisplay({
       score: composite.score,
       rules,
       extracted: BASE_JOB,
-      recommendation: "referral_gated",
-      referralPathwayAvailable: true,
-      referralPathwayNotes: "Connection via bootcamp",
+      recommendation: composite.recommendation,
     });
-    expect(display!.actionLine).toMatch(/tailored|Strong shot|Worth applying/i);
-    expect(display!.referralAdvice).toMatch(/bootcamp/i);
-    expect(display!.referralUrgency).toMatch(/strongly_advised|advised|optional/);
-    expect(display!.actionLine).not.toMatch(/bootcamp/i);
+    expect(display!.actionLine.startsWith(`${display!.bandHeadline} — `)).toBe(true);
+    expect(display!.actionLine).not.toMatch(/referral/i);
+    expect(display).not.toHaveProperty("referralAdvice");
     expect(display!.scoreDerivation).toBeTruthy();
   });
 });

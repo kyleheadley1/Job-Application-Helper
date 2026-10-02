@@ -1,15 +1,22 @@
 import type { CertificationBoostMeta } from "../lib/certificationBoost.js";
 
-export type Recommendation =
-  | "apply_cold"
-  | "referral_gated"
-  | "stretch_signal"
-  | "skip"
-  | "no"
-  | "yes"
-  | "selective_yes";
+/** Score-tier recommendation — derived only from the final score. */
+export type Recommendation = "strong_apply" | "apply" | "stretch" | "weak";
 
-/** Pre-composite model values kept for persisted job migration. */
+export const RECOMMENDATIONS = ["strong_apply", "apply", "stretch", "weak"] as const satisfies readonly Recommendation[];
+
+/** Values persisted before the score-tier model; normalized on read. */
+export const LEGACY_RECOMMENDATIONS = [
+  "apply_cold",
+  "referral_gated",
+  "stretch_signal",
+  "skip",
+  "no",
+  "yes",
+  "selective_yes",
+] as const;
+
+/** Tone bands for generated assets (cover letter / why-company). */
 export type LegacyRecommendation = "yes" | "selective_yes" | "no";
 
 export type HardRuleFlag = {
@@ -117,11 +124,9 @@ export type EligibilityFlag = {
   severity: "check";
 };
 
-export type ReferralUrgency = "strongly_advised" | "advised" | "optional";
+export type ScoreBand = Recommendation;
 
-export type ScoreBand = "strong_apply" | "apply" | "skip" | "no";
-
-export type BandHeadline = "Strong yes" | "Yes" | "If quick" | "Skip";
+export type BandHeadline = "Strong apply" | "Apply" | "Apply but weak (stretch)" | "Weak";
 
 export type AdjacentRoleFunctionKind =
   | "implementation_analyst"
@@ -156,9 +161,6 @@ export type ScoreDisplay = {
   survivabilityPenalties: SurvivabilityPenalty[];
   dominantLever?: StrategicLeverSelection;
   actionLine: string;
-  /** Always present — derived from score after composite; never affects scoring. */
-  referralAdvice: string;
-  referralUrgency: ReferralUrgency;
   eligibilityAdvisory?: EligibilityFlag;
   eligibilityAdvisories?: EligibilityFlag[];
   /** Set when a listing-relevant cert boosts credentialSignal. */
@@ -182,6 +184,11 @@ export type ScoreBreakdown = {
   functionalOverlap: number;
   recruiterFriendliness: number;
   careerValue: number;
+  /** LLM category scores before deterministic clamps/docks — lets stored scores be replayed exactly. */
+  llmCategories?: Pick<
+    ScoreBreakdown,
+    "stackFit" | "levelFit" | "domainFit" | "resumeStoryClarity" | "functionalOverlap" | "recruiterFriendliness" | "careerValue"
+  >;
   /** Capability axis (stack + level + functional), 0–100. */
   capability?: number;
   capabilityBreakdown?: CapabilityBreakdown;
@@ -215,6 +222,10 @@ export type RuleEvaluation = {
   /** Alias for strictNewGradPipeline (API stability). */
   newGradPenalty: boolean;
   seniorityOverreach: boolean;
+  /** Title/label reads senior but the JD asks nothing beyond the profile — soft dock, no gate. */
+  seniorityStretch?: boolean;
+  /** Proportional dock for the JD's years range / mid-level label vs the candidate's years. */
+  experienceGap?: { dock: number; reason: string };
   locationMismatch: boolean;
   visaMismatch: boolean;
   citizenshipMismatch: boolean;

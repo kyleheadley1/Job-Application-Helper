@@ -4,6 +4,8 @@ import { computeJdTextHash } from "../../../lib/jdTextHash.js";
 import { logger } from "../../../lib/logger.js";
 import { withLlmContext } from "../../llm/llmUsage.js";
 import type { JobRecord } from "../../../types/job.js";
+import type { ResumeContextSet } from "../../../types/resumeContext.js";
+import { recomputeStoredJobScore } from "../../../lib/recomputeStoredJobScore.js";
 import {
   getGmailApplications,
   normalizeCompany,
@@ -173,6 +175,36 @@ export const runScoringDiagnostic = async (key: string): Promise<ApplicationEval
   };
   await evaluationsRepository.setDiagnostic(key, diagnostic);
   return { ...evaluation, diagnostic };
+};
+
+/**
+ * Re-run deterministic rules + composite on a stored score's extraction and LLM categories.
+ * No LLM calls, so rule fixes apply without run-to-run noise. Only for deliberate manual
+ * rescores — normal syncs and recovery runs never touch `fit`.
+ */
+export const replayStoredScore = async (
+  evaluation: ApplicationEvaluation,
+  resumeContexts?: ResumeContextSet,
+): Promise<NonNullable<ApplicationEvaluation["fit"]>> => {
+  const detail = evaluation.fit?.detail;
+  if (!detail || !evaluation.jd?.text) throw new NoStoredJdError(evaluation.key);
+  const stored = {
+    extracted: { ...detail.extracted, rawText: evaluation.jd.text },
+    score: detail.score,
+    recommendedResume: detail.recommendedResume,
+  } as JobRecord;
+  const out = recomputeStoredJobScore({ job: stored, resumeContexts });
+  return fitFromJob({
+    ...stored,
+    rules: out.rules,
+    score: out.score,
+    recommendation: out.recommendation,
+    topMatch: detail.topMatch,
+    mainRisk: detail.mainRisk,
+    rationale: detail.rationale,
+    risks: detail.risks,
+    resumeRationale: detail.resumeRationale,
+  } as JobRecord);
 };
 
 export type ScoringReport = {

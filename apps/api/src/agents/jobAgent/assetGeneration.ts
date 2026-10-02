@@ -29,8 +29,7 @@ import { termGroundedInJdRawText } from "../../lib/jdLanguagePresence.js";
 const legacyRecBand = (rec: JobRecord["recommendation"]): "yes" | "selective_yes" | "no" =>
   toLegacyRecommendation(rec);
 
-const isSkipRec = (rec: JobRecord["recommendation"]): boolean =>
-  rec === "no" || rec === "skip";
+const isSkipRec = (rec: JobRecord["recommendation"]): boolean => rec === "weak";
 
 const CoverLetterOut = z.object({ coverLetter: z.string().min(1) });
 const WhyCompanyOut = z.object({ whyCompany: z.string().min(1) });
@@ -266,7 +265,7 @@ export const buildDeterministicGeneratedAssets = (
   while (talkingPoints.length < 3) {
     talkingPoints.push(`Relevant strength I can substantiate: ${profile.strengths[talkingPoints.length]}.`);
   }
-  if (job.recommendation !== "yes" && talkingPoints.length < 5) {
+  if (legacyRecBand(job.recommendation) !== "yes" && talkingPoints.length < 5) {
     talkingPoints.push(
       "I approach fit risks directly, but keep focus on where I can deliver immediate value in this role.",
     );
@@ -317,7 +316,7 @@ export const buildDeterministicGeneratedAssets = (
   if (rules.clearanceMismatch) {
     avoidClaiming.push("Clearance: do not claim cleared work without it.");
   }
-  if (rules.seniorityOverreach) {
+  if (rules.seniorityOverreach || rules.seniorityStretch) {
     avoidClaiming.push("Seniority: posting reads above your level story — don't claim staff-level ownership.");
   }
   if (rules.stackMismatch) {
@@ -377,7 +376,7 @@ export const generateJobAssets = async (params: GenerateJobAssetsParams): Promis
     return {
       generated: {},
       skipped: true,
-      skipReason: "Recommendation is 'no'; asset generation is skipped unless force=true.",
+      skipReason: "Recommendation is 'Weak'; asset generation is skipped unless force=true.",
     };
   }
 

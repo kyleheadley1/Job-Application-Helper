@@ -151,7 +151,7 @@ describe("rawText-grounded tech cites — Fleetio + Bubble regression", () => {
         },
         rules: bounded,
         extracted: fixture.extracted,
-        recommendation: "stretch_signal",
+        recommendation: "stretch",
       });
 
       assertNoGoAnywhere([

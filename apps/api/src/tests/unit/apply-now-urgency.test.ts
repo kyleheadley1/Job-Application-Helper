@@ -100,7 +100,7 @@ describe("evaluateApplyNowUrgency", () => {
       evaluateApplyNowUrgency({
         extracted: productSweJob(),
         rules: baseRules(),
-        recommendation: "apply_cold",
+        recommendation: "apply",
         scoreBand: "apply",
         final: 78,
         jobCreatedAt: CREATED_1H_AGO,
@@ -114,7 +114,7 @@ describe("evaluateApplyNowUrgency", () => {
       evaluateApplyNowUrgency({
         extracted: productSweJob(),
         rules: baseRules(),
-        recommendation: "apply_cold",
+        recommendation: "apply",
         final: 78,
         jobCreatedAt: CREATED_2D_AGO,
         nowMs: NOW,
@@ -127,7 +127,7 @@ describe("evaluateApplyNowUrgency", () => {
       evaluateApplyNowUrgency({
         extracted: productSweJob({ rawText: "Posted 12 hours ago\n11-50 employees\nTypeScript" }),
         rules: baseRules(),
-        recommendation: "apply_cold",
+        recommendation: "apply",
         final: 78,
         jobCreatedAt: CREATED_1H_AGO,
         nowMs: NOW,
@@ -144,7 +144,7 @@ describe("evaluateApplyNowUrgency", () => {
           rawText: "Posted 1 hour ago\n10,001+ employees\nTypeScript React",
         }),
         rules: baseRules(),
-        recommendation: "apply_cold",
+        recommendation: "apply",
         final: 78,
         jobCreatedAt: CREATED_1H_AGO,
         nowMs: NOW,
@@ -157,7 +157,7 @@ describe("evaluateApplyNowUrgency", () => {
       evaluateApplyNowUrgency({
         extracted: productSweJob(),
         rules: { ...baseRules(), adjacentRoleFunction: true },
-        recommendation: "apply_cold",
+        recommendation: "apply",
         final: 68,
         jobCreatedAt: CREATED_1H_AGO,
         nowMs: NOW,
@@ -172,7 +172,7 @@ describe("apply-now urgency on score display", () => {
       score: highScore(),
       rules: baseRules(),
       extracted: productSweJob(),
-      recommendation: "apply_cold",
+      recommendation: "apply",
       jobCreatedAt: CREATED_1H_AGO,
     });
     // buildScoreDisplay uses Date.now(); pin via evaluate path already covered —
@@ -184,7 +184,7 @@ describe("apply-now urgency on score display", () => {
         postedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
         rawText: "NicheStartup — Software Engineer\n11-50 employees\nTypeScript React",
       }),
-      recommendation: "apply_cold",
+      recommendation: "apply",
     });
     expect(withIso?.applyNowUrgency).toBe(true);
     expect(withIso?.applyNowUrgencyNote).toBe(APPLY_NOW_URGENCY_MESSAGE);

@@ -113,7 +113,7 @@ describe("stack mismatch two-tier detection", () => {
       resumeText: SWE_RESUME,
     });
     expect(composite.score.capability).toBeLessThan(75);
-    expect(composite.recommendation).not.toBe("apply_cold");
+    expect(composite.recommendation).not.toBe("strong_apply");
   });
 
   it("Node/TS/React role with all required core present → no mismatch", () => {

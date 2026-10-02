@@ -109,7 +109,7 @@ vi.mock("../../services/gmail/jdRecovery/evaluations.repository.js", () => ({
 vi.mock("../../agents/jobAgent/orchestrator.js", () => ({
   triageJob: vi.fn(async () => ({
     score: { total: 78 },
-    recommendation: "selective_yes",
+    recommendation: "stretch",
     recommendedResume: "BASE",
     rules: { notes: [], seniorityOverreach: true },
     extracted: { title: "Software Engineer", rawText: "full JD text" },
@@ -240,7 +240,7 @@ describe("JD recovery runner", () => {
       appliedAt: day(20),
       recovery: { status: "scored", attempts: [], serperQueries: 0 },
       jd: { text: LONG, textHash: "h" },
-      fit: { total: 25, recommendation: "skip", recommendedResume: "BASE", scoredAt: day(19), promptVersion: "v1" },
+      fit: { total: 25, recommendation: "weak", recommendedResume: "BASE", scoredAt: day(19), promptVersion: "v1" },
       outcome: { status: "applied", updatedAt: day(20), history: [] },
       createdAt: day(19),
       updatedAt: day(19),

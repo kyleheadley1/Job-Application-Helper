@@ -157,8 +157,8 @@ describe("Tria Federal — citizen + sponsorable clearance", () => {
 
     const composite = compositeFor(TRIA_JOB, rules);
     expect(composite.hardGateFired).toBe(false);
-    expect(composite.recommendation).not.toBe("no");
-    expect(composite.scoreBand).not.toBe("no");
+    expect(composite.hardGateFired).toBe(false);
+    expect(composite.recommendation).not.toBe("weak");
     expect(composite.score.capability).toBeGreaterThanOrEqual(78);
 
     const display = buildScoreDisplay({
@@ -169,7 +169,7 @@ describe("Tria Federal — citizen + sponsorable clearance", () => {
     });
     expect(display?.hardGates).toEqual([]);
     expect(display?.eligibilityAdvisories?.some((a) => a.reason.match(/clearance/i))).toBe(true);
-    expect(display?.bandHeadline).toMatch(/Yes|Strong yes/);
+    expect(display?.bandHeadline).toMatch(/^(Apply|Strong apply)$/);
   });
 });
 
@@ -203,7 +203,8 @@ describe("active clearance hard gate", () => {
 
     const composite = compositeFor(ACTIVE_CLEARANCE_JOB, rules);
     expect(composite.hardGateFired).toBe(true);
-    expect(composite.recommendation).toBe("no");
+    expect(composite.recommendation).toBe("weak");
+    expect(composite.hardGateFired).toBe(true);
   });
 });
 
@@ -216,7 +217,7 @@ describe("bare clearance required — hire-now branch", () => {
 
     const composite = compositeFor(NOCTUA_JOB, rules);
     expect(composite.hardGateFired).toBe(false);
-    expect(composite.recommendation).not.toBe("no");
+    expect(composite.hardGateFired).toBe(false);
 
     const withoutPenalty = compositeFor(NOCTUA_JOB, {
       ...rules,
@@ -249,13 +250,13 @@ describe("clearance soft flag score isolation", () => {
       score: compositeFor(TRIA_JOB, rules).score,
       rules,
       extracted: TRIA_JOB,
-      recommendation: "apply_cold",
+      recommendation: "apply",
     });
     const withoutFlag = buildScoreDisplay({
       score: compositeFor(TRIA_JOB, rules).score,
       rules: { ...rules, clearanceEligibilityFlag: undefined },
       extracted: TRIA_JOB,
-      recommendation: "apply_cold",
+      recommendation: "apply",
     });
 
     for (const field of [

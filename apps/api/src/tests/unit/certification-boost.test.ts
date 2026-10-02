@@ -9,7 +9,6 @@ import {
 } from "../../lib/certificationBoost.js";
 import { computeCompositeScore } from "../../lib/compositeScoreModel.js";
 import { evaluateHardGates } from "../../lib/hardGates.js";
-import { deriveReferralAdvice } from "../../lib/referralAdvice.js";
 import { buildScoreDisplay } from "../../lib/scoreDisplayModel.js";
 import { computeSurvivability, scoreCredentialSignal } from "../../lib/survivabilityScore.js";
 import type { ExtractedJobData } from "../../types/job.js";
@@ -121,7 +120,7 @@ describe("Cherry Hill — AWS cert boost", () => {
     expect(boosted.score).toBeCloseTo(0.5, 2);
   });
 
-  it("re-tags credential row as credential/material and softens referral urgency", () => {
+  it("re-tags credential row as credential/material and lifts credential signal", () => {
     const survivability = computeSurvivability({
       extracted: CHERRY_HILL_JOB,
       rules: CHERRY_HILL_RULES,
@@ -163,10 +162,7 @@ describe("Cherry Hill — AWS cert boost", () => {
       rawScore: RAW_SCORE,
       resumeText: "TypeScript Node engineer with AWS project work",
     });
-    const referralWithCert = deriveReferralAdvice({ survivabilityBreakdown: survivability });
-    const referralWithoutCert = deriveReferralAdvice({ survivabilityBreakdown: withoutCert });
-    expect(referralWithoutCert.urgency).toBe("strongly_advised");
-    expect(referralWithCert.urgency).toBe("advised");
+    expect(survivability.credentialSignal).toBeGreaterThan(withoutCert.credentialSignal);
   });
 
   it("does not satisfy degree hard gates or reduce degree dock", () => {

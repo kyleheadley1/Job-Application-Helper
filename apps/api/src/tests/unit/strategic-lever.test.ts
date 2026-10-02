@@ -147,17 +147,15 @@ describe("strategicLever selection", () => {
           requirements: ["Node/Express backend APIs", "LLM integrations"],
           rawText: "Node Express backend APIs with RAG/LLM workflow integrations.",
         },
-        recommendation: "referral_gated",
-        referralPathwayAvailable: true,
-        referralPathwayNotes: "Connection via bootcamp",
+        recommendation: "weak",
       });
       return display?.actionLine;
     });
 
     for (const line of lines) {
-      // total 37 → skip band; dominant lever is employerRecognizability (binding), not
+      // total 37 → weak tier; dominant lever is employerRecognizability (binding), not
       // jittered cosmetic impactMetricQuality — action line must stay stable on that lever.
-      expect(line).toMatch(/Not worth the effort — employer recognizability/i);
+      expect(line).toMatch(/^Weak — employer recognizability/i);
       expect(line).not.toMatch(/impact metric quality/i);
       expect(line).not.toMatch(/bootcamp/i);
       expect(line).not.toMatch(/referral/i);

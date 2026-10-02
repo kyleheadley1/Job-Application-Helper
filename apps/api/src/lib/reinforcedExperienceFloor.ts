@@ -133,12 +133,8 @@ export const estimateCandidateProfessionalYears = (params: {
   profile?: UserProfile;
   resumeText?: string;
 }): number | null => {
-  if (
-    params.profile?.estimatedProfessionalYears != null &&
-    Number.isFinite(params.profile.estimatedProfessionalYears)
-  ) {
-    return params.profile.estimatedProfessionalYears;
-  }
+  const hinted = params.profile?.screeningYears ?? params.profile?.estimatedProfessionalYears;
+  if (hinted != null && Number.isFinite(hinted)) return hinted;
   const text = params.resumeText ?? "";
   if (!text.trim()) return null;
 

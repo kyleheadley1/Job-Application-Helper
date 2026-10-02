@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
-import type { JobRecord, JobStatus } from "../types/job";
+import { RECOMMENDATION_LABELS, type JobRecord, type JobStatus } from "../types/job";
 import { JsonPanel } from "../components/JsonPanel";
 import {
   agencyDisclosureNote,
@@ -107,7 +107,7 @@ export const RoleDetailPage = () => {
         <h3>{jobHeaderLabel(job.extracted)}</h3>
         {agencyNote ? <p className="muted agency-note">{agencyNote}</p> : null}
         <p>
-          Score: <strong>{job.score.total}</strong> | Recommendation: <strong>{job.recommendation}</strong> | Resume:{" "}
+          Score: <strong>{job.score.total}</strong> | Recommendation: <strong>{RECOMMENDATION_LABELS[job.recommendation] ?? job.recommendation}</strong> | Resume:{" "}
           <strong>{job.recommendedResume}</strong>
         </p>
         <p>

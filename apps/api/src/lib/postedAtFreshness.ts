@@ -106,8 +106,8 @@ export const isFavorableShapeForApplyNow = (params: {
 }): boolean => {
   if (params.rules.adjacentRoleFunction) return false;
   if (params.rules.platformInfraRole) return false;
-  if (params.scoreBand === "no" || params.scoreBand === "skip") return false;
-  if (params.recommendation === "apply_cold") return true;
+  if (params.scoreBand === "weak" || params.scoreBand === "stretch") return false;
+  if (params.recommendation === "strong_apply" || params.recommendation === "apply") return true;
   if (params.scoreBand === "strong_apply" || params.scoreBand === "apply") return true;
   if (typeof params.final === "number" && params.final >= 70) return true;
   return false;

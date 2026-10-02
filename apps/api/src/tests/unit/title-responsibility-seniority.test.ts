@@ -38,7 +38,7 @@ describe("title/responsibility seniority — August Law FDE", () => {
     expect(scored.score.levelFit).toBeLessThanOrEqual(TITLE_RESPONSIBILITY_MISMATCH_LEVEL_FIT_MAX);
     expect(scored.score.total).toBeLessThan(85);
     expect(scored.score.total).toBeLessThan(80);
-    expect(scored.recommendation).not.toBe("apply_cold");
+    expect(scored.recommendation).not.toBe("strong_apply");
 
     const survRows = scored.score.scoreDisplay?.survivabilityRows ?? [];
     expect(survRows.some((r) => r.key === "highOwnershipLowSupport")).toBe(true);

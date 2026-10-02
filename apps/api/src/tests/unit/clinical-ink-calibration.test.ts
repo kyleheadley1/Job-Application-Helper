@@ -69,7 +69,7 @@ describe("Clinical Ink calibration — soft Python preference", () => {
     });
 
     expect(composite.score.total).toBeGreaterThanOrEqual(70);
-    expect(composite.scoreBand).not.toBe("skip");
+    expect(composite.scoreBand).not.toBe("weak");
 
     const display = buildScoreDisplay({
       score: composite.score,

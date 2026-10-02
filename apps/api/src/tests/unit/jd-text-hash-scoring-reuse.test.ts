@@ -135,7 +135,9 @@ describe("scoreJob preserved categories", () => {
     );
 
     const raw = storedCategoryScores(result.scoring.score);
-    expect(raw.levelFit).toBe(STORED_CATEGORIES.levelFit);
+    // Reused input categories are kept pre-clamp; the scored levelFit may sit under a seniority ceiling.
+    expect(result.scoring.score.llmCategories?.levelFit).toBe(STORED_CATEGORIES.levelFit);
+    expect(raw.levelFit).toBeLessThanOrEqual(STORED_CATEGORIES.levelFit);
     expect(raw.domainFit).toBe(STORED_CATEGORIES.domainFit);
     expect(result.scoring.score.survivabilityBreakdown?.domainMatchForListing).toBeDefined();
   });

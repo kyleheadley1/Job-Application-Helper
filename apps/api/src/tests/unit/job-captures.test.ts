@@ -109,7 +109,7 @@ const scoredJob = (overrides: Partial<JobRecord> = {}): JobRecord =>
       total: 76,
       recommendationLabel: "Strong fit, good screen odds",
     },
-    recommendation: "apply_cold",
+    recommendation: "apply",
     salaryAsk: {},
     recommendedResume: "BASE",
     resumeRationale: [],

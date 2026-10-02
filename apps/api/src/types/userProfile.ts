@@ -36,6 +36,11 @@ export type UserProfile = {
    * Do not invent this at score time — keep it as an explicit profile hint.
    */
   estimatedProfessionalYears?: number;
+  /**
+   * Years to weigh against a JD's experience bar when judging screen odds (e.g. 2 when ongoing
+   * project work makes a 2-year bar realistic). Falls back to estimatedProfessionalYears.
+   */
+  screeningYears?: number;
   /** When false, JD "no sponsorship" / work-auth language is not treated as a gate for this candidate. */
   requiresSponsorship: boolean;
   citizenshipStatus?: {

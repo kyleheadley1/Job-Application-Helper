@@ -135,7 +135,7 @@ describe("disjunctive language — Fleetio + Cherry + WorldQuant", () => {
       const scored = scoreCalibrationAnchor("worldquantFullStackDeveloper");
       expect(scored.rules.disjunctiveLanguageRequirementSatisfied).toBe(true);
       expect(scored.rules.coreLanguageGap ?? []).not.toContain("Java");
-      expect(scored.recommendation).not.toBe("skip");
+      expect(scored.recommendation).not.toBe("weak");
       const blob = [
         ...(scored.rules.notes ?? []),
         scored.score.scoreDisplay?.bandHeadline ?? "",

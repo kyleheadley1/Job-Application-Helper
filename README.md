@@ -18,7 +18,7 @@ It is designed as an operator assistant, not an autonomous applier.
 
 - Structured job extraction from pasted text/URL inputs
 - Conservative fit scoring: capability ± survivability adjustment − gap dock, with explicit hard gates and rule penalties
-- Recommendation bands: `apply_cold`, `referral_gated`, `stretch_signal`, `skip`, `no` (hard gate)
+- Recommendation is the score tier, nothing else: Strong apply (80+), Apply (65–79), Apply but weak (stretch) (50–64), Weak (under 50, including hard-gated roles, which are capped at 25 and show the gate reason)
 - Resume recommendation between your two resume variants: `BASE` (general) and `AI` (specialized). See section H. Older records may show legacy `SWE`/`SIE`/`EARLY_CAREER`
 - On-demand generation of cover letter, why-company, talking points, and bullet candidates
 - Tracker workflow with an explicit "confirm applied" flow, editable applied date, and notes
@@ -74,8 +74,13 @@ Scores are final: a scored row is never re-scored by later syncs, recovery runs,
 Scoring:
 
 - Go detection no longer fires on English "go" ("evaluations that go beyond benchmarks"). "Golang" always counts; a bare "Go" only counts in a language context: listed with other languages or frameworks, under a `Languages:`/`Stack:` label, alone on a line, or framed as "experience with Go", "Go services", "Strong Go required". One shared detector is used everywhere, including the deterministic extractor that previously copied every match into required skills
-- The seniority hard gate (caps the score at 25) no longer fires on an inferred "senior" label alone. It needs a seniority word in the title, an explicit Seniority field in the posting, or 5+ minimum years; otherwise the role is flagged for manual review. The heuristic extractor now reads seniority from the title only, so body text like "senior client engineers" or "technical staff at our clients" no longer marks a role senior
-- All scored roles were rescored once after these fixes
+- The seniority hard gate (caps the score at 25) only fires when the posting obviously wants more experience: 5+ minimum years (from the years field or Required text; ranges count by their lower bound), senior-depth asks (capacity planning, performance tuning, memory management…), or people-leadership asks (direct reports, managing a team, years leading). A Senior/Staff/Principal title or Seniority label without those asks is an ambitious stretch, not a gate. An inferred "senior" label with nothing in the posting to back it is flagged for manual review. The heuristic extractor reads seniority from the title only, so body text like "senior client engineers" or "technical staff at our clients" no longer marks a role senior
+- Experience gap: below the gate, the JD's years range is weighed against `screeningYears` in your profile. The dock is 2 points per year under the minimum plus 1 per year the range extends above it (at 2 years: "2–6 years" −4, "2–5 years" −3, "3–5 years" −4, "2+ years" 0; max −8). A mid-level label with no stated years is −3 unless the title says junior/entry/associate/I. The title stretch counts as −8, and the two together are capped at −12
+- These seniority/experience docks are applied as a ceiling on level fit (18/20 minus the dock in level-fit points), not as a separate subtraction. The AI's level fit already judges experience, so a role it already marked down isn't docked twice, while a role it rated fully matched loses about the dock. The reason and the ceiling are shown under "Rules that fired"
+- New scores store the AI's raw category scores, so a rule fix can be replayed on stored scores exactly (no AI calls, no run-to-run noise) with `replayStoredScore`
+- The location hard gate no longer fires on a preferred location ("Based in San Francisco (preferred)"), regardless of how the extractor reads the work model
+- All scored roles were rescored once after these fixes, then replayed deterministically with the experience-gap and level-fit-ceiling rules
+- Referral language is gone. The old labels (`apply_cold`, `referral_gated`, `stretch_signal`, `skip`, `no`) came from a capability/survivability matrix that could disagree with the score, and nearly every 50–84 role read "get a referral". The recommendation is now the four score tiers above, the "referral advice" line under the score was removed, and stored roles were relabeled without changing any score
 
 Gmail dashboard:
 
@@ -184,7 +189,7 @@ The scorer reads your profile from `user_profile.json` in the same resume folder
 - degree status and training
 - target roles and location preferences
 - flagship projects with measurable outcomes
-- estimated professional years
+- estimated professional years, plus optional `screeningYears`: the years to weigh against a JD's experience bar (e.g. `2` when ongoing project work makes a 2-year bar realistic). Falls back to estimated professional years
 - sponsorship, citizenship and clearance status
 - home location
 - certifications

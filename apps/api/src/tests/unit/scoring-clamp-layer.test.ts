@@ -92,7 +92,7 @@ describe("scoring clamp layer", () => {
     expect(score.resumeStoryClarity).toBeLessThanOrEqual(5);
     expect(score.functionalOverlap).toBeLessThanOrEqual(7);
     expect(clampedRules.hardRuleFlags?.some((f) => f.id === "coreLanguageMismatch")).toBe(true);
-    expect(recommendation).toBe("no");
+    expect(recommendation).toBe("weak");
     expect(score.total).toBeLessThanOrEqual(45);
   });
 

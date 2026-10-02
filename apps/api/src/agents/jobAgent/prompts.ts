@@ -90,7 +90,7 @@ Category guidance (score each factor once here):
 - domainFit (0–10): Applied AI JD + profile LLM/RAG shipping → 7–8/10 unless domainMismatch. Healthcare product/full-stack (not clinical SME) → 6–7/10.
 - functionalOverlap (0–15): End-to-end AI workflows + profile with shipped LLM/RAG projects → 12–13/15 unless hard rule contradicts.
 - resumeStoryClarity (0–10): Clear role arc match → 9–10/10; fragmented/off-topic → lower.
-- recruiterFriendliness (0–15): NYC/hybrid NYC viable → boost. traditionalCompanyPenalty/financePenalty/vagueEarlyStageAiCalibration → reflect stricter screen (~9–10/15 for vague early-stage AI at unknown employer unless strong company/referral).
+- recruiterFriendliness (0–15): NYC/hybrid NYC viable → boost. traditionalCompanyPenalty/financePenalty/vagueEarlyStageAiCalibration → reflect stricter screen (~9–10/15 for vague early-stage AI at unknown employer unless strong company).
 - careerValue (0–10): Founding-engineer stretch or strong product/AI trajectory → note upside; vague startup AI buzzwords alone → do not inflate.
 
 Soft rule flags (weigh in categories above — NOT re-applied later):
@@ -146,7 +146,7 @@ Return EXACTLY these keys (and no others):
     "careerValue": number (0-10),
     "total": number (0-100)
   },
-  "recommendation": "yes" | "selective_yes" | "no",
+  "recommendation": "strong_apply" | "apply" | "stretch" | "weak",
   "topMatch": string (one short sentence; never boolean),
   "mainRisk": string (one short sentence; never boolean),
   "rationale": string[],
@@ -159,6 +159,7 @@ Notes:
 - Keep rationale decision-useful: exactly 2 strings — JD-shaped fit, then concrete shipped proof.
 - "risks" array: max 1 entry after mainRisk (two distinct risks total).
 - "topMatch" should be role-specific; avoid generic profile-only phrasing.
+- When comparing the candidate to a JD's years-of-experience bar (levelFit, risks), use userProfile.screeningYears when present (else estimatedProfessionalYears). A range like "2–6 years" is met at its floor; the upper end only means stronger competition, not a disqualifier.
 
 Extracted job:
 ${JSON.stringify(extractedForScoring(params.extracted), null, 2)}

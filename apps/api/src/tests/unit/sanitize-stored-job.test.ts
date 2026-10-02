@@ -52,7 +52,7 @@ describe("sanitizeScoreBreakdown", () => {
     expect(sanitized.survivabilityBreakdown?.certificationBoost).toBeUndefined();
   });
 
-  it("drops stale scoreDisplay missing referral fields", () => {
+  it("drops stale scoreDisplay persisted with a pre-tier score band", () => {
     const sanitized = sanitizeScoreBreakdown({
       ...baseScore(),
       capability: 80,
@@ -65,8 +65,8 @@ describe("sanitizeScoreBreakdown", () => {
         survAdjustment: -2,
         gapDock: 0,
         scoreDerivation: "80 + (-2) = 78",
-        scoreBand: "apply",
-        bandHeadline: "Yes",
+        scoreBand: "skip" as never,
+        bandHeadline: "Yes" as never,
         worthTailoring: true,
         survivabilityRows: [],
         hardGates: [],
@@ -118,7 +118,7 @@ describe("sanitizeStoredJobRecord", () => {
         },
       },
       score: sanitizeScoreBreakdown({ ...baseScore(), capability: 70, total: 70 }),
-      recommendation: "apply_cold",
+      recommendation: "apply",
       salaryAsk: {},
       recommendedResume: "BASE",
       resumeRationale: [],
