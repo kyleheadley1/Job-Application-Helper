@@ -2,7 +2,8 @@ import { getDb } from "../../../config/mongo.js";
 import { env } from "../../../config/env.js";
 
 const SERPER_URL = "https://google.serper.dev/search";
-const USAGE_DOC_ID = "serper";
+/** Versioned so a pipeline change can start a fresh count. */
+const USAGE_DOC_ID = "serper-v2";
 
 export type SerperResult = { title: string; link: string; snippet?: string };
 
@@ -32,9 +33,10 @@ export const serperClient = {
 
 type UsageDoc = { _id: string; jobKeys: string[]; queries: number; updatedAt: string };
 
+/** `cap` and `queries` are in Serper queries (1 query = 1 credit); `jobKeys` are applications searched. */
 export type SerperUsage = { jobKeys: string[]; queries: number; cap: number };
 
-/** Lifetime Serper usage, counted in distinct application keys. */
+/** Lifetime Serper usage. Queries are summed across every usage doc since the free grant never resets. */
 export const serperUsageRepository = {
   async collection() {
     const db = await getDb();
@@ -43,8 +45,13 @@ export const serperUsageRepository = {
 
   async get(): Promise<SerperUsage> {
     const col = await this.collection();
-    const doc = await col.findOne({ _id: USAGE_DOC_ID });
-    return { jobKeys: doc?.jobKeys ?? [], queries: doc?.queries ?? 0, cap: env.serperMaxJobsTotal };
+    const docs = await col.find({}).toArray();
+    const current = docs.find((d) => d._id === USAGE_DOC_ID);
+    return {
+      jobKeys: current?.jobKeys ?? [],
+      queries: docs.reduce((sum, d) => sum + (d.queries ?? 0), 0),
+      cap: env.serperMaxQueriesTotal,
+    };
   },
 
   async record(jobKey: string, queries: number): Promise<void> {

@@ -70,9 +70,17 @@ vi.mock("../../services/jobs/jobs.repository.js", () => ({
   jobsRepository: { findAll: vi.fn(async () => []) },
 }));
 
+const startRecoveryRunMock = vi.hoisted(() => vi.fn(async () => ({ queued: 0, running: false, started: false })));
+vi.mock("../../services/gmail/jdRecovery/runRecovery.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../services/gmail/jdRecovery/runRecovery.js")>()),
+  startRecoveryRun: startRecoveryRunMock,
+}));
+
 vi.mock("../../services/gmail/jdRecovery/evaluations.repository.js", () => ({
   evaluationsRepository: {
     findByKeys: vi.fn(async () => new Map()),
+    findByCompanyKeys: vi.fn(async () => []),
+    rekey: vi.fn(),
     listSince: vi.fn(async () => []),
     upsert: vi.fn(),
     updateOutcome: vi.fn(),
@@ -224,6 +232,8 @@ describe("gmail routes", () => {
     expect(gmailClient.getMessage).not.toHaveBeenCalled();
     expect(runStructuredMock).not.toHaveBeenCalled();
     expect(res.body.applications[0]).toMatchObject({ company: "Bubble" });
+    expect(startRecoveryRunMock).toHaveBeenCalledWith(7);
+    expect(res.body.recovery).toEqual({ queued: 0, running: false, started: false });
   });
 
   it("retries messages whose LLM call failed previously", async () => {

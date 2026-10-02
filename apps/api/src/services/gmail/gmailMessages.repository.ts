@@ -10,6 +10,7 @@ export type StoredGmailMessage = {
   subject: string;
   prefilterPassed: boolean;
   prefilterReason: string;
+  prefilterVersion?: number;
   /** Set only when the message went through the LLM. */
   classification?: EmailClassification;
   /** False when the LLM call failed; such messages are retried on the next sync. */
@@ -25,13 +26,25 @@ export const gmailMessagesRepository = {
     return db.collection<Doc>("gmail_messages");
   },
 
-  /** Ids already processed successfully (LLM failures are excluded so they get retried). */
-  async findProcessedIds(ids: string[]): Promise<Set<string>> {
+  /**
+   * Ids already processed successfully. LLM failures are excluded so they get retried, and so are
+   * messages dropped by an older prefilter version.
+   */
+  async findProcessedIds(ids: string[], prefilterVersion = 1): Promise<Set<string>> {
     if (ids.length === 0) return new Set();
     const col = await this.collection();
     const docs = await col
       .find(
-        { _id: { $in: ids }, llmSucceeded: { $ne: false } },
+        {
+          _id: { $in: ids },
+          llmSucceeded: { $ne: false },
+          $nor: [
+            {
+              prefilterPassed: false,
+              $or: [{ prefilterVersion: { $exists: false } }, { prefilterVersion: { $lt: prefilterVersion } }],
+            },
+          ],
+        },
         { projection: { _id: 1 } },
       )
       .toArray();

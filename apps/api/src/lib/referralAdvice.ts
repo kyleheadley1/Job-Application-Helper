@@ -135,7 +135,7 @@ export const deriveReferralAdvice = (params: {
   let advice: string;
   if (params.jdDegreePositive) {
     advice =
-      "Portfolio-first screen — cold apply has real odds; lead with shipped work (RAG project, GitHub). Referral helpful, not gating.";
+      "Portfolio-first screen — cold apply has real odds; lead with shipped work (portfolio projects, GitHub). Referral helpful, not gating.";
   } else if (urgency === "strongly_advised") {
     advice =
       "Cold-apply odds are low for routable reasons (credential / recognizability) — a referral would substantially help.";

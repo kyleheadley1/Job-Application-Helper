@@ -118,6 +118,34 @@ describe("buildApplications", () => {
     expect(apps[0]!.status).toBe("rejected");
   });
 
+  it("remembers an interview that ended in rejection and flags an estimated applied date", () => {
+    const apps = buildApplications(
+      [
+        msg("Seso Labor", null, "interview", "2026-09-25T22:00:00.000Z"),
+        msg("Seso", "Software Engineer, AI/Agents", "rejected", "2026-09-29T17:00:00.000Z"),
+      ],
+      [],
+    );
+    expect(apps).toHaveLength(1);
+    expect(apps[0]).toMatchObject({
+      status: "rejected",
+      furthestStage: "interviewing",
+      appliedAtKnown: false,
+      appliedAt: "2026-09-25T22:00:00.000Z",
+    });
+  });
+
+  it("reports a known applied date and 'applied' as the furthest stage for a plain rejection", () => {
+    const [app] = buildApplications(
+      [
+        msg("Teleskope", "Software Engineer", "applied", "2026-09-26T10:00:00.000Z"),
+        msg("Teleskope", "Software Engineer", "rejected", "2026-10-01T15:30:00.000Z"),
+      ],
+      [],
+    );
+    expect(app).toMatchObject({ furthestStage: "applied", appliedAtKnown: true });
+  });
+
   it("skips non-application and company-less messages", () => {
     expect(
       buildApplications(

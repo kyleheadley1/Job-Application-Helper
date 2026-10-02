@@ -74,6 +74,18 @@ describe("prefilterEmail", () => {
       prefilterEmail(email({ from: "friend@gmail.com", subject: "Dinner Friday?", body: "Want to grab food?" })),
     ).toEqual({ keep: false, reason: "no_application_signal" });
   });
+
+  it("keeps calendar invites from company domains but not from personal addresses", () => {
+    const subject = "Invitation: Jane Doe and Alex Smith @ Mon Sep 28, 2026 3pm - 3:30pm (EDT)";
+    expect(prefilterEmail(email({ from: "Rush Moody <rush@sesolabor.com>", subject }))).toEqual({
+      keep: true,
+      reason: "calendar_invite",
+    });
+    expect(prefilterEmail(email({ from: "friend@gmail.com", subject: "Invitation: Dinner @ Fri 7pm" }))).toEqual({
+      keep: false,
+      reason: "no_application_signal",
+    });
+  });
 });
 
 describe("buildSearchQuery", () => {

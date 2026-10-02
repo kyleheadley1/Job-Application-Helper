@@ -72,7 +72,7 @@ export const profileHasPortfolio = (profile: UserProfile, resumeText = ""): bool
     ].join(" "),
   );
   if ((profile.flagshipProjects?.length ?? 0) >= 1) return true;
-  return /\b(github\.com|gitlab\.com|ragproject|shipped|deployed|portfolio|open source|open-source|hackathon|prototype)\b/.test(
+  return /\b(github\.com|gitlab\.com|shipped|deployed|portfolio|open source|open-source|hackathon|prototype)\b/.test(
     blob,
   );
 };
@@ -91,19 +91,19 @@ const profileCredentialBlob = (profile: UserProfile): string =>
 
 export const profileHasAssociateDegree = (profile: UserProfile): boolean => {
   if (profile.degreeStatus.hasBachelors) return false;
-  return /\b(associate of arts|associate'?s(?:\s+degree)?|\ba\.?\s*a\.?\b)\b/i.test(
+  return /\b(associate of arts|associate(?:'?s)?\s+degree|associate'?s|\ba\.?\s*a\.?\b)\b/i.test(
     profileCredentialBlob(profile),
   );
 };
 
 export const profileHasBootcampCert = (profile: UserProfile): boolean => {
   const blob = profileCredentialBlob(profile);
-  if (/\b(bootcamp|bootcamp|certificate|certification program|software development certificate)\b/i.test(blob)) {
+  if (/\b(bootcamp|immersive|certificate|certification program|software development certificate)\b/i.test(blob)) {
     return true;
   }
   return Boolean(
     profile.training?.program &&
-      /\b(bootcamp|bootcamp|residency|fellowship|certificate)\b/i.test(profile.training.program),
+      /\b(bootcamp|immersive|residency|fellowship|certificate)\b/i.test(profile.training.program),
   );
 };
 

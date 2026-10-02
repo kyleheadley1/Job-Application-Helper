@@ -128,7 +128,7 @@ export const scoreCredentialSignal = (
     if (profileHasAssociateDegree(profile)) baseline = associateBaseline(densePool);
     else if (
       profile.training?.program &&
-      /\b(bootcamp|bootcamp|residency|fellowship)\b/i.test(profile.training.program)
+      /\b(bootcamp|immersive|residency|fellowship)\b/i.test(profile.training.program)
     ) {
       baseline = bootcampBaseline(densePool);
     }
@@ -145,18 +145,18 @@ export const scoreCredentialSignal = (
   if (profileHasCsDegree(profile)) return 0.95;
   if (profile.degreeStatus.hasBachelors && !densePool) return 0.72;
   if (rules.degreeHasEquivalencyClause) {
-    if (/\b(associate of arts|associate'?s)\b/i.test(profile.degreeStatus.note)) {
+    if (/\b(associate of arts|associate(?:'?s)?\s+degree|associate'?s)\b/i.test(profile.degreeStatus.note)) {
       return densePool ? 0.48 : 0.58;
     }
-    if (profile.training?.program && /\b(bootcamp|bootcamp|residency|fellowship)\b/i.test(profile.training.program)) {
+    if (profile.training?.program && /\b(bootcamp|immersive|residency|fellowship)\b/i.test(profile.training.program)) {
       return densePool ? 0.5 : 0.62;
     }
     return densePool ? 0.55 : 0.65;
   }
-  if (/\b(associate of arts|associate'?s)\b/i.test(profile.degreeStatus.note)) {
+  if (/\b(associate of arts|associate(?:'?s)?\s+degree|associate'?s)\b/i.test(profile.degreeStatus.note)) {
     return densePool ? 0.38 : 0.52;
   }
-  if (profile.training?.program && /\b(bootcamp|bootcamp|residency|fellowship)\b/i.test(profile.training.program)) {
+  if (profile.training?.program && /\b(bootcamp|immersive|residency|fellowship)\b/i.test(profile.training.program)) {
     return densePool ? 0.4 : 0.58;
   }
   return densePool ? 0.32 : 0.5;

@@ -1,7 +1,7 @@
 import { logger } from "../../lib/logger.js";
 import { gmailAuth } from "./gmailAuth.js";
 import { gmailClient } from "./gmailClient.js";
-import { buildSearchQuery, classifyEmailWithLlm, prefilterEmail } from "./gmailClassifier.js";
+import { buildSearchQuery, classifyEmailWithLlm, PREFILTER_VERSION, prefilterEmail } from "./gmailClassifier.js";
 import { gmailMessagesRepository } from "./gmailMessages.repository.js";
 
 export const DEFAULT_SYNC_DAYS = 7;
@@ -33,7 +33,7 @@ const runPool = async <T>(items: T[], limit: number, worker: (item: T) => Promis
 export const syncGmail = async (days = DEFAULT_SYNC_DAYS): Promise<GmailSyncResult> => {
   const window = Math.min(Math.max(1, Math.floor(days)), MAX_SYNC_DAYS);
   const ids = await gmailClient.listMessageIds(buildSearchQuery(window));
-  const processed = await gmailMessagesRepository.findProcessedIds(ids);
+  const processed = await gmailMessagesRepository.findProcessedIds(ids, PREFILTER_VERSION);
   const todo = ids.filter((id) => !processed.has(id));
 
   const result: GmailSyncResult = {
@@ -57,6 +57,7 @@ export const syncGmail = async (days = DEFAULT_SYNC_DAYS): Promise<GmailSyncResu
       subject: email.subject,
       prefilterPassed: prefilter.keep,
       prefilterReason: prefilter.reason,
+      prefilterVersion: PREFILTER_VERSION,
       processedAt: new Date().toISOString(),
     };
     if (!prefilter.keep) {

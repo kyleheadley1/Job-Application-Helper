@@ -78,8 +78,16 @@ export const env = {
   /** Where the OAuth callback sends the browser back to (the web app dashboard). */
   webAppUrl: (process.env.WEB_APP_URL?.trim() || "http://localhost:5173").replace(/\/+$/, ""),
   serperApiKey: process.env.SERPER_API_KEY?.trim() || undefined,
-  /** Lifetime cap on distinct applications that may use Serper search. */
-  serperMaxJobsTotal: Number(process.env.SERPER_MAX_JOBS_TOTAL ?? 10),
+  /** Lifetime Serper query budget (the free grant is 2,500 one-time queries). */
+  serperMaxQueriesTotal: Number(process.env.SERPER_MAX_QUERIES_TOTAL ?? 1250),
+  /** Email classification is simple; low effort cuts hidden reasoning tokens (billed as output). */
+  gmailClassifyReasoningEffort: (["minimal", "low", "medium", "high"] as const).find(
+    (e) => e === (process.env.GMAIL_CLASSIFY_REASONING_EFFORT ?? "minimal"),
+  ),
+  /** USD per 1M tokens; defaults are gpt-5-mini list prices. */
+  openAiInputPricePerM: Number(process.env.OPENAI_INPUT_PRICE_PER_M ?? 0.25),
+  openAiCachedInputPricePerM: Number(process.env.OPENAI_CACHED_INPUT_PRICE_PER_M ?? 0.025),
+  openAiOutputPricePerM: Number(process.env.OPENAI_OUTPUT_PRICE_PER_M ?? 2),
   jdRecoveryMaxPerRun: Number(process.env.JD_RECOVERY_MAX_PER_RUN ?? 5),
   topJobsSyncEnabled: parseBooleanEnv(process.env.TOP_JOBS_SYNC_ENABLED, false),
   /** Cron in TOP_JOBS_SYNC_TIMEZONE — default 6:00 AM US Eastern daily. */

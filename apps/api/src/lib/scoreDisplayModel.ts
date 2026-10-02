@@ -564,7 +564,7 @@ export const deriveActionLine = (params: {
     scoreBand !== "no" &&
     scoreBand !== "skip"
   ) {
-    return "Portfolio-first screen — cold apply has real odds; lead with shipped work (RAG project, GitHub). Referral helpful, not gating.";
+    return "Portfolio-first screen — cold apply has real odds; lead with shipped work (portfolio projects, GitHub). Referral helpful, not gating.";
   }
 
   if (scoreBand === "no") {

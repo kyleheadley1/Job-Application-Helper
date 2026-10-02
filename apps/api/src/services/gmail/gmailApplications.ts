@@ -18,8 +18,12 @@ export type GmailApplication = {
   key: string;
   company: string;
   role: string | null;
+  /** First "applied" email, or the earliest email when no confirmation was found. */
   appliedAt: string;
+  appliedAtKnown: boolean;
   status: ApplicationStatus;
+  /** Most advanced stage reached, ignoring a later rejection (interview → rejected stays "interviewing"). */
+  furthestStage: Exclude<ApplicationStatus, "rejected">;
   lastUpdateAt: string;
   emails: ApplicationEmail[];
   trackerJobId?: string;
@@ -34,6 +38,13 @@ const EVENT_TO_STATUS: Record<Exclude<EmailEventType, "other">, ApplicationStatu
   interview: "interviewing",
   assessment: "assessment",
   offer: "offer",
+};
+
+const STAGE_RANK: Record<GmailApplication["furthestStage"], number> = {
+  applied: 0,
+  assessment: 1,
+  interviewing: 2,
+  offer: 3,
 };
 
 /** Same-timestamp tie-break: the more advanced/final event wins. */
@@ -105,8 +116,28 @@ type Group = {
   messages: StoredGmailMessage[];
 };
 
+type CompanyBucket = { company: string; roled: Group[]; unroled: StoredGmailMessage[] };
+
+const wordPrefix = (short: string, long: string) => long.startsWith(`${short} `);
+
+/**
+ * Role-less mail (calendar invites, recruiter notes) often names the company differently
+ * ("Seso Labor" vs "Seso"). Fold such a bucket into the one other company it is a word-prefix variant of.
+ */
+const mergeRoleLessVariants = (byCompany: Map<string, CompanyBucket>) => {
+  for (const [key, bucket] of [...byCompany]) {
+    if (bucket.roled.length > 0) continue;
+    const targets = [...byCompany.keys()].filter(
+      (other) => other !== key && byCompany.get(other)!.roled.length > 0 && (wordPrefix(other, key) || wordPrefix(key, other)),
+    );
+    if (targets.length !== 1) continue;
+    byCompany.get(targets[0]!)!.unroled.push(...bucket.unroled);
+    byCompany.delete(key);
+  }
+};
+
 const groupMessages = (messages: StoredGmailMessage[]): Group[] => {
-  const byCompany = new Map<string, { company: string; roled: Group[]; unroled: StoredGmailMessage[] }>();
+  const byCompany = new Map<string, CompanyBucket>();
   for (const m of messages) {
     const c = m.classification;
     if (!c?.isApplicationEmail || !c.company) continue;
@@ -124,6 +155,8 @@ const groupMessages = (messages: StoredGmailMessage[]): Group[] => {
     if (existing) existing.messages.push(m);
     else bucket.roled.push({ companyKey, company: c.company, role: c.role, messages: [m] });
   }
+
+  mergeRoleLessVariants(byCompany);
 
   const groups: Group[] = [];
   for (const [companyKey, bucket] of byCompany) {
@@ -148,12 +181,18 @@ const toApplication = (group: Group): Omit<GmailApplication, "trackerJobId" | "t
   const status: ApplicationStatus = latest
     ? EVENT_TO_STATUS[latest.classification!.eventType as Exclude<EmailEventType, "other">]
     : "applied";
+  const furthestStage = statusEvents.reduce<GmailApplication["furthestStage"]>((best, m) => {
+    const s = EVENT_TO_STATUS[m.classification!.eventType as Exclude<EmailEventType, "other">];
+    return s !== "rejected" && STAGE_RANK[s] > STAGE_RANK[best] ? s : best;
+  }, "applied");
   return {
     key: `${group.companyKey}::${group.role ? roleTokens(group.role).join(" ") : ""}`,
     company: group.company,
     role: group.role,
     appliedAt: (firstApplied ?? sorted[0]!).date,
+    appliedAtKnown: Boolean(firstApplied),
     status,
+    furthestStage,
     lastUpdateAt: sorted[sorted.length - 1]!.date,
     emails: sorted
       .map((m) => ({
