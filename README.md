@@ -38,6 +38,10 @@ It is designed as an operator assistant, not an autonomous applier.
 - Google OAuth with the `gmail.readonly` scope. Full email bodies are never stored, only a per-message classification
 - Free rule-based prefilter, then an LLM classifier: applied, assessment, interview, rejected, offer, other. Calendar invites from company domains count as interviews
 - Groups emails into applications by company and role, tracks status and the furthest stage reached (e.g. "rejected after interviewing"), and flags estimated applied dates when no confirmation email exists
+- Interview rounds: each interview email gets a small extra LLM read for the round number, what the round is and who it's with. Emails about the same round (invite, calendar invite, reschedule) are grouped together, and the status shows "Recruiter screen", "2nd round", "3rd round · technical with Jane Doe", or "rejected after 2nd round". Each sync also backfills round details for older interview emails, whatever their age
+- Interview vs interviewing: the "Interview" status card counts applications that reached an interview in the window. Being actively in process is shown separately: an "Interviewing" pill (an open application with an upcoming interview or interview email in the last 21 days, otherwise "Interviewed") and an "Interviewing now" list in the upcoming interviews card
+- Upcoming interviews: the top of the dashboard lists confirmed interview times from the last 60 days of email, soonest first, with company, role, round, date and time (with a "Today" / "Tomorrow" / "In N days" badge). Reschedules replace the earlier time; cancelled interviews and rejected roles drop off. Times stated without a timezone use `USER_TIMEZONE` (defaults to your machine's zone)
+- Scoring details: click any fit score to open the full breakdown: category scores, survivability, hard gates and the rules that fired, penalties, extractor output and the stored JD. Scores given before this snapshot existed can be audited with "Run diagnostic re-score", which re-runs the stored JD and saves the result separately. The original score never changes
 - Matches applications to tracker rows and suggests status updates (e.g. "Update to Rejected")
 - 7- or 30-day window. Syncing again only processes new mail
 
@@ -56,7 +60,7 @@ Verification rules:
 - Ties are broken by the title or city named in the email. Identical postings repeated per location are merged
 - Anything weaker is kept as a candidate for you to pick, or you can paste the JD yourself
 
-Scores are final: a scored row is never re-scored by later syncs, recovery runs, or a change in the application's key. Each new score stores its category breakdown (shown on hover).
+Scores are final: a scored row is never re-scored by later syncs, recovery runs, or a change in the application's key. Each new score stores its full scoring detail (click the score to see it). A deliberate one-off rescore of every stored JD is only done by hand after a scoring bug fix, never automatically.
 
 **Dashboard metrics**
 
@@ -64,6 +68,20 @@ Scores are final: a scored row is never re-scored by later syncs, recovery runs,
 - Where the JDs came from: verified and candidate counts per source (email, company boards, Serper, pasted), with Serper usefulness and budget
 - OpenAI cost: today, last 7 days, per scored role, per email, and by feature, estimated from OpenAI-reported token counts
 - A low-budget warning when 20% or less of the Serper budget is left
+
+**Recent fixes**
+
+Scoring:
+
+- Go detection no longer fires on English "go" ("evaluations that go beyond benchmarks"). "Golang" always counts; a bare "Go" only counts in a language context: listed with other languages or frameworks, under a `Languages:`/`Stack:` label, alone on a line, or framed as "experience with Go", "Go services", "Strong Go required". One shared detector is used everywhere, including the deterministic extractor that previously copied every match into required skills
+- The seniority hard gate (caps the score at 25) no longer fires on an inferred "senior" label alone. It needs a seniority word in the title, an explicit Seniority field in the posting, or 5+ minimum years; otherwise the role is flagged for manual review. The heuristic extractor now reads seniority from the title only, so body text like "senior client engineers" or "technical staff at our clients" no longer marks a role senior
+- All scored roles were rescored once after these fixes
+
+Gmail dashboard:
+
+- Calendar invites Gmail renames for new senders ("Invitation from an unknown sender: …") are recognised as interviews; older dropped invites are re-checked automatically
+- Applications split by a mangled company name are merged when they share the same company email domain
+- A new booking after the previous round's interview was held starts the next round, so a follow-up meeting isn't folded into the recruiter screen
 
 ## C. Repo Structure (High-Level)
 
@@ -236,7 +254,7 @@ Working the dashboard:
 
 - **Needs your pick:** choose the right posting from the candidates, or paste the JD.
 - **Not found:** the note says why (e.g. "board has no open jobs (posting likely closed)" or the closest title on the board). Paste the JD if you still care about the role.
-- Hover the fit score for its breakdown and the JD match badge for every step that was tried.
+- Click the fit score for the full scoring detail (rules that fired, hard gates, extractor output, stored JD). Hover the JD match badge for every step that was tried.
 
 Suggested routine: sync once a day, clear "Needs your pick" weekly, and read the score-vs-outcome card once there are about 30 outcomes.
 

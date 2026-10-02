@@ -7,6 +7,7 @@ import type {
   GmailStatus,
   GmailSyncResult,
   RecoveryStart,
+  ScoringReport,
 } from "../types/gmail";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000/api";
@@ -140,6 +141,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ url }),
     }),
+  gmailScoringReport: (key: string) =>
+    request<ScoringReport>(`/gmail/evaluations/${encodeURIComponent(key)}/scoring`, { cache: "no-store" }),
+  gmailRunDiagnostic: (key: string) =>
+    request<ScoringReport>(`/gmail/evaluations/${encodeURIComponent(key)}/diagnose`, { method: "POST" }),
   gmailPasteJd: (key: string, text: string, url?: string) =>
     request<{ evaluation: EvaluationSummary }>(`/gmail/evaluations/${encodeURIComponent(key)}/jd`, {
       method: "POST",

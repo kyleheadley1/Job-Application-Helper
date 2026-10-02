@@ -86,6 +86,18 @@ describe("prefilterEmail", () => {
       reason: "no_application_signal",
     });
   });
+
+  it("keeps invites Gmail relabels for new senders, and updated invites", () => {
+    const from = "Lauren Stein <lauren@axle.insure>";
+    for (const subject of [
+      "Invitation from an unknown sender: Interview with Axle @ Tue Oct 6, 2026 10:45am - 11am (EDT) (jane@gmail.com)",
+      "Updated invitation from an unknown sender: Interview with Axle @ Tue Oct 6, 2026 11am - 11:15am (EDT)",
+      "Updated invitation with note: Interview with Axle @ Tue Oct 6, 2026",
+    ]) {
+      expect(prefilterEmail(email({ from, subject }))).toEqual({ keep: true, reason: "calendar_invite" });
+    }
+    expect(prefilterEmail(email({ from, subject: "Accepted: Interview with Axle @ Tue Oct 6" })).keep).toBe(false);
+  });
 });
 
 describe("buildSearchQuery", () => {

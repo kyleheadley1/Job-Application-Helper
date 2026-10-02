@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
+import { ScoringDetailsPanel } from "../components/ScoringDetailsPanel";
 import type {
   ApplicationStatus,
   CostSummary,
@@ -12,6 +13,7 @@ import type {
   GmailApplication,
   GmailStatus,
   RecoveryStart,
+  UpcomingInterview,
 } from "../types/gmail";
 import type { JobStatus } from "../types/job";
 
@@ -29,7 +31,7 @@ const STATUS_ORDER: ApplicationStatus[] = ["applied", "assessment", "interviewin
 const STATUS_LABEL: Record<ApplicationStatus, string> = {
   applied: "Applied",
   assessment: "Assessment",
-  interviewing: "Interviewing",
+  interviewing: "Interview",
   rejected: "Rejected",
   offer: "Offer",
 };
@@ -148,11 +150,134 @@ const fitTooltip = (evaluation: EvaluationSummary): string => {
     .join("\n");
 };
 
-function FitCell({ evaluation }: { evaluation?: EvaluationSummary }) {
+/** Got at least one interview, whatever happened after. */
+const reachedInterview = (app: GmailApplication) =>
+  (app.interviewRounds?.length ?? 0) > 0 || app.furthestStage === "interviewing" || app.furthestStage === "offer";
+
+const STATUS_CARD_HINT: Record<ApplicationStatus, string> = {
+  applied: "Applied, no response beyond the confirmation yet",
+  assessment: "Latest step is an assessment",
+  interviewing: "Reached at least one interview, whatever happened after (includes later rejections)",
+  rejected: "Rejected at any stage",
+  offer: "Received an offer",
+};
+
+/** "Interviewing" only while the process is active; a stalled one reads "Interviewed". */
+const statusPillLabel = (app: GmailApplication): string => {
+  if (app.status !== "interviewing") return STATUS_LABEL[app.status];
+  return app.activelyInterviewing === false ? "Interviewed" : "Interviewing";
+};
+
+const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+
+/** Current interview round under the status pill, or the round a rejection came after. */
+function StageNote({ app }: { app: GmailApplication }) {
+  const rounds = app.interviewRounds ?? [];
+  const last = rounds[rounds.length - 1];
+  const title = rounds.length > 1 ? rounds.map((r) => r.label).join("\n") : undefined;
+  if (last && (app.status === "interviewing" || app.status === "rejected" || app.status === "offer")) {
+    const text = app.status === "interviewing" ? last.label : `after ${lowerFirst(last.label)}`;
+    return (
+      <div className="muted smallText" title={title}>
+        {text}
+      </div>
+    );
+  }
+  if (app.status === "rejected" && app.furthestStage && app.furthestStage !== "applied") {
+    return <div className="muted smallText">after {STATUS_LABEL[app.furthestStage].toLowerCase()}</div>;
+  }
+  return null;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+
+/** "Today", "Tomorrow", "In 3 days", or "Now" while the interview is under way. */
+const relativeDay = (at: Date, now: Date): string => {
+  if (at.getTime() <= now.getTime()) return "Now";
+  const days = Math.round((startOfDay(at) - startOfDay(now)) / DAY_MS);
+  if (days === 0) return "Today";
+  if (days === 1) return "Tomorrow";
+  return `In ${days} days`;
+};
+
+const interviewWhen = (iv: UpcomingInterview): string => {
+  const start = new Date(iv.scheduledAt);
+  const date = start.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  const time = (d: Date) => d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const end = iv.durationMinutes ? new Date(start.getTime() + iv.durationMinutes * 60_000) : null;
+  const zone = start.toLocaleTimeString(undefined, { timeZoneName: "short" }).split(" ").pop();
+  return `${date} · ${time(start)}${end ? `–${time(end)}` : ""} ${zone ?? ""}`.trim();
+};
+
+/** Confirmed interviews that haven't ended yet, soonest first. */
+function UpcomingInterviewsCard({ interviews, active }: { interviews: UpcomingInterview[]; active: GmailApplication[] }) {
+  const now = new Date();
+  return (
+    <div className="card stack" style={{ gap: "0.5rem" }}>
+      <div className="rowBetween">
+        <strong>Upcoming interviews</strong>
+        <span className="muted smallText" title="Open applications with an upcoming interview or interview activity in the last 3 weeks">
+          Interviewing now: {active.length === 0 ? "none" : active.map((a) => a.company).join(", ")}
+        </span>
+      </div>
+      {interviews.length === 0 ? (
+        <span className="muted smallText">No confirmed interview times found in the last 60 days of email.</span>
+      ) : (
+        <table className="table">
+          <tbody>
+            {interviews.map((iv) => {
+              const soon = new Date(iv.scheduledAt).getTime() - now.getTime() < DAY_MS;
+              return (
+                <tr key={`${iv.key}-${iv.roundNumber}`}>
+                  <td style={{ whiteSpace: "nowrap" }}>
+                    <span className={`pill ${soon ? "warn" : "good"}`}>{relativeDay(new Date(iv.scheduledAt), now)}</span>
+                  </td>
+                  <td style={{ whiteSpace: "nowrap" }}>{interviewWhen(iv)}</td>
+                  <td>
+                    <strong>{iv.company}</strong>
+                    {iv.role && <div className="muted smallText">{iv.role}</div>}
+                  </td>
+                  <td>{iv.label}</td>
+                  <td>
+                    {iv.gmailUrl && (
+                      <a href={iv.gmailUrl} target="_blank" rel="noreferrer" className="smallText">
+                        Open email
+                      </a>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function FitCell({
+  evaluation,
+  open,
+  onToggle,
+}: {
+  evaluation?: EvaluationSummary;
+  open: boolean;
+  onToggle: () => void;
+}) {
   if (evaluation?.fitTotal === undefined) return <span className="muted">—</span>;
   return (
-    <div className="stack" style={{ gap: "0.2rem" }} title={fitTooltip(evaluation)}>
-      <span className={`pill fitScore ${fitClass(evaluation.fitTotal)}`}>{Math.round(evaluation.fitTotal)}</span>
+    <div className="stack" style={{ gap: "0.2rem" }} title={`${fitTooltip(evaluation)}\n\nClick for full scoring details`}>
+      <button
+        type="button"
+        className={`pill fitScore ${fitClass(evaluation.fitTotal)}`}
+        onClick={onToggle}
+        aria-expanded={open}
+        style={{ cursor: "pointer", border: "none", font: "inherit" }}
+      >
+        {Math.round(evaluation.fitTotal)} {open ? "▾" : "▸"}
+      </button>
       {evaluation.recommendedResume && (
         <span className="muted smallText">{evaluation.recommendedResume} resume</span>
       )}
@@ -397,10 +522,12 @@ export function DashboardPage() {
   const [notice, setNotice] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   const [pendingRecovery, setPendingRecovery] = useState(0);
+  const [upcoming, setUpcoming] = useState<UpcomingInterview[]>([]);
   const [evaluations, setEvaluations] = useState<EvaluationsResponse | null>(null);
   const [windowDays, setWindowDays] = useState<WindowDays>(readWindow);
   const [filter, setFilter] = useState<RecoveryFilter>("all");
   const [reviewKey, setReviewKey] = useState<string | null>(null);
+  const [scoringKey, setScoringKey] = useState<string | null>(null);
   const autoSynced = useRef(false);
 
   const loadEvaluations = useCallback(async () => {
@@ -410,9 +537,10 @@ export function DashboardPage() {
   }, [windowDays]);
 
   const loadApplications = useCallback(async () => {
-    const { applications: items, pendingRecovery: pending } = await api.gmailApplications(windowDays);
+    const { applications: items, pendingRecovery: pending, upcomingInterviews } = await api.gmailApplications(windowDays);
     setApplications(items);
     setPendingRecovery(pending);
+    setUpcoming(upcomingInterviews ?? []);
     await loadEvaluations().catch(() => null);
   }, [windowDays, loadEvaluations]);
 
@@ -430,6 +558,7 @@ export function DashboardPage() {
       const result = await api.gmailSync(windowDays);
       setApplications(result.applications);
       setPendingRecovery(result.pendingRecovery);
+      setUpcoming(result.upcomingInterviews ?? []);
       setStatus(await api.gmailStatus());
       await afterRecoveryStart(result.recovery);
       if (result.llmFailures > 0) {
@@ -553,8 +682,9 @@ export function DashboardPage() {
 
   const counts = STATUS_ORDER.map((s) => ({
     status: s,
-    count: applications.filter((a) => a.status === s).length,
+    count: applications.filter((a) => (s === "interviewing" ? reachedInterview(a) : a.status === s)).length,
   }));
+  const activeInterviews = applications.filter((a) => a.activelyInterviewing);
 
   const filterCounts = (Object.keys(FILTER_LABEL) as RecoveryFilter[]).map((f) => ({
     filter: f,
@@ -636,9 +766,11 @@ export function DashboardPage() {
             </div>
           </div>
 
+          <UpcomingInterviewsCard interviews={upcoming} active={activeInterviews} />
+
           <div className="grid" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
             {counts.map(({ status: s, count }) => (
-              <div key={s} className="card">
+              <div key={s} className="card" title={STATUS_CARD_HINT[s]}>
                 <div className="muted">{STATUS_LABEL[s]}</div>
                 <div style={{ fontSize: "1.8rem", fontWeight: 700 }}>{count}</div>
               </div>
@@ -717,9 +849,11 @@ export function DashboardPage() {
                             >
                               {p.company} <strong>{Math.round(p.fit)}</strong>
                               {p.verifiedBy === "user" ? " *" : ""}
-                              {r.outcome === "rejected" && p.furthestStage && p.furthestStage !== "applied"
-                                ? ` (after ${STATUS_LABEL[p.furthestStage].toLowerCase()})`
-                                : ""}
+                              {r.outcome === "rejected" && p.furthestRound
+                                ? ` (after ${lowerFirst(p.furthestRound.label)})`
+                                : r.outcome === "rejected" && p.furthestStage && p.furthestStage !== "applied"
+                                  ? ` (after ${STATUS_LABEL[p.furthestStage].toLowerCase()})`
+                                  : ""}
                             </span>
                           ))}
                         </td>
@@ -779,6 +913,7 @@ export function DashboardPage() {
                                   </a>{" "}
                                   <span className="muted">
                                     · {formatDate(email.date)} · {email.eventType}
+                                    {email.round ? ` (round ${email.round})` : ""}
                                   </span>
                                 </li>
                               ))}
@@ -794,13 +929,15 @@ export function DashboardPage() {
                           )}
                         </td>
                         <td>
-                          <span className={`pill ${STATUS_PILL[app.status]}`}>{STATUS_LABEL[app.status]}</span>
-                          {app.status === "rejected" && app.furthestStage && app.furthestStage !== "applied" && (
-                            <div className="muted smallText">after {STATUS_LABEL[app.furthestStage].toLowerCase()}</div>
-                          )}
+                          <span className={`pill ${STATUS_PILL[app.status]}`}>{statusPillLabel(app)}</span>
+                          <StageNote app={app} />
                         </td>
                         <td>
-                          <FitCell evaluation={app.evaluation} />
+                          <FitCell
+                            evaluation={app.evaluation}
+                            open={scoringKey === app.key}
+                            onToggle={() => setScoringKey(scoringKey === app.key ? null : app.key)}
+                          />
                         </td>
                         <td>
                           <JdMatchCell
@@ -832,6 +969,13 @@ export function DashboardPage() {
                           )}
                         </td>
                       </tr>
+                      {scoringKey === app.key && app.evaluation?.fitTotal !== undefined && (
+                        <tr>
+                          <td colSpan={7}>
+                            <ScoringDetailsPanel appKey={app.key} />
+                          </td>
+                        </tr>
+                      )}
                       {reviewKey === app.key && app.evaluation && (
                         <tr>
                           <td colSpan={7}>

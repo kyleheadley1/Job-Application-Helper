@@ -1,5 +1,6 @@
 import { getDb } from "../../config/mongo.js";
 import type { EmailClassification } from "./gmailClassifier.js";
+import type { InterviewDetail } from "./interviewRounds.js";
 
 /** Per-message classification cache. Full email bodies are never stored. */
 export type StoredGmailMessage = {
@@ -54,6 +55,29 @@ export const gmailMessagesRepository = {
   async upsert(message: StoredGmailMessage): Promise<void> {
     const col = await this.collection();
     await col.replaceOne({ _id: message.id }, message, { upsert: true });
+  },
+
+  /** Interview emails with no round details, or details from an older extraction version. Newest first. */
+  async listInterviewIdsMissingDetail(limit: number, version: number): Promise<string[]> {
+    const col = await this.collection();
+    const docs = await col
+      .find(
+        {
+          "classification.isApplicationEmail": true,
+          "classification.eventType": "interview",
+          "classification.interview.version": { $ne: version },
+        },
+        { projection: { _id: 1 } },
+      )
+      .sort({ date: -1 })
+      .limit(limit)
+      .toArray();
+    return docs.map((d) => d._id);
+  },
+
+  async setInterviewDetail(id: string, detail: InterviewDetail): Promise<void> {
+    const col = await this.collection();
+    await col.updateOne({ _id: id }, { $set: { "classification.interview": detail } });
   },
 
   async listApplicationMessagesSince(sinceIso: string): Promise<StoredGmailMessage[]> {

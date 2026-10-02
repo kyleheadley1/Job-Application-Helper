@@ -1,7 +1,8 @@
 import type { JobRecord, JobStatus } from "../../types/job.js";
 import { jobsRepository } from "../jobs/jobs.repository.js";
-import type { EmailEventType } from "./gmailClassifier.js";
+import { isAtsSender, isFreemailSender, type EmailEventType } from "./gmailClassifier.js";
 import { gmailMessagesRepository, type StoredGmailMessage } from "./gmailMessages.repository.js";
+import { buildInterviewRounds, type InterviewRound } from "./interviewRounds.js";
 
 export type ApplicationStatus = "applied" | "assessment" | "interviewing" | "rejected" | "offer";
 
@@ -12,6 +13,8 @@ export type ApplicationEmail = {
   date: string;
   eventType: EmailEventType;
   gmailUrl: string;
+  /** Interview round this email belongs to. */
+  round?: number;
 };
 
 export type GmailApplication = {
@@ -24,6 +27,10 @@ export type GmailApplication = {
   status: ApplicationStatus;
   /** Most advanced stage reached, ignoring a later rejection (interview → rejected stays "interviewing"). */
   furthestStage: Exclude<ApplicationStatus, "rejected">;
+  /** Interview rounds in order; the last one is the furthest round reached. */
+  interviewRounds: InterviewRound[];
+  /** Still open with an upcoming interview or recent interview activity, as opposed to merely having interviewed. */
+  activelyInterviewing: boolean;
   lastUpdateAt: string;
   emails: ApplicationEmail[];
   trackerJobId?: string;
@@ -136,6 +143,41 @@ const mergeRoleLessVariants = (byCompany: Map<string, CompanyBucket>) => {
   }
 };
 
+const SENDER_DOMAIN_RE = /@([a-z0-9.-]+\.[a-z]{2,})\s*>?\s*$/i;
+
+/** The employer's own mail domain, or null for ATS vendors and personal mail. */
+export const companySenderDomain = (from: string): string | null => {
+  if (isAtsSender(from) || isFreemailSender(from)) return null;
+  return from.match(SENDER_DOMAIN_RE)?.[1]?.toLowerCase() ?? null;
+};
+
+const bucketDomains = (bucket: CompanyBucket): Set<string> => {
+  const domains = new Set<string>();
+  for (const m of [...bucket.unroled, ...bucket.roled.flatMap((g) => g.messages)]) {
+    const d = companySenderDomain(m.from);
+    if (d) domains.add(d);
+  }
+  return domains;
+};
+
+/**
+ * The classifier sometimes names the company from the sender domain ("SesolaBor" for sesolabor.com).
+ * Fold a role-less bucket into the one other company that has mail from the same domain.
+ */
+const mergeRoleLessBySenderDomain = (byCompany: Map<string, CompanyBucket>) => {
+  for (const [key, bucket] of [...byCompany]) {
+    if (bucket.roled.length > 0) continue;
+    const domains = bucketDomains(bucket);
+    if (domains.size === 0) continue;
+    const targets = [...byCompany.keys()].filter(
+      (other) => other !== key && [...bucketDomains(byCompany.get(other)!)].some((d) => domains.has(d)),
+    );
+    if (targets.length !== 1) continue;
+    byCompany.get(targets[0]!)!.unroled.push(...bucket.unroled);
+    byCompany.delete(key);
+  }
+};
+
 const groupMessages = (messages: StoredGmailMessage[]): Group[] => {
   const byCompany = new Map<string, CompanyBucket>();
   for (const m of messages) {
@@ -157,6 +199,7 @@ const groupMessages = (messages: StoredGmailMessage[]): Group[] => {
   }
 
   mergeRoleLessVariants(byCompany);
+  mergeRoleLessBySenderDomain(byCompany);
 
   const groups: Group[] = [];
   for (const [companyKey, bucket] of byCompany) {
@@ -169,7 +212,23 @@ const groupMessages = (messages: StoredGmailMessage[]): Group[] => {
   return groups;
 };
 
-const toApplication = (group: Group): Omit<GmailApplication, "trackerJobId" | "trackerStatus" | "trackerTitle" | "suggestedStatus"> => {
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** With no upcoming interview, interview activity this recent still counts as an active process. */
+const ACTIVE_INTERVIEW_DAYS = 21;
+const CLOSED: ApplicationStatus[] = ["rejected", "offer"];
+
+const isActivelyInterviewing = (status: ApplicationStatus, rounds: InterviewRound[], now: number): boolean => {
+  const last = rounds[rounds.length - 1];
+  if (!last || CLOSED.includes(status)) return false;
+  if (last.scheduledAt && !last.cancelled && Date.parse(last.scheduledAt) > now) return true;
+  const lastActivity = Math.max(Date.parse(last.lastEmailAt), last.scheduledAt ? Date.parse(last.scheduledAt) : 0);
+  return now - lastActivity <= ACTIVE_INTERVIEW_DAYS * DAY_MS;
+};
+
+const toApplication = (
+  group: Group,
+  now: number,
+): Omit<GmailApplication, "trackerJobId" | "trackerStatus" | "trackerTitle" | "suggestedStatus"> => {
   const sorted = [...group.messages].sort(
     (a, b) =>
       a.date.localeCompare(b.date) ||
@@ -185,6 +244,8 @@ const toApplication = (group: Group): Omit<GmailApplication, "trackerJobId" | "t
     const s = EVENT_TO_STATUS[m.classification!.eventType as Exclude<EmailEventType, "other">];
     return s !== "rejected" && STAGE_RANK[s] > STAGE_RANK[best] ? s : best;
   }, "applied");
+  const interviewRounds = buildInterviewRounds(sorted.filter((m) => m.classification!.eventType === "interview"));
+  const roundByEmail = new Map(interviewRounds.flatMap((r) => r.emailIds.map((id) => [id, r.number] as const)));
   return {
     key: `${group.companyKey}::${group.role ? roleTokens(group.role).join(" ") : ""}`,
     company: group.company,
@@ -193,6 +254,8 @@ const toApplication = (group: Group): Omit<GmailApplication, "trackerJobId" | "t
     appliedAtKnown: Boolean(firstApplied),
     status,
     furthestStage,
+    interviewRounds,
+    activelyInterviewing: isActivelyInterviewing(status, interviewRounds, now),
     lastUpdateAt: sorted[sorted.length - 1]!.date,
     emails: sorted
       .map((m) => ({
@@ -202,6 +265,7 @@ const toApplication = (group: Group): Omit<GmailApplication, "trackerJobId" | "t
         date: m.date,
         eventType: m.classification!.eventType,
         gmailUrl: gmailUrl(m.threadId),
+        ...(roundByEmail.has(m.id) ? { round: roundByEmail.get(m.id) } : {}),
       }))
       .reverse(),
   };
@@ -265,10 +329,11 @@ export const matchTrackerJob = (
 export const buildApplications = (
   messages: StoredGmailMessage[],
   trackerJobs: JobRecord[],
+  now = Date.now(),
 ): GmailApplication[] =>
   groupMessages(messages)
     .map((group) => {
-      const app = toApplication(group);
+      const app = toApplication(group, now);
       const match = matchTrackerJob(app, trackerJobs);
       if (!match) return app;
       return {
@@ -280,6 +345,52 @@ export const buildApplications = (
       };
     })
     .sort((a, b) => b.lastUpdateAt.localeCompare(a.lastUpdateAt));
+
+export type UpcomingInterview = {
+  key: string;
+  company: string;
+  role: string | null;
+  roundNumber: number;
+  label: string;
+  scheduledAt: string;
+  durationMinutes: number | null;
+  gmailUrl?: string;
+};
+
+/** Invites can be sent weeks ahead, so look further back than the dashboard window. */
+export const UPCOMING_LOOKBACK_DAYS = 60;
+/** An interview stays listed until it should have ended. */
+const DEFAULT_INTERVIEW_MINUTES = 60;
+
+export const upcomingInterviews = (apps: GmailApplication[], now = Date.now()): UpcomingInterview[] =>
+  apps
+    .filter((app) => !CLOSED.includes(app.status))
+    .flatMap((app) =>
+      app.interviewRounds
+        .filter(
+          (r) =>
+            r.scheduledAt &&
+            !r.cancelled &&
+            Date.parse(r.scheduledAt) + (r.durationMinutes ?? DEFAULT_INTERVIEW_MINUTES) * 60_000 > now,
+        )
+        .map((r) => {
+          const lastEmailId = r.emailIds[r.emailIds.length - 1];
+          return {
+            key: app.key,
+            company: app.company,
+            role: app.role,
+            roundNumber: r.number,
+            label: r.label,
+            scheduledAt: r.scheduledAt!,
+            durationMinutes: r.durationMinutes,
+            gmailUrl: app.emails.find((e) => e.id === lastEmailId)?.gmailUrl,
+          };
+        }),
+    )
+    .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
+
+export const getUpcomingInterviews = async (): Promise<UpcomingInterview[]> =>
+  upcomingInterviews(await getGmailApplications(UPCOMING_LOOKBACK_DAYS));
 
 export const getGmailApplications = async (days: number): Promise<GmailApplication[]> => {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();

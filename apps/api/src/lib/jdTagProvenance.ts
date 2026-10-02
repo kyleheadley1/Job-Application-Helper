@@ -1,5 +1,6 @@
 import type { ExtractedJobData } from "../types/job.js";
 import { normalizeText } from "./text.js";
+import { GO_LANGUAGE_PATTERNS } from "./goLanguage.js";
 
 /** Where in the JD a tag was sourced — drives penalty eligibility. */
 export type TagSourceStrength = "REQUIRED" | "PREFERRED" | "NARRATIVE";
@@ -43,7 +44,7 @@ const TERM_PRESENCE: Array<{ norm: string; patterns: RegExp[] }> = [
   { norm: "postgresql", patterns: [/\bpostgres(?:ql)?\b/i] },
   { norm: "node.js", patterns: [/\bnode(?:\.js)?\b/i] },
   { norm: "python", patterns: [/\bpython\b/i] },
-  { norm: "go", patterns: [/\bgolang\b/i, /\bgo\b(?!\s*-)/i] },
+  { norm: "go", patterns: GO_LANGUAGE_PATTERNS },
   { norm: "ui/ux design", patterns: [/\bui\s*\/\s*ux\b/i, /\bui\/ux\s+design\b/i] },
   { norm: "ui/ux", patterns: [/\bui\s*\/\s*ux\b/i] },
   { norm: "rest apis", patterns: [/\brest\s+apis?\b/i, /\brestful\b/i] },

@@ -120,7 +120,19 @@ export const earlyCareerConflictsWithYears = (job: ExtractedJobData): boolean =>
 };
 
 /**
+ * Senior/staff seniority field with nothing in the posting to back it: no explicit
+ * Seniority label, no seniority noun in the title, and years min unstated or ≤4.
+ * The field is then an inference (often from prose like "senior client engineers").
+ */
+export const seniorityFieldUncorroborated = (job: ExtractedJobData): boolean =>
+  !readLabeledSeniorityValue(job) &&
+  !roleTitleSignalsSeniority(job.title) &&
+  !yearsExperienceSignalsOverreach(job.yearsExperience?.min) &&
+  seniorityFieldSignalsOverreach(effectiveSeniorityFieldForGate(job));
+
+/**
  * Flag for manual review when:
+ * - the senior seniority field is uncorroborated (see above), OR
  * - structured seniority is empty and body years alone would gate, OR
  * - early-career chrome conflicts with years ≥5 (polluted year parse like 2–10+ → min 10).
  * Do not silently fire the hard gate in those cases.
@@ -129,6 +141,7 @@ export const seniorityNeedsManualReview = (job: ExtractedJobData): boolean => {
   if (roleTitleSignalsSeniority(job.title)) return false;
   if (earlyCareerLevelVetoesSeniorityGate(job)) return false;
   if (earlyCareerConflictsWithYears(job)) return true;
+  if (seniorityFieldUncorroborated(job)) return true;
   if (hasEmptyStructuredSeniority(job) && yearsExperienceSignalsOverreach(job.yearsExperience?.min)) {
     return true;
   }
@@ -196,7 +209,9 @@ export const explainSeniorityGateTrigger = (
       needsManualReview: true,
       triggerDetail: earlyCareerConflictsWithYears(job)
         ? "early-career seniority conflicts with years min ≥5 — fail safe, no gate"
-        : "structured seniority empty — years/prose alone do not gate",
+        : seniorityFieldUncorroborated(job)
+          ? `seniority field "${job.seniority}" not backed by title, Seniority label, or years ≥5 — no gate`
+          : "structured seniority empty — years/prose alone do not gate",
     };
   }
 

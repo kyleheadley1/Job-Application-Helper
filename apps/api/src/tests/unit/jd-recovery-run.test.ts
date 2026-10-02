@@ -85,6 +85,10 @@ vi.mock("../../services/gmail/jdRecovery/evaluations.repository.js", () => ({
     upsert: vi.fn(async (e: ApplicationEvaluation) => {
       state.evaluations.set(e.key, structuredClone(e));
     }),
+    setDiagnostic: vi.fn(async (key: string, diagnostic: ApplicationEvaluation["diagnostic"]) => {
+      const e = state.evaluations.get(key);
+      if (e) e.diagnostic = diagnostic;
+    }),
     findByCompanyKeys: vi.fn(async (companyKeys: string[]) =>
       [...state.evaluations.values()]
         .filter((e) => companyKeys.some((c) => e.key.startsWith(`${c}::`)))
@@ -107,6 +111,8 @@ vi.mock("../../agents/jobAgent/orchestrator.js", () => ({
     score: { total: 78 },
     recommendation: "selective_yes",
     recommendedResume: "BASE",
+    rules: { notes: [], seniorityOverreach: true },
+    extracted: { title: "Software Engineer", rawText: "full JD text" },
   })),
 }));
 
@@ -125,6 +131,7 @@ import {
   rankSerperResults,
   recoverApplication,
   runRecovery,
+  runScoringDiagnostic,
 } from "../../services/gmail/jdRecovery/runRecovery.js";
 import { buildRubricSummary } from "../../services/gmail/jdRecovery/summary.js";
 
@@ -160,6 +167,8 @@ const addApp = (opts: {
     appliedAtKnown: opts.status !== "rejected",
     status: opts.status ?? "applied",
     furthestStage: "applied",
+    interviewRounds: [],
+    activelyInterviewing: false,
     lastUpdateAt: day(opts.appliedDay),
     emails: [
       {
@@ -216,8 +225,33 @@ describe("JD recovery runner", () => {
     const e = state.evaluations.get("acme::se")!;
     expect(e.recovery).toMatchObject({ status: "scored", source: "email_link", url, match: { level: "high" } });
     expect(e.fit).toMatchObject({ total: 78, recommendedResume: "BASE" });
+    expect(e.fit?.detail?.rules).toMatchObject({ seniorityOverreach: true });
+    expect(e.fit?.detail?.extracted).toEqual({ title: "Software Engineer" });
     expect(e.outcomeAtScoring).toBe("rejected");
     expect(e.jd?.textHash).toBeTruthy();
+  });
+
+  it("runs a scoring diagnostic on the stored JD without touching the original score", async () => {
+    addApp({ key: "acme::se", company: "Acme", role: "Software Engineer", appliedDay: 20 });
+    state.evaluations.set("acme::se", {
+      key: "acme::se",
+      company: "Acme",
+      role: "Software Engineer",
+      appliedAt: day(20),
+      recovery: { status: "scored", attempts: [], serperQueries: 0 },
+      jd: { text: LONG, textHash: "h" },
+      fit: { total: 25, recommendation: "skip", recommendedResume: "BASE", scoredAt: day(19), promptVersion: "v1" },
+      outcome: { status: "applied", updatedAt: day(20), history: [] },
+      createdAt: day(19),
+      updatedAt: day(19),
+    });
+
+    const result = await runScoringDiagnostic("acme::se");
+
+    expect(vi.mocked(triageJob).mock.calls[0]![0]).toEqual({ rawText: LONG, companyHint: "Acme", fullPrep: false });
+    expect(result.fit?.total).toBe(25);
+    expect(result.diagnostic).toMatchObject({ total: 78, detail: { rules: { seniorityOverreach: true } } });
+    expect(state.evaluations.get("acme::se")!.fit?.total).toBe(25);
   });
 
   it("falls back to Serper with the req ID and scores only an exact match", async () => {
