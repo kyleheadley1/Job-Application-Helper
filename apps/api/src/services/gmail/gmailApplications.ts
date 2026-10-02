@@ -1,3 +1,4 @@
+import { appliedAtIso } from "../../lib/trackerAutoArchive.js";
 import type { JobRecord, JobStatus } from "../../types/job.js";
 import { jobsRepository } from "../jobs/jobs.repository.js";
 import { isAtsSender, isFreemailSender, type EmailEventType } from "./gmailClassifier.js";
@@ -5,6 +6,8 @@ import { gmailMessagesRepository, type StoredGmailMessage } from "./gmailMessage
 import { buildInterviewRounds, type InterviewRound } from "./interviewRounds.js";
 
 export type ApplicationStatus = "applied" | "assessment" | "interviewing" | "rejected" | "offer";
+
+export type AppliedAtSource = "email" | "tracker" | "estimated";
 
 export type ApplicationEmail = {
   id: string;
@@ -21,9 +24,13 @@ export type GmailApplication = {
   key: string;
   company: string;
   role: string | null;
-  /** First "applied" email, or the earliest email when no confirmation was found. */
+  /**
+   * First "applied" email, else the tracker's applied date, else the earliest email (the application
+   * happened on or before it). Later status emails only move lastUpdateAt.
+   */
   appliedAt: string;
   appliedAtKnown: boolean;
+  appliedAtSource: AppliedAtSource;
   status: ApplicationStatus;
   /** Most advanced stage reached, ignoring a later rejection (interview → rejected stays "interviewing"). */
   furthestStage: Exclude<ApplicationStatus, "rejected">;
@@ -252,6 +259,7 @@ const toApplication = (
     role: group.role,
     appliedAt: (firstApplied ?? sorted[0]!).date,
     appliedAtKnown: Boolean(firstApplied),
+    appliedAtSource: firstApplied ? "email" : "estimated",
     status,
     furthestStage,
     interviewRounds,
@@ -326,6 +334,17 @@ export const matchTrackerJob = (
   return best?.job;
 };
 
+/** Without a confirmation email, the tracker's applied date beats guessing from the first (often rejection) email. */
+const trackerAppliedAt = (
+  app: Pick<GmailApplication, "appliedAtSource" | "lastUpdateAt">,
+  job: JobRecord,
+): Pick<GmailApplication, "appliedAt" | "appliedAtKnown" | "appliedAtSource"> | undefined => {
+  if (app.appliedAtSource !== "estimated") return undefined;
+  const iso = appliedAtIso(job);
+  if (!iso || Date.parse(iso) > Date.parse(app.lastUpdateAt)) return undefined;
+  return { appliedAt: iso, appliedAtKnown: true, appliedAtSource: "tracker" };
+};
+
 export const buildApplications = (
   messages: StoredGmailMessage[],
   trackerJobs: JobRecord[],
@@ -338,6 +357,7 @@ export const buildApplications = (
       if (!match) return app;
       return {
         ...app,
+        ...trackerAppliedAt(app, match),
         trackerJobId: match.id,
         trackerStatus: match.status,
         trackerTitle: match.extracted.title,

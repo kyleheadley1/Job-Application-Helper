@@ -921,11 +921,25 @@ export function DashboardPage() {
                           </details>
                         </td>
                         <td>
-                          {formatDate(app.appliedAt)}
-                          {app.appliedAtKnown === false && (
-                            <div className="muted smallText" title="No application confirmation email was found; this is the earliest email.">
-                              first email
-                            </div>
+                          {app.appliedAtKnown === false ? (
+                            <>
+                              <span className="muted">Before {formatDate(app.appliedAt)}</span>
+                              <div
+                                className="muted smallText"
+                                title="No application confirmation email or tracker applied date was found; you applied on or before the earliest email."
+                              >
+                                date unknown
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              {formatDate(app.appliedAt)}
+                              {app.appliedAtSource === "tracker" && (
+                                <div className="muted smallText" title="No confirmation email in this window; date applied comes from the tracker.">
+                                  from tracker
+                                </div>
+                              )}
+                            </>
                           )}
                         </td>
                         <td>

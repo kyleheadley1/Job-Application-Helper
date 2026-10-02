@@ -158,6 +158,55 @@ describe("buildApplications", () => {
     ).toEqual([]);
   });
 
+  it("keeps the tracker's applied date when the only email is a rejection", () => {
+    const tracked = {
+      ...job("cg", "Capgemini", "Software Engineer", "lapsed"),
+      statusHistory: [{ fromStatus: "to_review", toStatus: "applied", createdAt: "2026-08-20T15:00:00.000Z" }],
+    } as unknown as JobRecord;
+    const [app] = buildApplications(
+      [msg("Capgemini Group", "Software Engineer", "rejected", "2026-10-02T12:00:00.000Z")],
+      [tracked],
+    );
+    expect(app).toMatchObject({
+      status: "rejected",
+      appliedAt: "2026-08-20T15:00:00.000Z",
+      appliedAtKnown: true,
+      appliedAtSource: "tracker",
+      lastUpdateAt: "2026-10-02T12:00:00.000Z",
+      suggestedStatus: "rejected",
+    });
+  });
+
+  it("prefers the manual tracker applied date and never lets the tracker override a confirmation email", () => {
+    const tracked = {
+      ...job("cg", "Capgemini", "Software Engineer", "applied"),
+      tracker: { appliedAt: "2026-08-18T00:00:00.000Z" },
+      statusHistory: [{ fromStatus: "to_review", toStatus: "applied", createdAt: "2026-08-20T15:00:00.000Z" }],
+    } as unknown as JobRecord;
+    const [rejectionOnly] = buildApplications(
+      [msg("Capgemini", "Software Engineer", "rejected", "2026-10-02T12:00:00.000Z")],
+      [tracked],
+    );
+    expect(rejectionOnly!.appliedAt).toBe("2026-08-18T00:00:00.000Z");
+
+    const [confirmed] = buildApplications(
+      [
+        msg("Capgemini", "Software Engineer", "applied", "2026-09-30T12:00:00.000Z"),
+        msg("Capgemini", "Software Engineer", "rejected", "2026-10-02T12:00:00.000Z"),
+      ],
+      [tracked],
+    );
+    expect(confirmed).toMatchObject({ appliedAt: "2026-09-30T12:00:00.000Z", appliedAtSource: "email" });
+  });
+
+  it("leaves the date estimated when the tracker has no applied date", () => {
+    const [app] = buildApplications(
+      [msg("Capgemini", "Software Engineer", "rejected", "2026-10-02T12:00:00.000Z")],
+      [job("cg", "Capgemini", "Software Engineer", "to_review")],
+    );
+    expect(app).toMatchObject({ appliedAtKnown: false, appliedAtSource: "estimated" });
+  });
+
   it("matches tracker jobs and suggests a status update", () => {
     const [app] = buildApplications(
       [
