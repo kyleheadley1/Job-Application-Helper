@@ -10,6 +10,7 @@ import { repoRootDir } from "./config/env.js";
 import { resumeContextService } from "./services/resume/resumeContext.js";
 import { RESUME_TYPES } from "./types/resume.js";
 import { startTopJobsScheduler } from "./services/topJobs/topJobsScheduler.js";
+import { startGmailSyncScheduler } from "./services/gmail/gmailSyncScheduler.js";
 import { capturesService } from "./services/captures/captures.service.js";
 
 const trackerWorkbookPath = (): string =>
@@ -64,6 +65,7 @@ const start = async (): Promise<void> => {
   await ensureTrackerSeed();
   await preloadResumeContext();
   startTopJobsScheduler();
+  startGmailSyncScheduler();
   await capturesService.resumeUnfinished();
   const server = app.listen(env.port, () => {
     logger.info("API server started", { port: env.port, env: env.nodeEnv });

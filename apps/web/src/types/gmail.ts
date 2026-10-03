@@ -6,6 +6,8 @@ export type GmailStatus = {
   email?: string;
   lastSyncAt?: string;
   needsReconnect?: boolean;
+  /** Minutes between background syncs on the API; 0 when disabled. */
+  autoSyncMinutes?: number;
 };
 
 export type EmailEventType = "applied" | "rejected" | "interview" | "assessment" | "offer" | "other";

@@ -52,8 +52,19 @@ const runPool = async <T>(items: T[], limit: number, worker: (item: T) => Promis
   await Promise.all(runners);
 };
 
-/** Pull recent mail, prefilter with rules, classify survivors with the LLM, cache results. */
-export const syncGmail = async (days = DEFAULT_SYNC_DAYS): Promise<GmailSyncResult> => {
+let inFlight: Promise<unknown> = Promise.resolve();
+
+/**
+ * Pull recent mail, prefilter with rules, classify survivors with the LLM, cache results.
+ * Runs one at a time so a manual and a scheduled sync never pay to classify the same email twice.
+ */
+export const syncGmail = (days = DEFAULT_SYNC_DAYS): Promise<GmailSyncResult> => {
+  const run = inFlight.catch(() => undefined).then(() => syncGmailNow(days));
+  inFlight = run;
+  return run;
+};
+
+const syncGmailNow = async (days: number): Promise<GmailSyncResult> => {
   const window = Math.min(Math.max(1, Math.floor(days)), MAX_SYNC_DAYS);
   const ids = await gmailClient.listMessageIds(buildSearchQuery(window));
   const processed = await gmailMessagesRepository.findProcessedIds(ids, PREFILTER_VERSION);

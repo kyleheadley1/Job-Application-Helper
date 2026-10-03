@@ -69,7 +69,7 @@ const sendGmailError = (res: Response, error: unknown): boolean => {
 gmailRouter.get("/status", async (_req, res, next) => {
   try {
     res.setHeader("Cache-Control", "no-store");
-    res.json(await gmailAuth.getStatus());
+    res.json({ ...(await gmailAuth.getStatus()), autoSyncMinutes: env.gmailAutoSyncMinutes });
   } catch (error) {
     next(error);
   }
