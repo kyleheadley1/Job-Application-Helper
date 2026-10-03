@@ -22,6 +22,8 @@ type WindowDays = (typeof WINDOW_OPTIONS)[number];
 const WINDOW_STORAGE_KEY = "dashboard.windowDays";
 const AUTO_SYNC_AFTER_MS = 15 * 60 * 1000;
 const RECOVERY_POLL_MS = 5000;
+/** How often an open dashboard checks whether a background sync has landed. */
+const STATUS_POLL_MS = 5 * 60 * 1000;
 const SMALL_SAMPLE = 5;
 const MIN_PASTED_JD_CHARS = 300;
 const SERPER_LOW_BUDGET_SHARE = 0.2;
@@ -612,6 +614,26 @@ export function DashboardPage() {
     })();
   }, [loadApplications, runSync]);
 
+  const lastSyncAt = status?.lastSyncAt;
+  const autoSyncOn = Boolean(status?.connected && status.autoSyncMinutes);
+
+  useEffect(() => {
+    if (!autoSyncOn) return;
+    const timer = window.setInterval(() => {
+      void (async () => {
+        try {
+          const s = await api.gmailStatus();
+          if (s.lastSyncAt === lastSyncAt) return;
+          setStatus(s);
+          if (!syncing) await loadApplications();
+        } catch {
+          // Background check only; the next poll or a manual sync will surface errors.
+        }
+      })();
+    }, STATUS_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [autoSyncOn, lastSyncAt, syncing, loadApplications]);
+
   const recoveryRunning = evaluations?.run.running ?? false;
 
   useEffect(() => {
@@ -745,6 +767,9 @@ export function DashboardPage() {
           <div className="rowBetween">
             <span className="muted">
               {status.email ?? "Gmail"} · {status.lastSyncAt ? `last synced ${formatDateTime(status.lastSyncAt)}` : "not synced yet"}
+              {status.autoSyncMinutes
+                ? ` · auto-syncs every ${status.autoSyncMinutes === 60 ? "hour" : `${status.autoSyncMinutes} min`}`
+                : ""}
             </span>
             <div className="row">
               <button

@@ -91,6 +91,8 @@ export const env = {
   openAiCachedInputPricePerM: Number(process.env.OPENAI_CACHED_INPUT_PRICE_PER_M ?? 0.025),
   openAiOutputPricePerM: Number(process.env.OPENAI_OUTPUT_PRICE_PER_M ?? 2),
   jdRecoveryMaxPerRun: Number(process.env.JD_RECOVERY_MAX_PER_RUN ?? 5),
+  /** Minutes between background Gmail syncs (0 disables). */
+  gmailAutoSyncMinutes: Math.max(0, Number(process.env.GMAIL_AUTO_SYNC_MINUTES ?? 60) || 0),
   topJobsSyncEnabled: parseBooleanEnv(process.env.TOP_JOBS_SYNC_ENABLED, false),
   /** Cron in TOP_JOBS_SYNC_TIMEZONE — default 6:00 AM US Eastern daily. */
   topJobsSyncCron: process.env.TOP_JOBS_SYNC_CRON ?? "0 6 * * *",
