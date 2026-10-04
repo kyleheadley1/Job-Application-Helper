@@ -1,7 +1,7 @@
 import { logger } from "../../lib/logger.js";
 import type { AlertPlatform } from "../../types/topJob.js";
 import { normalizeCompany } from "../gmail/gmailApplications.js";
-import { fetchPosting, type FetchedPosting } from "../gmail/jdRecovery/fetchPosting.js";
+import { fetchPosting, PostingFetchError, type FetchedPosting } from "../gmail/jdRecovery/fetchPosting.js";
 import { ATS_SITE_FILTER, rankSerperResults } from "../gmail/jdRecovery/runRecovery.js";
 import { serperClient, serperUsageRepository } from "../gmail/jdRecovery/serperClient.js";
 import { normalizeForMatch, strictTitleSimilarity, titleInText } from "../gmail/jdRecovery/titleMatch.js";
@@ -16,7 +16,7 @@ const HEAD_CHARS = 3000;
 
 export type AlertJd =
   | { ok: true; posting: FetchedPosting; platform: AlertPlatform; alertUrl: string | null; viaSearch: boolean; serperQueries: number }
-  | { ok: false; reason: string; serperQueries: number };
+  | { ok: false; reason: string; serperQueries: number; closed?: boolean };
 
 export type AlertJdDeps = {
   fetch: (url: string) => Promise<FetchedPosting>;
@@ -80,6 +80,9 @@ export const resolveAlertJd = async (listing: AlertListingDoc, deps: AlertJdDeps
       }
       notes.push(`${link.platform}: different role`);
     } catch (error) {
+      if (error instanceof PostingFetchError && error.reason === "closed") {
+        return { ok: false, reason: "closed", serperQueries: 0, closed: true };
+      }
       notes.push(`${link.platform}: ${error instanceof Error ? error.message.slice(0, 80) : "error"}`);
     }
   }

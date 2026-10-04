@@ -38,6 +38,13 @@ export type TopJobRecord = {
   recommendedResume: StoredResumeType;
   resumeRationale: string[];
   promotedToJobId?: string;
+  /** Location from the alert or the posting page. */
+  location?: string;
+  /** Why the row is no longer shown: the posting closed, or the location isn't remote/NYC. */
+  hiddenReason?: "closed" | "location";
+  hiddenAt?: string;
+  /** Last time the posting was re-checked for being closed. */
+  liveCheckedAt?: string;
 };
 
 export type TopJobsSyncStats = {
@@ -54,8 +61,16 @@ export type TopJobsSyncStats = {
   belowMinScore: number;
   /** No readable job description from the alert link or a search fallback. */
   jdUnavailable: number;
+  /** Not remote and not in the NYC metro. */
+  locationFiltered: number;
+  /** Posting no longer accepting applications. */
+  closed: number;
+  /** Previously listed roles hidden this run (closed since, or location doesn't fit). */
+  retired: number;
   serperQueries: number;
   bySource: Partial<Record<AlertPlatform, number>>;
+  /** Scoring stopped early because today's share of the monthly budget ran out. */
+  budgetLimited?: boolean;
 };
 
 export type TopJobsSyncMeta = {
@@ -79,4 +94,5 @@ export type TopJobsSyncStatus = {
   openAiKeyConfigured: boolean;
   /** Roles parsed from alerts that haven't been checked yet (waiting on the daily scoring cap). */
   pendingListings: number;
+  budget: { monthlyUsd: number; spentThisMonthUsd: number };
 };

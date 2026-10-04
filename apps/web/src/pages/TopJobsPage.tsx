@@ -54,9 +54,13 @@ function lastRunSummary(stats: TopJobsSyncStats): string {
     `${stats.stored} added`,
   ];
   if (stats.skippedExisting) parts.push(`${stats.skippedExisting} already seen or applied`);
+  if (stats.locationFiltered) parts.push(`${stats.locationFiltered} not remote/NYC`);
+  if (stats.closed) parts.push(`${stats.closed} closed`);
+  if (stats.retired) parts.push(`${stats.retired} earlier listing${stats.retired === 1 ? "" : "s"} removed`);
   if (stats.belowMinScore) parts.push(`${stats.belowMinScore} below 70`);
   if (stats.jdUnavailable) parts.push(`${stats.jdUnavailable} no readable posting`);
   if (stats.serperQueries) parts.push(`${stats.serperQueries} search credit${stats.serperQueries === 1 ? "" : "s"}`);
+  if (stats.budgetLimited) parts.push("paused at today's budget");
   return parts.join(" · ");
 }
 
@@ -168,13 +172,20 @@ export function TopJobsPage() {
         <div>
           <h2>Top Jobs</h2>
           <p className="muted">
-            Roles from your LinkedIn, Indeed, ZipRecruiter, and Remote Hunter job-alert emails, scored ≥70
-            and not already in the tracker or applied to. Default order: fit × recency.
+            Remote or NYC roles from your LinkedIn, Indeed, ZipRecruiter, and Remote Hunter job-alert emails,
+            scored ≥70, still open, and not already in the tracker or applied to. Default order: fit × recency.
           </p>
           {status && (
             <p className="muted">
               Last synced: {status.lastSyncAt ? formatPostedAgo(status.lastSyncAt) : "Never"}
               {status.pendingListings > 0 && <> · {status.pendingListings} roles queued for the next run</>}
+              {status.budget && (
+                <>
+                  {" "}
+                  · ${status.budget.spentThisMonthUsd.toFixed(2)} of ${status.budget.monthlyUsd.toFixed(2)} monthly
+                  budget used
+                </>
+              )}
               {status.lastSyncStats && <> · Last run: {lastRunSummary(status.lastSyncStats)}</>}
             </p>
           )}

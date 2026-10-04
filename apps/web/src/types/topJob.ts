@@ -34,7 +34,11 @@ export type TopJobsSyncStats = {
   skippedExisting: number;
   belowMinScore: number;
   jdUnavailable: number;
+  locationFiltered?: number;
+  closed?: number;
+  retired?: number;
   serperQueries: number;
+  budgetLimited?: boolean;
   bySource: Partial<Record<AlertPlatform, number>>;
 };
 
@@ -50,4 +54,5 @@ export type TopJobsSyncStatus = {
   serperConfigured: boolean;
   openAiKeyConfigured: boolean;
   pendingListings: number;
+  budget?: { monthlyUsd: number; spentThisMonthUsd: number };
 };

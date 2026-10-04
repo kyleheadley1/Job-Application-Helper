@@ -100,7 +100,9 @@ export const env = {
   topJobsSyncScheduleHour: Number(process.env.TOP_JOBS_SYNC_SCHEDULE_HOUR ?? 6),
   topJobsSyncScheduleMinute: Number(process.env.TOP_JOBS_SYNC_SCHEDULE_MINUTE ?? 0),
   topJobsSyncCatchupOnStart: parseBooleanEnv(process.env.TOP_JOBS_SYNC_CATCHUP_ON_START, true),
-  topJobsMaxTriagesPerSync: Number(process.env.TOP_JOBS_MAX_TRIAGES_PER_SYNC ?? 15),
+  topJobsMaxTriagesPerSync: Number(process.env.TOP_JOBS_MAX_TRIAGES_PER_SYNC ?? 5),
+  /** Hard monthly OpenAI spend cap for Top Jobs (alert parsing + scoring), paced evenly per day. */
+  topJobsMonthlyBudgetUsd: Number(process.env.TOP_JOBS_MONTHLY_BUDGET_USD ?? 2),
   topJobsMinScore: Number(process.env.TOP_JOBS_MIN_SCORE ?? 70),
   /** How far back alert emails are read, and how long an unchecked alert role stays queued (days). */
   topJobsListingMaxAgeDays: Number(process.env.TOP_JOBS_LISTING_MAX_AGE_DAYS ?? 14),

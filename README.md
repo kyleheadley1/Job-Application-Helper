@@ -126,7 +126,7 @@ Optional, by feature:
 - **Triage / resumes:** `RESUME_CONTEXT_DIR`, `PRELOAD_RESUME_CONTEXT_ON_START`, `TRIAGE_FAST_MODE`, `TRIAGE_SKIP_LLM_RESUME_SELECTION_IN_FAST_MODE`
 - **Tracker seed:** `AUTO_IMPORT_TRACKER_ON_START`, `TRACKER_SEED_WORKBOOK_PATH`
 - **Web:** `VITE_API_BASE_URL` (web -> API base URL)
-- **Top Jobs:** `TOP_JOBS_SYNC_ENABLED`, `TOP_JOBS_*` (Gmail connection required; `SERPER_API_KEY` enables the Indeed/ZipRecruiter fallback)
+- **Top Jobs:** `TOP_JOBS_SYNC_ENABLED`, `TOP_JOBS_*` (Gmail connection required; `SERPER_API_KEY` enables the Indeed/ZipRecruiter fallback). `TOP_JOBS_MONTHLY_BUDGET_USD` (default $2) is a hard monthly OpenAI cap, paced evenly per day; `TOP_JOBS_MAX_TRIAGES_PER_SYNC` (default 5) caps scorings per run
 - **Extension:** `EXTENSION_API_TOKEN` (shared secret, also pasted into the extension options)
 - **Gmail:** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `WEB_APP_URL`, `GMAIL_CLASSIFY_REASONING_EFFORT` (default `minimal`)
 - **JD recovery:** `SERPER_API_KEY` (optional fallback), `SERPER_MAX_QUERIES_TOTAL` (default `1250`), `JD_RECOVERY_MAX_PER_RUN` (default `5`)

@@ -10,12 +10,15 @@ import { gmailAuth } from "../gmail/gmailAuth.js";
 import { normalizeCompany, roleSimilarity } from "../gmail/gmailApplications.js";
 import { evaluationsRepository } from "../gmail/jdRecovery/evaluations.repository.js";
 import { withLlmContext } from "../llm/llmUsage.js";
+import { fetchPosting, PostingFetchError, type FetchedPosting } from "../gmail/jdRecovery/fetchPosting.js";
 import { preFilterListing, preFilterTitle } from "./preFilter.js";
 import { topJobsRepository } from "./topJobs.repository.js";
 import { jobsRepository } from "../jobs/jobs.repository.js";
 import type { JobRecord } from "../../types/job.js";
 import { buildTrackerSpreadsheetFromJob } from "../../tracker/canonicalSpreadsheet.js";
 import { ingestAlertEmails } from "./alertEmails.js";
+import { classifyLocation, locationFits } from "./locationFit.js";
+import { loadTopJobsBudget } from "./topJobsBudget.js";
 import { resolveAlertJd, type AlertJd } from "./alertJd.js";
 import { alertListingsRepository, type AlertListingDoc, type AlertListingStatus } from "./alertListings.repository.js";
 
@@ -43,6 +46,9 @@ export const emptySyncStats = (): TopJobsSyncStats => ({
   skippedExisting: 0,
   belowMinScore: 0,
   jdUnavailable: 0,
+  locationFiltered: 0,
+  closed: 0,
+  retired: 0,
   serperQueries: 0,
   bySource: {},
 });
@@ -79,6 +85,8 @@ const listingToTopJob = (listing: DiscoveredListing, job: JobRecord, now: string
   rationale: job.rationale,
   recommendedResume: job.recommendedResume,
   resumeRationale: job.resumeRationale,
+  ...(listing.location ? { location: listing.location } : {}),
+  liveCheckedAt: now,
 });
 
 export const toDiscoveredListing = (
@@ -93,8 +101,8 @@ export const toDiscoveredListing = (
     title: listing.title,
     description: jd.posting.text,
     applyUrl: jd.viaSearch || !jd.alertUrl ? jd.posting.url : jd.alertUrl,
-    location: listing.location ?? undefined,
-    remote: /\bremote\b/i.test(listing.location ?? ""),
+    location: listing.location ?? jd.posting.location ?? undefined,
+    remote: /\bremote\b/i.test(`${listing.location ?? ""} ${jd.posting.location ?? ""}`),
     sourcePostedAt: listing.firstSeenAt,
     sourceUpdatedAt: listing.lastSeenAt,
   };
@@ -131,6 +139,12 @@ export const processAlertListings = async (
       await deps.setOutcome(listing._id, { status: "filtered", reason: titleCheck.reason });
       continue;
     }
+    const alertLocation = classifyLocation(listing.location);
+    if (alertLocation === "mismatch") {
+      stats.locationFiltered += 1;
+      await deps.setOutcome(listing._id, { status: "filtered", reason: "location_mismatch" });
+      continue;
+    }
     if (isKnownRole(listing.company, listing.title, deps.known)) {
       stats.skippedExisting += 1;
       await deps.setOutcome(listing._id, { status: "duplicate" });
@@ -140,8 +154,19 @@ export const processAlertListings = async (
     const jd = await deps.resolveJd(listing);
     stats.serperQueries += jd.serperQueries;
     if (!jd.ok) {
-      stats.jdUnavailable += 1;
-      await deps.setOutcome(listing._id, { status: "jd_unavailable", reason: jd.reason });
+      if (jd.closed) stats.closed += 1;
+      else stats.jdUnavailable += 1;
+      await deps.setOutcome(listing._id, jd.closed ? { status: "filtered", reason: "closed" } : { status: "jd_unavailable", reason: jd.reason });
+      continue;
+    }
+    if (jd.posting.closed) {
+      stats.closed += 1;
+      await deps.setOutcome(listing._id, { status: "filtered", reason: "closed" });
+      continue;
+    }
+    if (alertLocation !== "fit" && classifyLocation(jd.posting.location) === "mismatch") {
+      stats.locationFiltered += 1;
+      await deps.setOutcome(listing._id, { status: "filtered", reason: "location_mismatch" });
       continue;
     }
 
@@ -156,6 +181,13 @@ export const processAlertListings = async (
     const job = await deps.triage(discovered);
     stats.triaged += 1;
     deps.known.push({ company: listing.company, title: listing.title });
+    if (
+      !locationFits({ alertLocation: listing.location, postingLocation: jd.posting.location, extracted: job.extracted })
+    ) {
+      stats.locationFiltered += 1;
+      await deps.setOutcome(listing._id, { status: "filtered", reason: "location_mismatch" });
+      continue;
+    }
     if (job.score.total < deps.minScore) {
       stats.belowMinScore += 1;
       await deps.setOutcome(listing._id, { status: "below_min", reason: String(job.score.total) });
@@ -199,7 +231,7 @@ const storeTopJob = async (listing: DiscoveredListing, job: JobRecord): Promise<
 
 const loadKnownRoles = async (): Promise<KnownRole[]> => {
   const [topJobs, tracker, evaluations] = await Promise.all([
-    topJobsRepository.list(0),
+    topJobsRepository.listAll(),
     jobsRepository.list(),
     evaluationsRepository.listSince(new Date(0).toISOString()),
   ]);
@@ -209,6 +241,72 @@ const loadKnownRoles = async (): Promise<KnownRole[]> => {
     ...evaluations.map((e) => ({ company: e.company, title: e.role ?? e.recovery.recoveredRole ?? "" })),
   ].filter((k) => k.company && k.title);
 };
+
+/** Listed roles are re-checked for closing at most this often. */
+const LIVE_RECHECK_MS = 20 * 60 * 60 * 1000;
+const BOT_BLOCKED_HOST_RE = /(^|\.)(indeed|indeedemail|ziprecruiter)\.com$/i;
+
+export type RecheckDeps = {
+  list: () => Promise<TopJobRecord[]>;
+  fetch: (url: string) => Promise<FetchedPosting>;
+  hide: (id: string, reason: NonNullable<TopJobRecord["hiddenReason"]>) => Promise<void>;
+  markChecked: (id: string) => Promise<void>;
+};
+
+const defaultRecheckDeps: RecheckDeps = {
+  list: () => topJobsRepository.list(0),
+  fetch: fetchPosting,
+  hide: (id, reason) => topJobsRepository.hide(id, reason),
+  markChecked: (id) => topJobsRepository.markLiveChecked(id),
+};
+
+/** Hide listed roles whose location doesn't fit or whose posting has since closed; tracker rows are untouched. */
+export const recheckListedTopJobs = async (deps: RecheckDeps = defaultRecheckDeps, now = Date.now()): Promise<number> => {
+  let retired = 0;
+  for (const job of await deps.list()) {
+    if (job.promotedToJobId) continue;
+    if (!locationFits({ alertLocation: job.location, extracted: job.extracted })) {
+      await deps.hide(job.id, "location");
+      retired += 1;
+      continue;
+    }
+    if (job.liveCheckedAt && now - Date.parse(job.liveCheckedAt) < LIVE_RECHECK_MS) continue;
+    let host = "";
+    try {
+      host = new URL(job.applyUrl).hostname;
+    } catch {
+      continue;
+    }
+    if (BOT_BLOCKED_HOST_RE.test(host)) continue;
+    try {
+      const posting = await deps.fetch(job.applyUrl);
+      if (posting.closed) {
+        await deps.hide(job.id, "closed");
+        retired += 1;
+        continue;
+      }
+      if (!locationFits({ alertLocation: job.location, postingLocation: posting.location, extracted: job.extracted })) {
+        await deps.hide(job.id, "location");
+        retired += 1;
+        continue;
+      }
+      await deps.markChecked(job.id);
+    } catch (error) {
+      if (error instanceof PostingFetchError && (error.reason === "closed" || error.reason === "not_found")) {
+        await deps.hide(job.id, "closed");
+        retired += 1;
+      }
+    }
+  }
+  return retired;
+};
+
+/** With only a few scorings a day, spend them first on roles the alert already says are remote/NYC. */
+export const prioritizePending = (pending: AlertListingDoc[]): AlertListingDoc[] =>
+  pending
+    .map((listing, i) => ({ listing, i, fit: classifyLocation(listing.location) === "fit" ? 0 : 1 }))
+    .sort((a, b) => a.fit - b.fit || a.i - b.i)
+    .map((x) => x.listing);
 
 export const listingWindowStart = (now = Date.now()): string =>
   new Date(now - env.topJobsListingMaxAgeDays * 86_400_000).toISOString();
@@ -250,16 +348,24 @@ const runTopJobsSyncInner = async (manual: boolean): Promise<TopJobsSyncStats> =
 
   const stats = emptySyncStats();
   try {
+    stats.retired = await recheckListedTopJobs();
+    if ((await loadTopJobsBudget()).exhausted) {
+      stats.budgetLimited = true;
+      await topJobsRepository.recordSyncResult({ stats, manual, error: null });
+      logger.info("Top jobs sync skipped alert parsing — monthly budget reached", stats);
+      return stats;
+    }
     const ingest = await ingestAlertEmails();
     stats.alertEmails = ingest.alertEmails;
     stats.listingsParsed = ingest.listingsParsed;
 
-    const pending = await alertListingsRepository.listPending(listingWindowStart());
+    const budget = await loadTopJobsBudget();
+    const pending = prioritizePending(await alertListingsRepository.listPending(listingWindowStart()));
     await processAlertListings(
       pending,
       {
         known: await loadKnownRoles(),
-        maxTriages: env.topJobsMaxTriagesPerSync,
+        maxTriages: budget.allowedTriages,
         minScore: env.topJobsMinScore,
         resolveJd: (l) => resolveAlertJd(l),
         triage: triageListing,
@@ -268,6 +374,13 @@ const runTopJobsSyncInner = async (manual: boolean): Promise<TopJobsSyncStats> =
       },
       stats,
     );
+    if (
+      budget.allowedTriages < env.topJobsMaxTriagesPerSync &&
+      stats.triaged >= budget.allowedTriages &&
+      stats.fetched < pending.length
+    ) {
+      stats.budgetLimited = true;
+    }
 
     await topJobsRepository.recordSyncResult({ stats, manual, error: null });
     logger.info("Top jobs sync completed", stats);

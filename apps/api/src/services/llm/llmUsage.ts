@@ -70,6 +70,17 @@ export const llmUsageRepository = {
     const docs = await col.find({ day: { $gte: day } }, { projection: { _id: 0 } }).toArray();
     return docs as LlmUsageRecord[];
   },
+
+  async costByDaySince(feature: LlmFeature, day: string): Promise<Record<string, number>> {
+    const col = await this.collection();
+    const rows = await col
+      .aggregate<{ _id: string; cost: number }>([
+        { $match: { feature, day: { $gte: day } } },
+        { $group: { _id: "$day", cost: { $sum: "$costUsd" } } },
+      ])
+      .toArray();
+    return Object.fromEntries(rows.map((r) => [r._id, r.cost]));
+  },
 };
 
 /** Fire-and-forget; usage tracking must never break a model call. */

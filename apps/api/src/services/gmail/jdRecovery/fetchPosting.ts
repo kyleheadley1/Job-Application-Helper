@@ -10,6 +10,10 @@ export type FetchedPosting = {
   title?: string;
   requisitionId?: string;
   datePosted?: string;
+  /** Work location as the site states it ("New York, NY", "Remote"), when it does. */
+  location?: string;
+  /** The site says applications are closed; still useful as a JD for roles already applied to. */
+  closed?: boolean;
   text: string;
 };
 
@@ -73,6 +77,7 @@ type GreenhouseJob = {
   internal_job_id?: number;
   updated_at?: string;
   first_published?: string;
+  location?: { name?: string };
 };
 
 const fetchGreenhouse = async (url: URL): Promise<Omit<FetchedPosting, "url" | "source">> => {
@@ -89,6 +94,7 @@ const fetchGreenhouse = async (url: URL): Promise<Omit<FetchedPosting, "url" | "
     company: job.company_name,
     requisitionId: job.requisition_id ?? undefined,
     datePosted: job.first_published ?? job.updated_at,
+    location: job.location?.name,
     text: [job.title, htmlToText(job.content ?? "")].filter(Boolean).join("\n\n"),
   };
 };
@@ -100,6 +106,8 @@ type LeverPosting = {
   lists?: Array<{ text?: string; content?: string }>;
   additionalPlain?: string;
   createdAt?: number;
+  categories?: { location?: string };
+  workplaceType?: string;
 };
 
 const fetchLever = async (url: URL): Promise<Omit<FetchedPosting, "url" | "source">> => {
@@ -113,6 +121,7 @@ const fetchLever = async (url: URL): Promise<Omit<FetchedPosting, "url" | "sourc
     title: p.text,
     company,
     datePosted: p.createdAt ? new Date(p.createdAt).toISOString() : undefined,
+    location: [p.categories?.location, p.workplaceType === "remote" ? "Remote" : undefined].filter(Boolean).join(" · ") || undefined,
     text: [p.text, p.descriptionPlain ?? htmlToText(p.description ?? ""), ...lists, p.additionalPlain]
       .filter(Boolean)
       .join("\n\n"),
@@ -127,6 +136,8 @@ type AshbyBoard = {
     descriptionHtml?: string;
     publishedAt?: string;
     jobUrl?: string;
+    location?: string;
+    isRemote?: boolean;
   }>;
 };
 
@@ -142,6 +153,7 @@ const fetchAshby = async (url: URL): Promise<Omit<FetchedPosting, "url" | "sourc
     title: job.title,
     company: org,
     datePosted: job.publishedAt,
+    location: [job.location, job.isRemote ? "Remote" : undefined].filter(Boolean).join(" · ") || undefined,
     text: [job.title, job.descriptionPlain ?? htmlToText(job.descriptionHtml ?? "")].filter(Boolean).join("\n\n"),
   };
 };
@@ -180,6 +192,7 @@ const fetchWorkday = async (url: URL): Promise<Omit<FetchedPosting, "url" | "sou
     company: job.hiringOrganization?.name,
     requisitionId: info.jobReqId,
     datePosted: info.startDate,
+    location: info.location,
     text: [info.title, info.location, htmlToText(info.jobDescription ?? "")].filter(Boolean).join("\n\n"),
   };
 };
@@ -191,6 +204,24 @@ type JsonLdJobPosting = {
   datePosted?: string;
   hiringOrganization?: { name?: string } | string;
   identifier?: { value?: string | number; name?: string } | string | number;
+  validThrough?: string;
+  jobLocationType?: string;
+  jobLocation?: JsonLdPlace | JsonLdPlace[];
+};
+
+type JsonLdPlace = { address?: { addressLocality?: string; addressRegion?: string } | string };
+
+const jsonLdLocation = (posting: JsonLdJobPosting): string | undefined => {
+  const places = Array.isArray(posting.jobLocation) ? posting.jobLocation : posting.jobLocation ? [posting.jobLocation] : [];
+  const names = places
+    .map((p) =>
+      typeof p.address === "string"
+        ? p.address
+        : [p.address?.addressLocality, p.address?.addressRegion].filter(Boolean).join(", "),
+    )
+    .filter(Boolean);
+  if (/TELECOMMUTE/i.test(posting.jobLocationType ?? "")) names.unshift("Remote");
+  return names.length ? names.join(" · ") : undefined;
 };
 
 const isJobPosting = (node: unknown): node is JsonLdJobPosting => {
@@ -235,6 +266,8 @@ export const parseJsonLdJobPosting = (html: string): Omit<FetchedPosting, "url" 
       company: typeof org === "string" ? org : org?.name,
       requisitionId: identifier !== undefined && identifier !== null ? String(identifier) : undefined,
       datePosted: posting.datePosted,
+      location: jsonLdLocation(posting),
+      ...(posting.validThrough && Date.parse(posting.validThrough) < Date.now() ? { closed: true } : {}),
       text: [posting.title, htmlToText(posting.description ?? "")].filter(Boolean).join("\n\n"),
     };
   }
@@ -260,13 +293,20 @@ const firstMatchText = (html: string, re: RegExp): string | undefined => {
   return raw ? htmlToPlainText(raw).trim() || undefined : undefined;
 };
 
+const LINKEDIN_CLOSED_RE = /no longer accepting applications|closed-job/i;
+
 export const parseLinkedInGuestHtml = (html: string): Omit<FetchedPosting, "url" | "source"> => {
+  const descriptionAt = html.search(/show-more-less-html__markup/i);
+  const closed = LINKEDIN_CLOSED_RE.test(descriptionAt > 0 ? html.slice(0, descriptionAt) : html);
   const title = firstMatchText(html, /<h2[^>]*top-card-layout__title[^>]*>([\s\S]*?)<\/h2>/i);
   const company = firstMatchText(html, /<a[^>]*topcard__org-name-link[^>]*>([\s\S]*?)<\/a>/i);
+  const location = firstMatchText(html, /<span[^>]*class="topcard__flavor topcard__flavor--bullet"[^>]*>([\s\S]*?)<\/span>/i);
   const description = html.match(/<div[^>]*show-more-less-html__markup[^>]*>([\s\S]*?)<\/div>/i)?.[1];
   return {
     title,
     company,
+    location,
+    ...(closed ? { closed: true } : {}),
     text: [title, company, description ? htmlToText(description) : htmlToPlainText(html)].filter(Boolean).join("\n\n"),
   };
 };

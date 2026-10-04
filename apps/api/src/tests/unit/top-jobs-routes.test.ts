@@ -103,6 +103,7 @@ describe("top jobs routes", () => {
       serperConfigured: false,
       openAiKeyConfigured: true,
       pendingListings: 7,
+      budget: { monthlyUsd: 2, spentThisMonthUsd: 0.26 },
     });
 
     const res = await request(app).get("/api/top-jobs/sync/status");

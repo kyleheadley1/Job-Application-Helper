@@ -117,6 +117,69 @@ describe("processAlertListings", () => {
     expect(stats).toMatchObject({ jdUnavailable: 1, belowMinScore: 1, serperQueries: 1 });
   });
 
+  it("drops roles outside remote/NYC before fetching when the alert names a place", async () => {
+    const { deps, calls, outcomes } = makeDeps();
+    const stats = emptySyncStats();
+    await processAlertListings(
+      [
+        listing({ company: "Parasail", _id: "p", location: "San Mateo, CA (On-site)" }),
+        listing({ company: "Nyco", _id: "n", location: "New York, NY (Hybrid)" }),
+      ],
+      deps,
+      stats,
+    );
+    expect(outcomes.get("p")).toBe("filtered");
+    expect(calls).toEqual(["jd:Nyco", "triage:Nyco"]);
+    expect(stats.locationFiltered).toBe(1);
+  });
+
+  it("drops roles whose posting page or scorer places them outside remote/NYC", async () => {
+    const { deps, calls, outcomes } = makeDeps({
+      resolveJd: vi.fn(async (l: AlertListingDoc): Promise<AlertJd> => {
+        const jd = okJd(l);
+        if (jd.ok && l.company === "Mitre") jd.posting.location = "Bedford, MA";
+        return jd;
+      }),
+      triage: vi.fn(async (l) =>
+        ({
+          score: { total: 85 },
+          extracted: l.company === "Vague" ? { location: "Austin, TX", remoteType: "onsite" } : { remoteType: "remote" },
+        }) as unknown as JobRecord,
+      ),
+    });
+    const stats = emptySyncStats();
+    await processAlertListings(
+      [
+        listing({ company: "Mitre", _id: "m", location: "United States" }),
+        listing({ company: "Vague", _id: "v", location: null }),
+        listing({ company: "Remoteco", _id: "r", location: null }),
+      ],
+      deps,
+      stats,
+    );
+    expect(calls).not.toContain("triage:Mitre");
+    expect(outcomes.get("m")).toBe("filtered");
+    expect(outcomes.get("v")).toBe("filtered");
+    expect(outcomes.get("r")).toBe("stored");
+    expect(stats.locationFiltered).toBe(2);
+  });
+
+  it("skips postings that are no longer accepting applications", async () => {
+    const { deps, calls, outcomes } = makeDeps({
+      resolveJd: vi.fn(async (l: AlertListingDoc): Promise<AlertJd> => {
+        const jd = okJd(l);
+        if (jd.ok) jd.posting.closed = true;
+        return jd;
+      }),
+    });
+    const stats = emptySyncStats();
+    await processAlertListings([listing({ company: "Fonzi", _id: "f", location: "New York, NY" })], deps, stats);
+    expect(deps.resolveJd).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual([]);
+    expect(outcomes.get("f")).toBe("filtered");
+    expect(stats.closed).toBe(1);
+  });
+
   it("matches known roles by employer and close title", () => {
     const known = [{ company: "Acme, Inc.", title: "Software Engineer II" }];
     expect(isKnownRole("Acme", "Software Engineer II", known)).toBe(true);
