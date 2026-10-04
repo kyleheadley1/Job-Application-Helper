@@ -10,6 +10,7 @@ import {
   GmailReconnectRequiredError,
 } from "../services/gmail/gmailAuth.js";
 import { DEFAULT_SYNC_DAYS, MAX_SYNC_DAYS, syncGmail } from "../services/gmail/gmailSync.js";
+import { getInterviewBrief } from "../services/gmail/interviewBrief.js";
 import { evaluationsRepository } from "../services/gmail/jdRecovery/evaluations.repository.js";
 import {
   AlreadyScoredError,
@@ -217,6 +218,32 @@ gmailRouter.get("/evaluations/:key/scoring", async (req, res, next) => {
     res.json(toScoringReport(evaluation));
   } catch (error) {
     if (sendEvaluationError(res, error)) return;
+    next(error);
+  }
+});
+
+const sendInterviewBrief = async (res: Response, key: string, regenerate: boolean) => {
+  const brief = await getInterviewBrief(key, regenerate);
+  if (!brief) {
+    res.status(404).json({ error: "NOT_FOUND", message: `No application for ${key}` });
+    return;
+  }
+  res.setHeader("Cache-Control", "no-store");
+  res.json(brief);
+};
+
+gmailRouter.get("/evaluations/:key/interview-brief", async (req, res, next) => {
+  try {
+    await sendInterviewBrief(res, req.params.key, false);
+  } catch (error) {
+    next(error);
+  }
+});
+
+gmailRouter.post("/evaluations/:key/interview-brief/regenerate", async (req, res, next) => {
+  try {
+    await sendInterviewBrief(res, req.params.key, true);
+  } catch (error) {
     next(error);
   }
 });

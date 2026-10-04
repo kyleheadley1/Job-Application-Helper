@@ -862,3 +862,55 @@ tbody .tracker-sticky-left {
 .smallText {
   font-size: 0.8rem;
 }
+
+.linkButton {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #7ee787;
+  cursor: pointer;
+  font: inherit;
+}
+
+.linkButton:hover {
+  text-decoration: underline;
+}
+
+.errorText {
+  color: #f85149;
+}
+
+.interviewBrief {
+  gap: 0.4rem;
+  padding: 0.5rem 0.65rem;
+  border-left: 2px solid #30363d;
+  font-size: 0.85rem;
+}
+
+.interviewBrief ul {
+  margin: 0.15rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.interviewBrief li {
+  margin-bottom: 0.25rem;
+}
+
+.briefColumns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.briefHeading {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8b949e;
+}
+
+@media (max-width: 800px) {
+  .briefColumns {
+    grid-template-columns: 1fr;
+  }
+}

@@ -12,6 +12,7 @@ import type {
   EvaluationsResponse,
   GmailApplication,
   GmailStatus,
+  InterviewBriefResponse,
   RecoveryStart,
   UpcomingInterview,
 } from "../types/gmail";
@@ -213,9 +214,149 @@ const interviewWhen = (iv: UpcomingInterview): string => {
   return `${date} · ${time(start)}${end ? `–${time(end)}` : ""} ${zone ?? ""}`.trim();
 };
 
-/** Confirmed interviews that haven't ended yet, soonest first. */
-function UpcomingInterviewsCard({ interviews, active }: { interviews: UpcomingInterview[]; active: GmailApplication[] }) {
+type BriefState = { loading: boolean; data?: InterviewBriefResponse; error?: string; copied?: boolean };
+
+function InterviewBriefPanel({
+  state,
+  onRegenerate,
+  onCopy,
+  onOpenJd,
+}: {
+  state: BriefState | undefined;
+  onRegenerate: () => void;
+  onCopy: () => void;
+  onOpenJd: () => void;
+}) {
+  if (!state || (state.loading && !state.data)) return <span className="muted smallText">Building brief…</span>;
+  if (state.error && !state.data) return <span className="smallText errorText">{state.error}</span>;
+  const { data } = state;
+  if (!data) return null;
+  const b = data.brief;
+  return (
+    <div className="interviewBrief stack">
+      {data.round && <div className="muted smallText">This round: {data.round}</div>}
+      {b ? (
+        <>
+          <div className="smallText">
+            <strong>{data.company}:</strong> {b.companyBio}
+            <div className="muted">Team need: {b.teamNeed}</div>
+          </div>
+          <div className="briefColumns">
+            <div>
+              <div className="briefHeading">Matches</div>
+              <ul>
+                {b.strengths.map((s) => (
+                  <li key={s.point}>
+                    <strong>{s.point}</strong> <span className="muted">— {s.evidence}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <div className="briefHeading">Weak spots</div>
+              <ul>
+                {b.weakPoints.map((w) => (
+                  <li key={w.gap}>
+                    <strong>{w.gap}</strong>
+                    <div className="muted">Probe: {w.probe}</div>
+                    <div>Say: {w.answer}</div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          {b.askThem.length > 0 && (
+            <div className="smallText">
+              <div className="briefHeading">Ask them</div>
+              <ul>
+                {b.askThem.map((q) => (
+                  <li key={q}>{q}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
+      ) : data.reason === "no_jd" ? (
+        <span className="muted smallText">
+          No job description recovered yet, so there's no brief.{" "}
+          <button type="button" className="linkButton" onClick={onOpenJd}>
+            Paste the JD
+          </button>{" "}
+          to get one. The prep prompt below still has the company, role, and round.
+        </span>
+      ) : (
+        <span className="smallText errorText">Couldn't generate the brief. Try Regenerate.</span>
+      )}
+      <div className="row">
+        <button type="button" className="btn-secondary smallText" onClick={onCopy}>
+          {state.copied ? "Copied" : "Copy prep prompt"}
+        </button>
+        {data.reason !== "no_jd" && (
+          <button type="button" className="btn-secondary smallText" onClick={onRegenerate} disabled={state.loading}>
+            {state.loading ? "Regenerating…" : "Regenerate"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Confirmed interviews that haven't ended yet, soonest first, each with a collapsible prep brief. */
+function UpcomingInterviewsCard({
+  interviews,
+  active,
+  onOpenJd,
+}: {
+  interviews: UpcomingInterview[];
+  active: GmailApplication[];
+  onOpenJd: (key: string) => void;
+}) {
   const now = new Date();
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const [briefs, setBriefs] = useState<Record<string, BriefState>>({});
+
+  const load = async (key: string, regenerate = false) => {
+    setBriefs((s) => ({ ...s, [key]: { ...s[key], loading: true, error: undefined } }));
+    try {
+      const data = await api.gmailInterviewBrief(key, regenerate);
+      setBriefs((s) => ({ ...s, [key]: { loading: false, data } }));
+    } catch (error) {
+      setBriefs((s) => ({ ...s, [key]: { ...s[key], loading: false, error: errorText(error) } }));
+    }
+  };
+
+  const toggle = (key: string) => {
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+    if (!briefs[key]?.data && !briefs[key]?.loading) void load(key);
+  };
+
+  const copy = async (key: string) => {
+    const prompt = briefs[key]?.data?.prepPrompt;
+    if (!prompt) return;
+    await navigator.clipboard.writeText(prompt);
+    setBriefs((s) => ({ ...s, [key]: { ...s[key]!, copied: true } }));
+    window.setTimeout(() => setBriefs((s) => ({ ...s, [key]: { ...s[key]!, copied: false } })), 2000);
+  };
+
+  const panel = (key: string) => (
+    <InterviewBriefPanel
+      state={briefs[key]}
+      onRegenerate={() => void load(key, true)}
+      onCopy={() => void copy(key)}
+      onOpenJd={() => onOpenJd(key)}
+    />
+  );
+
+  const scheduledKeys = new Set(interviews.map((iv) => iv.key));
+  const unscheduled = active.filter((a) => !scheduledKeys.has(a.key));
+  const firstRowByKey = new Map<string, string>();
+  for (const iv of interviews) if (!firstRowByKey.has(iv.key)) firstRowByKey.set(iv.key, `${iv.key}-${iv.roundNumber}`);
+
   return (
     <div className="card stack" style={{ gap: "0.5rem" }}>
       <div className="rowBetween">
@@ -231,29 +372,69 @@ function UpcomingInterviewsCard({ interviews, active }: { interviews: UpcomingIn
           <tbody>
             {interviews.map((iv) => {
               const soon = new Date(iv.scheduledAt).getTime() - now.getTime() < DAY_MS;
+              const rowId = `${iv.key}-${iv.roundNumber}`;
+              const showBrief = open.has(iv.key) && firstRowByKey.get(iv.key) === rowId;
               return (
-                <tr key={`${iv.key}-${iv.roundNumber}`}>
-                  <td style={{ whiteSpace: "nowrap" }}>
-                    <span className={`pill ${soon ? "warn" : "good"}`}>{relativeDay(new Date(iv.scheduledAt), now)}</span>
-                  </td>
-                  <td style={{ whiteSpace: "nowrap" }}>{interviewWhen(iv)}</td>
-                  <td>
-                    <strong>{iv.company}</strong>
-                    {iv.role && <div className="muted smallText">{iv.role}</div>}
-                  </td>
-                  <td>{iv.label}</td>
-                  <td>
-                    {iv.gmailUrl && (
-                      <a href={iv.gmailUrl} target="_blank" rel="noreferrer" className="smallText">
-                        Open email
-                      </a>
-                    )}
-                  </td>
-                </tr>
+                <Fragment key={rowId}>
+                  <tr>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <span className={`pill ${soon ? "warn" : "good"}`}>{relativeDay(new Date(iv.scheduledAt), now)}</span>
+                    </td>
+                    <td style={{ whiteSpace: "nowrap" }}>{interviewWhen(iv)}</td>
+                    <td>
+                      <strong>{iv.company}</strong>
+                      {iv.role && <div className="muted smallText">{iv.role}</div>}
+                    </td>
+                    <td>{iv.label}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <button
+                        type="button"
+                        className="linkButton smallText"
+                        onClick={() => toggle(iv.key)}
+                        aria-expanded={open.has(iv.key)}
+                      >
+                        Prep {open.has(iv.key) ? "▾" : "▸"}
+                      </button>
+                      {iv.gmailUrl && (
+                        <>
+                          {" · "}
+                          <a href={iv.gmailUrl} target="_blank" rel="noreferrer" className="smallText">
+                            Open email
+                          </a>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                  {showBrief && (
+                    <tr>
+                      <td colSpan={5}>{panel(iv.key)}</td>
+                    </tr>
+                  )}
+                </Fragment>
               );
             })}
           </tbody>
         </table>
+      )}
+      {unscheduled.length > 0 && (
+        <div className="stack" style={{ gap: "0.35rem" }}>
+          <span className="muted smallText">Interviewing, no time on the calendar:</span>
+          {unscheduled.map((a) => (
+            <div key={a.key} className="stack" style={{ gap: "0.25rem" }}>
+              <button
+                type="button"
+                className="linkButton smallText"
+                style={{ alignSelf: "flex-start" }}
+                onClick={() => toggle(a.key)}
+                aria-expanded={open.has(a.key)}
+              >
+                {a.company}
+                {a.role ? ` · ${a.role}` : ""} — Prep {open.has(a.key) ? "▾" : "▸"}
+              </button>
+              {open.has(a.key) && panel(a.key)}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -708,6 +889,12 @@ export function DashboardPage() {
   }));
   const activeInterviews = applications.filter((a) => a.activelyInterviewing);
 
+  const openJdReview = (key: string) => {
+    setFilter("all");
+    setReviewKey(key);
+    window.setTimeout(() => document.getElementById(`app-row-${key}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
+  };
+
   const filterCounts = (Object.keys(FILTER_LABEL) as RecoveryFilter[]).map((f) => ({
     filter: f,
     count: f === "all" ? applications.length : applications.filter((a) => filterOf(a) === f).length,
@@ -791,7 +978,7 @@ export function DashboardPage() {
             </div>
           </div>
 
-          <UpcomingInterviewsCard interviews={upcoming} active={activeInterviews} />
+          <UpcomingInterviewsCard interviews={upcoming} active={activeInterviews} onOpenJd={openJdReview} />
 
           <div className="grid" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
             {counts.map(({ status: s, count }) => (
@@ -921,7 +1108,7 @@ export function DashboardPage() {
                 <tbody>
                   {visible.map((app) => (
                     <Fragment key={app.key}>
-                      <tr>
+                      <tr id={`app-row-${app.key}`}>
                         <td>{app.company}</td>
                         <td>
                           {app.role ?? <span className="muted">Role not stated</span>}

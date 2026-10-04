@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSearchQuery, prefilterEmail } from "../../services/gmail/gmailClassifier.js";
+import { buildPlatformSearchQuery, buildSearchQuery, prefilterEmail } from "../../services/gmail/gmailClassifier.js";
 import {
   decodeBase64Url,
   extractBodyText,
@@ -103,6 +103,36 @@ describe("prefilterEmail", () => {
 describe("buildSearchQuery", () => {
   it("bounds by the requested window", () => {
     expect(buildSearchQuery(7)).toMatch(/^newer_than:7d /);
+  });
+});
+
+describe("LinkedIn / job-platform confirmations", () => {
+  const linkedIn = {
+    from: "LinkedIn <jobs-noreply@linkedin.com>",
+    subject: "Kyle, your application was sent to Code Compass",
+    snippet: "Your application was sent to Code Compass",
+  };
+
+  it("keeps 'your application was sent to' even when the body has job-alert sections", () => {
+    const result = prefilterEmail(
+      email({ ...linkedIn, body: "Software Engineer · Code Compass\n\nSimilar jobs\nTop job picks for you\nPeople also viewed" }),
+    );
+    expect(result.keep).toBe(true);
+  });
+
+  it("matches the phrase without relying on the ATS sender", () => {
+    expect(prefilterEmail(email({ subject: linkedIn.subject, snippet: linkedIn.snippet }))).toEqual({
+      keep: true,
+      reason: "application_phrase",
+    });
+  });
+
+  it("searches platform senders in every Gmail category", () => {
+    const q = buildPlatformSearchQuery(7);
+    expect(q).toMatch(/^newer_than:7d /);
+    expect(q).toContain("from:(linkedin.com OR indeed.com OR indeedemail.com)");
+    expect(q).toContain('"application was sent"');
+    expect(q).not.toContain("category:");
   });
 });
 

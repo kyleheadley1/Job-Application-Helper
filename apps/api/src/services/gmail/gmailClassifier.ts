@@ -42,19 +42,26 @@ const SEARCH_KEYWORDS = [
 export const buildSearchQuery = (days: number): string =>
   `newer_than:${days}d -category:promotions -category:social (${SEARCH_KEYWORDS.join(" OR ")})`;
 
+const PLATFORM_SENDERS = ["linkedin.com", "indeed.com", "indeedemail.com"];
+const PLATFORM_PHRASES = ['"application was sent"', '"applied to"', '"application submitted"'];
+
+/** Gmail files job-platform confirmations under Social, which the main query skips. */
+export const buildPlatformSearchQuery = (days: number): string =>
+  `newer_than:${days}d from:(${PLATFORM_SENDERS.join(" OR ")}) (${PLATFORM_PHRASES.join(" OR ")})`;
+
 /** Applicant-tracking systems and job platforms that send application lifecycle email. */
 const ATS_SENDER_RE =
   /@(?:[\w-]+\.)*(greenhouse(?:-mail)?\.io|greenhouse\.com|lever\.co|hire\.lever\.co|ashbyhq\.com|myworkday(?:jobs)?\.com|workday\.com|smartrecruiters\.com|icims\.com|jobvite\.com|linkedin\.com|indeed\.com|indeedemail\.com|simplify\.jobs|workablemail\.com|workable\.com|bamboohr\.com|rippling\.com|breezy\.hr|recruitee\.com|teamtailor\.com|jazzhr\.com|applytojob\.com|successfactors\.com|taleo\.net|oraclecloud\.com|hackerrank\.com|codesignal\.com)\b/i;
 
 const APPLICATION_PHRASE_RE =
-  /\b(thank(?:s| you) for (?:your )?(?:applying|application|interest)|we(?:'ve| have) received your application|application (?:received|submitted|confirmation|update|status)|your application (?:to|for|with)|you applied (?:to|for)|move forward with (?:other|your)|not (?:to )?(?:move|moving) forward|decided to (?:pursue|proceed with) other|unfortunately,? (?:we|after)|schedule (?:an?|your) (?:interview|call|chat)|invite you to (?:an? )?(?:interview|chat|call|complete)|phone screen|technical (?:interview|screen|assessment)|coding (?:challenge|assessment|exercise)|take[- ]home|online assessment|hackerrank|codesignal|offer letter|pleased to (?:offer|extend)|next steps? in (?:the|our) (?:hiring|interview|recruiting) process|candidacy)\b/i;
+  /\b(thank(?:s| you) for (?:your )?(?:applying|application|interest)|we(?:'ve| have) received your application|application (?:received|submitted|confirmation|update|status)|your application (?:to|for|with)|your application (?:was|has been) (?:sent|submitted)|application (?:was )?sent to|applied (?:on|via) (?:linkedin|indeed)|you applied (?:to|for)|move forward with (?:other|your)|not (?:to )?(?:move|moving) forward|decided to (?:pursue|proceed with) other|unfortunately,? (?:we|after)|schedule (?:an?|your) (?:interview|call|chat)|invite you to (?:an? )?(?:interview|chat|call|complete)|phone screen|technical (?:interview|screen|assessment)|coding (?:challenge|assessment|exercise)|take[- ]home|online assessment|hackerrank|codesignal|offer letter|pleased to (?:offer|extend)|next steps? in (?:the|our) (?:hiring|interview|recruiting) process|candidacy)\b/i;
 
 /** Alerts, digests, and marketing that mention jobs but are not about an application. */
 const NOT_APPLICATION_RE =
   /\b(jobs? (?:you may be|you might be) interested in|new jobs? (?:for you|matching|near)|job alert|jobs? recommended for you|recommended jobs|top job picks|is hiring\b|are hiring\b|similar jobs|job matches|weekly digest|daily digest|newsletter|webinar|unsubscribe from (?:job )?alerts|people (?:also )?viewed|who viewed your profile|connection request|endorse)\b/i;
 
 /** Bump when the prefilter keeps more mail, so previously dropped messages are re-checked. */
-export const PREFILTER_VERSION = 3;
+export const PREFILTER_VERSION = 4;
 
 /**
  * Google/Outlook calendar invites ("Invitation: Alex and Jane @ Mon …") carry no application phrases.
@@ -119,6 +126,7 @@ eventType rules:
 - offer: job offer
 - other: application-related but none of the above
 Calendar invitations: an invite from someone at a company for a call, chat, screen, or interview with the user is an "interview" event even if the word "interview" never appears. The company is the employer named in the invite, or the organization behind the sender's email domain (use its short brand name, e.g. "Acme" for jane@acmelabs.com). Personal or social events are NOT application emails.
+Job platforms: "your application was sent to X" (LinkedIn, Indeed) is an "applied" event; the company is X (not LinkedIn or Indeed) and the role is the job title shown in the email body.
 Never guess a company or role that is not supported by the email.`;
 
 const NOT_APPLICATION: EmailClassification = {

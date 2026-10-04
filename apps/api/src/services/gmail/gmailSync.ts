@@ -1,7 +1,10 @@
 import { logger } from "../../lib/logger.js";
 import { gmailAuth } from "./gmailAuth.js";
 import { gmailClient } from "./gmailClient.js";
-import { buildSearchQuery, classifyEmailWithLlm, PREFILTER_VERSION, prefilterEmail } from "./gmailClassifier.js";
+import {
+  buildPlatformSearchQuery,
+  buildSearchQuery,
+  classifyEmailWithLlm, PREFILTER_VERSION, prefilterEmail } from "./gmailClassifier.js";
 import { gmailMessagesRepository } from "./gmailMessages.repository.js";
 import { extractInterviewDetail, INTERVIEW_DETAIL_VERSION } from "./interviewRounds.js";
 
@@ -66,7 +69,11 @@ export const syncGmail = (days = DEFAULT_SYNC_DAYS): Promise<GmailSyncResult> =>
 
 const syncGmailNow = async (days: number): Promise<GmailSyncResult> => {
   const window = Math.min(Math.max(1, Math.floor(days)), MAX_SYNC_DAYS);
-  const ids = await gmailClient.listMessageIds(buildSearchQuery(window));
+  const [main, platform] = await Promise.all([
+    gmailClient.listMessageIds(buildSearchQuery(window)),
+    gmailClient.listMessageIds(buildPlatformSearchQuery(window)),
+  ]);
+  const ids = [...new Set([...main, ...platform])];
   const processed = await gmailMessagesRepository.findProcessedIds(ids, PREFILTER_VERSION);
   const todo = ids.filter((id) => !processed.has(id));
 

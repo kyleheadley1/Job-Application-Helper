@@ -3,6 +3,7 @@ import type { ExtractedJobData } from "../../../types/job.js";
 import type { StoredResumeType } from "../../../types/resume.js";
 import type { RuleEvaluation, ScoreBreakdown } from "../../../types/scoring.js";
 import type { ApplicationStatus } from "../gmailApplications.js";
+import type { InterviewBrief } from "../interviewBrief.js";
 import type { EvidenceSource, MatchLevel } from "./assessJdMatch.js";
 
 export type RecoveryStatus = "scored" | "unverified" | "not_found" | "fetch_failed";
@@ -109,6 +110,8 @@ export type ApplicationEvaluation = {
     detail?: ScoringDetail;
   };
   diagnostic?: ScoringDiagnostic;
+  /** Interview cheat sheet, generated on first request and kept; never feeds the score. */
+  interviewBrief?: InterviewBrief;
   /** Gmail status at the moment of scoring; never passed to the scorer. */
   outcomeAtScoring?: ApplicationStatus;
   outcome: {
@@ -186,6 +189,11 @@ export const evaluationsRepository = {
   async setDiagnostic(key: string, diagnostic: ScoringDiagnostic): Promise<void> {
     const col = await this.collection();
     await col.updateOne({ _id: key }, { $set: { diagnostic, updatedAt: new Date().toISOString() } });
+  },
+
+  async setInterviewBrief(key: string, interviewBrief: InterviewBrief): Promise<void> {
+    const col = await this.collection();
+    await col.updateOne({ _id: key }, { $set: { interviewBrief, updatedAt: new Date().toISOString() } });
   },
 
   async updateOutcome(key: string, outcome: ApplicationEvaluation["outcome"]): Promise<void> {

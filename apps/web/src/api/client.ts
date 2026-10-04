@@ -6,6 +6,7 @@ import type {
   GmailApplicationsResponse,
   GmailStatus,
   GmailSyncResult,
+  InterviewBriefResponse,
   RecoveryStart,
   ScoringReport,
 } from "../types/gmail";
@@ -141,6 +142,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ url }),
     }),
+  gmailInterviewBrief: (key: string, regenerate = false) =>
+    request<InterviewBriefResponse>(
+      `/gmail/evaluations/${encodeURIComponent(key)}/interview-brief${regenerate ? "/regenerate" : ""}`,
+      regenerate ? { method: "POST" } : { cache: "no-store" },
+    ),
   gmailScoringReport: (key: string) =>
     request<ScoringReport>(`/gmail/evaluations/${encodeURIComponent(key)}/scoring`, { cache: "no-store" }),
   gmailRunDiagnostic: (key: string) =>

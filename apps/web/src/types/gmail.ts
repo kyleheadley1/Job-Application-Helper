@@ -207,6 +207,26 @@ export type UpcomingInterview = {
   gmailUrl?: string;
 };
 
+export type InterviewBrief = {
+  companyBio: string;
+  teamNeed: string;
+  strengths: Array<{ point: string; evidence: string }>;
+  weakPoints: Array<{ gap: string; probe: string; answer: string }>;
+  askThem: string[];
+  generatedAt: string;
+  promptVersion: string;
+};
+
+export type InterviewBriefResponse = {
+  key: string;
+  company: string;
+  role: string | null;
+  round: string | null;
+  brief: InterviewBrief | null;
+  reason?: "no_jd" | "llm_failed";
+  prepPrompt: string;
+};
+
 export type GmailApplicationsResponse = {
   days: number;
   applications: GmailApplication[];
