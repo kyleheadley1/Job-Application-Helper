@@ -1,5 +1,6 @@
 import { getDb } from "../../config/mongo.js";
 import type { AlertPlatform } from "../../types/topJob.js";
+import type { Prescreen } from "./prescreen.js";
 
 export type AlertListingStatus = "pending" | "filtered" | "duplicate" | "jd_unavailable" | "below_min" | "stored";
 
@@ -18,6 +19,7 @@ export type AlertListingDoc = {
   reason?: string;
   topJobId?: string;
   processedAt?: string;
+  prescreen?: Prescreen;
 };
 
 export type AlertMessageDoc = {
@@ -95,9 +97,19 @@ export const alertListingsRepository = {
     return col.find({ status: "pending", lastSeenAt: { $gte: sinceIso } }).sort({ lastSeenAt: -1 }).toArray();
   },
 
+  async get(key: string): Promise<AlertListingDoc | null> {
+    const col = await this.listings();
+    return col.findOne({ _id: key });
+  },
+
   async countPending(sinceIso: string): Promise<number> {
     const col = await this.listings();
     return col.countDocuments({ status: "pending", lastSeenAt: { $gte: sinceIso } });
+  },
+
+  async setPrescreen(key: string, prescreen: Prescreen): Promise<void> {
+    const col = await this.listings();
+    await col.updateOne({ _id: key }, { $set: { prescreen } });
   },
 
   async setOutcome(

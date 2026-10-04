@@ -28,8 +28,13 @@ import {
   scorePastedJd,
   startRecoveryRun,
 } from "../services/gmail/jdRecovery/runRecovery.js";
-import { buildCostSummary, buildRecoveryMetrics } from "../services/gmail/jdRecovery/recoveryMetrics.js";
+import {
+  buildCostSummary,
+  buildMonthSpend,
+  buildRecoveryMetrics,
+} from "../services/gmail/jdRecovery/recoveryMetrics.js";
 import { serperUsageRepository } from "../services/gmail/jdRecovery/serperClient.js";
+import { monthStartDay } from "../services/llm/featureBudget.js";
 import { llmUsageRepository, localDay } from "../services/llm/llmUsage.js";
 import { buildRubricSummary, toEvaluationSummary, withEvaluations } from "../services/gmail/jdRecovery/summary.js";
 
@@ -179,10 +184,11 @@ gmailRouter.get("/evaluations", async (req, res, next) => {
     const { days } = ApplicationsQuerySchema.parse(req.query);
     const since = new Date(Date.now() - days * DAY_MS).toISOString();
     const sinceDay = localDay(new Date(Date.now() - (days - 1) * DAY_MS));
-    const [evaluations, usage, llmRecords] = await Promise.all([
+    const [evaluations, usage, llmRecords, monthRecords] = await Promise.all([
       evaluationsRepository.listSince(since),
       serperUsageRepository.get(),
       llmUsageRepository.listSinceDay(sinceDay).catch(() => []),
+      llmUsageRepository.listSinceDay(monthStartDay(new Date())).catch(() => []),
     ]);
     res.setHeader("Cache-Control", "no-store");
     res.json({
@@ -191,12 +197,19 @@ gmailRouter.get("/evaluations", async (req, res, next) => {
       serper: { used: usage.queries, cap: usage.cap, configured: Boolean(env.serperApiKey) },
       rubricSummary: buildRubricSummary(evaluations),
       metrics: buildRecoveryMetrics(evaluations, usage),
-      costs: buildCostSummary(llmRecords, {
-        model: env.openAiModel,
-        today: localDay(),
-        sevenDaysAgo: localDay(new Date(Date.now() - 6 * DAY_MS)),
-        windowDays: days,
-      }),
+      costs: {
+        ...buildCostSummary(llmRecords, {
+          model: env.openAiModel,
+          today: localDay(),
+          sevenDaysAgo: localDay(new Date(Date.now() - 6 * DAY_MS)),
+          windowDays: days,
+        }),
+        thisMonth: buildMonthSpend(monthRecords, {
+          top_jobs: env.topJobsMonthlyBudgetUsd,
+          agent: env.agentMonthlyBudgetUsd,
+          assistant: env.assistantMonthlyBudgetUsd,
+        }),
+      },
       evaluations: evaluations.map(({ jd, recovery, fit, diagnostic: _diagnostic, ...rest }) => ({
         ...rest,
         fit: fit && { ...fit, detail: undefined },

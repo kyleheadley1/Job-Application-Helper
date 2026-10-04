@@ -19,6 +19,7 @@ import { buildTrackerSpreadsheetFromJob } from "../../tracker/canonicalSpreadshe
 import { ingestAlertEmails } from "./alertEmails.js";
 import { classifyLocation, locationFits } from "./locationFit.js";
 import { loadTopJobsBudget } from "./topJobsBudget.js";
+import { prescreenListings, type PrescreenDeps, type PrescreenVerdict } from "./prescreen.js";
 import { resolveAlertJd, type AlertJd } from "./alertJd.js";
 import { alertListingsRepository, type AlertListingDoc, type AlertListingStatus } from "./alertListings.repository.js";
 
@@ -301,12 +302,46 @@ export const recheckListedTopJobs = async (deps: RecheckDeps = defaultRecheckDep
   return retired;
 };
 
-/** With only a few scorings a day, spend them first on roles the alert already says are remote/NYC. */
+const PRESCREEN_RANK: Record<PrescreenVerdict | "none", number> = { score: 0, maybe: 1, none: 2, skip: 3 };
+
+/**
+ * With only a few scorings a day, spend them first on roles the pre-screen rated "score",
+ * then on roles the alert already says are remote/NYC, newest first.
+ */
 export const prioritizePending = (pending: AlertListingDoc[]): AlertListingDoc[] =>
   pending
-    .map((listing, i) => ({ listing, i, fit: classifyLocation(listing.location) === "fit" ? 0 : 1 }))
-    .sort((a, b) => a.fit - b.fit || a.i - b.i)
+    .map((listing, i) => ({
+      listing,
+      i,
+      verdict: PRESCREEN_RANK[listing.prescreen?.verdict ?? "none"],
+      fit: classifyLocation(listing.location) === "fit" ? 0 : 1,
+    }))
+    .sort((a, b) => a.verdict - b.verdict || a.fit - b.fit || a.i - b.i)
     .map((x) => x.listing);
+
+/** Label unscreened roles, then retire the ones rated "skip" so they never use a scoring. */
+export const applyPrescreen = async (
+  pending: AlertListingDoc[],
+  stats: TopJobsSyncStats,
+  deps: Partial<Pick<PrescreenDeps, "run">> & {
+    save: PrescreenDeps["save"];
+    setOutcome: ProcessDeps["setOutcome"];
+  },
+): Promise<AlertListingDoc[]> => {
+  const before = pending.filter((l) => !l.prescreen).length;
+  await prescreenListings(pending, { run: deps.run, save: deps.save });
+  stats.prescreened = before - pending.filter((l) => !l.prescreen).length;
+  const kept: AlertListingDoc[] = [];
+  for (const listing of pending) {
+    if (listing.prescreen?.verdict === "skip") {
+      stats.prescreenSkipped = (stats.prescreenSkipped ?? 0) + 1;
+      await deps.setOutcome(listing._id, { status: "filtered", reason: "prescreen" });
+    } else {
+      kept.push(listing);
+    }
+  }
+  return prioritizePending(kept);
+};
 
 export const listingWindowStart = (now = Date.now()): string =>
   new Date(now - env.topJobsListingMaxAgeDays * 86_400_000).toISOString();
@@ -360,7 +395,10 @@ const runTopJobsSyncInner = async (manual: boolean): Promise<TopJobsSyncStats> =
     stats.listingsParsed = ingest.listingsParsed;
 
     const budget = await loadTopJobsBudget();
-    const pending = prioritizePending(await alertListingsRepository.listPending(listingWindowStart()));
+    const pending = await applyPrescreen(await alertListingsRepository.listPending(listingWindowStart()), stats, {
+      save: (key, prescreen) => alertListingsRepository.setPrescreen(key, prescreen),
+      setOutcome: (key, outcome) => alertListingsRepository.setOutcome(key, outcome),
+    });
     await processAlertListings(
       pending,
       {
@@ -390,6 +428,46 @@ const runTopJobsSyncInner = async (manual: boolean): Promise<TopJobsSyncStats> =
     await topJobsRepository.recordSyncResult({ stats, manual, error: message });
     throw error;
   }
+};
+
+export class ListingNotScorableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ListingNotScorableError";
+  }
+}
+
+export type ListingOutcome = { status: Exclude<AlertListingStatus, "pending">; reason?: string; topJobId?: string };
+
+/**
+ * Scores one queued (or prescreen-skipped) alert listing on request, through the same filters as a
+ * sync. The cost lands on Top Jobs spend.
+ */
+export const scoreListingNow = async (key: string): Promise<ListingOutcome> => {
+  const listing = await alertListingsRepository.get(key);
+  if (!listing) throw new ListingNotScorableError("Listing not found");
+  const prescreenSkipped = listing.status === "filtered" && listing.reason === "prescreen";
+  if (listing.status !== "pending" && !prescreenSkipped) {
+    throw new ListingNotScorableError(`Listing was already processed (${listing.status})`);
+  }
+  let outcome: ListingOutcome = { status: "jd_unavailable", reason: "not processed" };
+  await processAlertListings(
+    [listing],
+    {
+      known: await loadKnownRoles(),
+      maxTriages: 1,
+      minScore: env.topJobsMinScore,
+      resolveJd: (l) => resolveAlertJd(l),
+      triage: triageListing,
+      store: storeTopJob,
+      setOutcome: async (k, o) => {
+        outcome = o;
+        await alertListingsRepository.setOutcome(k, o);
+      },
+    },
+    emptySyncStats(),
+  );
+  return outcome;
 };
 
 export const promoteTopJobToTracker = async (topJobId: string): Promise<JobRecord> => {

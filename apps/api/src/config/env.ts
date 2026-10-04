@@ -103,6 +103,12 @@ export const env = {
   topJobsMaxTriagesPerSync: Number(process.env.TOP_JOBS_MAX_TRIAGES_PER_SYNC ?? 5),
   /** Hard monthly OpenAI spend cap for Top Jobs (alert parsing + scoring), paced evenly per day. */
   topJobsMonthlyBudgetUsd: Number(process.env.TOP_JOBS_MONTHLY_BUDGET_USD ?? 2),
+  /** Daily next-steps agent; runs once a day after a Gmail sync. */
+  agentEnabled: parseBooleanEnv(process.env.AGENT_ENABLED, true),
+  /** Hard monthly OpenAI spend cap for the agent, paced evenly per day. Over budget it falls back to free rules. */
+  agentMonthlyBudgetUsd: Number(process.env.AGENT_MONTHLY_BUDGET_USD ?? 1.5),
+  /** Hard monthly OpenAI spend cap for the on-demand chat assistant, paced evenly per day. */
+  assistantMonthlyBudgetUsd: Number(process.env.ASSISTANT_MONTHLY_BUDGET_USD ?? 1.5),
   topJobsMinScore: Number(process.env.TOP_JOBS_MIN_SCORE ?? 70),
   /** How far back alert emails are read, and how long an unchecked alert role stays queued (days). */
   topJobsListingMaxAgeDays: Number(process.env.TOP_JOBS_LISTING_MAX_AGE_DAYS ?? 14),

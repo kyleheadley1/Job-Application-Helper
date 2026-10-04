@@ -39,6 +39,8 @@ export type TopJobsSyncStats = {
   retired?: number;
   serperQueries: number;
   budgetLimited?: boolean;
+  prescreened?: number;
+  prescreenSkipped?: number;
   bySource: Partial<Record<AlertPlatform, number>>;
 };
 

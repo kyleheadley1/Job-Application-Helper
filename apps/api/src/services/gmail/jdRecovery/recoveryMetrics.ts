@@ -139,6 +139,34 @@ export type CostSummary = {
   /** Mean OpenAI cost to score one role (JD extraction + scoring). */
   perScoredRole: number | null;
   perEmailClassified: number | null;
+  thisMonth?: MonthSpend;
+};
+
+export type MonthSpend = {
+  total: number;
+  byFeature: Record<LlmFeature, number>;
+  /** Hard monthly caps for features that have one. */
+  budgets: Partial<Record<LlmFeature, number>>;
+};
+
+export const buildMonthSpend = (
+  records: Pick<LlmUsageRecord, "feature" | "costUsd">[],
+  budgets: MonthSpend["budgets"],
+): MonthSpend => {
+  const byFeature: MonthSpend["byFeature"] = {
+    gmail_classify: 0,
+    jd_recovery: 0,
+    top_jobs: 0,
+    agent: 0,
+    assistant: 0,
+    other: 0,
+  };
+  let total = 0;
+  for (const r of records) {
+    byFeature[r.feature] += r.costUsd;
+    total += r.costUsd;
+  }
+  return { total, byFeature, budgets };
 };
 
 export const buildCostSummary = (
@@ -149,6 +177,8 @@ export const buildCostSummary = (
     gmail_classify: { costUsd: 0, calls: 0 },
     jd_recovery: { costUsd: 0, calls: 0 },
     top_jobs: { costUsd: 0, calls: 0 },
+    agent: { costUsd: 0, calls: 0 },
+    assistant: { costUsd: 0, calls: 0 },
     other: { costUsd: 0, calls: 0 },
   };
   const byDay = new Map<string, number>();

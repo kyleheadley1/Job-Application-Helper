@@ -6,6 +6,10 @@ export type GmailStatus = {
   email?: string;
   lastSyncAt?: string;
   needsReconnect?: boolean;
+  /** The connection includes gmail.drafts.create (never send). */
+  canCreateDrafts?: boolean;
+  /** Granted scopes beyond read-only + drafts.create; should never appear. */
+  extraScopes?: string[];
   /** Minutes between background syncs on the API; 0 when disabled. */
   autoSyncMinutes?: number;
 };
@@ -153,7 +157,14 @@ export type RecoveryMetrics = {
   };
 };
 
-export type LlmFeature = "gmail_classify" | "jd_recovery" | "top_jobs" | "other";
+export type LlmFeature = "gmail_classify" | "jd_recovery" | "top_jobs" | "agent" | "assistant" | "other";
+
+export type MonthSpend = {
+  total: number;
+  byFeature: Record<LlmFeature, number>;
+  /** Hard monthly caps for features that have one. */
+  budgets: Partial<Record<LlmFeature, number>>;
+};
 
 export type CostSummary = {
   model: string;
@@ -166,6 +177,7 @@ export type CostSummary = {
   byDay: Array<{ day: string; costUsd: number }>;
   perScoredRole: number | null;
   perEmailClassified: number | null;
+  thisMonth?: MonthSpend;
 };
 
 export type ScoringDetail = {

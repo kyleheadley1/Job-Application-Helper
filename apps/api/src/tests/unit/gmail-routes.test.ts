@@ -180,12 +180,14 @@ describe("gmail routes", () => {
     });
   });
 
-  it("redirects oauth/start to Google with read-only offline consent", async () => {
+  it("redirects oauth/start to Google with read-only + drafts.create offline consent", async () => {
     const res = await request(app).get("/api/gmail/oauth/start");
     expect(res.status).toBe(302);
     const url = new URL(res.headers.location!);
     expect(url.origin).toBe("https://accounts.google.com");
-    expect(url.searchParams.get("scope")).toBe("https://www.googleapis.com/auth/gmail.readonly");
+    expect(url.searchParams.get("scope")).toBe(
+      "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.drafts.create",
+    );
     expect(url.searchParams.get("access_type")).toBe("offline");
     expect(url.searchParams.get("state")).toBeTruthy();
   });

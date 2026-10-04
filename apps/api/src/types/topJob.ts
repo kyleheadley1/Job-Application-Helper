@@ -69,6 +69,10 @@ export type TopJobsSyncStats = {
   retired: number;
   serperQueries: number;
   bySource: Partial<Record<AlertPlatform, number>>;
+  /** Roles labelled by the cheap batched pre-screen this run. */
+  prescreened?: number;
+  /** Roles the pre-screen rated a clear mismatch, so they were never fully scored. */
+  prescreenSkipped?: number;
   /** Scoring stopped early because today's share of the monthly budget ran out. */
   budgetLimited?: boolean;
 };

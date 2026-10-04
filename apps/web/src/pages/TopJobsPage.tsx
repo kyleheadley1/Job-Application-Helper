@@ -49,6 +49,7 @@ function SourceBadge({ source }: { source: string }) {
 function lastRunSummary(stats: TopJobsSyncStats): string {
   const parts = [
     `${stats.alertEmails} new alert email${stats.alertEmails === 1 ? "" : "s"} (${stats.listingsParsed} roles)`,
+    ...(stats.prescreenSkipped ? [`${stats.prescreenSkipped} weak titles skipped by pre-screen`] : []),
     `${stats.fetched} checked`,
     `${stats.triaged} scored`,
     `${stats.stored} added`,

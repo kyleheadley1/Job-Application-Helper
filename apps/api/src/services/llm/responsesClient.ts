@@ -249,3 +249,107 @@ export class ResponsesClient {
 }
 
 export const responsesClient = new ResponsesClient();
+
+export type ToolDef = {
+  name: string;
+  description: string;
+  /** JSON Schema for the arguments object. */
+  parameters: Record<string, unknown>;
+  run: (args: Record<string, unknown>) => Promise<unknown>;
+};
+
+export type ToolLoopResult = {
+  success: boolean;
+  text: string;
+  steps: number;
+  toolCalls: Array<{ name: string; args: Record<string, unknown> }>;
+  error?: string;
+};
+
+type OutputItem = { type?: string; name?: string; arguments?: string; call_id?: string };
+
+/** Tool results are clipped so one big lookup can't balloon every later step's input. */
+export const MAX_TOOL_OUTPUT_CHARS = 6000;
+
+/**
+ * Responses API function-calling loop. Each step replays the conversation plus the model's output
+ * items and tool results; the last allowed step forbids tools so the model must answer.
+ */
+export const runWithTools = async (
+  request: {
+    systemPrompt: string;
+    messages: Array<{ role: "user" | "assistant"; content: string }>;
+    tools: ToolDef[];
+    maxSteps?: number;
+    reasoningEffort?: ReasoningEffort;
+  },
+  fetchImpl: typeof fetch = fetch,
+): Promise<ToolLoopResult> => {
+  const maxSteps = request.maxSteps ?? 6;
+  const toolCalls: ToolLoopResult["toolCalls"] = [];
+  if (!env.openAiApiKey) return { success: false, text: "", steps: 0, toolCalls, error: "OPENAI_API_KEY not set" };
+
+  const byName = new Map(request.tools.map((t) => [t.name, t]));
+  const input: unknown[] = [
+    { role: "system", content: request.systemPrompt },
+    ...request.messages.map((m) => ({ role: m.role, content: m.content })),
+  ];
+  const effort =
+    request.reasoningEffort && supportsReasoning(env.openAiModel) ? { reasoning: { effort: request.reasoningEffort } } : {};
+
+  for (let step = 1; step <= maxSteps; step += 1) {
+    const last = step === maxSteps;
+    let payload: { output?: OutputItem[]; usage?: OpenAiUsage; error?: { message?: string } };
+    try {
+      const response = await fetchImpl("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.openAiApiKey}` },
+        body: JSON.stringify({
+          model: env.openAiModel,
+          input,
+          tools: request.tools.map(({ name, description, parameters }) => ({ type: "function", name, description, parameters })),
+          tool_choice: last ? "none" : "auto",
+          ...effort,
+        }),
+      });
+      payload = (await response.json()) as typeof payload;
+      recordLlmUsage(env.openAiModel, payload.usage);
+      if (!response.ok) {
+        return { success: false, text: "", steps: step, toolCalls, error: payload.error?.message ?? `HTTP ${response.status}` };
+      }
+    } catch (error) {
+      return { success: false, text: "", steps: step, toolCalls, error: error instanceof Error ? error.message : String(error) };
+    }
+
+    const output = payload.output ?? [];
+    const calls = output.filter((o) => o.type === "function_call");
+    if (calls.length === 0) {
+      return { success: true, text: extractJsonTextFromOpenAiResponse(payload) ?? "", steps: step, toolCalls };
+    }
+
+    input.push(...output);
+    for (const call of calls) {
+      let args: Record<string, unknown> = {};
+      try {
+        args = call.arguments ? (JSON.parse(call.arguments) as Record<string, unknown>) : {};
+      } catch {
+        args = {};
+      }
+      toolCalls.push({ name: call.name ?? "", args });
+      const tool = byName.get(call.name ?? "");
+      let result: unknown;
+      try {
+        result = tool ? await tool.run(args) : { error: `Unknown tool ${call.name}` };
+      } catch (error) {
+        result = { error: error instanceof Error ? error.message : String(error) };
+      }
+      const text = JSON.stringify(result ?? null);
+      input.push({
+        type: "function_call_output",
+        call_id: call.call_id,
+        output: text.length > MAX_TOOL_OUTPUT_CHARS ? `${text.slice(0, MAX_TOOL_OUTPUT_CHARS)}…(truncated)` : text,
+      });
+    }
+  }
+  return { success: false, text: "", steps: maxSteps, toolCalls, error: "No answer within the step limit" };
+};

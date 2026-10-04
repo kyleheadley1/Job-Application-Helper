@@ -1,5 +1,7 @@
 import type { JobRecord, JobStatus } from "../types/job";
 import type { TopJobRecord, TopJobsSyncStatus } from "../types/topJob";
+import type { AgentPanel, AgentRunSummary, AgentSuggestion, DraftCreated, ReplyTarget } from "../types/agent";
+import type { AssistantProposal, AssistantReply, AssistantThread } from "../types/assistant";
 import type {
   EvaluationSummary,
   EvaluationsResponse,
@@ -158,4 +160,32 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ text, url: url || undefined }),
     }),
+  agentPanel: () => request<AgentPanel>("/agent/suggestions", { cache: "no-store" }),
+  agentRun: () => request<AgentPanel & { run: AgentRunSummary }>("/agent/run", { method: "POST" }),
+  agentApprove: (id: string) =>
+    request<{ suggestion: AgentSuggestion }>(`/agent/suggestions/${encodeURIComponent(id)}/approve`, {
+      method: "POST",
+    }),
+  agentReplyTarget: (id: string) =>
+    request<ReplyTarget>(`/agent/suggestions/${encodeURIComponent(id)}/reply-target`, { cache: "no-store" }),
+  agentCreateDraft: (id: string, to: string, body: string) =>
+    request<DraftCreated>(`/agent/suggestions/${encodeURIComponent(id)}/draft`, {
+      method: "POST",
+      body: JSON.stringify({ to, body }),
+    }),
+  agentDismiss: (id: string) =>
+    request<void>(`/agent/suggestions/${encodeURIComponent(id)}/dismiss`, { method: "POST" }),
+  assistantThread: () => request<AssistantThread>("/assistant/thread", { cache: "no-store" }),
+  assistantClear: () => request<void>("/assistant/thread", { method: "DELETE" }),
+  assistantSend: (text: string) =>
+    request<AssistantReply>("/assistant/message", { method: "POST", body: JSON.stringify({ text }) }),
+  assistantReplyTarget: (id: string) =>
+    request<ReplyTarget>(`/assistant/proposals/${encodeURIComponent(id)}/reply-target`, { cache: "no-store" }),
+  assistantApprove: (id: string, email?: { to: string; body: string }) =>
+    request<{ proposal: AssistantProposal; draftsUrl?: string }>(
+      `/assistant/proposals/${encodeURIComponent(id)}/approve`,
+      { method: "POST", body: JSON.stringify(email ? { email } : {}) },
+    ),
+  assistantDismiss: (id: string) =>
+    request<void>(`/assistant/proposals/${encodeURIComponent(id)}/dismiss`, { method: "POST" }),
 };

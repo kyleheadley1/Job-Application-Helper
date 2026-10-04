@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { planTopJobsBudget } from "../../services/topJobs/topJobsBudget.js";
+import { planFeatureBudget } from "../../services/llm/featureBudget.js";
 import { prioritizePending } from "../../services/topJobs/topJobsSync.js";
 import type { AlertListingDoc } from "../../services/topJobs/alertListings.repository.js";
 
@@ -43,6 +44,14 @@ describe("planTopJobsBudget", () => {
     expect(plan.allowedTriages).toBe(0);
     expect(plan.exhausted).toBe(true);
     expect(plan.spentThisMonthUsd).toBeCloseTo(2.1);
+  });
+});
+
+describe("planFeatureBudget", () => {
+  it("allows one agent run a day at $1.50 a month and none once today's share is spent", () => {
+    const base = { monthlyUsd: 1.5, now: at("2026-11-01"), maxUnits: 1, perUnitUsd: 0.02 };
+    expect(planFeatureBudget({ ...base, costByDay: {} }).allowedUnits).toBe(1);
+    expect(planFeatureBudget({ ...base, costByDay: { "2026-11-01": 0.04 } }).allowedUnits).toBe(0);
   });
 });
 

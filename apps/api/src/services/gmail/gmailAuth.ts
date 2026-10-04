@@ -8,6 +8,13 @@ const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 const GMAIL_PROFILE_URL = "https://gmail.googleapis.com/gmail/v1/users/me/profile";
 export const GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
+/** Create new drafts only: cannot send, edit, or delete drafts. Sending stays in Gmail, by you. */
+export const GMAIL_DRAFTS_CREATE_SCOPE = "https://www.googleapis.com/auth/gmail.drafts.create";
+export const GMAIL_SCOPES = [GMAIL_READONLY_SCOPE, GMAIL_DRAFTS_CREATE_SCOPE] as const;
+
+/** Granted scopes other than the two the app asks for (should always be empty). */
+export const extraScopes = (granted: string[]): string[] =>
+  granted.filter((s) => !(GMAIL_SCOPES as readonly string[]).includes(s));
 
 const AUTH_DOC_ID = "default";
 const STATE_TTL_MS = 10 * 60 * 1000;
@@ -19,6 +26,8 @@ export type GmailAuthDoc = {
   connectedAt: string;
   lastSyncAt?: string;
   needsReconnect?: boolean;
+  /** Scopes Google reported on the last token exchange; absent on connections made before drafts. */
+  grantedScopes?: string[];
 };
 
 export type GmailStatus = {
@@ -27,6 +36,8 @@ export type GmailStatus = {
   email?: string;
   lastSyncAt?: string;
   needsReconnect?: boolean;
+  canCreateDrafts: boolean;
+  extraScopes?: string[];
 };
 
 /** Refresh token was revoked or expired (Testing-mode apps expire them after 7 days). */
@@ -58,9 +69,14 @@ type TokenResponse = {
   access_token?: string;
   expires_in?: number;
   refresh_token?: string;
+  /** Space-separated scopes actually granted. */
+  scope?: string;
   error?: string;
   error_description?: string;
 };
+
+export const parseScopes = (scope: string | undefined): string[] =>
+  scope ? scope.split(/\s+/).filter(Boolean) : [];
 
 export const isGmailConfigured = (): boolean =>
   Boolean(env.googleClientId && env.googleClientSecret);
@@ -82,12 +98,17 @@ class GmailAuthService {
   async getStatus(): Promise<GmailStatus> {
     const configured = isGmailConfigured();
     const doc = await this.getAuthDoc();
+    const connected = Boolean(doc?.refreshToken) && !doc?.needsReconnect;
+    const granted = doc?.grantedScopes ?? [];
+    const extra = extraScopes(granted);
     return {
       configured,
-      connected: Boolean(doc?.refreshToken) && !doc?.needsReconnect,
+      connected,
       email: doc?.email,
       lastSyncAt: doc?.lastSyncAt,
       needsReconnect: doc?.needsReconnect || undefined,
+      canCreateDrafts: connected && granted.includes(GMAIL_DRAFTS_CREATE_SCOPE),
+      ...(extra.length ? { extraScopes: extra } : {}),
     };
   }
 
@@ -101,10 +122,11 @@ class GmailAuthService {
       client_id: env.googleClientId!,
       redirect_uri: env.googleRedirectUri,
       response_type: "code",
-      scope: GMAIL_READONLY_SCOPE,
+      scope: GMAIL_SCOPES.join(" "),
       access_type: "offline",
       prompt: "consent",
-      include_granted_scopes: "true",
+      // Incremental auth would carry forward any broader scope granted in the past.
+      include_granted_scopes: "false",
       state,
     });
     return `${GOOGLE_AUTH_URL}?${params.toString()}`;
@@ -161,10 +183,11 @@ class GmailAuthService {
       email,
       connectedAt: new Date().toISOString(),
       lastSyncAt: existing?.lastSyncAt,
+      grantedScopes: parseScopes(tokens.scope),
     };
     const col = await this.collection();
     await col.replaceOne({ _id: AUTH_DOC_ID }, doc, { upsert: true });
-    logger.info("Gmail connected", { email });
+    logger.info("Gmail connected", { email, grantedScopes: doc.grantedScopes });
     return doc;
   }
 
@@ -195,6 +218,11 @@ class GmailAuthService {
         value: tokens.access_token!,
         expiresAt: Date.now() + (tokens.expires_in ?? 3600) * 1000,
       };
+      const granted = parseScopes(tokens.scope);
+      if (granted.length && granted.sort().join(" ") !== [...(doc.grantedScopes ?? [])].sort().join(" ")) {
+        const col = await this.collection();
+        await col.updateOne({ _id: AUTH_DOC_ID }, { $set: { grantedScopes: granted } });
+      }
       return this.accessToken.value;
     } catch (error) {
       if (error instanceof GmailReconnectRequiredError) await this.markNeedsReconnect();

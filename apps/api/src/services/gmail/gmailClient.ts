@@ -144,11 +144,12 @@ export const RATE_LIMIT_BACKOFF_MS = [2_000, 8_000, 20_000, 35_000];
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-const gmailFetch = async <T>(path: string): Promise<T> => {
+const gmailFetch = async <T>(path: string, init?: { method: "POST"; body: unknown }): Promise<T> => {
   for (let attempt = 0; ; attempt += 1) {
     const token = await gmailAuth.getAccessToken();
     const response = await fetch(`${GMAIL_API}${path}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}`, ...(init ? { "Content-Type": "application/json" } : {}) },
+      ...(init ? { method: init.method, body: JSON.stringify(init.body) } : {}),
     });
     if (response.status === 401) {
       await gmailAuth.markNeedsReconnect();
@@ -206,4 +207,39 @@ export const gmailClient = {
   async getMessage(id: string, maxBodyChars = MAX_BODY_CHARS): Promise<ParsedEmail> {
     return parseGmailMessage(await this.getRawMessage(id), maxBodyChars);
   },
+
+  async getReplyHeaders(id: string): Promise<ReplyHeaders> {
+    const params = new URLSearchParams({ format: "metadata" });
+    for (const h of ["From", "Reply-To", "Subject", "Message-ID", "References"]) params.append("metadataHeaders", h);
+    const raw = await gmailFetch<GmailRawMessage>(`/messages/${encodeURIComponent(id)}?${params.toString()}`);
+    return {
+      threadId: raw.threadId,
+      from: header(raw.payload, "From"),
+      replyTo: header(raw.payload, "Reply-To"),
+      subject: header(raw.payload, "Subject"),
+      messageId: header(raw.payload, "Message-ID"),
+      references: header(raw.payload, "References"),
+    };
+  },
+
+  /**
+   * Creates a draft (gmail.drafts.create). The app holds no send permission and has no send method;
+   * you send drafts yourself in Gmail.
+   */
+  async createDraft(raw: string, threadId?: string): Promise<{ draftId: string; threadId: string }> {
+    const draft = await gmailFetch<{ id: string; message?: { threadId?: string } }>("/drafts", {
+      method: "POST",
+      body: { message: { raw, ...(threadId ? { threadId } : {}) } },
+    });
+    return { draftId: draft.id, threadId: draft.message?.threadId ?? threadId ?? "" };
+  },
+};
+
+export type ReplyHeaders = {
+  threadId: string;
+  from: string;
+  replyTo: string;
+  subject: string;
+  messageId: string;
+  references: string;
 };

@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
+import { NextStepsCard } from "../components/NextStepsCard";
 import { ScoringDetailsPanel } from "../components/ScoringDetailsPanel";
 import type {
   ActionItem,
@@ -583,6 +584,8 @@ const FEATURE_LABEL: Record<LlmFeature, string> = {
   gmail_classify: "Email classification",
   jd_recovery: "JD scoring",
   top_jobs: "Top Jobs (alert parsing + scoring)",
+  agent: "Next-steps agent",
+  assistant: "Chat assistant",
   other: "Other (tracker, assets)",
 };
 
@@ -711,7 +714,10 @@ function FitOutcomeCard({ rubric }: { rubric: RubricSummary }) {
 }
 
 function CostCard({ costs }: { costs: CostSummary }) {
-  const features = (Object.keys(costs.byFeature) as LlmFeature[]).filter((f) => costs.byFeature[f].calls > 0);
+  const month = costs.thisMonth;
+  const features = (Object.keys(costs.byFeature) as LlmFeature[]).filter(
+    (f) => costs.byFeature[f].calls > 0 || (month?.byFeature[f] ?? 0) > 0 || month?.budgets[f] != null,
+  );
   return (
     <div className="card stack">
       <strong>OpenAI cost</strong>
@@ -726,6 +732,11 @@ function CostCard({ costs }: { costs: CostSummary }) {
             <span className="pointChip">
               Last 7 days <strong>{usd(costs.last7Days)}</strong>
             </span>
+            {month && (
+              <span className="pointChip" title="All OpenAI spend since the 1st of this month">
+                This month <strong>{usd(month.total)}</strong>
+              </span>
+            )}
             <span className="pointChip">
               Per scored role <strong>{usd(costs.perScoredRole)}</strong>
             </span>
@@ -734,14 +745,31 @@ function CostCard({ costs }: { costs: CostSummary }) {
             </span>
           </div>
           <table className="table">
+            <thead>
+              <tr>
+                <th>Feature</th>
+                <th>Last {costs.windowDays} days</th>
+                <th>Cost</th>
+                {month && <th>This month</th>}
+              </tr>
+            </thead>
             <tbody>
-              {features.map((f) => (
-                <tr key={f}>
-                  <td>{FEATURE_LABEL[f]}</td>
-                  <td>{costs.byFeature[f].calls} calls</td>
-                  <td>{usd(costs.byFeature[f].costUsd)}</td>
-                </tr>
-              ))}
+              {features.map((f) => {
+                const cap = month?.budgets[f];
+                return (
+                  <tr key={f}>
+                    <td>{FEATURE_LABEL[f]}</td>
+                    <td>{costs.byFeature[f].calls} calls</td>
+                    <td>{usd(costs.byFeature[f].costUsd)}</td>
+                    {month && (
+                      <td>
+                        {usd(month.byFeature[f])}
+                        {cap != null && <span className="muted"> of {usd(cap)} cap</span>}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           <span className="muted smallText">
@@ -1186,7 +1214,7 @@ export function DashboardPage() {
           <p className="muted">
             {status.needsReconnect
               ? "Google expired or revoked access (Testing-mode apps expire after 7 days). Reconnect to keep syncing."
-              : "Read-only access. The app scans recent job-related emails to find applications and status updates."}
+              : "Read access to find applications and status updates, plus permission to create drafts (never send) for emails you approve."}
           </p>
           <div>
             <a href={api.gmailConnectUrl}>
@@ -1194,6 +1222,19 @@ export function DashboardPage() {
             </a>
           </div>
         </div>
+      )}
+
+      {status?.connected && status.extraScopes && status.extraScopes.length > 0 && (
+        <p className="card error-text smallText">
+          Gmail granted more access than this app asks for ({status.extraScopes.join(", ")}). Remove the app in your
+          Google account&apos;s third-party access settings, then reconnect.
+        </p>
+      )}
+      {status?.connected && !status.canCreateDrafts && (
+        <p className="card smallText">
+          Reconnect Gmail to let approved emails become Gmail drafts (create-only; the app can never send).{" "}
+          <a href={api.gmailConnectUrl}>Reconnect Gmail</a>
+        </p>
       )}
 
       {status?.connected && (
@@ -1224,6 +1265,8 @@ export function DashboardPage() {
               </button>
             </div>
           </div>
+
+          <NextStepsCard onTrackerChanged={() => void loadApplications()} />
 
           <UpcomingInterviewsCard
             interviews={upcoming}

@@ -1,4 +1,5 @@
 import { Link, Navigate, Route, Routes, useParams } from "react-router-dom";
+import { AssistantPanel } from "./components/AssistantPanel";
 import { AddJobPage } from "./pages/AddJobPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { TrackerPage } from "./pages/TrackerPage";
@@ -33,6 +34,7 @@ function App() {
         <Route path="/jobs/:id/detail" element={<RoleDetailPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <AssistantPanel />
     </main>
   );
 }
