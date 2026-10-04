@@ -850,6 +850,143 @@ tbody .tracker-sticky-left {
   font-family: inherit;
 }
 
+.fitOutcomeTitle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.fitOutcomeMean {
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.fitOutcome {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #30363d;
+}
+
+.fitOutcomeHead {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+}
+
+.fitStrip {
+  position: relative;
+  height: 38px;
+  margin-right: 1rem;
+}
+
+.fitStripTrack {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 18px;
+  height: 2px;
+  background: #30363d;
+  border-radius: 1px;
+}
+
+.fitStripTick {
+  position: absolute;
+  top: 10px;
+  height: 18px;
+  border-left: 1px dashed #30363d;
+}
+
+.fitStripTick span {
+  position: absolute;
+  top: 18px;
+  transform: translateX(-50%);
+  font-size: 0.65rem;
+  color: #8b949e;
+}
+
+.fitStripDot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 50%;
+  border: 1px solid #0d1117;
+  opacity: 0.9;
+}
+
+.fitStripMean {
+  position: absolute;
+  top: 4px;
+  height: 30px;
+  border-left: 2px solid #f0f6fc;
+}
+
+.fitTiers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.fitTier {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.fitTierLabel {
+  padding-top: 0.25rem;
+}
+
+.fitTierCount {
+  margin-left: 0.25rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: #21262d;
+}
+
+.fitTierChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.fitChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 0.15rem 0.5rem 0.15rem 0.2rem;
+  font-size: 0.8rem;
+}
+
+.fitChipScore {
+  min-width: 1.8rem;
+  text-align: center;
+  border-radius: 4px;
+  padding: 0.05rem 0.25rem;
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+
+.fitChipNote {
+  font-size: 0.72rem;
+}
+
+@media (max-width: 700px) {
+  .fitOutcomeHead,
+  .fitTier {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+  }
+}
+
 .pointChip {
   display: inline-block;
   border: 1px solid #30363d;

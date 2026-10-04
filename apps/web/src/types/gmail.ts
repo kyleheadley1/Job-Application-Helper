@@ -153,7 +153,7 @@ export type RecoveryMetrics = {
   };
 };
 
-export type LlmFeature = "gmail_classify" | "jd_recovery" | "other";
+export type LlmFeature = "gmail_classify" | "jd_recovery" | "top_jobs" | "other";
 
 export type CostSummary = {
   model: string;
@@ -207,6 +207,21 @@ export type UpcomingInterview = {
   gmailUrl?: string;
 };
 
+export type ActionType = "schedule" | "reply" | "assessment" | "offer";
+
+export type ActionItem = {
+  key: string;
+  company: string;
+  role: string | null;
+  emailId: string;
+  threadId: string;
+  type: ActionType;
+  summary: string | null;
+  deadline: string | null;
+  receivedAt: string;
+  gmailUrl: string;
+};
+
 export type InterviewBrief = {
   companyBio: string;
   teamNeed: string;
@@ -232,6 +247,7 @@ export type GmailApplicationsResponse = {
   applications: GmailApplication[];
   pendingRecovery: number;
   upcomingInterviews?: UpcomingInterview[];
+  actionItems?: ActionItem[];
 };
 
 export type RecoveryStart = { queued: number; running: boolean; started: boolean };
@@ -245,8 +261,12 @@ export type GmailSyncResult = {
   applicationEmails: number;
   llmFailures: number;
   interviewDetails?: number;
+  deferred?: number;
+  rateLimited?: boolean;
+  trackerAdded?: number;
   applications: GmailApplication[];
   pendingRecovery: number;
   upcomingInterviews?: UpcomingInterview[];
+  actionItems?: ActionItem[];
   recovery?: RecoveryStart;
 };

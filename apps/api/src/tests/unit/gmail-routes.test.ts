@@ -31,6 +31,10 @@ vi.mock("../../config/mongo.js", async (importOriginal) => {
   };
 });
 
+vi.mock("../../services/gmail/trackerAutoAdd.js", () => ({
+  addMissingApplicationsQuietly: vi.fn(async () => 0),
+}));
+
 vi.mock("../../services/llm/responsesClient.js", () => ({
   responsesClient: { runStructured: (...args: unknown[]) => runStructuredMock(...args) },
 }));
@@ -73,6 +77,10 @@ vi.mock("../../services/gmail/gmailMessages.repository.js", () => ({
         )
         .map((m) => m.id),
     ),
+    listIdsMissingAction: vi.fn(async () => []),
+    setAction: vi.fn(async () => undefined),
+    listOpenActionMessages: vi.fn(async () => []),
+    setActionReplied: vi.fn(async () => undefined),
     setInterviewDetail: vi.fn(async (id: string, detail: InterviewDetail) => {
       const m = messageStore.get(id);
       if (m?.classification) m.classification.interview = detail;

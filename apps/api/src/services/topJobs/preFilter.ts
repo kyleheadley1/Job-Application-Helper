@@ -4,7 +4,7 @@ import { normalizeText } from "../../lib/text.js";
 import type { DiscoveredListing } from "../../types/topJob.js";
 
 const SENIORITY_OVERREACH_RE =
-  /\b(senior|staff|principal|lead|director|manager|head of|vp\b|vice president)\b/i;
+  /\b(senior|staff|principal|distinguished|fellow|lead|director|manager|head of|vp\b|vice president)\b/i;
 
 const TITLE_DENY_RE =
   /\b(sales engineer|devops|sre|site reliability|data analyst|data scientist|qa engineer|quality assurance|recruiter|account executive|customer success)\b/i;
@@ -43,13 +43,9 @@ export type PreFilterResult = {
   reason?: string;
 };
 
-export const preFilterListing = (listing: DiscoveredListing): PreFilterResult => {
-  const title = listing.title.trim();
-  const blob = normalizeText(`${title} ${listing.description} ${listing.location ?? ""}`);
-
-  if (listing.description.trim().length < 200) {
-    return { pass: false, reason: "description_too_short" };
-  }
+/** Title-only checks, run before spending a fetch or a scoring call on an alert role. */
+export const preFilterTitle = (rawTitle: string): PreFilterResult => {
+  const title = rawTitle.trim();
   if (SENIORITY_OVERREACH_RE.test(title)) {
     return { pass: false, reason: "seniority_overreach" };
   }
@@ -59,6 +55,18 @@ export const preFilterListing = (listing: DiscoveredListing): PreFilterResult =>
   if (!TITLE_KEEP_RE.test(title)) {
     return { pass: false, reason: "title_not_engineering" };
   }
+  return { pass: true };
+};
+
+export const preFilterListing = (listing: DiscoveredListing): PreFilterResult => {
+  const title = listing.title.trim();
+  const blob = normalizeText(`${title} ${listing.description} ${listing.location ?? ""}`);
+
+  if (listing.description.trim().length < 200) {
+    return { pass: false, reason: "description_too_short" };
+  }
+  const titleCheck = preFilterTitle(title);
+  if (!titleCheck.pass) return titleCheck;
   if (!STACK_KEYWORDS.some((k) => blob.includes(k))) {
     return { pass: false, reason: "no_stack_overlap" };
   }

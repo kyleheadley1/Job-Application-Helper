@@ -6,12 +6,18 @@ import { env } from "../../config/env.js";
 import { logger } from "../../lib/logger.js";
 import { shortlistTrackerFields } from "../../lib/shortlist.js";
 import type { DiscoveredListing, TopJobRecord, TopJobsSyncStats } from "../../types/topJob.js";
-import { fetchDiscoveredListings } from "./discoveryProvider.js";
-import { preFilterListings, sortListingsByPostedDesc } from "./preFilter.js";
+import { gmailAuth } from "../gmail/gmailAuth.js";
+import { normalizeCompany, roleSimilarity } from "../gmail/gmailApplications.js";
+import { evaluationsRepository } from "../gmail/jdRecovery/evaluations.repository.js";
+import { withLlmContext } from "../llm/llmUsage.js";
+import { preFilterListing, preFilterTitle } from "./preFilter.js";
 import { topJobsRepository } from "./topJobs.repository.js";
 import { jobsRepository } from "../jobs/jobs.repository.js";
 import type { JobRecord } from "../../types/job.js";
 import { buildTrackerSpreadsheetFromJob } from "../../tracker/canonicalSpreadsheet.js";
+import { ingestAlertEmails } from "./alertEmails.js";
+import { resolveAlertJd, type AlertJd } from "./alertJd.js";
+import { alertListingsRepository, type AlertListingDoc, type AlertListingStatus } from "./alertListings.repository.js";
 
 export class TopJobsSyncCooldownError extends Error {
   constructor(message: string) {
@@ -20,23 +26,39 @@ export class TopJobsSyncCooldownError extends Error {
   }
 }
 
-const dedupeListings = (listings: DiscoveredListing[]): DiscoveredListing[] => {
-  const seen = new Set<string>();
-  const out: DiscoveredListing[] = [];
-  for (const l of listings) {
-    const key = l.applyUrl.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(l);
+export class TopJobsGmailRequiredError extends Error {
+  constructor() {
+    super("Connect Gmail on the Dashboard so Top Jobs can read your job-alert emails.");
+    this.name = "TopJobsGmailRequiredError";
   }
-  return out;
+}
+
+export const emptySyncStats = (): TopJobsSyncStats => ({
+  alertEmails: 0,
+  listingsParsed: 0,
+  fetched: 0,
+  preFiltered: 0,
+  triaged: 0,
+  stored: 0,
+  skippedExisting: 0,
+  belowMinScore: 0,
+  jdUnavailable: 0,
+  serperQueries: 0,
+  bySource: {},
+});
+
+/** Same employer and close enough title to be the role already seen or applied to. */
+const KNOWN_ROLE_SIMILARITY = 0.8;
+
+export type KnownRole = { company: string; title: string };
+
+export const isKnownRole = (company: string, title: string, known: KnownRole[]): boolean => {
+  const c = normalizeCompany(company);
+  if (!c) return false;
+  return known.some((k) => normalizeCompany(k.company) === c && roleSimilarity(title, k.title) >= KNOWN_ROLE_SIMILARITY);
 };
 
-const listingToTopJob = (
-  listing: DiscoveredListing,
-  job: JobRecord,
-  now: string,
-): TopJobRecord => ({
+const listingToTopJob = (listing: DiscoveredListing, job: JobRecord, now: string): TopJobRecord => ({
   id: randomUUID(),
   source: listing.source,
   externalId: listing.externalId,
@@ -59,6 +81,138 @@ const listingToTopJob = (
   resumeRationale: job.resumeRationale,
 });
 
+export const toDiscoveredListing = (
+  listing: AlertListingDoc,
+  jd: Extract<AlertJd, { ok: true }>,
+): DiscoveredListing => {
+  const alertLink = listing.links.find((l) => l.url === jd.alertUrl);
+  return {
+    source: `${jd.platform}_alert`,
+    externalId: alertLink?.externalId ?? listing._id,
+    company: listing.company,
+    title: listing.title,
+    description: jd.posting.text,
+    applyUrl: jd.viaSearch || !jd.alertUrl ? jd.posting.url : jd.alertUrl,
+    location: listing.location ?? undefined,
+    remote: /\bremote\b/i.test(listing.location ?? ""),
+    sourcePostedAt: listing.firstSeenAt,
+    sourceUpdatedAt: listing.lastSeenAt,
+  };
+};
+
+export type ProcessDeps = {
+  known: KnownRole[];
+  maxTriages: number;
+  minScore: number;
+  resolveJd: (listing: AlertListingDoc) => Promise<AlertJd>;
+  triage: (listing: DiscoveredListing) => Promise<JobRecord>;
+  store: (listing: DiscoveredListing, job: JobRecord) => Promise<string>;
+  setOutcome: (
+    key: string,
+    outcome: { status: Exclude<AlertListingStatus, "pending">; reason?: string; topJobId?: string },
+  ) => Promise<void>;
+};
+
+/**
+ * Cheapest checks first: title filter and de-duplication cost nothing, the JD fetch may cost a
+ * search credit, and scoring is the only paid step. Roles left once the cap is hit stay pending.
+ */
+export const processAlertListings = async (
+  pending: AlertListingDoc[],
+  deps: ProcessDeps,
+  stats: TopJobsSyncStats,
+): Promise<void> => {
+  for (const listing of pending) {
+    if (stats.triaged >= deps.maxTriages) break;
+    stats.fetched += 1;
+
+    const titleCheck = preFilterTitle(listing.title);
+    if (!titleCheck.pass) {
+      await deps.setOutcome(listing._id, { status: "filtered", reason: titleCheck.reason });
+      continue;
+    }
+    if (isKnownRole(listing.company, listing.title, deps.known)) {
+      stats.skippedExisting += 1;
+      await deps.setOutcome(listing._id, { status: "duplicate" });
+      continue;
+    }
+
+    const jd = await deps.resolveJd(listing);
+    stats.serperQueries += jd.serperQueries;
+    if (!jd.ok) {
+      stats.jdUnavailable += 1;
+      await deps.setOutcome(listing._id, { status: "jd_unavailable", reason: jd.reason });
+      continue;
+    }
+
+    const discovered = toDiscoveredListing(listing, jd);
+    const full = preFilterListing(discovered);
+    if (!full.pass) {
+      await deps.setOutcome(listing._id, { status: "filtered", reason: full.reason });
+      continue;
+    }
+    stats.preFiltered += 1;
+
+    const job = await deps.triage(discovered);
+    stats.triaged += 1;
+    deps.known.push({ company: listing.company, title: listing.title });
+    if (job.score.total < deps.minScore) {
+      stats.belowMinScore += 1;
+      await deps.setOutcome(listing._id, { status: "below_min", reason: String(job.score.total) });
+      continue;
+    }
+    const topJobId = await deps.store(discovered, job);
+    stats.stored += 1;
+    stats.bySource[jd.platform] = (stats.bySource[jd.platform] ?? 0) + 1;
+    await deps.setOutcome(listing._id, { status: "stored", topJobId });
+  }
+};
+
+const triageListing = async (listing: DiscoveredListing): Promise<JobRecord> => {
+  const rawJob = await withLlmContext({ feature: "top_jobs", key: listing.externalId }, () =>
+    triageJob({ rawText: listing.description, companyHint: listing.company, fullPrep: false }),
+  );
+  rawJob.extracted.url = listing.applyUrl;
+  rawJob.extracted.rawText = listing.description;
+  if (!rawJob.extracted.title?.trim() || rawJob.extracted.title === "Unknown Title") {
+    rawJob.extracted.title = listing.title;
+  }
+  if (!rawJob.extracted.company?.trim() || rawJob.extracted.company === "Unknown Company") {
+    rawJob.extracted.company = listing.company;
+  }
+  rawJob.extracted = applyCompanyPresentation(
+    { ...rawJob.extracted, company: rawJob.extracted.company, rawText: listing.description },
+    listing.company,
+  );
+  return rawJob;
+};
+
+const storeTopJob = async (listing: DiscoveredListing, job: JobRecord): Promise<string> => {
+  const existing =
+    (await topJobsRepository.findBySourceKey(listing.source, listing.externalId)) ??
+    (await topJobsRepository.findByApplyUrl(listing.applyUrl));
+  const record = listingToTopJob(listing, job, new Date().toISOString());
+  record.id = existing?.id ?? topJobsRepository.createId();
+  await topJobsRepository.upsert(record);
+  return record.id;
+};
+
+const loadKnownRoles = async (): Promise<KnownRole[]> => {
+  const [topJobs, tracker, evaluations] = await Promise.all([
+    topJobsRepository.list(0),
+    jobsRepository.list(),
+    evaluationsRepository.listSince(new Date(0).toISOString()),
+  ]);
+  return [
+    ...topJobs.map((j) => ({ company: j.extracted.company ?? "", title: j.extracted.title ?? "" })),
+    ...tracker.items.map((j) => ({ company: j.extracted.company ?? "", title: j.extracted.title ?? "" })),
+    ...evaluations.map((e) => ({ company: e.company, title: e.role ?? e.recovery.recoveredRole ?? "" })),
+  ].filter((k) => k.company && k.title);
+};
+
+export const listingWindowStart = (now = Date.now()): string =>
+  new Date(now - env.topJobsListingMaxAgeDays * 86_400_000).toISOString();
+
 let syncInProgress = false;
 
 export const runTopJobsSync = async (options?: {
@@ -70,37 +224,18 @@ export const runTopJobsSync = async (options?: {
   if (!options?.skipConcurrencyGuard && syncInProgress) {
     logger.info("Top jobs sync skipped — already in progress");
     const meta = await topJobsRepository.getSyncMeta();
-    return (
-      meta.lastSyncStats ?? {
-        fetched: 0,
-        preFiltered: 0,
-        triaged: 0,
-        stored: 0,
-        skippedExisting: 0,
-        belowMinScore: 0,
-        source: "jobsbase",
-        jsearchCreditsUsed: 0,
-        jsearchListings: 0,
-        jobsbaseListings: 0,
-      }
-    );
+    return meta.lastSyncStats ?? emptySyncStats();
   }
 
-  if (!options?.skipConcurrencyGuard) {
-    syncInProgress = true;
-  }
-
+  if (!options?.skipConcurrencyGuard) syncInProgress = true;
   try {
     return await runTopJobsSyncInner(manual);
   } finally {
-    if (!options?.skipConcurrencyGuard) {
-      syncInProgress = false;
-    }
+    if (!options?.skipConcurrencyGuard) syncInProgress = false;
   }
 };
 
 const runTopJobsSyncInner = async (manual: boolean): Promise<TopJobsSyncStats> => {
-
   if (manual) {
     const status = await topJobsRepository.getSyncStatus();
     if (!status.canManualRefresh) {
@@ -110,108 +245,36 @@ const runTopJobsSyncInner = async (manual: boolean): Promise<TopJobsSyncStats> =
     }
   }
 
-  const meta = await topJobsRepository.getSyncMeta();
-  const stats: TopJobsSyncStats = {
-    fetched: 0,
-    preFiltered: 0,
-    triaged: 0,
-    stored: 0,
-    skippedExisting: 0,
-    belowMinScore: 0,
-    source: "jobsbase",
-    jsearchCreditsUsed: 0,
-    jsearchListings: 0,
-    jobsbaseListings: 0,
-  };
+  const gmail = await gmailAuth.getStatus();
+  if (!gmail.configured || !gmail.connected) throw new TopJobsGmailRequiredError();
 
+  const stats = emptySyncStats();
   try {
-    const fetchResult = await fetchDiscoveredListings({
-      jsearchCreditsUsedThisMonth: meta.jsearchCreditsUsedThisMonth,
-    });
-    stats.jsearchCreditsUsed = fetchResult.jsearchCreditsUsed;
-    stats.source = fetchResult.source;
-    stats.jsearchListings = fetchResult.jsearchCount;
-    stats.jobsbaseListings = fetchResult.jobsbaseCount;
+    const ingest = await ingestAlertEmails();
+    stats.alertEmails = ingest.alertEmails;
+    stats.listingsParsed = ingest.listingsParsed;
 
-    const sorted = sortListingsByPostedDesc(dedupeListings(fetchResult.listings));
-    stats.fetched = sorted.length;
-
-    const survivors = preFilterListings(sorted);
-    stats.preFiltered = survivors.length;
-
-    const maxTriages = env.topJobsMaxTriagesPerSync;
-    let triageCount = 0;
-    const now = new Date().toISOString();
-
-    for (const listing of survivors) {
-      if (triageCount >= maxTriages) break;
-
-      const existing =
-        (await topJobsRepository.findBySourceKey(listing.source, listing.externalId)) ??
-        (await topJobsRepository.findByApplyUrl(listing.applyUrl));
-
-      if (
-        existing &&
-        existing.sourceUpdatedAt === listing.sourceUpdatedAt &&
-        existing.score.total >= env.topJobsMinScore
-      ) {
-        stats.skippedExisting += 1;
-        continue;
-      }
-
-      const rawJob = await triageJob({
-        rawText: listing.description,
-        companyHint: listing.company,
-        fullPrep: false,
-      });
-      rawJob.extracted.url = listing.applyUrl;
-      rawJob.extracted.rawText = listing.description;
-      if (!rawJob.extracted.title?.trim() || rawJob.extracted.title === "Unknown Title") {
-        rawJob.extracted.title = listing.title;
-      }
-      if (!rawJob.extracted.company?.trim() || rawJob.extracted.company === "Unknown Company") {
-        rawJob.extracted.company = listing.company;
-      }
-      rawJob.extracted = applyCompanyPresentation(
-        {
-          ...rawJob.extracted,
-          company: rawJob.extracted.company,
-          rawText: listing.description,
-        },
-        listing.company,
-      );
-
-      triageCount += 1;
-      stats.triaged += 1;
-
-      if (rawJob.score.total < env.topJobsMinScore) {
-        stats.belowMinScore += 1;
-        continue;
-      }
-
-      const record = listingToTopJob(listing, rawJob, now);
-      record.id = existing?.id ?? topJobsRepository.createId();
-      await topJobsRepository.upsert(record);
-      stats.stored += 1;
-    }
-
-    await topJobsRepository.recordSyncResult({
+    const pending = await alertListingsRepository.listPending(listingWindowStart());
+    await processAlertListings(
+      pending,
+      {
+        known: await loadKnownRoles(),
+        maxTriages: env.topJobsMaxTriagesPerSync,
+        minScore: env.topJobsMinScore,
+        resolveJd: (l) => resolveAlertJd(l),
+        triage: triageListing,
+        store: storeTopJob,
+        setOutcome: (key, outcome) => alertListingsRepository.setOutcome(key, outcome),
+      },
       stats,
-      manual,
-      jsearchCreditsDelta: stats.jsearchCreditsUsed,
-      error: null,
-    });
+    );
 
+    await topJobsRepository.recordSyncResult({ stats, manual, error: null });
     logger.info("Top jobs sync completed", stats);
     return stats;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await topJobsRepository.recordSyncResult({
-      stats,
-      manual,
-      jsearchCreditsDelta: stats.jsearchCreditsUsed,
-      error: message,
-    });
+    await topJobsRepository.recordSyncResult({ stats, manual, error: message });
     throw error;
   }
 };

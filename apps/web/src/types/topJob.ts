@@ -1,6 +1,8 @@
 import type { ExtractedJobData, Recommendation, ResumeType, RuleEvaluation, ScoreBreakdown } from "./job";
 
-export type TopJobSource = "jsearch" | "jobsbase";
+export type AlertPlatform = "linkedin" | "indeed" | "ziprecruiter" | "remotehunter";
+
+export type TopJobSource = `${AlertPlatform}_alert`;
 
 export type TopJobRecord = {
   id: string;
@@ -22,28 +24,30 @@ export type TopJobRecord = {
   promotedToJobId?: string;
 };
 
+export type TopJobsSyncStats = {
+  alertEmails: number;
+  listingsParsed: number;
+  fetched: number;
+  preFiltered: number;
+  triaged: number;
+  stored: number;
+  skippedExisting: number;
+  belowMinScore: number;
+  jdUnavailable: number;
+  serperQueries: number;
+  bySource: Partial<Record<AlertPlatform, number>>;
+};
+
 export type TopJobsSyncStatus = {
   lastSyncAt: string | null;
   lastManualSyncAt: string | null;
-  lastSyncStats: {
-    fetched: number;
-    preFiltered: number;
-    triaged: number;
-    stored: number;
-    skippedExisting: number;
-    belowMinScore?: number;
-    source: TopJobSource | "mixed";
-    jsearchCreditsUsed: number;
-    jsearchListings?: number;
-    jobsbaseListings?: number;
-  } | null;
+  lastSyncStats: TopJobsSyncStats | null;
   lastSyncError: string | null;
-  jsearchCreditsUsedThisMonth: number;
-  jsearchCreditsRemaining: number;
-  jsearchMonthlyCap: number;
   manualRefreshCooldownMin: number;
   canManualRefresh: boolean;
   manualRefreshAvailableAt: string | null;
-  rapidApiKeyConfigured: boolean;
+  gmailConnected: boolean;
+  serperConfigured: boolean;
   openAiKeyConfigured: boolean;
+  pendingListings: number;
 };

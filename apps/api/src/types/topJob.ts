@@ -2,7 +2,10 @@ import type { ExtractedJobData } from "./job.js";
 import type { StoredResumeType } from "./resume.js";
 import type { Recommendation, RuleEvaluation, ScoreBreakdown } from "./scoring.js";
 
-export type TopJobSource = "jsearch" | "jobsbase";
+export const ALERT_PLATFORMS = ["linkedin", "indeed", "ziprecruiter", "remotehunter"] as const;
+export type AlertPlatform = (typeof ALERT_PLATFORMS)[number];
+
+export type TopJobSource = `${AlertPlatform}_alert`;
 
 export type DiscoveredListing = {
   source: TopJobSource;
@@ -38,22 +41,25 @@ export type TopJobRecord = {
 };
 
 export type TopJobsSyncStats = {
+  /** New alert emails read this run. */
+  alertEmails: number;
+  /** Roles pulled out of those emails (before de-duplication). */
+  listingsParsed: number;
+  /** Pending roles considered this run. */
   fetched: number;
   preFiltered: number;
   triaged: number;
   stored: number;
   skippedExisting: number;
   belowMinScore: number;
-  source: TopJobSource | "mixed";
-  jsearchCreditsUsed: number;
-  jsearchListings: number;
-  jobsbaseListings: number;
+  /** No readable job description from the alert link or a search fallback. */
+  jdUnavailable: number;
+  serperQueries: number;
+  bySource: Partial<Record<AlertPlatform, number>>;
 };
 
 export type TopJobsSyncMeta = {
   _id: "sync_meta";
-  jsearchCreditsUsedThisMonth: number;
-  jsearchCreditsResetAt: string;
   lastSyncAt: string | null;
   lastManualSyncAt: string | null;
   lastSyncStats: TopJobsSyncStats | null;
@@ -65,12 +71,12 @@ export type TopJobsSyncStatus = {
   lastManualSyncAt: string | null;
   lastSyncStats: TopJobsSyncStats | null;
   lastSyncError: string | null;
-  jsearchCreditsUsedThisMonth: number;
-  jsearchCreditsRemaining: number;
-  jsearchMonthlyCap: number;
   manualRefreshCooldownMin: number;
   canManualRefresh: boolean;
   manualRefreshAvailableAt: string | null;
-  rapidApiKeyConfigured: boolean;
+  gmailConnected: boolean;
+  serperConfigured: boolean;
   openAiKeyConfigured: boolean;
+  /** Roles parsed from alerts that haven't been checked yet (waiting on the daily scoring cap). */
+  pendingListings: number;
 };

@@ -3,6 +3,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { ScoringDetailsPanel } from "../components/ScoringDetailsPanel";
 import type {
+  ActionItem,
+  ActionType,
   ApplicationStatus,
   CostSummary,
   EvaluationSummary,
@@ -14,6 +16,8 @@ import type {
   GmailStatus,
   InterviewBriefResponse,
   RecoveryStart,
+  RubricPoint,
+  RubricSummary,
   UpcomingInterview,
 } from "../types/gmail";
 import type { JobStatus } from "../types/job";
@@ -127,7 +131,8 @@ const FILTER_LABEL: Record<RecoveryFilter, string> = {
   pending: "Not checked yet",
 };
 
-const fitClass = (fit: number) => (fit >= 75 ? "good" : fit >= 60 ? "warn" : "bad");
+/** Colors follow the recommendation tiers: strong apply / apply / stretch / weak. */
+const fitClass = (fit: number) => (fit >= 80 ? "good" : fit >= 65 ? "info" : fit >= 50 ? "warn" : "bad");
 
 const CATEGORY_LABEL: Record<string, string> = {
   stackFit: "Stack",
@@ -302,14 +307,45 @@ function InterviewBriefPanel({
 }
 
 /** Confirmed interviews that haven't ended yet, soonest first, each with a collapsible prep brief. */
+const ACTION_LABEL: Record<ActionType, { label: string; pill: string }> = {
+  schedule: { label: "Schedule", pill: "info" },
+  reply: { label: "Reply", pill: "neutral" },
+  assessment: { label: "Assessment", pill: "warn" },
+  offer: { label: "Offer", pill: "good" },
+};
+
+const ACTION_FALLBACK_SUMMARY: Record<ActionType, string> = {
+  schedule: "Pick a time for the next interview",
+  reply: "Reply to the recruiter",
+  assessment: "Complete the assessment",
+  offer: "Respond to the offer",
+};
+
+const deadlinePill = (deadline: string, now: Date): { text: string; cls: string } => {
+  const at = new Date(deadline);
+  const hoursLeft = (at.getTime() - now.getTime()) / 3_600_000;
+  const date = at.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  if (hoursLeft < 0) return { text: `Overdue · ${date}`, cls: "bad" };
+  return { text: `Due ${date}`, cls: hoursLeft < 48 ? "warn" : "neutral" };
+};
+
+const waitingFor = (receivedAt: string, now: Date): string => {
+  const days = Math.floor((now.getTime() - new Date(receivedAt).getTime()) / DAY_MS);
+  return days <= 0 ? "today" : days === 1 ? "1 day" : `${days} days`;
+};
+
 function UpcomingInterviewsCard({
   interviews,
   active,
+  actions,
   onOpenJd,
+  onDismissAction,
 }: {
   interviews: UpcomingInterview[];
   active: GmailApplication[];
+  actions: ActionItem[];
   onOpenJd: (key: string) => void;
+  onDismissAction: (emailId: string) => void;
 }) {
   const now = new Date();
   const [open, setOpen] = useState<Set<string>>(new Set());
@@ -353,7 +389,8 @@ function UpcomingInterviewsCard({
   );
 
   const scheduledKeys = new Set(interviews.map((iv) => iv.key));
-  const unscheduled = active.filter((a) => !scheduledKeys.has(a.key));
+  const actionKeys = new Set(actions.map((a) => a.key));
+  const unscheduled = active.filter((a) => !scheduledKeys.has(a.key) && !actionKeys.has(a.key));
   const firstRowByKey = new Map<string, string>();
   for (const iv of interviews) if (!firstRowByKey.has(iv.key)) firstRowByKey.set(iv.key, `${iv.key}-${iv.roundNumber}`);
 
@@ -365,6 +402,77 @@ function UpcomingInterviewsCard({
           Interviewing now: {active.length === 0 ? "none" : active.map((a) => a.company).join(", ")}
         </span>
       </div>
+      {actions.length > 0 && (
+        <div className="stack" style={{ gap: "0.35rem" }}>
+          <span className="briefHeading">Waiting on you</span>
+          <table className="table">
+            <tbody>
+              {actions.map((a) => {
+                const kind = ACTION_LABEL[a.type];
+                const due = a.deadline ? deadlinePill(a.deadline, now) : null;
+                const canPrep = !scheduledKeys.has(a.key);
+                return (
+                  <Fragment key={a.emailId}>
+                    <tr>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <span className={`pill ${kind.pill}`}>{kind.label}</span>
+                      </td>
+                      <td>
+                        <strong>{a.company}</strong>
+                        {a.role && <div className="muted smallText">{a.role}</div>}
+                      </td>
+                      <td>
+                        {a.summary ?? ACTION_FALLBACK_SUMMARY[a.type]}
+                        <div className="muted smallText">
+                          Waiting {waitingFor(a.receivedAt, now)}
+                          {due && (
+                            <>
+                              {" · "}
+                              <span className={`pill ${due.cls}`}>{due.text}</span>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <a href={a.gmailUrl} target="_blank" rel="noreferrer" className="smallText">
+                          Open email
+                        </a>
+                        {canPrep && (
+                          <>
+                            {" · "}
+                            <button
+                              type="button"
+                              className="linkButton smallText"
+                              onClick={() => toggle(a.key)}
+                              aria-expanded={open.has(a.key)}
+                            >
+                              Prep {open.has(a.key) ? "▾" : "▸"}
+                            </button>
+                          </>
+                        )}
+                        {" · "}
+                        <button
+                          type="button"
+                          className="linkButton smallText"
+                          title="Mark handled; it also clears on its own once you reply in that thread"
+                          onClick={() => onDismissAction(a.emailId)}
+                        >
+                          Done
+                        </button>
+                      </td>
+                    </tr>
+                    {canPrep && open.has(a.key) && (
+                      <tr>
+                        <td colSpan={4}>{panel(a.key)}</td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
       {interviews.length === 0 ? (
         <span className="muted smallText">No confirmed interview times found in the last 60 days of email.</span>
       ) : (
@@ -474,8 +582,133 @@ const usd = (n: number | null | undefined) =>
 const FEATURE_LABEL: Record<LlmFeature, string> = {
   gmail_classify: "Email classification",
   jd_recovery: "JD scoring",
-  other: "Other (tracker, top jobs, assets)",
+  top_jobs: "Top Jobs (alert parsing + scoring)",
+  other: "Other (tracker, assets)",
 };
+
+const FIT_TIERS = [
+  { label: "Strong apply", min: 80 },
+  { label: "Apply", min: 65 },
+  { label: "Stretch", min: 50 },
+  { label: "Weak", min: 0 },
+] as const;
+
+/** Short "after round 2" note for chips; the full round label goes in the tooltip. */
+const reachedNote = (outcome: ApplicationStatus, p: RubricPoint): string | null => {
+  if (outcome !== "rejected") return null;
+  if (p.furthestRound) return `after round ${p.furthestRound.number}`;
+  if (p.furthestStage && p.furthestStage !== "applied") return `after ${STATUS_LABEL[p.furthestStage].toLowerCase()}`;
+  return null;
+};
+
+/** Hard-gated roles bottom out around 25, so the strip starts at 20 to use its width. */
+const STRIP_MIN = 20;
+const stripPct = (fit: number) => `${(Math.min(100, Math.max(STRIP_MIN, fit)) - STRIP_MIN) / (100 - STRIP_MIN) * 100}%`;
+
+function FitStrip({ points, mean }: { points: RubricPoint[]; mean: number | null }) {
+  const seen = new Map<number, number>();
+  return (
+    <div className="fitStrip" aria-hidden>
+      <div className="fitStripTrack" />
+      {[50, 65, 80].map((t) => (
+        <div key={t} className="fitStripTick" style={{ left: stripPct(t) }}>
+          <span>{t}</span>
+        </div>
+      ))}
+      {points.map((p, i) => {
+        const x = Math.round(p.fit);
+        const stack = seen.get(x) ?? 0;
+        seen.set(x, stack + 1);
+        return (
+          <span
+            key={`${p.company}-${i}`}
+            className={`fitStripDot ${fitClass(p.fit)}`}
+            style={{ left: stripPct(x), top: `${14 - stack * 5}px` }}
+            title={`${p.company} ${x}`}
+          />
+        );
+      })}
+      {mean !== null && <div className="fitStripMean" style={{ left: stripPct(mean) }} title={`Mean ${mean}`} />}
+    </div>
+  );
+}
+
+function FitOutcomeCard({ rubric }: { rubric: RubricSummary }) {
+  const rows = rubric.rows.filter((r) => r.count > 0);
+  const reached = rubric.reachedInterview;
+  return (
+    <div className="card stack">
+      <div className="stack" style={{ gap: "0.25rem" }}>
+        <strong>Fit score vs outcome</strong>
+        <span className="muted smallText">
+          Each JD was scored blind to the outcome.
+          {rubric.userVerified > 0 && ` ${rubric.userVerified} of ${rubric.scored} were picked or pasted by you (*).`}
+          {rubric.scored < SMALL_SAMPLE * 2 && ` Only ${rubric.scored} scored so far, so read these as anecdotes.`}
+          {reached && reached.count > 0 && (
+            <>
+              {" "}
+              Reached an interview (any outcome after): {reached.count}, mean fit <strong>{reached.meanFit}</strong>.
+            </>
+          )}
+        </span>
+      </div>
+
+      {rows.map((r) => {
+        const points = rubric.points[r.outcome] ?? [];
+        return (
+          <section key={r.outcome} className="fitOutcome">
+            <div className="fitOutcomeHead">
+              <div className="fitOutcomeTitle">
+                <strong>{STATUS_LABEL[r.outcome]}</strong>
+                <span>
+                  <span className="fitOutcomeMean">{r.meanFit ?? "—"}</span>
+                  <span className="muted smallText"> avg</span>
+                </span>
+                <span className="muted smallText">
+                  {r.count} scored{r.count < SMALL_SAMPLE ? " · small sample" : ""}
+                </span>
+              </div>
+              <FitStrip points={points} mean={r.meanFit} />
+            </div>
+            <div className="fitTiers">
+              {FIT_TIERS.map((tier, ti) => {
+                const max = ti === 0 ? Infinity : FIT_TIERS[ti - 1]!.min;
+                const inTier = points.filter((p) => p.fit >= tier.min && p.fit < max);
+                if (inTier.length === 0) return null;
+                return (
+                  <div key={tier.label} className="fitTier">
+                    <span className="fitTierLabel muted smallText">
+                      {tier.label} <span className="fitTierCount">{inTier.length}</span>
+                    </span>
+                    <div className="fitTierChips">
+                      {inTier.map((p, i) => {
+                        const note = reachedNote(r.outcome, p);
+                        return (
+                          <span
+                            key={`${p.company}-${i}`}
+                            className="fitChip"
+                            title={`${p.company}${p.role ? ` — ${p.role}` : ""}${p.furthestRound ? ` · reached ${p.furthestRound.label}` : ""}${p.verifiedBy === "user" ? " · picked by you" : ""}`}
+                          >
+                            <span className={`fitChipScore ${fitClass(p.fit)}`}>{Math.round(p.fit)}</span>
+                            <span className="fitChipName">
+                              {p.company}
+                              {p.verifiedBy === "user" && <span className="muted"> *</span>}
+                            </span>
+                            {note && <span className="muted fitChipNote">{note}</span>}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
 
 function CostCard({ costs }: { costs: CostSummary }) {
   const features = (Object.keys(costs.byFeature) as LlmFeature[]).filter((f) => costs.byFeature[f].calls > 0);
@@ -706,6 +939,7 @@ export function DashboardPage() {
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   const [pendingRecovery, setPendingRecovery] = useState(0);
   const [upcoming, setUpcoming] = useState<UpcomingInterview[]>([]);
+  const [actions, setActions] = useState<ActionItem[]>([]);
   const [evaluations, setEvaluations] = useState<EvaluationsResponse | null>(null);
   const [windowDays, setWindowDays] = useState<WindowDays>(readWindow);
   const [filter, setFilter] = useState<RecoveryFilter>("all");
@@ -720,10 +954,12 @@ export function DashboardPage() {
   }, [windowDays]);
 
   const loadApplications = useCallback(async () => {
-    const { applications: items, pendingRecovery: pending, upcomingInterviews } = await api.gmailApplications(windowDays);
+    const { applications: items, pendingRecovery: pending, upcomingInterviews, actionItems } =
+      await api.gmailApplications(windowDays);
     setApplications(items);
     setPendingRecovery(pending);
     setUpcoming(upcomingInterviews ?? []);
+    setActions(actionItems ?? []);
     await loadEvaluations().catch(() => null);
   }, [windowDays, loadEvaluations]);
 
@@ -742,12 +978,23 @@ export function DashboardPage() {
       setApplications(result.applications);
       setPendingRecovery(result.pendingRecovery);
       setUpcoming(result.upcomingInterviews ?? []);
+      setActions(result.actionItems ?? []);
       setStatus(await api.gmailStatus());
       await afterRecoveryStart(result.recovery);
-      if (result.llmFailures > 0) {
+      if (result.rateLimited) {
+        setNotice({
+          kind: "error",
+          text: `Gmail's per-minute limit was hit; ${result.deferred ?? 0} email(s) will be picked up on the next sync. Wait a minute and sync again to finish now.`,
+        });
+      } else if (result.llmFailures > 0) {
         setNotice({
           kind: "error",
           text: `${result.llmFailures} email(s) couldn't be classified; they'll be retried on the next sync.`,
+        });
+      } else if (result.trackerAdded) {
+        setNotice({
+          kind: "ok",
+          text: `Added ${result.trackerAdded} scored application${result.trackerAdded === 1 ? "" : "s"} to the tracker.`,
         });
       }
     } catch (error) {
@@ -978,7 +1225,19 @@ export function DashboardPage() {
             </div>
           </div>
 
-          <UpcomingInterviewsCard interviews={upcoming} active={activeInterviews} onOpenJd={openJdReview} />
+          <UpcomingInterviewsCard
+            interviews={upcoming}
+            active={activeInterviews}
+            actions={actions}
+            onOpenJd={openJdReview}
+            onDismissAction={(emailId) => {
+              setActions((list) => list.filter((a) => a.emailId !== emailId));
+              void api.gmailDismissAction(emailId).catch((error) => {
+                setNotice({ kind: "error", text: errorText(error) });
+                void loadApplications();
+              });
+            }}
+          />
 
           <div className="grid" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
             {counts.map(({ status: s, count }) => (
@@ -1018,64 +1277,7 @@ export function DashboardPage() {
             </div>
           )}
 
-          {rubric && rubric.scored > 0 && (
-            <div className="card stack">
-              <strong>Fit score vs outcome</strong>
-              <p className="muted smallText">
-                Each JD was scored blind to the outcome.
-                {rubric.userVerified > 0 && ` ${rubric.userVerified} of ${rubric.scored} were picked by you.`}
-                {rubric.scored < SMALL_SAMPLE * 2 && ` Only ${rubric.scored} scored so far, so read these as anecdotes.`}
-              </p>
-              {rubric.reachedInterview && rubric.reachedInterview.count > 0 && (
-                <p className="smallText">
-                  Reached an interview (any outcome after): {rubric.reachedInterview.count} scored, mean fit{" "}
-                  <strong>{rubric.reachedInterview.meanFit}</strong>
-                </p>
-              )}
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Outcome</th>
-                    <th>Mean fit</th>
-                    <th>Scores</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rubric.rows
-                    .filter((r) => r.count > 0)
-                    .map((r) => (
-                      <tr key={r.outcome}>
-                        <td>
-                          {STATUS_LABEL[r.outcome]}
-                          <div className="muted smallText">
-                            {r.count} scored{r.count < SMALL_SAMPLE ? " (small sample)" : ""}
-                          </div>
-                        </td>
-                        <td>{r.meanFit ?? "—"}</td>
-                        <td>
-                          {(rubric.points[r.outcome] ?? []).map((p, i) => (
-                            <span
-                              key={`${p.company}-${i}`}
-                              className="pointChip"
-                              title={`${p.company}${p.role ? ` — ${p.role}` : ""}${p.verifiedBy === "user" ? " (picked by you)" : ""}`}
-                            >
-                              {p.company} <strong>{Math.round(p.fit)}</strong>
-                              {p.verifiedBy === "user" ? " *" : ""}
-                              {r.outcome === "rejected" && p.furthestRound
-                                ? ` (after ${lowerFirst(p.furthestRound.label)})`
-                                : r.outcome === "rejected" && p.furthestStage && p.furthestStage !== "applied"
-                                  ? ` (after ${STATUS_LABEL[p.furthestStage].toLowerCase()})`
-                                  : ""}
-                            </span>
-                          ))}
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-              {rubric.userVerified > 0 && <span className="muted smallText">* picked or pasted by you</span>}
-            </div>
-          )}
+          {rubric && rubric.scored > 0 && <FitOutcomeCard rubric={rubric} />}
 
           <div className="card stack">
             {applications.length > 0 && (
@@ -1190,6 +1392,10 @@ export function DashboardPage() {
                                 </button>
                               )}
                             </div>
+                          ) : app.evaluation?.fitTotal === undefined ? (
+                            <span className="muted" title="Scored applications are added to the tracker automatically">
+                              Not in tracker · adds once scored
+                            </span>
                           ) : (
                             <span className="muted">Not in tracker</span>
                           )}

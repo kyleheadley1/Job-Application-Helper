@@ -35,6 +35,7 @@ const ensureIndexes = async (targetDb: Db): Promise<void> => {
     topJobs.createIndex({ "score.total": -1 }),
     topJobs.createIndex({ source: 1, externalId: 1 }, { unique: true }),
     topJobs.createIndex({ applyUrl: 1 }),
+    targetDb.collection("top_jobs_alert_listings").createIndex({ status: 1, lastSeenAt: -1 }),
   ]);
   indexesEnsured = true;
 };

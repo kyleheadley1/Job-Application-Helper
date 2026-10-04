@@ -4,6 +4,7 @@ import { jobsRepository } from "../jobs/jobs.repository.js";
 import { isAtsSender, isFreemailSender, type EmailEventType } from "./gmailClassifier.js";
 import { gmailMessagesRepository, type StoredGmailMessage } from "./gmailMessages.repository.js";
 import { buildInterviewRounds, type InterviewRound } from "./interviewRounds.js";
+import type { ActionType } from "./actionRequest.js";
 
 export type ApplicationStatus = "applied" | "assessment" | "interviewing" | "rejected" | "offer";
 
@@ -44,6 +45,18 @@ export type GmailApplication = {
   trackerStatus?: JobStatus;
   trackerTitle?: string;
   suggestedStatus?: JobStatus;
+  /** The latest open request for the candidate to do something (schedule, reply, assessment, offer). */
+  actionNeeded?: PendingAction;
+};
+
+export type PendingAction = {
+  emailId: string;
+  threadId: string;
+  type: ActionType;
+  summary: string | null;
+  deadline: string | null;
+  receivedAt: string;
+  gmailUrl: string;
 };
 
 const EVENT_TO_STATUS: Record<Exclude<EmailEventType, "other">, ApplicationStatus> = {
@@ -232,6 +245,38 @@ const isActivelyInterviewing = (status: ApplicationStatus, rounds: InterviewRoun
   return now - lastActivity <= ACTIVE_INTERVIEW_DAYS * DAY_MS;
 };
 
+/** Requests with no activity for this long drop off the list. */
+export const ACTION_STALE_DAYS = 14;
+
+/**
+ * The newest action request, unless it was handled: the candidate replied in the thread or marked it
+ * done, a later email with no request of its own moved things along, it went stale, or the application ended.
+ */
+export const pendingAction = (
+  sorted: StoredGmailMessage[],
+  status: ApplicationStatus,
+  now: number,
+): PendingAction | undefined => {
+  if (status === "rejected") return undefined;
+  let idx = sorted.length - 1;
+  while (idx >= 0 && !sorted[idx]!.classification?.action?.needed) idx -= 1;
+  if (idx < 0) return undefined;
+  const m = sorted[idx]!;
+  const action = m.classification!.action!;
+  if (!action.type || m.actionRepliedAt || m.actionDismissedAt) return undefined;
+  if (sorted.slice(idx + 1).some((later) => later.date > m.date)) return undefined;
+  if (now - Date.parse(m.date) > ACTION_STALE_DAYS * DAY_MS) return undefined;
+  return {
+    emailId: m.id,
+    threadId: m.threadId,
+    type: action.type,
+    summary: action.summary,
+    deadline: action.deadline,
+    receivedAt: m.date,
+    gmailUrl: gmailUrl(m.threadId),
+  };
+};
+
 const toApplication = (
   group: Group,
   now: number,
@@ -253,7 +298,9 @@ const toApplication = (
   }, "applied");
   const interviewRounds = buildInterviewRounds(sorted.filter((m) => m.classification!.eventType === "interview"));
   const roundByEmail = new Map(interviewRounds.flatMap((r) => r.emailIds.map((id) => [id, r.number] as const)));
+  const actionNeeded = pendingAction(sorted, status, now);
   return {
+    ...(actionNeeded ? { actionNeeded } : {}),
     key: `${group.companyKey}::${group.role ? roleTokens(group.role).join(" ") : ""}`,
     company: group.company,
     role: group.role,
@@ -279,7 +326,7 @@ const toApplication = (
   };
 };
 
-const STATUS_TO_JOB_STATUS: Record<ApplicationStatus, JobStatus> = {
+export const STATUS_TO_JOB_STATUS: Record<ApplicationStatus, JobStatus> = {
   applied: "applied",
   assessment: "assessment",
   interviewing: "interviewing",
@@ -313,12 +360,31 @@ export const suggestTrackerStatus = (
 const trackerCompany = (job: JobRecord): string =>
   normalizeCompany(job.extracted.companyDisplayName || job.extracted.company || "");
 
+/** Applied dates further apart than this mean a re-application, not the same one. */
+export const SAME_APPLICATION_DAYS = 21;
+
+/** Only a confirmed applied date on both sides can rule a tracker row out. */
+export const appliedDatesCompatible = (
+  app: Partial<Pick<GmailApplication, "appliedAt" | "appliedAtSource">>,
+  job: JobRecord,
+): boolean => {
+  if (app.appliedAtSource !== "email" || !app.appliedAt) return true;
+  const trackerIso = appliedAtIso(job);
+  if (!trackerIso) return true;
+  return Math.abs(Date.parse(trackerIso) - Date.parse(app.appliedAt)) <= SAME_APPLICATION_DAYS * 86_400_000;
+};
+
 export const matchTrackerJob = (
-  app: Pick<GmailApplication, "company" | "role">,
+  app: Pick<GmailApplication, "company" | "role"> &
+    Partial<Pick<GmailApplication, "key" | "appliedAt" | "appliedAtSource">>,
   jobs: JobRecord[],
 ): JobRecord | undefined => {
+  if (app.key) {
+    const linked = jobs.find((j) => j.tracker?.gmailKey === app.key);
+    if (linked) return linked;
+  }
   const companyKey = normalizeCompany(app.company);
-  const candidates = jobs.filter((j) => trackerCompany(j) === companyKey);
+  const candidates = jobs.filter((j) => trackerCompany(j) === companyKey && appliedDatesCompatible(app, j));
   if (candidates.length === 0) return undefined;
   if (!app.role) return candidates.length === 1 ? candidates[0] : undefined;
   let best: { job: JobRecord; score: number } | undefined;
@@ -409,8 +475,26 @@ export const upcomingInterviews = (apps: GmailApplication[], now = Date.now()): 
     )
     .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
 
+export type ActionItem = PendingAction & { key: string; company: string; role: string | null };
+
+/** Open requests, soonest deadline first, then oldest request first (it has waited longest). */
+export const actionItems = (apps: GmailApplication[]): ActionItem[] =>
+  apps
+    .filter((app) => app.actionNeeded)
+    .map((app) => ({ ...app.actionNeeded!, key: app.key, company: app.company, role: app.role }))
+    .sort(
+      (a, b) =>
+        (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999") || a.receivedAt.localeCompare(b.receivedAt),
+    );
+
+/** Upcoming interviews and open action requests, from one look back over interview-length history. */
+export const getInterviewPanel = async (): Promise<{ upcoming: UpcomingInterview[]; actions: ActionItem[] }> => {
+  const apps = await getGmailApplications(UPCOMING_LOOKBACK_DAYS);
+  return { upcoming: upcomingInterviews(apps), actions: actionItems(apps) };
+};
+
 export const getUpcomingInterviews = async (): Promise<UpcomingInterview[]> =>
-  upcomingInterviews(await getGmailApplications(UPCOMING_LOOKBACK_DAYS));
+  (await getInterviewPanel()).upcoming;
 
 export const getGmailApplications = async (days: number): Promise<GmailApplication[]> => {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();

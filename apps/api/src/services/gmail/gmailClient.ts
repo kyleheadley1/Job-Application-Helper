@@ -80,6 +80,11 @@ export const extractBodyText = (payload: GmailMessagePart | undefined): string =
   return "";
 };
 
+export const extractHtml = (payload: GmailMessagePart | undefined): string => {
+  const html = findPart(payload, "text/html");
+  return html?.body?.data ? decodeBase64Url(html.body.data) : "";
+};
+
 const HREF_RE = /href\s*=\s*["']([^"']+)["']/gi;
 const BARE_URL_RE = /https?:\/\/[^\s<>"')\]]+/gi;
 
@@ -122,20 +127,44 @@ export const parseGmailMessage = (raw: GmailRawMessage, maxBodyChars = MAX_BODY_
   };
 };
 
-const gmailFetch = async <T>(path: string): Promise<T> => {
-  const token = await gmailAuth.getAccessToken();
-  const response = await fetch(`${GMAIL_API}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (response.status === 401) {
-    await gmailAuth.markNeedsReconnect();
-    throw new GmailReconnectRequiredError();
+/** Gmail's per-user, per-minute quota is still exhausted after backing off. */
+export class GmailRateLimitError extends Error {
+  readonly code = "GMAIL_RATE_LIMITED" as const;
+  constructor() {
+    super("Gmail's per-minute request limit was hit. Remaining emails will be picked up on the next sync.");
+    this.name = "GmailRateLimitError";
   }
-  if (!response.ok) {
+}
+
+export const isRateLimitResponse = (status: number, body: string): boolean =>
+  status === 429 || (status === 403 && /rateLimitExceeded|userRateLimitExceeded|quota exceeded/i.test(body));
+
+/** Waits between retries; Gmail's quota window is one minute, so the total spans about that. */
+export const RATE_LIMIT_BACKOFF_MS = [2_000, 8_000, 20_000, 35_000];
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+const gmailFetch = async <T>(path: string): Promise<T> => {
+  for (let attempt = 0; ; attempt += 1) {
+    const token = await gmailAuth.getAccessToken();
+    const response = await fetch(`${GMAIL_API}${path}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (response.status === 401) {
+      await gmailAuth.markNeedsReconnect();
+      throw new GmailReconnectRequiredError();
+    }
+    if (response.ok) return (await response.json()) as T;
     const text = await response.text().catch(() => "");
+    if (isRateLimitResponse(response.status, text)) {
+      const wait = RATE_LIMIT_BACKOFF_MS[attempt];
+      if (wait === undefined) throw new GmailRateLimitError();
+      const retryAfter = Number(response.headers.get("retry-after")) * 1000;
+      await sleep(Math.max(wait, Number.isFinite(retryAfter) ? retryAfter : 0) + Math.random() * 500);
+      continue;
+    }
     throw new Error(`Gmail API request failed (${response.status}): ${text.slice(0, 300)}`);
   }
-  return (await response.json()) as T;
 };
 
 export const gmailClient = {
@@ -158,10 +187,23 @@ export const gmailClient = {
     return ids.slice(0, max);
   },
 
-  async getMessage(id: string, maxBodyChars = MAX_BODY_CHARS): Promise<ParsedEmail> {
-    const raw = await gmailFetch<GmailRawMessage>(
-      `/messages/${encodeURIComponent(id)}?format=full`,
+  /** Message ids, dates, and labels in a thread (no bodies); used to spot the candidate's own replies. */
+  async getThreadMessages(threadId: string): Promise<Array<{ id: string; date: string; sent: boolean }>> {
+    const thread = await gmailFetch<{ messages?: GmailRawMessage[] }>(
+      `/threads/${encodeURIComponent(threadId)}?format=minimal`,
     );
-    return parseGmailMessage(raw, maxBodyChars);
+    return (thread.messages ?? []).map((m) => ({
+      id: m.id,
+      date: new Date(Number(m.internalDate ?? 0)).toISOString(),
+      sent: (m.labelIds ?? []).includes("SENT"),
+    }));
+  },
+
+  async getRawMessage(id: string): Promise<GmailRawMessage> {
+    return gmailFetch<GmailRawMessage>(`/messages/${encodeURIComponent(id)}?format=full`);
+  },
+
+  async getMessage(id: string, maxBodyChars = MAX_BODY_CHARS): Promise<ParsedEmail> {
+    return parseGmailMessage(await this.getRawMessage(id), maxBodyChars);
   },
 };

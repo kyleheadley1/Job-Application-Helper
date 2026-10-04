@@ -142,6 +142,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ url }),
     }),
+  gmailDismissAction: (emailId: string) =>
+    request<void>(`/gmail/actions/${encodeURIComponent(emailId)}/dismiss`, { method: "POST" }),
   gmailInterviewBrief: (key: string, regenerate = false) =>
     request<InterviewBriefResponse>(
       `/gmail/evaluations/${encodeURIComponent(key)}/interview-brief${regenerate ? "/regenerate" : ""}`,

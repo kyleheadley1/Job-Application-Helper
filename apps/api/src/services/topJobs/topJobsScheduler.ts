@@ -1,7 +1,7 @@
 import cron, { type ScheduledTask } from "node-cron";
 import { env } from "../../config/env.js";
 import { logger } from "../../lib/logger.js";
-import { runTopJobsSync } from "./topJobsSync.js";
+import { runTopJobsSync, TopJobsGmailRequiredError } from "./topJobsSync.js";
 import { topJobsRepository } from "./topJobs.repository.js";
 import { needsCatchupSync } from "./topJobsScheduleTime.js";
 
@@ -12,6 +12,10 @@ const runBackgroundSync = async (reason: "scheduled" | "catchup"): Promise<void>
     const stats = await runTopJobsSync({ manual: false });
     logger.info(`Top jobs ${reason} sync completed`, stats);
   } catch (error) {
+    if (error instanceof TopJobsGmailRequiredError) {
+      logger.info(`Top jobs ${reason} sync skipped — Gmail not connected`);
+      return;
+    }
     logger.error(`Top jobs ${reason} sync failed`, {
       message: error instanceof Error ? error.message : String(error),
     });

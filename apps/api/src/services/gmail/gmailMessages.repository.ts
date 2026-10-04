@@ -1,4 +1,5 @@
 import { getDb } from "../../config/mongo.js";
+import type { ActionRequest } from "./actionRequest.js";
 import type { EmailClassification } from "./gmailClassifier.js";
 import type { InterviewDetail } from "./interviewRounds.js";
 
@@ -17,6 +18,10 @@ export type StoredGmailMessage = {
   /** False when the LLM call failed; such messages are retried on the next sync. */
   llmSucceeded?: boolean;
   processedAt: string;
+  /** When the candidate replied in this thread after an action request. */
+  actionRepliedAt?: string;
+  /** When the candidate marked the action request done by hand. */
+  actionDismissedAt?: string;
 };
 
 type Doc = StoredGmailMessage & { _id: string };
@@ -78,6 +83,59 @@ export const gmailMessagesRepository = {
   async setInterviewDetail(id: string, detail: InterviewDetail): Promise<void> {
     const col = await this.collection();
     await col.updateOne({ _id: id }, { $set: { "classification.interview": detail } });
+  },
+
+  /** Recent application emails of the given types not yet checked for an action request (or checked by an older version). */
+  async listIdsMissingAction(sinceIso: string, eventTypes: string[], version: number, limit: number): Promise<string[]> {
+    const col = await this.collection();
+    const docs = await col
+      .find(
+        {
+          date: { $gte: sinceIso },
+          "classification.isApplicationEmail": true,
+          "classification.eventType": { $in: eventTypes },
+          "classification.action.version": { $ne: version },
+        },
+        { projection: { _id: 1 } },
+      )
+      .sort({ date: -1 })
+      .limit(limit)
+      .toArray();
+    return docs.map((d) => d._id);
+  },
+
+  async setAction(id: string, action: ActionRequest): Promise<void> {
+    const col = await this.collection();
+    await col.updateOne({ _id: id }, { $set: { "classification.action": action } });
+  },
+
+  /** Recent action requests the candidate hasn't replied to or dismissed. */
+  async listOpenActionMessages(sinceIso: string): Promise<Array<Pick<StoredGmailMessage, "id" | "threadId" | "date">>> {
+    const col = await this.collection();
+    const docs = await col
+      .find(
+        {
+          date: { $gte: sinceIso },
+          "classification.action.needed": true,
+          actionRepliedAt: { $exists: false },
+          actionDismissedAt: { $exists: false },
+        },
+        { projection: { _id: 1, threadId: 1, date: 1 } },
+      )
+      .toArray();
+    return docs.map((d) => ({ id: d._id, threadId: d.threadId, date: d.date }));
+  },
+
+  async setActionReplied(id: string, at: string): Promise<void> {
+    const col = await this.collection();
+    await col.updateOne({ _id: id }, { $set: { actionRepliedAt: at } });
+  },
+
+  /** Returns false when no such message exists. */
+  async dismissAction(id: string): Promise<boolean> {
+    const col = await this.collection();
+    const result = await col.updateOne({ _id: id }, { $set: { actionDismissedAt: new Date().toISOString() } });
+    return result.matchedCount > 0;
   },
 
   async listApplicationMessagesSince(sinceIso: string): Promise<StoredGmailMessage[]> {

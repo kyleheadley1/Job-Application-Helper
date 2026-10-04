@@ -2,13 +2,15 @@ import { Router, type Response } from "express";
 import { z } from "zod";
 import { env } from "../config/env.js";
 import { logger } from "../lib/logger.js";
-import { getGmailApplications, getUpcomingInterviews } from "../services/gmail/gmailApplications.js";
+import { getGmailApplications, getInterviewPanel } from "../services/gmail/gmailApplications.js";
+import { gmailMessagesRepository } from "../services/gmail/gmailMessages.repository.js";
 import {
   gmailAuth,
   GmailNotConfiguredError,
   GmailNotConnectedError,
   GmailReconnectRequiredError,
 } from "../services/gmail/gmailAuth.js";
+import { GmailRateLimitError } from "../services/gmail/gmailClient.js";
 import { DEFAULT_SYNC_DAYS, MAX_SYNC_DAYS, syncGmail } from "../services/gmail/gmailSync.js";
 import { getInterviewBrief } from "../services/gmail/interviewBrief.js";
 import { evaluationsRepository } from "../services/gmail/jdRecovery/evaluations.repository.js";
@@ -41,14 +43,28 @@ const ApplicationsQuerySchema = z.object({ days: DaysSchema });
 
 /** Applications with their evaluation summary; refreshes stored outcomes on the way. */
 const applicationsWithEvaluations = async (days: number) => {
-  const [applications, upcoming] = await Promise.all([getGmailApplications(days), getUpcomingInterviews()]);
+  const [applications, panel] = await Promise.all([getGmailApplications(days), getInterviewPanel()]);
   const evaluations = await loadEvaluations(applications);
   return {
     applications: withEvaluations(applications, evaluations),
     pendingRecovery: pendingApplications(applications, evaluations).length,
-    upcomingInterviews: upcoming,
+    upcomingInterviews: panel.upcoming,
+    actionItems: panel.actions,
   };
 };
+
+gmailRouter.post("/actions/:emailId/dismiss", async (req, res, next) => {
+  try {
+    const found = await gmailMessagesRepository.dismissAction(req.params.emailId);
+    if (!found) {
+      res.status(404).json({ error: "NOT_FOUND", message: "No such email" });
+      return;
+    }
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
 
 /** Map known Gmail errors to clear statuses; returns false when the error is unknown. */
 const sendGmailError = (res: Response, error: unknown): boolean => {
@@ -58,6 +74,10 @@ const sendGmailError = (res: Response, error: unknown): boolean => {
   }
   if (error instanceof GmailNotConnectedError) {
     res.status(409).json({ error: error.code, message: error.message });
+    return true;
+  }
+  if (error instanceof GmailRateLimitError) {
+    res.status(429).json({ error: error.code, message: error.message });
     return true;
   }
   if (error instanceof GmailReconnectRequiredError) {

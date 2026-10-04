@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { ActionType } from "../../services/gmail/actionRequest.js";
 import {
+  actionItems,
   buildApplications,
   matchTrackerJob,
   normalizeCompany,
@@ -220,6 +222,74 @@ describe("buildApplications", () => {
       trackerStatus: "applied",
       suggestedStatus: "interviewing",
     });
+  });
+});
+
+describe("pendingAction / actionItems", () => {
+  const now = Date.parse("2026-10-04T12:00:00.000Z");
+  const asking = (company: string, date: string, type: ActionType = "schedule", deadline: string | null = null) => {
+    const m = msg(company, "Software Engineer", "interview", date);
+    m.classification!.action = { needed: true, type, summary: "Pick a time", deadline, version: 1 };
+    return m;
+  };
+
+  it("lists the latest open request with its email link", () => {
+    const [app] = buildApplications([asking("Axle", "2026-10-03T10:00:00.000Z")], [], now);
+    expect(app!.actionNeeded).toMatchObject({ type: "schedule", summary: "Pick a time", receivedAt: "2026-10-03T10:00:00.000Z" });
+    expect(app!.actionNeeded!.gmailUrl).toContain("mail.google.com");
+  });
+
+  it("clears when you replied, marked it done, or a later email moved things along", () => {
+    const replied = asking("Axle", "2026-10-03T10:00:00.000Z");
+    replied.actionRepliedAt = "2026-10-03T12:00:00.000Z";
+    const dismissed = asking("Bolt", "2026-10-03T10:00:00.000Z");
+    dismissed.actionDismissedAt = "2026-10-03T12:00:00.000Z";
+    const apps = buildApplications(
+      [
+        replied,
+        dismissed,
+        asking("Cove", "2026-10-02T10:00:00.000Z"),
+        msg("Cove", "Software Engineer", "interview", "2026-10-03T09:00:00.000Z"),
+      ],
+      [],
+      now,
+    );
+    expect(apps.every((a) => !a.actionNeeded)).toBe(true);
+  });
+
+  it("drops requests after 14 quiet days and on rejection", () => {
+    const apps = buildApplications(
+      [
+        asking("Old", "2026-09-15T10:00:00.000Z"),
+        asking("Done", "2026-10-01T10:00:00.000Z"),
+        msg("Done", "Software Engineer", "rejected", "2026-10-01T10:00:00.000Z"),
+      ],
+      [],
+      now,
+    );
+    expect(apps.every((a) => !a.actionNeeded)).toBe(true);
+  });
+
+  it("a follow-up that asks again replaces the earlier request", () => {
+    const [app] = buildApplications(
+      [asking("Axle", "2026-10-01T10:00:00.000Z", "reply"), asking("Axle", "2026-10-03T10:00:00.000Z", "assessment")],
+      [],
+      now,
+    );
+    expect(app!.actionNeeded!.type).toBe("assessment");
+  });
+
+  it("orders by deadline, then by how long it has waited", () => {
+    const apps = buildApplications(
+      [
+        asking("Late", "2026-10-01T10:00:00.000Z"),
+        asking("Soon", "2026-10-03T10:00:00.000Z", "assessment", "2026-10-05T23:00:00.000Z"),
+        asking("Newer", "2026-10-03T11:00:00.000Z"),
+      ],
+      [],
+      now,
+    );
+    expect(actionItems(apps).map((a) => a.company)).toEqual(["Soon", "Late", "Newer"]);
   });
 });
 

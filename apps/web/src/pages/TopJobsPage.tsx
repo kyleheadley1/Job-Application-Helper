@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
-import type { TopJobRecord, TopJobsSyncStatus } from "../types/topJob";
+import type { AlertPlatform, TopJobRecord, TopJobsSyncStats, TopJobsSyncStatus } from "../types/topJob";
 import { ScoreBadge } from "../components/ScoreBadge";
 import { companyDisplayLabel, formatAvailableIn, formatPostedAgo } from "../lib/jobDisplay";
 import { resolveDisplayTitle } from "../lib/roleTitleDisplay";
@@ -28,6 +28,36 @@ function companyKey(job: TopJobRecord): string {
 
 function resumeLabel(job: TopJobRecord): string {
   return job.recommendedResume ?? "BASE";
+}
+
+const SOURCE_LABEL: Record<AlertPlatform, string> = {
+  linkedin: "LinkedIn",
+  indeed: "Indeed",
+  ziprecruiter: "ZipRecruiter",
+  remotehunter: "Remote Hunter",
+};
+
+function sourceLabel(source: string): string {
+  const platform = source.replace(/_alert$/, "") as AlertPlatform;
+  return SOURCE_LABEL[platform] ?? source;
+}
+
+function SourceBadge({ source }: { source: string }) {
+  return <span className="pill neutral">{sourceLabel(source)}</span>;
+}
+
+function lastRunSummary(stats: TopJobsSyncStats): string {
+  const parts = [
+    `${stats.alertEmails} new alert email${stats.alertEmails === 1 ? "" : "s"} (${stats.listingsParsed} roles)`,
+    `${stats.fetched} checked`,
+    `${stats.triaged} scored`,
+    `${stats.stored} added`,
+  ];
+  if (stats.skippedExisting) parts.push(`${stats.skippedExisting} already seen or applied`);
+  if (stats.belowMinScore) parts.push(`${stats.belowMinScore} below 70`);
+  if (stats.jdUnavailable) parts.push(`${stats.jdUnavailable} no readable posting`);
+  if (stats.serperQueries) parts.push(`${stats.serperQueries} search credit${stats.serperQueries === 1 ? "" : "s"}`);
+  return parts.join(" · ");
 }
 
 export function TopJobsPage() {
@@ -85,7 +115,7 @@ export function TopJobsPage() {
     status !== null && !status.canManualRefresh && !syncing;
   const refreshTitle = refreshBlocked
     ? `On cooldown — available ${formatAvailableIn(status.manualRefreshAvailableAt)}`
-    : "Fetch and score new listings";
+    : "Read new alert emails and score their roles";
 
   const handleRefresh = async () => {
     setSyncing(true);
@@ -138,43 +168,26 @@ export function TopJobsPage() {
         <div>
           <h2>Top Jobs</h2>
           <p className="muted">
-            Scored listings ≥70 from discovery sync (posted within 2 weeks). Default order: fit ×
-            recency (multiplicative — fresh strong matches beat stale perfect fits).
+            Roles from your LinkedIn, Indeed, ZipRecruiter, and Remote Hunter job-alert emails, scored ≥70
+            and not already in the tracker or applied to. Default order: fit × recency.
           </p>
           {status && (
             <p className="muted">
               Last synced: {status.lastSyncAt ? formatPostedAgo(status.lastSyncAt) : "Never"}
-              {" · "}
-              JSearch credits: {status.jsearchCreditsRemaining}/{status.jsearchMonthlyCap} remaining
-              {status.lastSyncStats && (
-                <>
-                  {" · "}
-                  Last run: {status.lastSyncStats.fetched} fetched → {status.lastSyncStats.preFiltered}{" "}
-                  pre-filtered → {status.lastSyncStats.triaged} triaged → {status.lastSyncStats.stored} stored
-                  {(status.lastSyncStats.belowMinScore ?? 0) > 0 && (
-                    <> · {status.lastSyncStats.belowMinScore} below 70</>
-                  )}
-                  {" · "}
-                  {status.lastSyncStats.source}
-                  {status.lastSyncStats.jsearchListings != null &&
-                    status.lastSyncStats.jobsbaseListings != null && (
-                      <>
-                        {" "}
-                        ({status.lastSyncStats.jsearchListings} jsearch +{" "}
-                        {status.lastSyncStats.jobsbaseListings} jobsbase)
-                      </>
-                    )}
-                </>
-              )}
+              {status.pendingListings > 0 && <> · {status.pendingListings} roles queued for the next run</>}
+              {status.lastSyncStats && <> · Last run: {lastRunSummary(status.lastSyncStats)}</>}
             </p>
           )}
-          {status && !status.rapidApiKeyConfigured && (
+          {status && !status.gmailConnected && (
             <p className="error-text">
-              RAPIDAPI_KEY is not set in .env — JSearch discovery is disabled. Add a free key from{" "}
-              <a href="https://rapidapi.com/letscrape-6bRBa3QguO5/api/jsearch" target="_blank" rel="noopener noreferrer">
-                RapidAPI JSearch
-              </a>{" "}
-              and restart the API.
+              Gmail isn&apos;t connected. Connect it on the <Link to="/">Dashboard</Link> so Top Jobs can read
+              your job-alert emails.
+            </p>
+          )}
+          {status && status.gmailConnected && !status.serperConfigured && (
+            <p className="muted">
+              SERPER_API_KEY isn&apos;t set, so Indeed and ZipRecruiter roles (whose pages block automated
+              reads) are skipped. LinkedIn and Remote Hunter roles still work.
             </p>
           )}
         </div>
@@ -215,7 +228,7 @@ export function TopJobsPage() {
       {loading ? (
         <p>Loading…</p>
       ) : sortedItems.length === 0 ? (
-        <p>No top jobs yet. Click Refresh to fetch and score listings.</p>
+        <p>No top jobs yet. Click Refresh to read your job-alert emails and score their roles.</p>
       ) : (
         <div className="tracker-wrap">
           <table className="tracker-table">
@@ -225,7 +238,8 @@ export function TopJobsPage() {
                 <th>Role</th>
                 <th>Score</th>
                 <th>Resume</th>
-                <th>Posted</th>
+                <th>Source</th>
+                <th>Alerted</th>
                 <th>Top match</th>
                 <th>Main risk</th>
                 <th>Apply</th>
@@ -253,6 +267,9 @@ export function TopJobsPage() {
                   </td>
                   <td>
                     <span className="tracker-resume">{resumeLabel(job)}</span>
+                  </td>
+                  <td>
+                    <SourceBadge source={job.source} />
                   </td>
                   <td
                     className="top-jobs-posted"
@@ -337,7 +354,7 @@ export function TopJobDetailPage() {
         <ScoreBadge score={job.score.total} />
       </div>
       <p className="muted">
-        Posted{" "}
+        <SourceBadge source={job.source} /> alert{" "}
         <span className="top-jobs-posted" title={postedRecencyTooltip(job.sourcePostedAt)}>
           {formatPostedAgo(job.sourcePostedAt)}
         </span>

@@ -23,7 +23,7 @@ It is designed as an operator assistant, not an autonomous applier.
 - On-demand generation of cover letter, why-company, talking points, and bullet candidates
 - Tracker workflow with an explicit "confirm applied" flow, editable applied date, and notes
 - Tracker import from a spreadsheet (`xlsx`)
-- Top Jobs discovery (optional): daily JSearch pull, auto-triaged and filtered by score
+- Top Jobs: daily scan of LinkedIn, Indeed, ZipRecruiter, and Remote Hunter job-alert emails (needs Gmail connected); roles are de-duplicated against the tracker and past applications, scored, and filtered by score
 - Local resume context grounding from files on your machine
 
 **Chrome extension (capture)**
@@ -126,7 +126,7 @@ Optional, by feature:
 - **Triage / resumes:** `RESUME_CONTEXT_DIR`, `PRELOAD_RESUME_CONTEXT_ON_START`, `TRIAGE_FAST_MODE`, `TRIAGE_SKIP_LLM_RESUME_SELECTION_IN_FAST_MODE`
 - **Tracker seed:** `AUTO_IMPORT_TRACKER_ON_START`, `TRACKER_SEED_WORKBOOK_PATH`
 - **Web:** `VITE_API_BASE_URL` (web -> API base URL)
-- **Top Jobs:** `RAPIDAPI_KEY`, `TOP_JOBS_SYNC_ENABLED`, `TOP_JOBS_*`, `JSEARCH_*`
+- **Top Jobs:** `TOP_JOBS_SYNC_ENABLED`, `TOP_JOBS_*` (Gmail connection required; `SERPER_API_KEY` enables the Indeed/ZipRecruiter fallback)
 - **Extension:** `EXTENSION_API_TOKEN` (shared secret, also pasted into the extension options)
 - **Gmail:** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `WEB_APP_URL`, `GMAIL_CLASSIFY_REASONING_EFFORT` (default `minimal`)
 - **JD recovery:** `SERPER_API_KEY` (optional fallback), `SERPER_MAX_QUERIES_TOTAL` (default `1250`), `JD_RECOVERY_MAX_PER_RUN` (default `5`)
@@ -222,6 +222,7 @@ Edit these to describe your own two resumes.
 - Verify tracker reseed behavior: `npm run verify:tracker --workspace api`
 - Re-score tracker roles: `npm run rescore:tracker` / `npm run rescore:tracker-all`
 - Pull Top Jobs once: `npm run sync:top-jobs --workspace api`
+- Remove old JSearch/jobsbase Top Jobs rows: `npm run purge:legacy-top-jobs --workspace api` (dry run; add `-- --yes` to delete)
 
 Startup behavior:
 
@@ -252,7 +253,7 @@ Captures are scored in the background and appear like an Add Job result: open th
 1. In Google Cloud Console, create an OAuth client of type "Web application" with the redirect URI `http://localhost:4000/api/gmail/oauth/callback`, and enable the Gmail API.
 2. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, and `WEB_APP_URL` in `.env`, then restart the API.
 3. Open the web app dashboard (`/`), click Connect Gmail, and approve read-only access.
-4. Click "Sync now" (the dashboard also syncs on load if the last sync is over 15 minutes old). While the API runs it also syncs in the background every `GMAIL_AUTO_SYNC_MINUTES` (default 60, `0` disables); a manual sync resets that timer, and only new emails and new applications cost anything. Recovery starts automatically after each sync and scores up to `JD_RECOVERY_MAX_PER_RUN` roles per run. "Recover JDs" starts a run by hand.
+4. Click "Sync now" (the dashboard also syncs on load if the last sync is over 15 minutes old). While the API runs it also syncs in the background every `GMAIL_AUTO_SYNC_MINUTES` (default 15, `0` disables); a manual sync resets that timer, and only new emails and new applications cost anything. Recovery starts automatically after each sync and scores up to `JD_RECOVERY_MAX_PER_RUN` roles per run. "Recover JDs" starts a run by hand.
 5. Optional: set `SERPER_API_KEY` to enable the web search fallback. Serper's 2,500 free queries are a one-time grant, so the default budget is half of that.
 
 Working the dashboard:

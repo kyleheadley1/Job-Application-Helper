@@ -3,7 +3,7 @@ import { getDb } from "../../config/mongo.js";
 import { env } from "../../config/env.js";
 import { logger } from "../../lib/logger.js";
 
-export type LlmFeature = "gmail_classify" | "jd_recovery" | "other";
+export type LlmFeature = "gmail_classify" | "jd_recovery" | "top_jobs" | "other";
 
 type LlmContext = { feature: LlmFeature; key?: string };
 

@@ -3,6 +3,7 @@ import { env } from "../../config/env.js";
 import { withLlmContext } from "../llm/llmUsage.js";
 import { responsesClient } from "../llm/responsesClient.js";
 import type { ParsedEmail } from "./gmailClient.js";
+import type { ActionRequest } from "./actionRequest.js";
 import type { InterviewDetail } from "./interviewRounds.js";
 
 export const EMAIL_EVENT_TYPES = [
@@ -23,6 +24,8 @@ export type EmailClassification = {
   confidence: number;
   /** Interview emails only; missing until round details have been extracted. */
   interview?: InterviewDetail;
+  /** What the email asks the candidate to do; missing until checked. */
+  action?: ActionRequest;
 };
 
 const SEARCH_KEYWORDS = [

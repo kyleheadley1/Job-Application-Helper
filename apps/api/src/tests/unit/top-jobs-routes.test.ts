@@ -5,19 +5,21 @@ import { topJobsRepository } from "../../services/topJobs/topJobs.repository.js"
 
 vi.mock("../../services/topJobs/topJobsSync.js", () => ({
   runTopJobsSync: vi.fn(async () => ({
+    alertEmails: 3,
+    listingsParsed: 24,
     fetched: 10,
     preFiltered: 3,
     triaged: 2,
     stored: 1,
     skippedExisting: 0,
     belowMinScore: 0,
-    source: "mixed",
-    jsearchCreditsUsed: 4,
-    jsearchListings: 8,
-    jobsbaseListings: 5,
+    jdUnavailable: 1,
+    serperQueries: 1,
+    bySource: { linkedin: 1 },
   })),
   promoteTopJobToTracker: vi.fn(),
   TopJobsSyncCooldownError: class extends Error {},
+  TopJobsGmailRequiredError: class extends Error {},
 }));
 
 describe("top jobs routes", () => {
@@ -29,7 +31,7 @@ describe("top jobs routes", () => {
     vi.spyOn(topJobsRepository, "list").mockResolvedValue([
       {
         id: "job-1",
-        source: "jsearch",
+        source: "linkedin_alert",
         externalId: "ext-1",
         applyUrl: "https://example.com/apply",
         sourcePostedAt: "2026-06-03T00:00:00.000Z",
@@ -88,24 +90,24 @@ describe("top jobs routes", () => {
     expect(res.body.items[0].score.total).toBe(82);
   });
 
-  it("GET /api/top-jobs/sync/status returns quota info", async () => {
+  it("GET /api/top-jobs/sync/status returns alert sync info", async () => {
     vi.spyOn(topJobsRepository, "getSyncStatus").mockResolvedValue({
       lastSyncAt: null,
       lastManualSyncAt: null,
       lastSyncStats: null,
       lastSyncError: null,
-      jsearchCreditsUsedThisMonth: 4,
-      jsearchCreditsRemaining: 176,
-      jsearchMonthlyCap: 180,
       manualRefreshCooldownMin: 60,
       canManualRefresh: true,
       manualRefreshAvailableAt: null,
-      rapidApiKeyConfigured: false,
+      gmailConnected: true,
+      serperConfigured: false,
       openAiKeyConfigured: true,
+      pendingListings: 7,
     });
 
     const res = await request(app).get("/api/top-jobs/sync/status");
     expect(res.status).toBe(200);
-    expect(res.body.jsearchCreditsRemaining).toBe(176);
+    expect(res.body.pendingListings).toBe(7);
+    expect(res.body).not.toHaveProperty("jsearchCreditsRemaining");
   });
 });

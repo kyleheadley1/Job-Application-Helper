@@ -3,6 +3,7 @@ import { topJobsRepository } from "../services/topJobs/topJobs.repository.js";
 import {
   promoteTopJobToTracker,
   runTopJobsSync,
+  TopJobsGmailRequiredError,
   TopJobsSyncCooldownError,
 } from "../services/topJobs/topJobsSync.js";
 
@@ -34,6 +35,10 @@ topJobsRouter.post("/sync", async (_req, res, next) => {
   } catch (error) {
     if (error instanceof TopJobsSyncCooldownError) {
       res.status(429).json({ message: error.message });
+      return;
+    }
+    if (error instanceof TopJobsGmailRequiredError) {
+      res.status(409).json({ message: error.message });
       return;
     }
     next(error);

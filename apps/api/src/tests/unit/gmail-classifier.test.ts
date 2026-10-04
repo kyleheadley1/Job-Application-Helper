@@ -3,6 +3,7 @@ import { buildPlatformSearchQuery, buildSearchQuery, prefilterEmail } from "../.
 import {
   decodeBase64Url,
   extractBodyText,
+  isRateLimitResponse,
   MAX_BODY_CHARS,
   parseGmailMessage,
   type GmailRawMessage,
@@ -133,6 +134,17 @@ describe("LinkedIn / job-platform confirmations", () => {
     expect(q).toContain("from:(linkedin.com OR indeed.com OR indeedemail.com)");
     expect(q).toContain('"application was sent"');
     expect(q).not.toContain("category:");
+  });
+});
+
+describe("isRateLimitResponse", () => {
+  it("treats per-minute quota 403s and 429s as retryable, other 403s as errors", () => {
+    const quota =
+      '{"error":{"code":403,"message":"Quota exceeded for quota metric \'Total Query Cost\' and limit \'Units per minute per user\'","errors":[{"reason":"rateLimitExceeded"}]}}';
+    expect(isRateLimitResponse(403, quota)).toBe(true);
+    expect(isRateLimitResponse(429, "")).toBe(true);
+    expect(isRateLimitResponse(403, '{"error":{"message":"Insufficient Permission"}}')).toBe(false);
+    expect(isRateLimitResponse(500, "rateLimitExceeded")).toBe(false);
   });
 });
 

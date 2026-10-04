@@ -148,6 +148,7 @@ export const buildCostSummary = (
   const byFeature: CostSummary["byFeature"] = {
     gmail_classify: { costUsd: 0, calls: 0 },
     jd_recovery: { costUsd: 0, calls: 0 },
+    top_jobs: { costUsd: 0, calls: 0 },
     other: { costUsd: 0, calls: 0 },
   };
   const byDay = new Map<string, number>();

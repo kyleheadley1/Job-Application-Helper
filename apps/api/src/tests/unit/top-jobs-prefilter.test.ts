@@ -2,12 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   preFilterListing,
   preFilterListings,
+  preFilterTitle,
   sortListingsByPostedDesc,
 } from "../../services/topJobs/preFilter.js";
 import type { DiscoveredListing } from "../../types/topJob.js";
 
 const baseListing = (overrides: Partial<DiscoveredListing> = {}): DiscoveredListing => ({
-  source: "jsearch",
+  source: "linkedin_alert",
   externalId: "abc123",
   company: "Acme AI",
   title: "Junior Software Engineer",
@@ -57,19 +58,12 @@ describe("topJobs preFilter", () => {
   });
 });
 
-describe("jsearch normalize", () => {
-  it("prefers job_apply_link over google link", async () => {
-    const { normalizeJSearchJob } = await import("../../services/topJobs/jsearchClient.js");
-    const listing = normalizeJSearchJob({
-      job_id: "x1",
-      employer_name: "Ooma, Inc.",
-      job_title: "Software Engineer",
-      job_description: "<p>Build TypeScript services for our platform with Node and React.</p>".repeat(5),
-      job_apply_link: "https://apply.example.com/job",
-      job_google_link: "https://google.com/jobs/xyz",
-      job_posted_at_datetime_utc: "2026-06-01T08:00:00.000Z",
-    });
-    expect(listing?.applyUrl).toBe("https://apply.example.com/job");
-    expect(listing?.company).toBe("Ooma, Inc.");
+describe("preFilterTitle", () => {
+  it("applies the title rules without needing a description", () => {
+    expect(preFilterTitle("Software Engineer").pass).toBe(true);
+    expect(preFilterTitle("Senior Software Engineer").reason).toBe("seniority_overreach");
+    expect(preFilterTitle("Distinguished Software Engineer (Remote)").reason).toBe("seniority_overreach");
+    expect(preFilterTitle("Site Reliability Engineer").reason).toBe("title_denylist");
+    expect(preFilterTitle("Account Manager").pass).toBe(false);
   });
 });

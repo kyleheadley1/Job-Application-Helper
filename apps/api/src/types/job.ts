@@ -180,6 +180,10 @@ export type JobRecord = {
     /** Manual override for date applied (ISO). Wins over statusHistory-derived appliedAt. */
     appliedAt?: string;
     notes?: string;
+    /** "gmail" when the row was created from an application email. */
+    source?: 'gmail';
+    /** Gmail application key the row was created from. */
+    gmailKey?: string;
   };
   /** Spreadsheet-shaped cells (camelCase); export maps to exact column labels. */
   trackerSpreadsheet?: Partial<TrackerSpreadsheetFields>;

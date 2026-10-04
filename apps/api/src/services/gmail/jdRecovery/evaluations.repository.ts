@@ -122,6 +122,9 @@ export type ApplicationEvaluation = {
     /** Last interview round reached, e.g. { number: 2, label: "2nd round · technical" }. */
     furthestRound?: { number: number; label: string };
   };
+  /** Set once the application was added to the tracker automatically; it is never added again. */
+  trackerAutoAddedAt?: string;
+  trackerJobId?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -194,6 +197,12 @@ export const evaluationsRepository = {
   async setInterviewBrief(key: string, interviewBrief: InterviewBrief): Promise<void> {
     const col = await this.collection();
     await col.updateOne({ _id: key }, { $set: { interviewBrief, updatedAt: new Date().toISOString() } });
+  },
+
+  async markTrackerAdded(key: string, trackerJobId: string): Promise<void> {
+    const col = await this.collection();
+    const now = new Date().toISOString();
+    await col.updateOne({ _id: key }, { $set: { trackerAutoAddedAt: now, trackerJobId, updatedAt: now } });
   },
 
   async updateOutcome(key: string, outcome: ApplicationEvaluation["outcome"]): Promise<void> {

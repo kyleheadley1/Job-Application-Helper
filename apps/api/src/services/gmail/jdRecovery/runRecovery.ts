@@ -61,6 +61,7 @@ import {
 import { fetchPosting, PostingFetchError, type FetchedPosting } from "./fetchPosting.js";
 import { inferCandidateStage } from "./recoveryMetrics.js";
 import { serperClient, serperUsageRepository, type SerperResult, type SerperUsage } from "./serperClient.js";
+import { addMissingApplicationsQuietly } from "../trackerAutoAdd.js";
 
 export const SCORER_VERSION = "jd-recovery-v1:base-ai";
 /** Bump to retry every unscored row with an improved recovery pipeline. */
@@ -723,6 +724,7 @@ const scoreUserPosting = async (
     updatedAt: now,
   };
   await evaluationsRepository.upsert(updated);
+  await addMissingApplicationsQuietly();
   return updated;
 };
 
@@ -887,6 +889,7 @@ export const runRecovery = async (
     state.processed = processed;
     state.scored = scored;
   }
+  if (scored > 0) await addMissingApplicationsQuietly();
   return { processed, scored };
 };
 

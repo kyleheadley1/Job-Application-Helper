@@ -9,25 +9,19 @@ import type {
   TopJobsSyncStatus,
 } from "../../types/topJob.js";
 import type { WithId } from "mongodb";
+import { gmailAuth } from "../gmail/gmailAuth.js";
+import { serperClient } from "../gmail/jdRecovery/serperClient.js";
+import { alertListingsRepository } from "./alertListings.repository.js";
 
 const SYNC_META_ID = "sync_meta" as const;
 
 const defaultSyncMeta = (): TopJobsSyncMeta => ({
   _id: SYNC_META_ID,
-  jsearchCreditsUsedThisMonth: 0,
-  jsearchCreditsResetAt: nextMonthStartIso(),
   lastSyncAt: null,
   lastManualSyncAt: null,
   lastSyncStats: null,
   lastSyncError: null,
 });
-
-function nextMonthStartIso(): string {
-  const d = new Date();
-  d.setUTCMonth(d.getUTCMonth() + 1, 1);
-  d.setUTCHours(0, 0, 0, 0);
-  return d.toISOString();
-}
 
 export class TopJobsRepository {
   private async topJobsCol() {
@@ -98,27 +92,18 @@ export class TopJobsRepository {
       await col.insertOne({ ...meta, _id: SYNC_META_ID });
       return meta;
     }
-    const meta = { ...doc, _id: SYNC_META_ID };
-    if (new Date(meta.jsearchCreditsResetAt).getTime() <= Date.now()) {
-      meta.jsearchCreditsUsedThisMonth = 0;
-      meta.jsearchCreditsResetAt = nextMonthStartIso();
-      await col.updateOne(
-        { _id: SYNC_META_ID },
-        {
-          $set: {
-            jsearchCreditsUsedThisMonth: 0,
-            jsearchCreditsResetAt: meta.jsearchCreditsResetAt,
-          },
-        },
-      );
-    }
-    return meta;
+    return {
+      _id: SYNC_META_ID,
+      lastSyncAt: doc.lastSyncAt ?? null,
+      lastManualSyncAt: doc.lastManualSyncAt ?? null,
+      lastSyncStats: doc.lastSyncStats && "alertEmails" in doc.lastSyncStats ? doc.lastSyncStats : null,
+      lastSyncError: doc.lastSyncError ?? null,
+    };
   }
 
   async recordSyncResult(params: {
     stats: TopJobsSyncStats;
     manual: boolean;
-    jsearchCreditsDelta: number;
     error?: string | null;
   }): Promise<TopJobsSyncMeta> {
     const col = await this.metaCol();
@@ -126,7 +111,6 @@ export class TopJobsRepository {
     const now = new Date().toISOString();
     const next: TopJobsSyncMeta = {
       ...meta,
-      jsearchCreditsUsedThisMonth: meta.jsearchCreditsUsedThisMonth + params.jsearchCreditsDelta,
       lastSyncAt: now,
       lastManualSyncAt: params.manual ? now : meta.lastManualSyncAt,
       lastSyncStats: params.stats,
@@ -134,7 +118,7 @@ export class TopJobsRepository {
     };
     await col.updateOne(
       { _id: SYNC_META_ID },
-      { $set: next },
+      { $set: next, $unset: { jsearchCreditsUsedThisMonth: "", jsearchCreditsResetAt: "" } },
       { upsert: true },
     );
     return next;
@@ -146,20 +130,25 @@ export class TopJobsRepository {
     const lastManual = meta.lastManualSyncAt ? new Date(meta.lastManualSyncAt).getTime() : 0;
     const cooldownEnds = lastManual + cooldownMs;
     const canManualRefresh = Date.now() >= cooldownEnds;
+    const [gmail, pendingListings] = await Promise.all([
+      gmailAuth.getStatus(),
+      alertListingsRepository.countPending(
+        new Date(Date.now() - env.topJobsListingMaxAgeDays * 86_400_000).toISOString(),
+      ),
+    ]);
 
     return {
       lastSyncAt: meta.lastSyncAt,
       lastManualSyncAt: meta.lastManualSyncAt,
       lastSyncStats: meta.lastSyncStats,
       lastSyncError: meta.lastSyncError,
-      jsearchCreditsUsedThisMonth: meta.jsearchCreditsUsedThisMonth,
-      jsearchCreditsRemaining: Math.max(0, env.jsearchMonthlyCap - meta.jsearchCreditsUsedThisMonth),
-      jsearchMonthlyCap: env.jsearchMonthlyCap,
       manualRefreshCooldownMin: env.topJobsManualRefreshCooldownMin,
       canManualRefresh,
       manualRefreshAvailableAt: canManualRefresh ? null : new Date(cooldownEnds).toISOString(),
-      rapidApiKeyConfigured: Boolean(env.rapidApiKey?.trim()),
+      gmailConnected: gmail.configured && gmail.connected,
+      serperConfigured: serperClient.isConfigured(),
       openAiKeyConfigured: Boolean(env.openAiApiKey?.trim()),
+      pendingListings,
     };
   }
 
