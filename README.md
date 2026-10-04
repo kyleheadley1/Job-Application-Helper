@@ -8,7 +8,9 @@ This project helps you evaluate postings, decide whether to apply, choose a resu
 
 The app ingests job posts (pasted text, URL, or a one-click capture from the Chrome extension), extracts structured data, scores fit conservatively, recommends whether to apply, suggests a resume, and supports on-demand generation of application materials.
 
-A Gmail dashboard reads your application emails (read-only), groups them into applications with their current status, recovers the original job description for each one, and scores it blind to the outcome so you can see whether the fit score predicts real results.
+A Gmail dashboard reads your application emails, groups them into applications with their current status, recovers the original job description for each one, and scores it blind to the outcome so you can see whether the fit score predicts real results.
+
+A low-cost agentic layer sits on top: a daily agent that finds your next steps (follow-ups, thank-yous, interview prep, ghosted roles) and an on-demand chat assistant that answers questions about your search. Both can suggest actions, but nothing changes and no email is sent without your approval (see "Agentic layer" below).
 
 It is designed as an operator assistant, not an autonomous applier.
 
@@ -23,7 +25,7 @@ It is designed as an operator assistant, not an autonomous applier.
 - On-demand generation of cover letter, why-company, talking points, and bullet candidates
 - Tracker workflow with an explicit "confirm applied" flow, editable applied date, and notes
 - Tracker import from a spreadsheet (`xlsx`)
-- Top Jobs: daily scan of LinkedIn, Indeed, ZipRecruiter, and Remote Hunter job-alert emails (needs Gmail connected); roles are de-duplicated against the tracker and past applications, scored, and filtered by score
+- Top Jobs: daily scan of LinkedIn, Indeed, ZipRecruiter, and Remote Hunter job-alert emails (needs Gmail connected). Only remote or NYC roles that are still open are kept; roles are de-duplicated against the tracker and past applications, scored, and filtered by score. A cheap batched pre-screen ranks queued alert titles first, so the few paid scorings (5 per run, $2/month cap) go to the most promising roles. Listed roles are rechecked and hidden once the posting closes
 - Local resume context grounding from files on your machine
 
 **Chrome extension (capture)**
@@ -35,7 +37,7 @@ It is designed as an operator assistant, not an autonomous applier.
 
 **Gmail dashboard (`/`)**
 
-- Google OAuth with exactly two scopes: `gmail.readonly` and `gmail.drafts.create`. The app can read mail and create drafts, but has no send permission and no send code; you send every email yourself from Gmail. Full email bodies are never stored, only a per-message classification. Connections made before drafts were added show a Reconnect prompt; until then everything except drafting works
+- Google OAuth with exactly two scopes: `gmail.readonly` and `gmail.drafts.create` (create drafts only, never send). Full email bodies are never stored, only a per-message classification
 - Free rule-based prefilter, then an LLM classifier: applied, assessment, interview, rejected, offer, other. Calendar invites from company domains count as interviews
 - Groups emails into applications by company and role, tracks status and the furthest stage reached (e.g. "rejected after interviewing"), and flags estimated applied dates when no confirmation email exists
 - Interview rounds: each interview email gets a small extra LLM read for the round number, what the round is and who it's with. Emails about the same round (invite, calendar invite, reschedule) are grouped together, and the status shows "Recruiter screen", "2nd round", "3rd round · technical with Jane Doe", or "rejected after 2nd round". Each sync also backfills round details for older interview emails, whatever their age
@@ -62,11 +64,38 @@ Verification rules:
 
 Scores are final: a scored row is never re-scored by later syncs, recovery runs, or a change in the application's key. Each new score stores its full scoring detail (click the score to see it). A deliberate one-off rescore of every stored JD is only done by hand after a scoring bug fix, never automatically.
 
+**Agentic layer (approval-based)**
+
+Two features act on your behalf, both built so that the model only reads and suggests. Anything that changes data or touches email goes through a card you approve.
+
+*Next steps agent (dashboard card)*
+
+- Once a day, after the first Gmail sync past 7am (or "Refresh" on the card), free rules scan your applications for:
+  - a pending request to reply to (schedule, assessment, offer)
+  - an interview in the next 3 days (prep)
+  - an interview in the last 2 days (thank-you)
+  - no reply for 7–29 days mid-process (follow-up)
+  - no reply for 30+ days on an open tracker row (mark as ghosted/`lapsed`)
+- One gpt-5-mini call then ranks the new items, explains each in a sentence, and writes short email drafts. Items already written, dismissed, or done are never paid for again. About $0.001–0.02 per day
+- What it does on its own: write suggestions and draft text inside the app. What waits for you: "Approve" applies a tracker change; "Create Gmail draft" opens an editor (recipient + text) and saves a reply draft in the original thread
+
+*Chat assistant (every page)*
+
+- "Ask assistant" (bottom right) answers plain-language questions ("What should I do today?", "Which applications went quiet?", "Draft a follow-up for my last interview") from your applications, tracker, Top Jobs queue, Next steps, stored JDs, and costs
+- It works through read-only lookup tools, at most 6 model steps per message with only the last 6 turns of history sent. About $0.002–0.01 per message
+- It can propose three actions, each shown as a card: change a tracker status, draft a reply email (editable before it's saved as a Gmail draft), or score a queued Top Jobs listing. Approve runs exactly the stored card, once; the model can't trigger it itself
+
+*Safety and cost model*
+
+- Gmail permissions are read + create drafts. The app has no send permission and no send code; every email is sent by you from Gmail. Recipients are checked (one address, no no-reply/ATS senders) and replies are threaded to the original message
+- Every paid feature has a hard monthly cap, spread evenly over the days left in the month: Top Jobs $2, Next steps agent $1.50, chat assistant $1.50. When a day's share is used up, the feature falls back to free rules or says so without calling the model
+- The cost card shows this month's spend per feature against its cap
+
 **Dashboard metrics**
 
 - Fit score vs outcome (mean fit per outcome, plus applications that reached an interview)
 - Where the JDs came from: verified and candidate counts per source (email, company boards, Serper, pasted), with Serper usefulness and budget
-- OpenAI cost: today, last 7 days, per scored role, per email, and by feature, estimated from OpenAI-reported token counts
+- OpenAI cost: today, last 7 days, this month (with per-feature caps), per scored role, per email, and by feature, estimated from OpenAI-reported token counts
 - A low-budget warning when 20% or less of the Serper budget is left
 
 **Recent fixes**
@@ -93,7 +122,11 @@ Gmail dashboard:
 - `apps/api/` - Express API, scoring/rules/orchestration, Gmail sync and JD recovery, import/verify scripts
   - `src/services/gmail/` - OAuth, sync, prefilter/classifier, application grouping
   - `src/services/gmail/jdRecovery/` - email evidence, ATS board APIs, posting fetchers, matching, Serper, metrics
-  - `src/services/llm/` - OpenAI Responses client and usage/cost tracking
+  - `src/services/llm/` - OpenAI Responses client (structured calls and the tool-calling loop), usage/cost tracking, per-feature monthly budgets
+  - `src/services/agent/` - daily Next steps agent (rule-based candidates, one budgeted LLM pass, suggestions store)
+  - `src/services/assistant/` - chat assistant (tools, proposal cards, thread storage)
+  - `src/services/proposals/` - the only code paths that apply approved actions (tracker status, Gmail draft)
+  - `src/services/topJobs/` - alert parsing, pre-screen, location/open checks, budgeted scoring
 - `apps/web/` - React + Vite frontend (Dashboard, Add Job, Top Jobs, Tracker)
 - `apps/extension/` - Chrome MV3 side-panel extension (React + Vite)
 - `scripts/` - root helper scripts (eval/regression utilities)
@@ -126,9 +159,9 @@ Optional, by feature:
 - **Triage / resumes:** `RESUME_CONTEXT_DIR`, `PRELOAD_RESUME_CONTEXT_ON_START`, `TRIAGE_FAST_MODE`, `TRIAGE_SKIP_LLM_RESUME_SELECTION_IN_FAST_MODE`
 - **Tracker seed:** `AUTO_IMPORT_TRACKER_ON_START`, `TRACKER_SEED_WORKBOOK_PATH`
 - **Web:** `VITE_API_BASE_URL` (web -> API base URL)
-- **Top Jobs:** `TOP_JOBS_SYNC_ENABLED`, `TOP_JOBS_*` (Gmail connection required; `SERPER_API_KEY` enables the Indeed/ZipRecruiter fallback). `TOP_JOBS_MONTHLY_BUDGET_USD` (default $2) is a hard monthly OpenAI cap, paced evenly per day; `TOP_JOBS_MAX_TRIAGES_PER_SYNC` (default 5) caps scorings per run. A cheap batched pre-screen rates queued alert titles first, so scorings go to the best ones and clear mismatches are never scored
-- **Next steps agent:** `AGENT_ENABLED`, `AGENT_MONTHLY_BUDGET_USD` (default $1.50). Once a day after the morning Gmail sync (or via Refresh on the dashboard), free rules find respond/prep/thank-you/follow-up/lapsed steps and one gpt-5-mini call ranks them and drafts short emails. Drafts are never sent; tracker changes only happen when you click Approve. Over budget, steps still appear with rule text and no drafts. "Create Gmail draft" on a step opens an editor (recipient + text); confirming saves a reply draft in the original Gmail thread, which you send from Gmail
-- **Chat assistant:** `ASSISTANT_MONTHLY_BUDGET_USD` (default $1.50). "Ask assistant" (bottom right, every page) answers questions from your applications, tracker, Top Jobs queue, Next steps, and costs using read-only lookups (at most 6 model steps per message, last 6 turns of history, roughly $0.005–0.01 per message). It can propose a tracker status change, a reply email, or scoring a queued Top Jobs listing; each shows as a card and nothing happens until you click Approve. Emails become Gmail drafts only. When the day's share of the budget is spent it says so without calling the model
+- **Top Jobs:** `TOP_JOBS_SYNC_ENABLED`, `TOP_JOBS_*` (Gmail connection required; `SERPER_API_KEY` enables the Indeed/ZipRecruiter fallback), `TOP_JOBS_MONTHLY_BUDGET_USD` (default $2), `TOP_JOBS_MAX_TRIAGES_PER_SYNC` (default 5)
+- **Next steps agent:** `AGENT_ENABLED` (default true), `AGENT_MONTHLY_BUDGET_USD` (default $1.50)
+- **Chat assistant:** `ASSISTANT_MONTHLY_BUDGET_USD` (default $1.50)
 - **Extension:** `EXTENSION_API_TOKEN` (shared secret, also pasted into the extension options)
 - **Gmail:** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `WEB_APP_URL`, `GMAIL_CLASSIFY_REASONING_EFFORT` (default `minimal`)
 - **JD recovery:** `SERPER_API_KEY` (optional fallback), `SERPER_MAX_QUERIES_TOTAL` (default `1250`), `JD_RECOVERY_MAX_PER_RUN` (default `5`)
@@ -154,7 +187,9 @@ Default local URI in `.env.example`:
 
 - `mongodb://127.0.0.1:27017/job_agent_mvp`
 
-Gmail and recovery collections: `gmail_auth`, `gmail_messages` (classifications only), `application_evaluations` (recovered JD + blind score + outcome), `ats_boards` (board slug cache), `serper_usage`, `llm_usage` (per-call token counts and cost).
+Gmail and recovery collections: `gmail_auth`, `gmail_messages` (classifications only), `application_evaluations` (recovered JD + blind score + outcome), `ats_boards` (board slug cache), `serper_usage`, `llm_usage` (per-call token counts and cost, tagged by feature).
+
+Agentic layer collections: `agent_suggestions` and `agent_meta` (Next steps), `assistant_threads` and `assistant_proposals` (chat assistant), `gmail_outbox` (a log of every draft the app created).
 
 ## H. Make It Yours: Resumes and Profile
 
@@ -254,7 +289,7 @@ Captures are scored in the background and appear like an Add Job result: open th
 
 1. In Google Cloud Console, create an OAuth client of type "Web application" with the redirect URI `http://localhost:4000/api/gmail/oauth/callback`, and enable the Gmail API.
 2. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, and `WEB_APP_URL` in `.env`, then restart the API.
-3. Open the web app dashboard (`/`), click Connect Gmail, and approve read-only access.
+3. In the OAuth consent screen's Data access, add exactly `gmail.readonly` and `gmail.drafts.create`. Open the web app dashboard (`/`), click Connect Gmail, and approve. If you connected before drafts existed, the dashboard shows a Reconnect prompt; everything except drafting works until you do. `npm run verify:gmail-drafts --workspace api` checks the grant live (creates two test drafts to yourself, confirms sending is refused).
 4. Click "Sync now" (the dashboard also syncs on load if the last sync is over 15 minutes old). While the API runs it also syncs in the background every `GMAIL_AUTO_SYNC_MINUTES` (default 15, `0` disables); a manual sync resets that timer, and only new emails and new applications cost anything. Recovery starts automatically after each sync and scores up to `JD_RECOVERY_MAX_PER_RUN` roles per run. "Recover JDs" starts a run by hand.
 5. Optional: set `SERPER_API_KEY` to enable the web search fallback. Serper's 2,500 free queries are a one-time grant, so the default budget is half of that.
 
@@ -272,9 +307,12 @@ All job-board lookups and the Gmail API are free. Costs are OpenAI calls (and Se
 
 - Email classification: about 0.03-0.05¢ per email (minimal reasoning effort)
 - Scoring a role (extraction + scoring): about 1.25¢
-- Typical daily use (5-10 applications): a few dollars a month
+- Top Jobs pre-screen: a fraction of a cent per batch of alert titles; scoring a listed role about 2¢
+- Next steps agent: about 0.1–2¢ per day
+- Chat assistant: about 0.2–1¢ per message
+- Typical daily use (5-10 applications): a few dollars a month. The target is under $5/month overall, and the capped features (Top Jobs $2, agent $1.50, assistant $1.50) can never exceed their limits
 
-The dashboard's OpenAI cost card shows actual spend from recorded token counts.
+The dashboard's OpenAI cost card shows actual spend from recorded token counts, including this month's spend per feature against its cap.
 
 ## M. Important Privacy Note
 
@@ -285,6 +323,6 @@ Before publishing this project publicly:
 - Do not commit personal/local tracker artifacts.
 - Always commit only `.env.example` (never real keys).
 
-Gmail access is read-only. Email bodies are fetched on demand and never stored. Only classifications, subjects/senders, and recovered job descriptions are kept in your local Mongo.
+Gmail access is read + create drafts; the app cannot send email. Email bodies are fetched on demand and never stored. Only classifications, subjects/senders, and recovered job descriptions are kept in your local Mongo.
 
 This repository is configured so local resume files and common secret/local artifact paths are ignored by git. You are still responsible for reviewing staged files before pushing.
