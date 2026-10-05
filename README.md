@@ -1,4 +1,4 @@
-# Job Application Helper
+# Job Search Copilot
 
 Production-minded job triage and application-prep assistant for software engineering roles.
 
