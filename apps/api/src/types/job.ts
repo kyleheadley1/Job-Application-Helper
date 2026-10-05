@@ -184,6 +184,8 @@ export type JobRecord = {
     source?: 'gmail';
     /** Gmail application key the row was created from. */
     gmailKey?: string;
+    /** You marked that this application reached a person (recruiter screen or later), e.g. a call with no email trail. */
+    reachedHuman?: boolean;
   };
   /** Spreadsheet-shaped cells (camelCase); export maps to exact column labels. */
   trackerSpreadsheet?: Partial<TrackerSpreadsheetFields>;

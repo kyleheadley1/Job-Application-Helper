@@ -208,6 +208,7 @@ gmailRouter.get("/evaluations", async (req, res, next) => {
           top_jobs: env.topJobsMonthlyBudgetUsd,
           agent: env.agentMonthlyBudgetUsd,
           assistant: env.assistantMonthlyBudgetUsd,
+          insights: env.insightsMonthlyBudgetUsd,
         }),
       },
       evaluations: evaluations.map(({ jd, recovery, fit, diagnostic: _diagnostic, ...rest }) => ({

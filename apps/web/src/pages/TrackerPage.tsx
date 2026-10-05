@@ -369,6 +369,18 @@ export const TrackerPage = () => {
     }
   };
 
+  const toggleReachedHuman = async (job: JobRecord) => {
+    if (busyJobId) return;
+    setBusyJobId(job.id);
+    try {
+      const mark = job.tracker.reachedHuman;
+      const updated = await api.setReachedHuman(job.id, mark === undefined ? true : mark ? false : null);
+      setJobs((list) => list.map((j) => (j.id === job.id ? updated : j)));
+    } finally {
+      setBusyJobId("");
+    }
+  };
+
   const dateFilteredJobs = useMemo(() => {
     if (!fromDate && !toDate) return jobs;
     return jobs.filter((j) => isDateKeyInRange(trackerDateKey(j), fromDate || undefined, toDate || undefined));
@@ -566,6 +578,32 @@ export const TrackerPage = () => {
               <span className="cell-lines-1 muted tracker-status-text" title={secondary}>
                 {secondary}
               </span>
+            ) : null}
+            {isAppliedPipelineStatus(job.status) || job.tracker.reachedHuman !== undefined ? (
+              <button
+                type="button"
+                className={`tracker-inline-action tracker-heard-back${
+                  job.tracker.reachedHuman === true ? " active" : job.tracker.reachedHuman === false ? " declined" : ""
+                }`}
+                disabled={busyJobId === job.id}
+                title={
+                  job.tracker.reachedHuman === true
+                    ? "You marked that a call or interview happened. Click to mark that none did."
+                    : job.tracker.reachedHuman === false
+                      ? "You marked that no call or interview happened, whatever Gmail shows. Click to clear."
+                      : "Mark whether a call or interview was offered (e.g. a phone screen with no email trail). Used by Application insights."
+                }
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void toggleReachedHuman(job);
+                }}
+              >
+                {job.tracker.reachedHuman === true
+                  ? "Heard back ✓"
+                  : job.tracker.reachedHuman === false
+                    ? "No call ✕"
+                    : "Heard back?"}
+              </button>
             ) : null}
           </div>
         );

@@ -39,8 +39,7 @@ It is designed as an operator assistant, not an autonomous applier.
 
 - Google OAuth with exactly two scopes: `gmail.readonly` and `gmail.drafts.create` (create drafts only, never send). Full email bodies are never stored, only a per-message classification
 - Free rule-based prefilter, then an LLM classifier: applied, assessment, interview, rejected, offer, other. Calendar invites from company domains count as interviews
-- Groups emails into applications by company and role, tracks status and the furthest stage reached (e.g. "rejected after interviewing"), and flags estimated applied dates when no confirmation email exists
-- Interview rounds: each interview email gets a small extra LLM read for the round number, what the round is and who it's with. Emails about the same round (invite, calendar invite, reschedule) are grouped together, and the status shows "Recruiter screen", "2nd round", "3rd round · technical with Jane Doe", or "rejected after 2nd round". Each sync also backfills round details for older interview emails, whatever their age
+- Groups emails into applications by company and role, tracks status and the furthest stage reached (e.g. "rejected after interviewing"), and flags estimated applied dates when no confirmation email exists. Two openings at one company stay separate when their titles name different specialties ("Content Data Products" vs "AI Platforms and Products"), and a bare "Software Engineer" email only joins an opening when exactly one matches- Interview rounds: each interview email gets a small extra LLM read for the round number, what the round is and who it's with. Emails about the same round (invite, calendar invite, reschedule) are grouped together, and the status shows "Recruiter screen", "2nd round", "3rd round · technical with Jane Doe", or "rejected after 2nd round". Each sync also backfills round details for older interview emails, whatever their age
 - Interview vs interviewing: the "Interview" status card counts applications that reached an interview in the window. Being actively in process is shown separately: an "Interviewing" pill (an open application with an upcoming interview or interview email in the last 21 days, otherwise "Interviewed") and an "Interviewing now" list in the upcoming interviews card
 - Upcoming interviews: the top of the dashboard lists confirmed interview times from the last 60 days of email, soonest first, with company, role, round, date and time (with a "Today" / "Tomorrow" / "In N days" badge). Reschedules replace the earlier time; cancelled interviews and rejected roles drop off. Times stated without a timezone use `USER_TIMEZONE` (defaults to your machine's zone)
 - Scoring details: click any fit score to open the full breakdown: category scores, survivability, hard gates and the rules that fired, penalties, extractor output and the stored JD. Scores given before this snapshot existed can be audited with "Run diagnostic re-score", which re-runs the stored JD and saves the result separately. The original score never changes
@@ -90,12 +89,21 @@ Two features act on your behalf, both built so that the model only reads and sug
 *Safety and cost model*
 
 - Gmail permissions are read + create drafts. The app has no send permission and no send code; every email is sent by you from Gmail. Recipients are checked (one address, no no-reply/ATS senders) and replies are threaded to the original message
-- Every paid feature has a hard monthly cap, spread evenly over the days left in the month: Top Jobs $2, Next steps agent $1.50, chat assistant $1.50. When a day's share is used up, the feature falls back to free rules or says so without calling the model
+- Every paid feature has a hard monthly cap, spread evenly over the days left in the month: Top Jobs $2, Next steps agent $1.50, chat assistant $1.50, insights summary $0.30. When a day's share is used up, the feature falls back to free rules or says so without calling the model
 - The cost card shows this month's spend per feature against its cap
 
-**Dashboard metrics**
+**Application insights (dashboard card)**
 
-- Fit score vs outcome (mean fit per outcome, plus applications that reached an interview)
+- Compares the applications that led to a call or interview (a recruiter screen or later, or an offer) with the ones that didn't, across your whole tracker and Gmail history. A Gmail application linked to a tracker row counts once. Assessments alone, rejections, lapsed roles and 30+ days of silence count as no; applications under 30 days old are left out as too early
+- Shows whether the fit score predicts callbacks (callback rate per score tier with plausible ranges, and an AUC check against chance), what the roles that heard back have in common (resume, location and work model, seniority, years asked, employer scale, applicant pool, domain, language gaps, degree, salary, where the posting lives, posting age, day applied), and the good fits (65+) that went quiet
+- Every comparison is tested for chance (Fisher's exact test with a false-discovery correction across all patterns). A pattern is only called conclusive with at least 15 applications on each side, enough responses, and a gap of 10+ points. When nothing clears that bar the card says the differences look like randomness
+- Conclusive patterns that are knowable before you apply become proposal cards. Nothing changes until you approve one; approved adjustments apply only to roles scored from then on (±4 each, ±8 total, never on hard-gated roles), show up as "Your history" in the scoring details, and stay frozen with that role. Existing scores never change, and you can turn an adjustment off at any time
+- Runs weekly after a Gmail sync, or on demand with Re-run. The statistics are free; an optional plain-English summary uses a $0.30/month cap (`INSIGHTS_MONTHLY_BUDGET_USD`), well under a cent per run
+- The older fit-score-by-outcome detail is folded into the card
+- From Gmail, an application counts as reaching a person when a call or interview was booked (a calendar invite or a confirmed time), or when an employer's person (not an automated sender) emailed about an interview. A staffing agency's own screening call doesn't count; it only counts once the agency books an interview with the employer (hiring manager, technical, team, onsite or final round) or an offer. Leftover invites that can't be tied to a role don't count as an extra application when that company already has one
+- The tracker's "Heard back?" button in the status column cycles through Heard back ✓ (a call or interview happened, e.g. a phone screen with no email trail), No call ✕ (none happened, whatever Gmail shows) and unmarked. For mail from before Gmail was connected, run the Gmail backfill (see section K)
+
+**Dashboard metrics**
 - Where the JDs came from: verified and candidate counts per source (email, company boards, Serper, pasted), with Serper usefulness and budget
 - OpenAI cost: today, last 7 days, this month (with per-feature caps), per scored role, per email, and by feature, estimated from OpenAI-reported token counts
 - A low-budget warning when 20% or less of the Serper budget is left
@@ -174,6 +182,7 @@ Optional, by feature:
 - **Top Jobs:** `TOP_JOBS_SYNC_ENABLED`, `TOP_JOBS_*` (Gmail connection required; `SERPER_API_KEY` enables the Indeed/ZipRecruiter fallback), `TOP_JOBS_MONTHLY_BUDGET_USD` (default $2), `TOP_JOBS_MAX_TRIAGES_PER_SYNC` (default 5)
 - **Next steps agent:** `AGENT_ENABLED` (default true), `AGENT_MONTHLY_BUDGET_USD` (default $1.50)
 - **Chat assistant:** `ASSISTANT_MONTHLY_BUDGET_USD` (default $1.50)
+- **Application insights summary:** `INSIGHTS_MONTHLY_BUDGET_USD` (default $0.30)
 - **Extension:** `EXTENSION_API_TOKEN` (shared secret, also pasted into the extension options)
 - **Gmail:** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `WEB_APP_URL`, `GMAIL_CLASSIFY_REASONING_EFFORT` (default `minimal`)
 - **JD recovery:** `SERPER_API_KEY` (optional fallback), `SERPER_MAX_QUERIES_TOTAL` (default `1250`), `JD_RECOVERY_MAX_PER_RUN` (default `5`)
@@ -275,7 +284,9 @@ Edit these to describe your own two resumes.
 
 Startup behavior:
 
-- By default, API boot auto-imports `data/job_role_scores_current.xlsx` if present (idempotent upsert). Disable with `AUTO_IMPORT_TRACKER_ON_START=false` or override the path with `TRACKER_SEED_WORKBOOK_PATH`.
+- By default, API boot auto-imports `data/job_role_scores_current.xlsx` if present. Disable with `AUTO_IMPORT_TRACKER_ON_START=false` or override the path with `TRACKER_SEED_WORKBOOK_PATH`.
+- Rows already imported are left alone on later imports, so status changes, notes and "Heard back" marks made in the app survive restarts. The one exception: if a row's outcome text changes in the spreadsheet, its status is updated and the change is added to its history.
+- Outcome text mentioning an interview, panel, screen, onsite, hiring manager or final round imports as interviewing.
 - API startup also preloads local resume context by default to reduce first-triage latency.
 
 Triage speed notes:
@@ -304,6 +315,7 @@ Captures are scored in the background and appear like an Add Job result: open th
 3. In the OAuth consent screen's Data access, add exactly `gmail.readonly` and `gmail.drafts.create`. Open the web app dashboard (`/`), click Connect Gmail, and approve. If you connected before drafts existed, the dashboard shows a Reconnect prompt; everything except drafting works until you do. `npm run verify:gmail-drafts --workspace api` checks the grant live (creates two test drafts to yourself, confirms sending is refused).
 4. Click "Sync now" (the dashboard also syncs on load if the last sync is over 15 minutes old). While the API runs it also syncs in the background every `GMAIL_AUTO_SYNC_MINUTES` (default 15, `0` disables); a manual sync resets that timer, and only new emails and new applications cost anything. Recovery starts automatically after each sync and scores up to `JD_RECOVERY_MAX_PER_RUN` roles per run. "Recover JDs" starts a run by hand.
 5. Optional: set `SERPER_API_KEY` to enable the web search fallback. Serper's 2,500 free queries are a one-time grant, so the default budget is half of that.
+6. Optional: catch up on mail from before you connected Gmail with `npm run backfill:gmail --workspace api -- 2025-09-01 2026-09-04` (start and end dates). It uses the same filters and classifier as a sync, skips mail already processed, and doesn't auto-add tracker rows. Classification counts against the Gmail budget, so backfill a few months at a time.
 
 Working the dashboard:
 
@@ -322,7 +334,8 @@ All job-board lookups and the Gmail API are free. Costs are OpenAI calls (and Se
 - Top Jobs pre-screen: a fraction of a cent per batch of alert titles; scoring a listed role about 2¢
 - Next steps agent: about 0.1–2¢ per day
 - Chat assistant: about 0.2–1¢ per message
-- Typical daily use (5-10 applications): a few dollars a month. The target is under $5/month overall, and the capped features (Top Jobs $2, agent $1.50, assistant $1.50) can never exceed their limits
+- Application insights: free statistics, plus under 0.1¢ for the weekly summary
+- Typical daily use (5-10 applications): a few dollars a month. The target is under $5/month overall, and the capped features (Top Jobs $2, agent $1.50, assistant $1.50, insights $0.30) can never exceed their limits
 
 The dashboard's OpenAI cost card shows actual spend from recorded token counts, including this month's spend per feature against its cap.
 

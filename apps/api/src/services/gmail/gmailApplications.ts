@@ -123,9 +123,35 @@ export const roleTokens = (role: string): string[] => {
   return [...new Set(expanded.split(/\s+/).filter((t) => t && !ROLE_STOPWORDS.has(t)))];
 };
 
+/** Words most engineering titles share; they can't tell two openings at one company apart. */
+const GENERIC_ROLE_TOKENS = new Set([
+  "software", "engineer", "engineering", "developer", "development", "senior", "junior", "staff",
+  "principal", "lead", "mid", "level", "product", "products",
+]);
+
+/** Tokens for comparing titles only; keys keep using roleTokens so stored keys don't change. */
+const matchTokens = (role: string): Set<string> =>
+  new Set(roleTokens(role.replace(/\b(front|back)[- ]end\b/gi, "$1end")));
+
+/**
+ * Share of the shorter title's words found in the other. When both titles name a specialty
+ * ("Content Data Products" vs "AI Platforms and Products"), they must share one of those words.
+ */
 export const roleSimilarity = (a: string, b: string): number => {
-  const ta = new Set(roleTokens(a));
-  const tb = new Set(roleTokens(b));
+  const ta = matchTokens(a);
+  const tb = matchTokens(b);
+  const loose = looseRoleSimilarity(a, b);
+  if (loose === 0) return 0;
+  const specificA = [...ta].filter((t) => !GENERIC_ROLE_TOKENS.has(t));
+  const specificB = new Set([...tb].filter((t) => !GENERIC_ROLE_TOKENS.has(t)));
+  if (specificA.length > 0 && specificB.size > 0 && !specificA.some((t) => specificB.has(t))) return 0;
+  return loose;
+};
+
+/** Plain word overlap, generic words included. */
+const looseRoleSimilarity = (a: string, b: string): number => {
+  const ta = matchTokens(a);
+  const tb = matchTokens(b);
   if (ta.size === 0 || tb.size === 0) return 0;
   let shared = 0;
   for (const t of ta) if (tb.has(t)) shared += 1;
@@ -198,8 +224,11 @@ const mergeRoleLessBySenderDomain = (byCompany: Map<string, CompanyBucket>) => {
   }
 };
 
+const isGenericRole = (role: string): boolean => [...matchTokens(role)].every((t) => GENERIC_ROLE_TOKENS.has(t));
+
 const groupMessages = (messages: StoredGmailMessage[]): Group[] => {
   const byCompany = new Map<string, CompanyBucket>();
+  const genericRoled: Array<{ bucket: CompanyBucket; companyKey: string; m: StoredGmailMessage }> = [];
   for (const m of messages) {
     const c = m.classification;
     if (!c?.isApplicationEmail || !c.company) continue;
@@ -211,11 +240,32 @@ const groupMessages = (messages: StoredGmailMessage[]): Group[] => {
       bucket.unroled.push(m);
       continue;
     }
+    if (isGenericRole(c.role)) {
+      genericRoled.push({ bucket, companyKey, m });
+      continue;
+    }
     const existing = bucket.roled.find(
       (g) => g.role && roleSimilarity(g.role, c.role!) >= ROLE_MATCH_THRESHOLD,
     );
     if (existing) existing.messages.push(m);
     else bucket.roled.push({ companyKey, company: c.company, role: c.role, messages: [m] });
+  }
+  // A bare "Software Engineer" can't say which of several openings it belongs to.
+  for (const { bucket, companyKey, m } of genericRoled) {
+    const role = m.classification!.role!;
+    const matches = bucket.roled.filter((g) => g.role && roleSimilarity(g.role, role) >= ROLE_MATCH_THRESHOLD);
+    if (matches.length === 1) matches[0]!.messages.push(m);
+    else if (matches.length > 1) bucket.unroled.push(m);
+    else bucket.roled.push({ companyKey, company: m.classification!.company!, role, messages: [m] });
+  }
+  // Keys come from the first email's role and title; recovered JDs and tracker links are stored by key.
+  const order = new Map(messages.map((m, i) => [m.id, i]));
+  for (const bucket of byCompany.values()) {
+    for (const g of bucket.roled) {
+      const first = g.messages.reduce((a, b) => (order.get(b.id)! < order.get(a.id)! ? b : a));
+      g.role = first.classification!.role!;
+      g.company = first.classification!.company!;
+    }
   }
 
   mergeRoleLessVariants(byCompany);
@@ -405,7 +455,10 @@ export const matchTrackerJob = (
       best = { job, score };
     }
   }
-  return best?.job;
+  if (best) return best.job;
+  // With one row at the company there's nothing to confuse it with ("Software Engineer, Mirage").
+  const only = candidates.length === 1 ? candidates[0]! : undefined;
+  return only && looseRoleSimilarity(app.role, only.extracted.title ?? "") >= ROLE_MATCH_THRESHOLD ? only : undefined;
 };
 
 /** Without a confirmation email, the tracker's applied date beats guessing from the first (often rejection) email. */

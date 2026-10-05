@@ -14,7 +14,8 @@
     "rescore:tracker-all": "tsx scripts/rescore-tracker-all.mts",
     "sync:top-jobs": "tsx scripts/sync-top-jobs.mts",
     "purge:legacy-top-jobs": "tsx scripts/purge-legacy-top-jobs.mts",
-    "verify:gmail-drafts": "tsx scripts/verify-gmail-drafts.mts"
+    "verify:gmail-drafts": "tsx scripts/verify-gmail-drafts.mts",
+    "backfill:gmail": "tsx scripts/backfill-gmail.mts"
   },
   "keywords": [],
   "author": "",

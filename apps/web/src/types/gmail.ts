@@ -157,7 +157,7 @@ export type RecoveryMetrics = {
   };
 };
 
-export type LlmFeature = "gmail_classify" | "jd_recovery" | "top_jobs" | "agent" | "assistant" | "other";
+export type LlmFeature = "gmail_classify" | "jd_recovery" | "top_jobs" | "agent" | "assistant" | "insights" | "other";
 
 export type MonthSpend = {
   total: number;

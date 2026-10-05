@@ -9,6 +9,7 @@ import {
   TabsBrief,
   useBriefStyle,
 } from "../components/InterviewBriefViews";
+import { InsightsCard } from "../components/InsightsCard";
 import { NextStepsCard } from "../components/NextStepsCard";
 import { ScoringDetailsPanel } from "../components/ScoringDetailsPanel";
 import type {
@@ -618,6 +619,7 @@ const FEATURE_LABEL: Record<LlmFeature, string> = {
   top_jobs: "Top Jobs (alert parsing + scoring)",
   agent: "Next-steps agent",
   assistant: "Chat assistant",
+  insights: "Application insights",
   other: "Other (tracker, assets)",
 };
 
@@ -668,11 +670,11 @@ function FitStrip({ points, mean }: { points: RubricPoint[]; mean: number | null
   );
 }
 
-function FitOutcomeCard({ rubric }: { rubric: RubricSummary }) {
+function FitOutcomeDetail({ rubric }: { rubric: RubricSummary }) {
   const rows = rubric.rows.filter((r) => r.count > 0);
   const reached = rubric.reachedInterview;
   return (
-    <div className="card stack">
+    <div className="stack" style={{ marginTop: "0.5rem" }}>
       <div className="stack" style={{ gap: "0.25rem" }}>
         <strong>Fit score vs outcome</strong>
         <span className="muted smallText">
@@ -1352,7 +1354,7 @@ export function DashboardPage() {
             </div>
           )}
 
-          {rubric && rubric.scored > 0 && <FitOutcomeCard rubric={rubric} />}
+          <InsightsCard>{rubric && rubric.scored > 0 && <FitOutcomeDetail rubric={rubric} />}</InsightsCard>
 
           <div className="card stack">
             {applications.length > 0 && (

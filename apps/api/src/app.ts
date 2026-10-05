@@ -6,6 +6,7 @@ import { agentRouter } from "./routes/agent.routes.js";
 import { assistantRouter } from "./routes/assistant.routes.js";
 import { capturesRouter } from "./routes/captures.routes.js";
 import { gmailRouter } from "./routes/gmail.routes.js";
+import { insightsRouter } from "./routes/insights.routes.js";
 import { jobsRouter } from "./routes/jobs.routes.js";
 import { topJobsRouter } from "./routes/topJobs.routes.js";
 import { env } from "./config/env.js";
@@ -27,6 +28,7 @@ app.use("/api/job-captures", capturesRouter);
 app.use("/api/gmail", gmailRouter);
 app.use("/api/agent", agentRouter);
 app.use("/api/assistant", assistantRouter);
+app.use("/api/insights", insightsRouter);
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   if (error instanceof ZodError) {

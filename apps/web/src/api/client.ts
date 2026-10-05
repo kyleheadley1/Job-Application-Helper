@@ -1,6 +1,7 @@
 import type { JobRecord, JobStatus } from "../types/job";
 import type { TopJobRecord, TopJobsSyncStatus } from "../types/topJob";
 import type { AgentPanel, AgentRunSummary, AgentSuggestion, DraftCreated, ReplyTarget } from "../types/agent";
+import type { InsightsPanel, ScoringAdjustment } from "../types/insights";
 import type { AssistantProposal, AssistantReply, AssistantThread } from "../types/assistant";
 import type {
   EvaluationSummary,
@@ -81,6 +82,11 @@ export const api = {
     request<JobRecord>(`/jobs/${id}/applied-at`, {
       method: "PATCH",
       body: JSON.stringify({ appliedAt }),
+    }),
+  setReachedHuman: (id: string, reachedHuman: boolean | null) =>
+    request<JobRecord>(`/jobs/${id}/reached-human`, {
+      method: "PATCH",
+      body: JSON.stringify({ reachedHuman }),
     }),
   deleteJob: async (id: string) => {
     const response = await fetch(`${API_BASE}/jobs/${id}`, { method: "DELETE" });
@@ -175,6 +181,12 @@ export const api = {
     }),
   agentDismiss: (id: string) =>
     request<void>(`/agent/suggestions/${encodeURIComponent(id)}/dismiss`, { method: "POST" }),
+  insightsPanel: () => request<InsightsPanel>("/insights", { cache: "no-store" }),
+  insightsRun: () => request<InsightsPanel>("/insights/run", { method: "POST" }),
+  insightsAdjustment: (id: string, action: "approve" | "dismiss" | "disable") =>
+    request<{ adjustment: ScoringAdjustment }>(`/insights/adjustments/${encodeURIComponent(id)}/${action}`, {
+      method: "POST",
+    }),
   assistantThread: () => request<AssistantThread>("/assistant/thread", { cache: "no-store" }),
   assistantClear: () => request<void>("/assistant/thread", { method: "DELETE" }),
   assistantSend: (text: string) =>

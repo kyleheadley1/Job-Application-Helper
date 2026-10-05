@@ -114,6 +114,23 @@ function DetailView({ detail }: { detail: ScoringDetail }) {
         </div>
       )}
 
+      {(score.historyAdjustments?.length ?? 0) > 0 && (
+        <div>
+          <strong className="smallText">Your history</strong>
+          <ul className="smallText">
+            {score.historyAdjustments!.map((a) => (
+              <li key={a.id}>
+                {a.label}: {a.points > 0 ? "+" : ""}
+                {a.points}
+              </li>
+            ))}
+          </ul>
+          <span className="muted smallText">
+            From scoring adjustments you approved in Application insights (capped at ±8 total, included in the final).
+          </span>
+        </div>
+      )}
+
       {(display?.hardGates?.length ?? 0) > 0 && (
         <div>
           <strong className="smallText">Hard gates</strong>

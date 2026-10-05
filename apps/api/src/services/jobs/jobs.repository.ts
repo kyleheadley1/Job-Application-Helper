@@ -353,6 +353,20 @@ export class JobsRepository {
     return next ? this.fromDoc(next) : null;
   }
 
+  async setReachedHuman(id: string, reachedHuman: boolean | null): Promise<JobRecord | null> {
+    const col = await this.collection();
+    const updatedAt = new Date().toISOString();
+    const res = await col.updateOne(
+      { _id: id },
+      reachedHuman === null
+        ? { $unset: { "tracker.reachedHuman": "" }, $set: { updatedAt } }
+        : { $set: { "tracker.reachedHuman": reachedHuman, updatedAt } },
+    );
+    if (res.matchedCount === 0) return null;
+    const next = await col.findOne({ _id: id });
+    return next ? this.fromDoc(next) : null;
+  }
+
   async exportRows(filters: JobListFilters = {}): Promise<{ rows: JobExportRow[]; total: number }> {
     const { items } = await this.list(filters);
     const rows: JobExportRow[] = items.map((job) => buildJobExportRow(job));
@@ -454,12 +468,29 @@ export class JobsRepository {
     const existing = await col.findOne({ importKey: record.importKey });
     const now = new Date().toISOString();
     if (existing) {
+      // The app owns imported rows after the first import: status edits, applied dates, notes, scores and
+      // markers survive restarts. Only a changed outcome cell in the workbook moves the status.
       const id = String(existing._id);
       const prev = this.fromDoc(existing);
+      const prevOutcome = prev.trackerSpreadsheet?.statusOutcome ?? "";
+      const nextOutcome = record.trackerSpreadsheet?.statusOutcome ?? "";
+      if (prevOutcome === nextOutcome) return prev;
       const next: JobRecord = {
-        ...record,
-        id,
-        createdAt: prev.createdAt,
+        ...prev,
+        trackerSpreadsheet: { ...prev.trackerSpreadsheet, statusOutcome: nextOutcome },
+        status: record.status,
+        statusHistory: [
+          ...(prev.statusHistory ?? []),
+          {
+            id: randomUUID(),
+            jobId: id,
+            fromStatus: prev.status,
+            toStatus: record.status,
+            note: "Outcome changed in the tracker spreadsheet",
+            createdAt: now,
+          },
+        ],
+        tracker: { ...prev.tracker, statusOutcome: record.tracker.statusOutcome },
         updatedAt: now,
       };
       await col.replaceOne(

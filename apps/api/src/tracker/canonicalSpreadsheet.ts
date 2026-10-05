@@ -182,7 +182,7 @@ const STATUS_KEYWORDS: Array<{ re: RegExp; status: JobStatus }> = [
   { re: /\bapplied\b|submitted\b/i, status: 'applied' },
   { re: /\bskip\b|pass(ed)?\b|declined\b|withdrew\b/i, status: 'skip' },
   { re: /\breject/i, status: 'rejected' },
-  { re: /\binterview/i, status: 'interviewing' },
+  { re: /\binterview|\bpanel\b|\bscreen(ed|ing)?\b|\bon-?site\b|hiring manager|final round/i, status: 'interviewing' },
   { re: /\bassessment\b|oa\b|take[-\s]?home/i, status: 'assessment' },
   { re: /\bclosed\b|filled\b|cancelled\b|canceled\b/i, status: 'closed' },
   { re: /\blapsed\b|ghosted\b|no response\b/i, status: 'lapsed' },

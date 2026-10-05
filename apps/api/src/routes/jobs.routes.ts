@@ -12,6 +12,7 @@ import {
   TriageRequestSchema,
   TriageResponseSchema,
   UpdateJobAppliedAtBodySchema,
+  UpdateJobReachedHumanBodySchema,
   UpdateJobNotesBodySchema,
   UpdateJobStatusBodySchema,
 } from "../agents/jobAgent/schemas.js";
@@ -214,6 +215,20 @@ jobsRouter.patch("/:id/applied-at", async (req, res, next) => {
     }
     if (error instanceof Error && /invalid applied date|applied date is required/i.test(error.message)) {
       res.status(400).json({ error: "INVALID_APPLIED_AT", message: error.message });
+      return;
+    }
+    next(error);
+  }
+});
+
+jobsRouter.patch("/:id/reached-human", async (req, res, next) => {
+  try {
+    const body = UpdateJobReachedHumanBodySchema.parse(req.body ?? {});
+    const job = await jobsService.setReachedHuman(req.params.id, body.reachedHuman);
+    res.json(JobRecordSchema.parse(job));
+  } catch (error) {
+    if (error instanceof JobNotFoundError) {
+      res.status(404).json({ error: error.code, message: error.message });
       return;
     }
     next(error);

@@ -4,6 +4,8 @@ import { RECOMMENDATION_LABELS } from "../config/capabilitySurvivabilityPolicy.j
 import { userProfile as defaultUserProfile } from "../config/userProfile.js";
 import { detectCapabilityGap, detectSpecializationGap } from "./capabilityGap.js";
 import { computeCompositeScore } from "./compositeScoreModel.js";
+import { recommendationForScore } from "./compositeScoring.js";
+import { applyHistoryPoints } from "./historyAdjustments.js";
 import { applyJdLanguageOutputBoundary } from "./jdLanguageOutputBoundary.js";
 import { sanitizeExtractedTags } from "./jdTagProvenance.js";
 import { detectReferralPathway } from "./referralPathway.js";
@@ -99,10 +101,16 @@ export const recomputeStoredJobScore = (params: {
     resumeText,
   });
 
-  const finalRecommendation = composite.recommendation;
+  const frozen = composite.hardGateReasons?.length ? undefined : job.score.historyAdjustments;
+  const adjustedScore: ScoreBreakdown = frozen?.length
+    ? { ...composite.score, total: applyHistoryPoints(composite.score.total, frozen), historyAdjustments: frozen }
+    : composite.score;
+  const finalRecommendation = frozen?.length
+    ? recommendationForScore(adjustedScore.total)
+    : composite.recommendation;
 
   const scoreDisplayFinal = buildScoreDisplay({
-    score: composite.score,
+    score: adjustedScore,
     rules: finalRules,
     extracted,
     profile,
@@ -115,13 +123,13 @@ export const recomputeStoredJobScore = (params: {
   const llmCategories = job.score.llmCategories;
   const scoreWithDisplay: ScoreBreakdown = scoreDisplayFinal
     ? {
-        ...composite.score,
+        ...adjustedScore,
         llmCategories,
         scoreDisplay: scoreDisplayFinal,
         recommendationLabel: scoreDisplayFinal.bandHeadline,
       }
     : {
-        ...composite.score,
+        ...adjustedScore,
         llmCategories,
         recommendationLabel: RECOMMENDATION_LABELS[finalRecommendation],
       };

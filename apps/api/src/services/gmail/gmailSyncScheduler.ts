@@ -4,6 +4,7 @@ import { gmailAuth, isGmailConfigured } from "./gmailAuth.js";
 import { DEFAULT_SYNC_DAYS, syncGmail } from "./gmailSync.js";
 import { startRecoveryRun } from "./jdRecovery/runRecovery.js";
 import { runDailyAgentIfDue } from "../agent/dailyAgent.js";
+import { runInsightsIfDue } from "../insights/insights.js";
 
 /** Leaves startup work (tracker import, resume preload) a head start before a catch-up sync. */
 const MIN_DELAY_MS = 60_000;
@@ -42,6 +43,7 @@ const tick = async (intervalMs: number): Promise<void> => {
       recoveryStarted: recovery.started,
     });
     await runDailyAgentIfDue();
+    await runInsightsIfDue();
   } catch (error) {
     logger.warn("Scheduled Gmail sync failed", { message: error instanceof Error ? error.message : String(error) });
   } finally {

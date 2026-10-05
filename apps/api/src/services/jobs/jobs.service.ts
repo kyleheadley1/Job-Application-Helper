@@ -323,6 +323,12 @@ export class JobsService {
     return updated;
   }
 
+  async setReachedHuman(id: string, reachedHuman: boolean | null): Promise<JobRecord> {
+    const updated = await jobsRepository.setReachedHuman(id, reachedHuman);
+    if (!updated) throw new JobNotFoundError();
+    return updated;
+  }
+
   async removeFromTracker(id: string): Promise<void> {
     const deletedTracked = await jobsRepository.deleteById(id);
     const deletedDraft = this.draftJobs.delete(id);

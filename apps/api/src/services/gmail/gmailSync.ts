@@ -118,13 +118,54 @@ export const syncGmail = (days = DEFAULT_SYNC_DAYS): Promise<GmailSyncResult> =>
   return run;
 };
 
+const gmailDay = (d: Date) => `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+
+/** Most mail one backfill window may list; windows are short enough that this is never reached in practice. */
+export const BACKFILL_MAX_MESSAGES = 2000;
+
+/**
+ * One-time catch-up for mail older than the sync window (e.g. screens from before Gmail was connected).
+ * Same prefilter and classification as a sync, so already-processed mail costs nothing. Skips the
+ * tracker auto-add and reply checks, which only make sense for recent mail.
+ */
+export const backfillGmailRange = (after: Date, before: Date): Promise<GmailSyncResult> => {
+  const range = ` after:${gmailDay(after)} before:${gmailDay(before)}`;
+  const days = Math.max(1, Math.round((before.getTime() - after.getTime()) / DAY_MS));
+  const run = inFlight
+    .catch(() => undefined)
+    .then(() =>
+      processMessages({
+        days,
+        queries: [
+          buildSearchQuery(MAX_SYNC_DAYS).replace(/^newer_than:\d+d/, "").trim() + range,
+          buildPlatformSearchQuery(MAX_SYNC_DAYS).replace(/^newer_than:\d+d/, "").trim() + range,
+        ],
+        max: BACKFILL_MAX_MESSAGES,
+        recentFollowUps: false,
+      }),
+    );
+  inFlight = run;
+  return run;
+};
+
 const syncGmailNow = async (days: number): Promise<GmailSyncResult> => {
   const window = Math.min(Math.max(1, Math.floor(days)), MAX_SYNC_DAYS);
-  const [main, platform] = await Promise.all([
-    gmailClient.listMessageIds(buildSearchQuery(window)),
-    gmailClient.listMessageIds(buildPlatformSearchQuery(window)),
-  ]);
-  const ids = [...new Set([...main, ...platform])];
+  return processMessages({
+    days: window,
+    queries: [buildSearchQuery(window), buildPlatformSearchQuery(window)],
+    recentFollowUps: true,
+  });
+};
+
+const processMessages = async (opts: {
+  days: number;
+  queries: string[];
+  max?: number;
+  recentFollowUps: boolean;
+}): Promise<GmailSyncResult> => {
+  const window = opts.days;
+  const lists = await Promise.all(opts.queries.map((q) => gmailClient.listMessageIds(q, opts.max)));
+  const ids = [...new Set(lists.flat())];
   const processed = await gmailMessagesRepository.findProcessedIds(ids, PREFILTER_VERSION);
   const todo = ids.filter((id) => !processed.has(id));
 
@@ -196,12 +237,14 @@ const syncGmailNow = async (days: number): Promise<GmailSyncResult> => {
   result.deferred = todo.length - handled;
   if (!result.rateLimited) {
     result.interviewDetails += await backfillInterviewDetails();
-    await backfillActionRequests();
-    await markRepliedActions();
-    result.trackerAdded = await addMissingApplicationsQuietly();
+    if (opts.recentFollowUps) {
+      await backfillActionRequests();
+      await markRepliedActions();
+      result.trackerAdded = await addMissingApplicationsQuietly();
+    }
   }
 
-  await gmailAuth.recordSync(new Date().toISOString());
+  if (opts.recentFollowUps) await gmailAuth.recordSync(new Date().toISOString());
   logger.info("Gmail sync complete", { ...result });
   return result;
 };

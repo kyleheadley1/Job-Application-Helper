@@ -105,5 +105,37 @@ describe("Mongo persistence restart-safe behavior", () => {
     expect(got?.statusHistory?.[0]?.toStatus).toBe("applied");
     expect(got?.scoreHistory?.length).toBe(1);
   });
+
+  it("re-importing the tracker workbook keeps app edits and only follows a changed outcome cell", async () => {
+    const seeded = {
+      ...makeRecord(),
+      importKey: "sheet-row-1",
+      status: "applied" as const,
+      trackerSpreadsheet: { statusOutcome: "Applied/Discussed" },
+    };
+    await jobsRepository.upsertByImportKey(seeded);
+    await jobsRepository.updateNotes(seeded.id, "Recruiter screen went well");
+    await jobsRepository.setReachedHuman(seeded.id, true);
+    const before = await jobsRepository.getById(seeded.id);
+
+    await jobsRepository.upsertByImportKey({ ...seeded, id: randomUUID(), tracker: { ...seeded.tracker, notes: "" } });
+    const same = await jobsRepository.getById(seeded.id);
+    expect(same?.tracker.notes).toBe("Recruiter screen went well");
+    expect(same?.tracker.reachedHuman).toBe(true);
+    expect(same?.updatedAt).toBe(before?.updatedAt);
+
+    await jobsRepository.upsertByImportKey({
+      ...seeded,
+      id: randomUUID(),
+      status: "rejected",
+      tracker: { ...seeded.tracker, statusOutcome: "rejected" },
+      trackerSpreadsheet: { statusOutcome: "Rejected" },
+    });
+    const moved = await jobsRepository.getById(seeded.id);
+    expect(moved?.status).toBe("rejected");
+    expect(moved?.statusHistory?.at(-1)?.toStatus).toBe("rejected");
+    expect(moved?.tracker.notes).toBe("Recruiter screen went well");
+    expect(moved?.tracker.reachedHuman).toBe(true);
+  });
 });
 

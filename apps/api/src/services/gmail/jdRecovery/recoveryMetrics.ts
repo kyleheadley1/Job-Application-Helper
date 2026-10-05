@@ -159,6 +159,7 @@ export const buildMonthSpend = (
     top_jobs: 0,
     agent: 0,
     assistant: 0,
+    insights: 0,
     other: 0,
   };
   let total = 0;
@@ -179,6 +180,7 @@ export const buildCostSummary = (
     top_jobs: { costUsd: 0, calls: 0 },
     agent: { costUsd: 0, calls: 0 },
     assistant: { costUsd: 0, calls: 0 },
+    insights: { costUsd: 0, calls: 0 },
     other: { costUsd: 0, calls: 0 },
   };
   const byDay = new Map<string, number>();

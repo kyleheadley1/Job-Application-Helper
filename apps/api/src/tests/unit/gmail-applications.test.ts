@@ -54,6 +54,51 @@ describe("normalizeCompany / roleSimilarity", () => {
     expect(roleSimilarity("Sr. Software Engineer", "Senior Software Engineer")).toBeGreaterThanOrEqual(0.6);
     expect(roleSimilarity("Software Engineer", "Product Designer")).toBeLessThan(0.6);
   });
+
+  it("keeps different specialties at one company apart", () => {
+    expect(
+      roleSimilarity("Software Engineer, Content Data Products", "Software Engineer - AI Platforms and Products (Frontend)"),
+    ).toBe(0);
+    expect(roleSimilarity("Front End Engineer", "Frontend Engineer")).toBeGreaterThanOrEqual(0.6);
+    expect(roleSimilarity("Software Engineer", "Software Engineer, Publishing Technology")).toBeGreaterThanOrEqual(0.6);
+  });
+});
+
+describe("generic and specific titles at one company", () => {
+  it("files a bare 'Software Engineer' email under the company when several openings match", () => {
+    const apps = buildApplications(
+      [
+        msg("NYT", "Software Engineer", "interview", "2026-03-25T10:00:00.000Z"),
+        msg("NYT", "Software Engineer, Content Data Products", "applied", "2026-03-20T10:00:00.000Z"),
+        msg("NYT", "Software Engineer - AI Platforms and Products (Frontend)", "interview", "2026-04-30T10:00:00.000Z"),
+      ],
+      [],
+    );
+    expect(apps.map((a) => `${a.role ?? "-"}:${a.emails.length}`).sort()).toEqual([
+      "-:1",
+      "Software Engineer - AI Platforms and Products (Frontend):1",
+      "Software Engineer, Content Data Products:1",
+    ]);
+  });
+
+  it("keeps the key from the first email when a generic title joins the only matching opening", () => {
+    const apps = buildApplications(
+      [
+        msg("Brellium", "Software Engineer", "applied", "2026-03-20T10:00:00.000Z"),
+        msg("Brellium", "Software Engineer, AI", "rejected", "2026-03-25T10:00:00.000Z"),
+      ],
+      [],
+    );
+    expect(apps).toHaveLength(1);
+    expect(apps[0]!.key).toBe("brellium::software engineer");
+  });
+
+  it("still links a loosely titled email to a company's only tracker row", () => {
+    const match = matchTrackerJob({ company: "Mirage", role: "Software Engineer, Backend" }, [
+      job("m", "Mirage", "Software Engineer, Mirage", "applied"),
+    ]);
+    expect(match?.id).toBe("m");
+  });
 });
 
 describe("buildApplications", () => {

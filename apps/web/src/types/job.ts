@@ -127,6 +127,8 @@ export type ScoreBreakdown = {
   scoreDisplay?: ScoreDisplay;
   recommendationLabel?: string;
   total: number;
+  /** Approved insights adjustments frozen in at first scoring; already included in `total`. */
+  historyAdjustments?: Array<{ id: string; label: string; points: number }>;
 };
 
 export type SurvivabilityDisplayRow = {
@@ -273,6 +275,8 @@ export type JobRecord = {
     postedAt?: string;
     /** Manual override for date applied (ISO). Wins over statusHistory-derived appliedAt. */
     appliedAt?: string;
+    /** You marked that this application reached a person (recruiter screen or later). */
+    reachedHuman?: boolean;
     notes?: string;
   };
   status: JobStatus;

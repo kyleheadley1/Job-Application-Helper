@@ -369,6 +369,9 @@ export const ScoreBreakdownSchema = z
     scoreDisplay: ScoreDisplaySchema.optional(),
     recommendationLabel: z.string().optional(),
     total: z.number().min(0).max(100),
+    historyAdjustments: z
+      .array(z.object({ id: z.string(), label: z.string(), points: z.number() }))
+      .optional(),
   })
   .superRefine((v, ctx) => {
     const legacySum =
@@ -508,6 +511,7 @@ export const JobRecordSchema = z.object({
       postedAt: z.string().optional(),
       appliedAt: z.string().optional(),
       notes: z.string().optional(),
+      reachedHuman: z.boolean().optional(),
     })
     .default({}),
   trackerSpreadsheet: TrackerSpreadsheetFieldsSchema,
@@ -559,6 +563,9 @@ export const UpdateJobStatusBodySchema = z.object({
 export const UpdateJobNotesBodySchema = z.object({
   notes: z.string().trim().max(10000),
 });
+
+/** true = reached a person, false = no call or interview (overrides Gmail), null = clear the mark. */
+export const UpdateJobReachedHumanBodySchema = z.object({ reachedHuman: z.boolean().nullable() });
 
 export const UpdateJobAppliedAtBodySchema = z.object({
   appliedAt: z

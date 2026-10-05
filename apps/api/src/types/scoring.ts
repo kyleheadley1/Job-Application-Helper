@@ -211,7 +211,11 @@ export type ScoreBreakdown = {
   degreePositiveNote?: string;
   /** Contract employment caveat for report display. */
   contractCaveat?: string;
+  /** Approved insights adjustments frozen in when this role was first scored; `total` already includes them. */
+  historyAdjustments?: HistoryAdjustment[];
 };
+
+export type HistoryAdjustment = { id: string; label: string; points: number };
 
 export type RuleEvaluation = {
   explicitDegreeRisk: boolean;

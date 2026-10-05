@@ -8,6 +8,7 @@ import {
 } from '../../config/scoringPolicy.js';
 import { evaluateShortlist } from '../../lib/shortlist.js';
 import type { JobRecord } from '../../types/job.js';
+import type { ScoreBreakdown } from '../../types/scoring.js';
 import { buildTrackerSpreadsheetFromJob } from '../../tracker/canonicalSpreadsheet.js';
 import { detectReferralPathway } from '../../lib/referralPathway.js';
 import { buildScoreDisplay } from '../../lib/scoreDisplayModel.js';
@@ -30,6 +31,12 @@ import {
   jdTextHashFromInput,
 } from '../../lib/jdTextHash.js';
 import { storedCategoryScores } from '../../lib/recomputeStoredJobScore.js';
+import { recommendationForScore } from '../../lib/compositeScoring.js';
+import {
+  applyHistoryPoints,
+  loadApprovedAdjustments,
+  matchAdjustments,
+} from '../../services/insights/applyAdjustments.js';
 
 export const triageJob = async (input: {
   url?: string;
@@ -140,7 +147,7 @@ export const triageJob = async (input: {
   });
   stageMs.resumeSelection = Date.now() - resumeSelStart;
 
-  let scoredScore = scored.score;
+  let scoredScore: ScoreBreakdown = scored.score;
   let scoredRulesFinal = scoredRules;
   let scoredRecommendation = scored.recommendation;
   activeResumeType = resumeSelection.recommendedResume;
@@ -159,6 +166,38 @@ export const triageJob = async (input: {
     });
     scoredScore = recomposite.score;
     scoredRecommendation = recomposite.recommendation;
+  }
+
+  // Re-triage keeps the adjustments the role was first scored with, so its score doesn't drift.
+  const hardGated = (buildScoreDisplay({
+    score: scoredScore,
+    rules: scoredRulesFinal,
+    extracted,
+    profile: userProfile,
+    recommendation: scoredRecommendation,
+  })?.hardGates?.length ?? 0) > 0;
+  const historyAdjustments = hardGated
+    ? []
+    : input.retriageFrom
+      ? (input.retriageFrom.score.historyAdjustments ?? [])
+      : matchAdjustments(
+          {
+            fit: scoredScore.total,
+            extracted,
+            rules: scoredRulesFinal,
+            score: scoredScore,
+            recommendedResume: resumeSelection.recommendedResume,
+            postingUrl: input.url ?? extracted.url,
+          },
+          await loadApprovedAdjustments(),
+        );
+  if (historyAdjustments.length > 0) {
+    scoredScore = {
+      ...scoredScore,
+      total: applyHistoryPoints(scoredScore.total, historyAdjustments),
+      historyAdjustments,
+    };
+    scoredRecommendation = recommendationForScore(scoredScore.total);
   }
 
   const salaryStart = Date.now();

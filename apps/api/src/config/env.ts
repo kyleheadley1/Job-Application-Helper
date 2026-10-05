@@ -109,6 +109,8 @@ export const env = {
   agentMonthlyBudgetUsd: Number(process.env.AGENT_MONTHLY_BUDGET_USD ?? 1.5),
   /** Hard monthly OpenAI spend cap for the on-demand chat assistant, paced evenly per day. */
   assistantMonthlyBudgetUsd: Number(process.env.ASSISTANT_MONTHLY_BUDGET_USD ?? 1.5),
+  /** Hard monthly OpenAI spend cap for the plain-English summary on the weekly insights run. */
+  insightsMonthlyBudgetUsd: Number(process.env.INSIGHTS_MONTHLY_BUDGET_USD ?? 0.3),
   topJobsMinScore: Number(process.env.TOP_JOBS_MIN_SCORE ?? 70),
   /** How far back alert emails are read, and how long an unchecked alert role stays queued (days). */
   topJobsListingMaxAgeDays: Number(process.env.TOP_JOBS_LISTING_MAX_AGE_DAYS ?? 14),
