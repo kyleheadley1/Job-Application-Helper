@@ -239,47 +239,57 @@ function InterviewBriefPanel({
   if (!data) return null;
   const b = data.brief;
   return (
-    <div className="interviewBrief stack">
-      {data.round && <div className="muted smallText">This round: {data.round}</div>}
+    <div className="interviewBrief">
+      {data.round && (
+        <div className="briefRound">
+          <span className="briefHeading">This round</span> {data.round}
+        </div>
+      )}
       {b ? (
         <>
-          <div className="smallText">
-            <strong>{data.company}:</strong> {b.companyBio}
-            <div className="muted">Team need: {b.teamNeed}</div>
-          </div>
+          <section className="briefSection">
+            <div className="briefHeading">About {data.company}</div>
+            <p className="briefText">{b.companyBio}</p>
+            <p className="briefText">
+              <span className="briefLabel">Team need</span> {b.teamNeed}
+            </p>
+          </section>
           <div className="briefColumns">
-            <div>
-              <div className="briefHeading">Matches</div>
-              <ul>
-                {b.strengths.map((s) => (
-                  <li key={s.point}>
-                    <strong>{s.point}</strong> <span className="muted">— {s.evidence}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <div className="briefHeading">Weak spots</div>
-              <ul>
-                {b.weakPoints.map((w) => (
-                  <li key={w.gap}>
-                    <strong>{w.gap}</strong>
-                    <div className="muted">Probe: {w.probe}</div>
-                    <div>Say: {w.answer}</div>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <section className="briefSection briefMatches">
+              <div className="briefHeading">Why you fit</div>
+              {b.strengths.map((s) => (
+                <div key={s.point} className="briefItem">
+                  <div className="briefItemTitle">{s.point}</div>
+                  <div className="briefText muted">{s.evidence}</div>
+                </div>
+              ))}
+            </section>
+            <section className="briefSection briefWeak">
+              <div className="briefHeading">Weak spots to prepare</div>
+              {b.weakPoints.map((w) => (
+                <div key={w.gap} className="briefItem">
+                  <div className="briefItemTitle">{w.gap}</div>
+                  <div className="briefText">
+                    <span className="briefLabel">They may ask</span> <em>{w.probe}</em>
+                  </div>
+                  <div className="briefSay">
+                    <span className="briefLabel">You can say</span> {w.answer}
+                  </div>
+                </div>
+              ))}
+            </section>
           </div>
           {b.askThem.length > 0 && (
-            <div className="smallText">
-              <div className="briefHeading">Ask them</div>
-              <ul>
+            <section className="briefSection briefAsk">
+              <div className="briefHeading">Questions to ask them</div>
+              <ol>
                 {b.askThem.map((q) => (
-                  <li key={q}>{q}</li>
+                  <li key={q} className="briefText">
+                    {q}
+                  </li>
                 ))}
-              </ul>
-            </div>
+              </ol>
+            </section>
           )}
         </>
       ) : data.reason === "no_jd" ? (

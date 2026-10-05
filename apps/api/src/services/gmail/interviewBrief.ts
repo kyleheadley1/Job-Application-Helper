@@ -33,11 +33,16 @@ export type InterviewBriefResponse = {
 const JD_CHARS = 6000;
 const RESUME_CHARS = 5000;
 
+/** Over-long text ends at the last full sentence within the limit when there is one, so lines don't stop mid-thought. */
 const clipWords = (max: number) => (s: string) => {
   const words = s.trim().split(/\s+/);
-  return words.length <= max ? words.join(" ") : `${words.slice(0, max).join(" ")}…`;
+  if (words.length <= max) return words.join(" ");
+  const clipped = words.slice(0, max).join(" ");
+  const sentenceEnd = Math.max(clipped.lastIndexOf(". "), clipped.lastIndexOf("; "));
+  return sentenceEnd > clipped.length / 2 ? clipped.slice(0, sentenceEnd + 1) : `${clipped}…`;
 };
-const text = (maxWords: number) => z.string().trim().min(1).transform(clipWords(maxWords));
+/** The prompt asks for `maxWords`; the clip allows some overshoot before cutting. */
+const text = (maxWords: number) => z.string().trim().min(1).transform(clipWords(Math.ceil(maxWords * 1.5)));
 const capped = <T extends z.ZodTypeAny>(item: T, max: number) =>
   z.array(item).transform((a) => a.slice(0, max));
 
@@ -58,9 +63,9 @@ Return JSON only:
 {
   "companyBio": string,   // <=40 words: what the company sells, to whom, stage/size if the JD says
   "teamNeed": string,     // <=25 words: what this team needs the hire to do
-  "strengths": [{ "point": string, "evidence": string }],          // up to 3: a JD requirement -> concrete proof from the resume
-  "weakPoints": [{ "gap": string, "probe": string, "answer": string }], // up to 3: the gap, the question an interviewer would ask, a one-line honest bridge answer
-  "askThem": [string]     // 2 sharp questions specific to this role/team
+  "strengths": [{ "point": string, "evidence": string }],          // up to 3: a JD requirement (<=12 words) -> concrete proof from the resume (<=25 words)
+  "weakPoints": [{ "gap": string, "probe": string, "answer": string }], // up to 3: the gap (<=12 words), the question an interviewer would ask (<=20 words), an honest bridge answer (<=30 words, 1-2 complete sentences)
+  "askThem": [string]     // 2 sharp questions specific to this role/team, <=25 words each
 }
 Weak points must come from the scorer's risks listed below (rephrase, don't add new ones unless the JD clearly demands something missing from the resume). Answers are honest bridges: adjacent experience plus how you'd close the gap, never claims the resume can't back.`;
 

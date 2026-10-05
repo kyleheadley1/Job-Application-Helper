@@ -1018,31 +1018,101 @@ tbody .tracker-sticky-left {
 }
 
 .interviewBrief {
-  gap: 0.4rem;
-  padding: 0.5rem 0.65rem;
-  border-left: 2px solid #30363d;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  margin-top: 0.4rem;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.briefRound {
   font-size: 0.85rem;
+  color: #c9d1d9;
 }
 
-.interviewBrief ul {
-  margin: 0.15rem 0 0;
-  padding-left: 1.1rem;
+.briefSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  background: #161b22;
+  border-radius: 6px;
+  border-top: 2px solid #30363d;
 }
 
-.interviewBrief li {
-  margin-bottom: 0.25rem;
+.briefMatches {
+  border-top-color: #3fb950;
+}
+
+.briefWeak {
+  border-top-color: #d29922;
+}
+
+.briefAsk {
+  border-top-color: #58a6ff;
+}
+
+.briefText {
+  margin: 0;
+}
+
+.briefItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.briefItem + .briefItem {
+  padding-top: 0.5rem;
+  border-top: 1px solid #21262d;
+}
+
+.briefItemTitle {
+  font-weight: 600;
+  color: #f0f6fc;
+}
+
+.briefLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8b949e;
+  margin-right: 0.3rem;
+}
+
+.briefSay {
+  padding: 0.4rem 0.55rem;
+  background: #1f6feb1a;
+  border-left: 2px solid #388bfd;
+  border-radius: 4px;
+}
+
+.briefAsk ol {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 
 .briefColumns {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.75rem;
+  align-items: start;
 }
 
 .briefHeading {
-  font-size: 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   color: #8b949e;
 }
 

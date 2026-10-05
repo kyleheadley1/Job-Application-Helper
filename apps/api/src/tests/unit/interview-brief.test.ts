@@ -67,11 +67,24 @@ describe("BriefSchema", () => {
       weakPoints: [weak, weak, weak, weak],
       askThem: ["a", "b", "c"],
     });
-    expect(parsed.companyBio.split(" ")).toHaveLength(40);
+    expect(parsed.companyBio.split(" ")).toHaveLength(60);
     expect(parsed.companyBio.endsWith("…")).toBe(true);
     expect(parsed.strengths).toHaveLength(3);
     expect(parsed.weakPoints).toHaveLength(3);
     expect(parsed.askThem).toHaveLength(2);
+  });
+
+  it("clips at the last full sentence instead of mid-thought", () => {
+    const first = Array.from({ length: 30 }, (_, i) => `a${i}`).join(" ");
+    const second = Array.from({ length: 30 }, (_, i) => `b${i}`).join(" ");
+    const parsed = BriefSchema.parse({
+      companyBio: "c",
+      teamNeed: "t",
+      strengths: [],
+      weakPoints: [{ gap: "g", probe: "q", answer: `${first}. ${second}.` }],
+      askThem: [],
+    });
+    expect(parsed.weakPoints[0]!.answer).toBe(`${first}.`);
   });
 });
 
