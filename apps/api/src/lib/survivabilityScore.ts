@@ -217,6 +217,19 @@ export const scoreDomainMatchForListing = (
 
 export { scorePoolFriendliness } from "./poolFriendliness.js";
 
+const PORTFOLIO_ASK_RE =
+  /\b(personal\s+projects?|side\s+projects?|open[\s-]?source\s+contributions?|contribut\w*\s+to\s+open[\s-]?source|github\s+profile|link\s+to\s+your\s+github|portfolio\s+of\s+(?:your\s+)?(?:work|projects?))\b/i;
+
+/** Employer and credential signals can't drop below this when the listing screens on portfolio evidence. */
+export const PORTFOLIO_FORWARD_SIGNAL_FLOOR = 0.6;
+
+/**
+ * The listing explicitly asks for personal projects or open source, and the candidate has them:
+ * the screen leans on that evidence, so employer brand and credentials weigh less.
+ */
+export const isPortfolioForwardMatch = (job: ExtractedJobData, profile: UserProfile, resumeText: string): boolean =>
+  PORTFOLIO_ASK_RE.test(jobBlob(job)) && profileHasPortfolio(profile, resumeText);
+
 export const computeSurvivability = (params: {
   extracted: ExtractedJobData;
   rules: RuleEvaluation;
@@ -237,10 +250,13 @@ export const computeSurvivability = (params: {
   );
 
   const poolMeta = computePoolFriendliness(params.extracted, params.profile);
+  const portfolioFloor = isPortfolioForwardMatch(params.extracted, params.profile, resumeText)
+    ? PORTFOLIO_FORWARD_SIGNAL_FLOOR
+    : 0;
 
   const subFactors: Record<SurvivabilitySubFactorKey, number> = {
-    employerRecognizability: scoreEmployerRecognizability(resumeText),
-    credentialSignal: credentialBoost.score,
+    employerRecognizability: Math.max(portfolioFloor, scoreEmployerRecognizability(resumeText)),
+    credentialSignal: Math.max(portfolioFloor, credentialBoost.score),
     impactMetricQuality: scoreImpactMetricQuality(resumeText),
     resumeStoryCoherence: scoreResumeStoryCoherence(resumeText, params.rawScore),
     domainMatchForListing: scoreDomainMatchForListing(

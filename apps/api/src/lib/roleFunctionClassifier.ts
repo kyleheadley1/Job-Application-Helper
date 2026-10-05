@@ -154,6 +154,29 @@ const PLATFORM_ENABLEMENT_PATTERNS: RegExp[] = [
   /\bterraform\b/i,
 ];
 
+/** Infrastructure work itself, as opposed to merely using cloud services. */
+const INFRA_CORE_PATTERNS: RegExp[] = [
+  /\bkubernetes\b|\bk8s\b/i,
+  /\bterraform\b|\binfrastructure[\s-]as[\s-]code\b|\biac\b/i,
+  /\bnetworking\b|\bservice\s+mesh\b/i,
+  /\bobservability\b|\bmonitoring\s+(?:and|&)\s+alerting\b/i,
+  /\bsite\s+reliability\b|\bsre\b|\bon[\s-]?call\b/i,
+  /\b(?:cloud|platform|core)\s+infrastructure\b|\binfrastructure\s+platform\b/i,
+  /\b(?:internal\s+)?developer\s+platform\b/i,
+  /\bdeploy(?:ment)?\s+(?:systems?|pipelines?|tooling|infrastructure)\b|\bci\/cd\b/i,
+  /\bdistributed\s+systems?\b|\bclusters?\b/i,
+  /\bcontainer(?:s|ization)?\b|\bdocker\b/i,
+];
+
+/** Product-builder work: UI, user experience, AI features, end-to-end feature ownership. */
+const PRODUCT_BUILDER_PATTERNS: RegExp[] = [
+  /\breact(?:js|\.js)?\b|\bfront[\s-]?end\b/i,
+  /\buser\s+experiences?\b|\bux\b/i,
+  /\bproduct\s+experiences?\b|\bproduct[\s-]minded\b|\bai[\s-]powered\s+(?:products?|features?|experiences?)\b/i,
+  /\bllms?\b|\blarge\s+language\s+models?\b/i,
+  /\bend[\s-]to[\s-]end\b|\bown(?:ing)?\s+features?\b|\bship(?:ping)?\s+fast\b/i,
+];
+
 const PRODUCT_USER_FACING_PATTERNS: RegExp[] = [
   /\bcustomer[\s-]?facing\b/i,
   /\bend[\s-]?users?\b/i,
@@ -249,12 +272,20 @@ export const classifyPlatformInfraRole = (job: ExtractedJobData): PlatformInfraC
 
   const enablementHits = countPatternHits(PLATFORM_ENABLEMENT_PATTERNS, blob);
   const productHits = countPatternHits(PRODUCT_USER_FACING_PATTERNS, blob);
+  const infraHits = countPatternHits(INFRA_CORE_PATTERNS, blob);
+  const builderHits = countPatternHits(PRODUCT_BUILDER_PATTERNS, blob);
+  const platformSignals = enablementHits + infraHits;
 
   if (productHits >= 2 && productHits > enablementHits) {
     return { detected: false, note: "" };
   }
 
-  if (titleMatch && (enablementHits >= 1 || productHits === 0)) {
+  // "AI Platform Engineer" building React + LLM product features is product work, whatever the title.
+  if (builderHits >= 3 && platformSignals < 2) {
+    return { detected: false, note: "" };
+  }
+
+  if (titleMatch && platformSignals >= 1) {
     return { detected: true, note: PLATFORM_INFRA_ROLE.FLAG };
   }
 
