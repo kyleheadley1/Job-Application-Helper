@@ -1,6 +1,14 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
+import {
+  AtmosBrief,
+  BriefStylePicker,
+  MinimalBrief,
+  RehearseBrief,
+  TabsBrief,
+  useBriefStyle,
+} from "../components/InterviewBriefViews";
 import { NextStepsCard } from "../components/NextStepsCard";
 import { ScoringDetailsPanel } from "../components/ScoringDetailsPanel";
 import type {
@@ -233,6 +241,7 @@ function InterviewBriefPanel({
   onCopy: () => void;
   onOpenJd: () => void;
 }) {
+  const [style, setStyle] = useBriefStyle();
   if (!state || (state.loading && !state.data)) return <span className="muted smallText">Building brief…</span>;
   if (state.error && !state.data) return <span className="smallText errorText">{state.error}</span>;
   const { data } = state;
@@ -240,12 +249,25 @@ function InterviewBriefPanel({
   const b = data.brief;
   return (
     <div className="interviewBrief">
-      {data.round && (
-        <div className="briefRound">
-          <span className="briefHeading">This round</span> {data.round}
-        </div>
-      )}
-      {b ? (
+      <div className="rowBetween" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
+        {data.round && (style === "sections" || !b) ? (
+          <div className="briefRound">
+            <span className="briefHeading">This round</span> {data.round}
+          </div>
+        ) : (
+          <span />
+        )}
+        {b && <BriefStylePicker value={style} onChange={setStyle} />}
+      </div>
+      {b && style === "minimal" ? (
+        <MinimalBrief data={data} b={b} />
+      ) : b && style === "tabs" ? (
+        <TabsBrief data={data} b={b} />
+      ) : b && style === "rehearse" ? (
+        <RehearseBrief data={data} b={b} />
+      ) : b && style === "atmos" ? (
+        <AtmosBrief data={data} b={b} />
+      ) : b ? (
         <>
           <section className="briefSection">
             <div className="briefHeading">About {data.company}</div>
@@ -1296,7 +1318,7 @@ export function DashboardPage() {
             {counts.map(({ status: s, count }) => (
               <div key={s} className="card" title={STATUS_CARD_HINT[s]}>
                 <div className="muted">{STATUS_LABEL[s]}</div>
-                <div style={{ fontSize: "1.8rem", fontWeight: 700 }}>{count}</div>
+                <div className="statNumber">{count}</div>
               </div>
             ))}
           </div>

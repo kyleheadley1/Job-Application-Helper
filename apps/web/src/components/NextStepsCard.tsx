@@ -13,8 +13,19 @@ const KIND_LABEL: Record<AgentKind, { label: string; pill: string }> = {
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-const dueText = (iso: string): string =>
-  new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+const countdown = (iso: string, now: number): string => {
+  const hours = Math.round((Date.parse(iso) - now) / 3_600_000);
+  if (!Number.isFinite(hours) || hours < 0) return "";
+  if (hours < 1) return "within the hour";
+  if (hours < 48) return `in ${hours}h`;
+  return `in ${Math.round(hours / 24)} days`;
+};
+
+const dueText = (iso: string, now = Date.now()): string => {
+  const when = new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  const left = countdown(iso, now);
+  return left ? `${when} (${left})` : when;
+};
 
 function SuggestionRow({
   s,

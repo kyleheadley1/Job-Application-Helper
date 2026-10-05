@@ -41,7 +41,7 @@ const SYSTEM_PROMPT = `You are a job-search assistant reviewing a candidate's op
 
 For every item return:
 - priority 1-5 (5 = do today: deadlines, interviews within a day; 1 = housekeeping)
-- reason: one sentence, <=25 words, why it matters now and what exactly to do
+- reason: one sentence, <=25 words, why it matters now and what exactly to do. Never say how long until something ("in 41 hours", "tomorrow", "in 3 days"): the app shows the date and a live countdown next to it.
 - draft: only when the item says draftable=yes. A short, warm, specific email (<=110 words) the candidate can send as-is: no subject line, no placeholders like [Name] except the recipient greeting "Hi there," when no name is known, signed "Best,". Never invent facts, names, or dates beyond those given.
 
 Return JSON only: {"items":[{"i":<number>,"priority":<1-5>,"reason":"...","draft":"..." | null}]}`;
@@ -110,7 +110,13 @@ export const runDailyAgent = async (deps: AgentDeps = defaultDeps, now = new Dat
     const prev = existing.get(c.id);
     return !prev || prev.status === "open";
   });
-  const fresh = live.filter((c) => existing.get(c.id)?.writtenBy !== "agent");
+  const today = localDay(now);
+  const isNew = (c: AgentCandidate) => existing.get(c.id)?.writtenBy !== "agent";
+  const isStale = (c: AgentCandidate) => {
+    const prev = existing.get(c.id);
+    return prev?.writtenBy === "agent" && localDay(new Date(prev.updatedAt)) !== today;
+  };
+  const fresh = [...live.filter(isNew), ...live.filter(isStale)];
 
   const budget = fresh.length > 0 ? await deps.loadBudget() : null;
   const toWrite = budget && budget.allowedUnits > 0 ? fresh.slice(0, MAX_AGENT_CANDIDATES) : [];
@@ -128,15 +134,16 @@ export const runDailyAgent = async (deps: AgentDeps = defaultDeps, now = new Dat
   for (const c of live) {
     const prev = existing.get(c.id);
     const item = written.get(c.id);
-    if (prev && !item) continue;
+    if (prev?.writtenBy === "agent" && !item) continue;
     const base = fromRules(c, prev?.createdAt ?? nowIso);
+    const draft = c.draftable ? (item?.draft ?? prev?.draft) : undefined;
     await deps.save(
       item
         ? {
             ...base,
             priority: item.priority,
             reason: item.reason,
-            ...(c.draftable && item.draft ? { draft: item.draft } : {}),
+            ...(draft ? { draft } : {}),
             writtenBy: "agent",
             updatedAt: nowIso,
           }

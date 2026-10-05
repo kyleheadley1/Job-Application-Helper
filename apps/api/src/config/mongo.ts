@@ -42,6 +42,9 @@ const ensureIndexes = async (targetDb: Db): Promise<void> => {
 
 export const getDb = async (): Promise<Db> => {
   if (dbOverride) return dbOverride;
+  if (process.env.VITEST) {
+    throw new Error("Tests must not touch the real database: use createMongoTestHarness or mock the repository.");
+  }
   if (db) return db;
   client = new MongoClient(env.mongoUri, { ignoreUndefined: true });
   await client.connect();

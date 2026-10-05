@@ -1,0 +1,345 @@
+/*
+ * Themes, set on <html data-theme> with data-mode="light" | "dark":
+ *   light   — "Paper": warm cream paper, ink text, terracotta accent (default)
+ *   atmos   — dark indigo
+ *   classic — original dark, the :root values in styles.css
+ * Every theme except classic shares the layout and type rules below. Shared rules use :where() so they
+ * stay at element-level specificity and never override class-based colors such as the score pills.
+ */
+
+[data-theme="atmos"] {
+  --canvas: #0e0c16;
+  --surface-0: #0b0a12;
+  --surface-1: #15131f;
+  --surface-2: #1b1828;
+  --surface-3: #221e31;
+  --border: rgba(237, 233, 254, 0.09);
+  --hairline: rgba(237, 233, 254, 0.06);
+  --text: #f4f2fb;
+  --text-strong: #ece9f7;
+  --text-soft: #cfcae2;
+  --text-muted: #8f8aa8;
+  --accent: #a78bfa;
+  --accent-soft: rgba(167, 139, 250, 0.14);
+  --accent-border: rgba(167, 139, 250, 0.32);
+  --row-hover: rgba(237, 233, 254, 0.025);
+  --topbar-bg: rgba(14, 12, 22, 0.72);
+  --edge: linear-gradient(120deg, #8b5cf6, #3b82f6 60%, #ec4899);
+  --edge-shadow: rgba(124, 58, 237, 0.22);
+  --glow:
+    radial-gradient(1100px 520px at 12% -120px, rgba(124, 58, 237, 0.28), transparent 70%),
+    radial-gradient(900px 480px at 88% -160px, rgba(37, 99, 235, 0.22), transparent 70%),
+    radial-gradient(700px 360px at 50% -200px, rgba(219, 39, 119, 0.12), transparent 70%);
+  color-scheme: dark;
+}
+
+/* Paper: tokens from the "Warm Editorial" design system (cream paper, ink, terracotta). */
+[data-theme="light"] {
+  --canvas: #f5efe4;
+  --surface-0: #fffdf8;
+  --surface-1: #fffaf2;
+  --surface-2: #f8f1e6;
+  --surface-3: #efe6d8;
+  --border: #e4d8c6;
+  --hairline: #eee4d5;
+  --text: #1c1a17;
+  --text-strong: #201914;
+  --text-soft: #4c4037;
+  --text-muted: #7a6d63;
+  --accent: #a8492a;
+  --accent-soft: #f6e4d8;
+  --accent-border: #e6c3ad;
+  --row-hover: #fbf5ec;
+  --topbar-bg: rgba(245, 239, 228, 0.82);
+  --edge: linear-gradient(120deg, #c0512f, #e0a43a 55%, #2f5b4f);
+  --edge-shadow: rgba(168, 73, 42, 0.18);
+  --glow:
+    radial-gradient(1000px 460px at 8% -140px, rgba(224, 164, 58, 0.16), transparent 70%),
+    radial-gradient(900px 440px at 92% -160px, rgba(192, 81, 47, 0.1), transparent 70%),
+    radial-gradient(800px 600px at 50% 110%, rgba(47, 91, 79, 0.06), transparent 70%);
+
+  --pill-good: #2e7d4f;
+  --pill-warn: #b5620a;
+  --pill-bad: #b3382c;
+  --pill-info: #2f5d8a;
+  --pill-fg: #fffdf8;
+  --green-text: #2e6b43;
+  --green-bg: #e3eedf;
+  --green-border: #8fbf9a;
+  --blue-text: #2f5279;
+  --blue-bg: #e2e9f1;
+  --blue-bg-strong: #dce5ef;
+  --amber-text: #8a5a0b;
+  --amber-bg: #f6e8cc;
+  --purple-text: #6b4785;
+  --purple-bg: #eee3f1;
+  --red-text: #9e3127;
+  --red-bg: #f6e0da;
+  --red-border: #e0a197;
+  color-scheme: light;
+}
+
+html:not([data-theme="classic"]) {
+  --font-ui: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: "IBM Plex Serif", "Iowan Old Style", Georgia, serif;
+}
+
+:where(html:not([data-theme="classic"])) body {
+  background: var(--glow), var(--canvas);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.003em;
+}
+
+/* Faint paper grain on the light themes so the canvas reads as a surface, not a screen. */
+:where([data-mode="light"]) body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.35;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.38 0 0 0 0 0.3 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Type: serif display for page titles, card titles, and the big numbers. */
+:where(html:not([data-theme="classic"])) :where(h1, h2, h3) {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+:where(html:not([data-theme="classic"])) h1 {
+  font-size: 1.6rem;
+}
+
+:where(html:not([data-theme="classic"])) h2 {
+  font-size: 1.9rem;
+}
+
+:where(html:not([data-theme="classic"]))
+  :where(.card h3, .card > strong:first-child, .card > .rowBetween > strong:first-child, .card > .row > strong:first-child) {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1.2rem;
+  letter-spacing: -0.01em;
+}
+
+:where(html:not([data-theme="classic"])) .statNumber {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 2.2rem;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+:where(html:not([data-theme="classic"])) .tracker-filters-heading {
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+/* Top bar: translucent strip that stays put as you scroll. */
+:where(html:not([data-theme="classic"])) .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  margin: -1rem -1rem 1.25rem;
+  padding: 0.25rem 1rem;
+  background: var(--topbar-bg);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+
+:where(html:not([data-theme="classic"])) .topbar nav {
+  gap: 0.25rem;
+}
+
+:where(html:not([data-theme="classic"])) .topbar nav a {
+  color: var(--text-soft);
+  text-decoration: none;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  transition: background 140ms, color 140ms;
+}
+
+:where(html:not([data-theme="classic"])) .topbar nav a:hover {
+  color: var(--text);
+  background: var(--accent-soft);
+}
+
+:where(html:not([data-theme="classic"])) .topbar nav a.active {
+  color: var(--text);
+  background: var(--surface-3);
+}
+
+/* Light themes: the active page is a solid ink pill, the strongest mark in the chrome. */
+:where([data-mode="light"]) .topbar nav a.active {
+  color: var(--surface-0);
+  background: var(--text);
+}
+
+/* Surfaces */
+:where(html:not([data-theme="classic"])) .card {
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+:where([data-mode="light"]) .card {
+  border-color: var(--border);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 1px 2px rgba(60, 40, 20, 0.04);
+}
+
+:where(html:not([data-theme="classic"])) .table th {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+:where(html:not([data-theme="classic"])) :where(.table th, .table td) {
+  border-bottom-color: var(--hairline);
+}
+
+:where(html:not([data-theme="classic"])) .table tbody tr {
+  transition: background 120ms;
+}
+
+:where(html:not([data-theme="classic"])) .table tbody tr:hover {
+  background: var(--row-hover);
+}
+
+/* Controls */
+:where(html:not([data-theme="classic"])) :where(input, textarea, select) {
+  background: var(--surface-0);
+  border-color: var(--border);
+  border-radius: 10px;
+}
+
+:where(html:not([data-theme="classic"])) :where(input, textarea, select):focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+:where(html:not([data-theme="classic"])) button {
+  border-radius: 10px;
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  transition: background 140ms, border-color 140ms, box-shadow 140ms;
+}
+
+:where(html:not([data-theme="classic"])) button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+:where(html:not([data-theme="classic"])) .btn-secondary {
+  background: var(--surface-3);
+  border-color: var(--border);
+}
+
+:where(html:not([data-theme="classic"])) :where(.linkButton, .bv-picker button, .bv-tab) {
+  background: none;
+  border-color: transparent;
+}
+
+:where(html:not([data-theme="classic"])) .bv-picker button.active {
+  background: var(--surface-3);
+}
+
+:where(html:not([data-theme="classic"])) .bv-tab.active {
+  border-bottom-color: var(--text);
+}
+
+:where([data-mode="light"]) a {
+  color: var(--accent);
+}
+
+/* Score and status pills: slightly bolder in the new themes. */
+:where(html:not([data-theme="classic"])) .pill {
+  font-weight: 600;
+}
+
+:where(html:not([data-theme="classic"])) .fitScore {
+  min-width: 2.6rem;
+  border-radius: 999px;
+}
+
+:where([data-mode="light"]) .fitScore {
+  box-shadow: 0 1px 2px rgba(60, 40, 20, 0.18);
+}
+
+/* Floating assistant button gets the one gradient edge in the UI. */
+:where(html:not([data-theme="classic"])) .assistant-toggle {
+  background:
+    linear-gradient(var(--surface-1), var(--surface-1)) padding-box,
+    var(--edge) border-box;
+  border: 1px solid transparent;
+  box-shadow: 0 8px 28px var(--edge-shadow);
+}
+
+:where(html:not([data-theme="classic"])) .assistant-panel {
+  background: color-mix(in srgb, var(--surface-1) 94%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+:where(html:not([data-theme="classic"])) .assistant-msg-user .assistant-bubble,
+:where(html:not([data-theme="classic"])) .briefSay {
+  background: var(--accent-soft);
+}
+
+:where(html:not([data-theme="classic"])) .briefSay {
+  border-left-color: var(--accent);
+}
+
+:where(html:not([data-theme="classic"])) .interviewBrief {
+  background: var(--surface-2);
+  border-radius: 12px;
+}
+
+:where([data-mode="light"]) .briefSection {
+  background: var(--surface-0);
+}
+
+:where([data-mode="light"]) .bv-atmos-hero {
+  background:
+    radial-gradient(120% 140% at 0% 0%, var(--accent-soft), transparent 55%),
+    var(--surface-0);
+}
+
+/* Light-mode contrast for colored text that was tuned for dark backgrounds. */
+:where([data-mode="light"]) :where(.bv-chip.bv-good, .bv-atmos-col.bv-good h5) {
+  color: var(--green-text);
+}
+
+:where([data-mode="light"]) :where(.bv-chip.bv-warn, .bv-atmos-col.bv-warn h5) {
+  color: var(--amber-text);
+}
+
+:where([data-mode="light"]) :where(.bv-chip.bv-info, .bv-atmos-ask h5, .bv-min-ask span) {
+  color: var(--blue-text);
+}
+
+:where([data-mode="light"]) .error {
+  color: var(--red-text);
+}
+
+:where([data-mode="light"]) .assistant-panel {
+  box-shadow: 0 8px 28px rgba(60, 40, 20, 0.12);
+}
+
+.theme-picker {
+  font-size: 0.78rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(html:not([data-theme="classic"])) * {
+    transition: none !important;
+  }
+}

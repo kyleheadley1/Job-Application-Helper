@@ -9,6 +9,7 @@ import { FilterBar } from "../components/FilterBar";
 import { etDateKey, etRangeKeys, isDateKeyInRange } from "../lib/dateEt";
 import {
   appliedAtIso,
+  appliedDateIso,
   appliedAtToDateInputValue,
   companyDisplayLabel,
   hasJdSource,
@@ -35,7 +36,7 @@ const PRIMARY_COLUMNS = [
   "mainRisk",
   "salary",
   "notes",
-  "updatedAt",
+  "applied",
 ] as const;
 
 const EXTRA_COLUMNS = ["rank", "discussed", "originalAlt", "priority"] as const;
@@ -51,7 +52,7 @@ const SORTABLE_KEYS = [
   "status",
   "resume",
   "salary",
-  "updatedAt",
+  "applied",
   "rank",
   "priority",
 ] as const;
@@ -182,9 +183,13 @@ function compareJobs(a: JobRecord, b: JobRecord, key: TrackerSortKey, dir: SortD
       cmp = na - nb;
       break;
     }
-    case "updatedAt":
+    case "applied": {
+      const appliedA = Boolean(appliedDateIso(a));
+      const appliedB = Boolean(appliedDateIso(b));
+      if (appliedA !== appliedB) return appliedA ? -1 : 1;
       cmp = trackerDateMs(a) - trackerDateMs(b);
       break;
+    }
     case "rank": {
       const ra = rankSortValue(a);
       const rb = rankSortValue(b);
@@ -205,7 +210,7 @@ function compareJobs(a: JobRecord, b: JobRecord, key: TrackerSortKey, dir: SortD
 }
 
 function defaultDirForKey(key: TrackerSortKey): SortDir {
-  if (key === "updatedAt" || key === "score" || key === "rank") return "desc";
+  if (key === "applied" || key === "score" || key === "rank") return "desc";
   return "asc";
 }
 
@@ -244,8 +249,8 @@ export const TrackerPage = () => {
   );
 
   const [sortKey, setSortKey] = useState<TrackerSortKey>(() => {
-    const k = readLs(LS_SORT_KEY, "updatedAt");
-    return isSortableKey(k) ? k : "updatedAt";
+    const k = readLs(LS_SORT_KEY, "applied");
+    return isSortableKey(k) ? k : "applied";
   });
   const [sortDir, setSortDir] = useState<SortDir>(() => {
     const d = readLs(LS_SORT_DIR, "desc");
@@ -594,7 +599,7 @@ export const TrackerPage = () => {
             {(job.tracker.notes ?? "").trim() || "—"}
           </span>
         );
-      case "updatedAt":
+      case "applied":
         {
           const main = trackerDisplayDate(job);
           const mainMs = new Date(main.sortIso).getTime();
@@ -706,7 +711,7 @@ export const TrackerPage = () => {
       mainRisk: "Main risk",
       salary: "Salary ask",
       notes: "Notes",
-      updatedAt: "Date",
+      applied: "Applied",
       rank: "Rank",
       discussed: "Discussed",
       originalAlt: "Orig / alt",

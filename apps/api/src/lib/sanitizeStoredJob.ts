@@ -45,14 +45,15 @@ const sanitizeSurvivabilityBreakdown = (score: ScoreBreakdown): ScoreBreakdown =
   };
 };
 
+const LABELS = new Set<string>(Object.values(RECOMMENDATION_LABELS));
+
 /** Drop cached scoreDisplay rows persisted before the score-tier recommendation model. */
 const sanitizeScoreDisplay = (display: ScoreDisplay | undefined): ScoreDisplay | undefined => {
   if (!display) return undefined;
   if (!(RECOMMENDATIONS as readonly string[]).includes(display.scoreBand)) return undefined;
-  return display;
+  if (LABELS.has(display.bandHeadline)) return display;
+  return { ...display, bandHeadline: RECOMMENDATION_LABELS[display.scoreBand] };
 };
-
-const LABELS = new Set<string>(Object.values(RECOMMENDATION_LABELS));
 
 const sanitizeRecommendationLabel = (score: ScoreBreakdown): ScoreBreakdown => {
   if (score.recommendationLabel && LABELS.has(score.recommendationLabel)) return score;

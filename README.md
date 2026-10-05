@@ -23,7 +23,7 @@ It is designed as an operator assistant, not an autonomous applier.
 - Recommendation is the score tier, nothing else: Strong apply (80+), Apply (65–79), Apply but weak (stretch) (50–64), Weak (under 50, including hard-gated roles, which are capped at 25 and show the gate reason)
 - Resume recommendation between your two resume variants: `BASE` (general) and `AI` (specialized). See section H. Older records may show legacy `SWE`/`SIE`/`EARLY_CAREER`
 - On-demand generation of cover letter, why-company, talking points, and bullet candidates
-- Tracker workflow with an explicit "confirm applied" flow, editable applied date, and notes
+- Tracker workflow with an explicit "confirm applied" flow, editable applied date, and notes. The tracker is ordered by applied date, newest first; a lapsed or rejected role keeps its applied date, and rows never applied to sort last. Last-updated times live on the dashboard (and in the date tooltip)
 - Tracker import from a spreadsheet (`xlsx`)
 - Top Jobs: daily scan of LinkedIn, Indeed, ZipRecruiter, and Remote Hunter job-alert emails (needs Gmail connected). Only remote or NYC roles that are still open are kept; roles are de-duplicated against the tracker and past applications, scored, and filtered by score. A cheap batched pre-screen ranks queued alert titles first, so the few paid scorings (5 per run, $2/month cap) go to the most promising roles. Listed roles are rechecked and hidden once the posting closes
 - Local resume context grounding from files on your machine
@@ -44,7 +44,9 @@ It is designed as an operator assistant, not an autonomous applier.
 - Interview vs interviewing: the "Interview" status card counts applications that reached an interview in the window. Being actively in process is shown separately: an "Interviewing" pill (an open application with an upcoming interview or interview email in the last 21 days, otherwise "Interviewed") and an "Interviewing now" list in the upcoming interviews card
 - Upcoming interviews: the top of the dashboard lists confirmed interview times from the last 60 days of email, soonest first, with company, role, round, date and time (with a "Today" / "Tomorrow" / "In N days" badge). Reschedules replace the earlier time; cancelled interviews and rejected roles drop off. Times stated without a timezone use `USER_TIMEZONE` (defaults to your machine's zone)
 - Scoring details: click any fit score to open the full breakdown: category scores, survivability, hard gates and the rules that fired, penalties, extractor output and the stored JD. Scores given before this snapshot existed can be audited with "Run diagnostic re-score", which re-runs the stored JD and saves the result separately. The original score never changes
-- Matches applications to tracker rows and suggests status updates (e.g. "Update to Rejected")
+- Matches applications to tracker rows and suggests status updates (e.g. "Update to Rejected"). A row matches on company (exact, or the shorter name leading the longer word for word, so "Pave" = "Pave Finance"), a similar role, and applied dates within 21 days
+- Scored applications with no tracker row are added to the tracker automatically, once, from the stored score (never re-scored), with their Gmail status history
+- Interview prep: "Prep" on an upcoming interview opens a short brief (company bio, the round, likely questions with what to say, your strongest matches and weak spots, questions to ask). It's generated once per application, stored, and never feeds the score. Answers are kept to complete sentences. The brief can be read as sections, a minimal page, tabs, rehearsal flip cards, or an atmospheric layout
 - 7- or 30-day window. Syncing again only processes new mail
 
 **JD recovery and blind scoring**
@@ -76,7 +78,7 @@ Two features act on your behalf, both built so that the model only reads and sug
   - an interview in the last 2 days (thank-you)
   - no reply for 7–29 days mid-process (follow-up)
   - no reply for 30+ days on an open tracker row (mark as ghosted/`lapsed`)
-- One gpt-5-mini call then ranks the new items, explains each in a sentence, and writes short email drafts. Items already written, dismissed, or done are never paid for again. About $0.001–0.02 per day
+- One gpt-5-mini call then ranks the new items, explains each in a sentence, and writes short email drafts. Items written on an earlier day are rewritten in that same daily call, so priorities and wording stay current; items written today, dismissed, or done are not paid for again. Due times show the date with a live countdown ("Oct 6, 10:45 AM (in 23h)"), so the text never carries a stale "in N hours". About $0.001–0.02 per day
 - What it does on its own: write suggestions and draft text inside the app. What waits for you: "Approve" applies a tracker change; "Create Gmail draft" opens an editor (recipient + text) and saves a reply draft in the original thread
 
 *Chat assistant (every page)*
@@ -98,7 +100,17 @@ Two features act on your behalf, both built so that the model only reads and sug
 - OpenAI cost: today, last 7 days, this month (with per-feature caps), per scored role, per email, and by feature, estimated from OpenAI-reported token counts
 - A low-budget warning when 20% or less of the Serper budget is left
 
+**Look and feel**
+
+- Three themes from the picker in the top bar: Paper (default: warm cream paper, ink text, terracotta accent, serif headings), Dark (indigo), and Classic dark (the original). The choice is remembered per browser
+- Score pills always keep their tier colors (green 80+, blue 65+, amber 50+, red below) in every theme
+
 **Recent fixes**
+
+Data integrity:
+
+- Tests can no longer touch your real database: under vitest, `getDb()` refuses to connect unless a test harness injected an isolated DB. A JD recovery test had been writing fixture jobs into the tracker through the auto-add step; those rows were removed
+- Score snapshots saved under the old recommendation labels ("Yes", "If quick", "Skip") are shown with the current tier label on read; the stored scores are unchanged
 
 Scoring:
 

@@ -360,6 +360,14 @@ export const suggestTrackerStatus = (
 const trackerCompany = (job: JobRecord): string =>
   normalizeCompany(job.extracted.companyDisplayName || job.extracted.company || "");
 
+/** Same company when the shorter normalized name leads the longer one word for word ("pave" ~ "pave finance"). */
+export const sameCompany = (a: string, b: string): boolean => {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const [short, long] = a.length <= b.length ? [a.split(" "), b.split(" ")] : [b.split(" "), a.split(" ")];
+  return short.every((token, i) => long[i] === token);
+};
+
 /** Applied dates further apart than this mean a re-application, not the same one. */
 export const SAME_APPLICATION_DAYS = 21;
 
@@ -384,7 +392,7 @@ export const matchTrackerJob = (
     if (linked) return linked;
   }
   const companyKey = normalizeCompany(app.company);
-  const candidates = jobs.filter((j) => trackerCompany(j) === companyKey && appliedDatesCompatible(app, j));
+  const candidates = jobs.filter((j) => sameCompany(trackerCompany(j), companyKey) && appliedDatesCompatible(app, j));
   if (candidates.length === 0) return undefined;
   if (!app.role) return candidates.length === 1 ? candidates[0] : undefined;
   let best: { job: JobRecord; score: number } | undefined;

@@ -315,6 +315,16 @@ describe("matchTrackerJob", () => {
   it("does not match unrelated roles", () => {
     expect(matchTrackerJob({ company: "Acme", role: "Product Designer" }, jobs)).toBeUndefined();
   });
+
+  it("matches when one company name leads the other word for word", () => {
+    const pave = [job("p", "Pave", "Software Engineer 1", "applied")];
+    expect(matchTrackerJob({ company: "Pave Finance", role: "Software Engineer" }, pave)?.id).toBe("p");
+  });
+
+  it("does not match a company that only shares a word prefix", () => {
+    const block = [job("x", "Blockchain Capital", "Software Engineer", "applied")];
+    expect(matchTrackerJob({ company: "Block", role: "Software Engineer" }, block)).toBeUndefined();
+  });
 });
 
 describe("suggestTrackerStatus", () => {

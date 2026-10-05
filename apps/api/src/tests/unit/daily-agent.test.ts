@@ -103,8 +103,9 @@ describe("runDailyAgent", () => {
     expect(summary.budgetLimited).toBe(true);
   });
 
-  it("never brings back dismissed steps and doesn't pay twice for steps already written", async () => {
-    const base = { company: "x", role: null, title: "t", reason: "r", priority: 1, draftable: false, createdAt: daysAgo(1), updatedAt: daysAgo(1) };
+  it("never brings back dismissed steps and doesn't pay twice for steps already written today", async () => {
+    const earlierToday = new Date(NOW.getTime() - 3_600_000).toISOString();
+    const base = { company: "x", role: null, title: "t", reason: "r", priority: 1, draftable: false, createdAt: daysAgo(1), updatedAt: earlierToday };
     const { deps, saved, expired } = makeDeps({
       existing: [
         { ...base, id: `mark_ghosted:a:${daysAgo(40).slice(0, 10)}`, kind: "mark_ghosted", appKey: "a", writtenBy: "agent", status: "dismissed" },
@@ -116,6 +117,28 @@ describe("runDailyAgent", () => {
     expect(saved).toEqual([]);
     expect(summary.candidates).toBe(1);
     expect(expired[0]).toEqual([`follow_up:b:${daysAgo(10).slice(0, 10)}`]);
+  });
+
+  it("rewrites steps the agent wrote on an earlier day, keeping the old draft if none comes back", async () => {
+    const followId = `follow_up:b:${daysAgo(10).slice(0, 10)}`;
+    const { deps, saved } = makeDeps({
+      loadApps: async () => [followUpApp("b")],
+      existing: [
+        {
+          id: followId, kind: "follow_up", appKey: "b", company: "b", role: null, title: "t", reason: "Interview in ~41 hours",
+          priority: 3, draftable: true, draft: "Old draft", writtenBy: "agent", status: "open", createdAt: daysAgo(2), updatedAt: daysAgo(1),
+        },
+      ],
+      run: vi.fn(async () => ({
+        success: true,
+        data: { items: [{ i: 1, priority: 5, reason: "Fresh reason.", draft: null }] },
+        diagnostics: { fallbackUsed: false },
+      })),
+    });
+    await runDailyAgent(deps, NOW);
+    expect(deps.run).toHaveBeenCalledTimes(1);
+    expect(saved).toHaveLength(1);
+    expect(saved[0]).toMatchObject({ id: followId, reason: "Fresh reason.", priority: 5, draft: "Old draft", createdAt: daysAgo(2) });
   });
 });
 

@@ -232,6 +232,11 @@ function earliestValidIso(values: Array<string | undefined>): string {
 
 export function appliedAtIso(job: JobRecord): string {
   if (!isAppliedPipelineStatus(job.status)) return "";
+  return appliedDateIso(job);
+}
+
+/** When the user applied, whatever the status is now (a lapsed or rejected job keeps its applied date). */
+export function appliedDateIso(job: JobRecord): string {
   // Manual override (tracker Date edit) wins over derived status-history timestamp.
   const override = job.tracker?.appliedAt?.trim();
   if (override) {
@@ -317,7 +322,7 @@ export type TrackerDisplayDate = {
  * 3) added/triaged timestamp (createdAt)
  */
 export function trackerDisplayDate(job: JobRecord): TrackerDisplayDate {
-  const applied = appliedAtIso(job);
+  const applied = appliedDateIso(job);
   if (applied) {
     return {
       displayText: formatTrackerDateCompact(applied),

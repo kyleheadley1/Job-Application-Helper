@@ -1,4 +1,5 @@
-import { Link, Navigate, Route, Routes, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Navigate, NavLink, Route, Routes, useParams } from "react-router-dom";
 import { AssistantPanel } from "./components/AssistantPanel";
 import { AddJobPage } from "./pages/AddJobPage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -12,16 +13,52 @@ function TopJobDetailRoute() {
   return <TopJobDetailPage key={id} />;
 }
 
+const THEMES = [
+  { id: "light", label: "Paper", mode: "light" },
+  { id: "atmos", label: "Dark", mode: "dark" },
+  { id: "classic", label: "Classic dark", mode: "dark" },
+] as const;
+type Theme = (typeof THEMES)[number]["id"];
+
+function ThemePicker() {
+  const [theme, setTheme] = useState<Theme>(() => {
+    const current = document.documentElement.dataset.theme;
+    return THEMES.some((t) => t.id === current) ? (current as Theme) : "light";
+  });
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.dataset.mode = THEMES.find((t) => t.id === theme)?.mode ?? "light";
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+  return (
+    <select
+      className="theme-picker"
+      value={theme}
+      onChange={(e) => setTheme(e.target.value as Theme)}
+      aria-label="Theme"
+    >
+      {THEMES.map((t) => (
+        <option key={t.id} value={t.id}>
+          {t.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function App() {
   return (
     <main className="layout">
       <header className="topbar">
         <h1>Job Search Copilot</h1>
         <nav className="row">
-          <Link to="/">Dashboard</Link>
-          <Link to="/addjob">Add Job</Link>
-          <Link to="/top-jobs">Top Jobs</Link>
-          <Link to="/tracker">Tracker</Link>
+          <NavLink to="/" end>
+            Dashboard
+          </NavLink>
+          <NavLink to="/addjob">Add Job</NavLink>
+          <NavLink to="/top-jobs">Top Jobs</NavLink>
+          <NavLink to="/tracker">Tracker</NavLink>
+          <ThemePicker />
         </nav>
       </header>
       <Routes>

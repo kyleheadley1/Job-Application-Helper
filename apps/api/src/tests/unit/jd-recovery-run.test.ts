@@ -25,6 +25,10 @@ vi.mock("../../services/gmail/jdRecovery/atsBoards.js", async (importOriginal) =
   atsBoardsRepository: { get: vi.fn(async () => null), put: vi.fn(async () => undefined) },
 }));
 
+vi.mock("../../services/gmail/trackerAutoAdd.js", () => ({
+  addMissingApplicationsQuietly: vi.fn(async () => 0),
+}));
+
 vi.mock("../../services/gmail/gmailApplications.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../services/gmail/gmailApplications.js")>()),
   getGmailApplications: vi.fn(async () => state.apps),
