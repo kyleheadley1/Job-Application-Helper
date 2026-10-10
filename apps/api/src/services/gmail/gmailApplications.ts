@@ -224,6 +224,12 @@ const mergeRoleLessBySenderDomain = (byCompany: Map<string, CompanyBucket>) => {
   }
 };
 
+/** Meeting names the classifier sometimes reports as the role ("Initial Screen Call"). */
+const STAGE_NAME_RE =
+  /^(?:(?:initial|intro(?:ductory)?|recruiter|phone|video|technical|hiring\s+manager|final|onsite|on-site|first|second|third|1st|2nd|3rd|30[\s-]?min(?:ute)?)\s+)*(?:screen(?:ing)?|call|chat|interview|round|meeting|conversation)(?:\s+call)?$/i;
+
+export const isStageNameRole = (role: string): boolean => STAGE_NAME_RE.test(role.trim());
+
 const isGenericRole = (role: string): boolean => [...matchTokens(role)].every((t) => GENERIC_ROLE_TOKENS.has(t));
 
 const groupMessages = (messages: StoredGmailMessage[]): Group[] => {
@@ -236,7 +242,7 @@ const groupMessages = (messages: StoredGmailMessage[]): Group[] => {
     if (!companyKey) continue;
     const bucket = byCompany.get(companyKey) ?? { company: c.company, roled: [], unroled: [] };
     byCompany.set(companyKey, bucket);
-    if (!c.role) {
+    if (!c.role || isStageNameRole(c.role)) {
       bucket.unroled.push(m);
       continue;
     }

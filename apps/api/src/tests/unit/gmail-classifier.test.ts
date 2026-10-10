@@ -50,6 +50,18 @@ describe("prefilterEmail", () => {
     ).toBe(true);
   });
 
+  it("keeps interview confirmations", () => {
+    expect(
+      prefilterEmail(
+        email({
+          from: "no-reply@ashbyhq.com",
+          subject: "Your interview with Clark has been confirmed!",
+          body: "Initial Screen Call on Mon, Oct 12, 2026 at 4:30 PM EDT.",
+        }),
+      ).keep,
+    ).toBe(true);
+  });
+
   it("drops job alerts even from ATS/job-board senders", () => {
     expect(
       prefilterEmail(

@@ -57,14 +57,14 @@ const ATS_SENDER_RE =
   /@(?:[\w-]+\.)*(greenhouse(?:-mail)?\.io|greenhouse\.com|lever\.co|hire\.lever\.co|ashbyhq\.com|myworkday(?:jobs)?\.com|workday\.com|smartrecruiters\.com|icims\.com|jobvite\.com|linkedin\.com|indeed\.com|indeedemail\.com|simplify\.jobs|workablemail\.com|workable\.com|bamboohr\.com|rippling\.com|breezy\.hr|recruitee\.com|teamtailor\.com|jazzhr\.com|applytojob\.com|successfactors\.com|taleo\.net|oraclecloud\.com|hackerrank\.com|codesignal\.com)\b/i;
 
 const APPLICATION_PHRASE_RE =
-  /\b(thank(?:s| you) for (?:your )?(?:applying|application|interest)|we(?:'ve| have) received your application|application (?:received|submitted|confirmation|update|status)|your application (?:to|for|with)|your application (?:was|has been) (?:sent|submitted)|application (?:was )?sent to|applied (?:on|via) (?:linkedin|indeed)|you applied (?:to|for)|move forward with (?:other|your)|not (?:to )?(?:move|moving) forward|decided to (?:pursue|proceed with) other|unfortunately,? (?:we|after)|schedule (?:an?|your) (?:interview|call|chat)|invite you to (?:an? )?(?:interview|chat|call|complete)|phone screen|technical (?:interview|screen|assessment)|coding (?:challenge|assessment|exercise)|take[- ]home|online assessment|hackerrank|codesignal|offer letter|pleased to (?:offer|extend)|next steps? in (?:the|our) (?:hiring|interview|recruiting) process|candidacy)\b/i;
+  /\b(thank(?:s| you) for (?:your )?(?:applying|application|interest)|we(?:'ve| have) received your application|application (?:received|submitted|confirmation|update|status)|your application (?:to|for|with)|your application (?:was|has been) (?:sent|submitted)|application (?:was )?sent to|applied (?:on|via) (?:linkedin|indeed)|you applied (?:to|for)|move forward with (?:other|your)|not (?:to )?(?:move|moving) forward|decided to (?:pursue|proceed with) other|unfortunately,? (?:we|after)|schedule (?:an?|your) (?:interview|call|chat)|invite you to (?:an? )?(?:interview|chat|call|complete)|phone screen|technical (?:interview|screen|assessment)|coding (?:challenge|assessment|exercise)|take[- ]home|online assessment|hackerrank|codesignal|offer letter|pleased to (?:offer|extend)|next steps? in (?:the|our) (?:hiring|interview|recruiting) process|candidacy|(?:your )?interview with [^.\n]{1,40} (?:has been |is )?(?:confirmed|scheduled)|recruiter screen|initial screen)\b/i;
 
 /** Alerts, digests, and marketing that mention jobs but are not about an application. */
 const NOT_APPLICATION_RE =
   /\b(jobs? (?:you may be|you might be) interested in|new jobs? (?:for you|matching|near)|job alert|jobs? recommended for you|recommended jobs|top job picks|is hiring\b|are hiring\b|similar jobs|job matches|weekly digest|daily digest|newsletter|webinar|unsubscribe from (?:job )?alerts|people (?:also )?viewed|who viewed your profile|connection request|endorse)\b/i;
 
 /** Bump when the prefilter keeps more mail, so previously dropped messages are re-checked. */
-export const PREFILTER_VERSION = 4;
+export const PREFILTER_VERSION = 5;
 
 /**
  * Google/Outlook calendar invites ("Invitation: Alex and Jane @ Mon …") carry no application phrases.
@@ -116,7 +116,7 @@ Return JSON only:
 {
   "isApplicationEmail": boolean,
   "company": string | null,   // hiring company, not the ATS vendor (e.g. "Acme", not "Greenhouse")
-  "role": string | null,      // job title exactly as written, null if not stated
+  "role": string | null,      // job title exactly as written, null if not stated; a meeting or stage name ("Initial Screen Call", "Phone Interview") is not a job title
   "eventType": "applied" | "rejected" | "interview" | "assessment" | "offer" | "other",
   "confidence": number        // 0..1
 }

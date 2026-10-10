@@ -99,7 +99,7 @@ Rules:
 - final: explicitly a final round or final interview. onsite: onsite / virtual onsite / superday / interview loop.
 - Calendar invites, confirmations, and reschedules are about an already-arranged round: advancesToNextRound is false.
 - Do not count the scheduling coordinator as an interviewer unless they run the interview. Give only real job titles in parentheses; omit calendar roles like "organizer". Never list the candidate.
-- scheduledAt: only a confirmed, specific date and time (calendar invite, "confirmed for", "see you on"). Proposed slots, availability requests, and scheduling links are null. Resolve relative dates ("tomorrow", "Monday") against the email's Date. Use the timezone the email states; if none is stated, use the candidate's timezone given below.
+- scheduledAt: only a confirmed, specific date and time (calendar invite, "confirmed for", "see you on"). Proposed slots, availability requests, and scheduling links are null. Resolve relative dates ("tomorrow", "Monday") against the email's Date. If the email gives a time but no date or weekday (e.g. "4:30 PM - 5:00 PM (EDT)" alone), return null: never assume it is the email's own date. Use the timezone the email states; if none is stated, use the candidate's timezone given below.
 - Never guess facts the email does not support; use null.`;
 
 /** Model output is trusted only when it parses to a real instant. */

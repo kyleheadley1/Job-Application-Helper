@@ -3,6 +3,7 @@ import type { ActionType } from "../../services/gmail/actionRequest.js";
 import {
   actionItems,
   buildApplications,
+  isStageNameRole,
   matchTrackerJob,
   normalizeCompany,
   roleSimilarity,
@@ -91,6 +92,25 @@ describe("generic and specific titles at one company", () => {
     );
     expect(apps).toHaveLength(1);
     expect(apps[0]!.key).toBe("brellium::software engineer");
+  });
+
+  it("treats a meeting name reported as the role as role-less", () => {
+    expect(isStageNameRole("Initial Screen Call")).toBe(true);
+    expect(isStageNameRole("Phone Interview")).toBe(true);
+    expect(isStageNameRole("Hiring Manager Interview")).toBe(true);
+    expect(isStageNameRole("Junior Software Engineer")).toBe(false);
+    expect(isStageNameRole("Call Center Engineer")).toBe(false);
+
+    const apps = buildApplications(
+      [
+        msg("Clark", "Junior Software Engineer", "interview", "2026-10-09T21:55:00.000Z"),
+        msg("Clark", "Initial Screen Call", "interview", "2026-10-10T07:19:00.000Z"),
+      ],
+      [],
+    );
+    expect(apps).toHaveLength(1);
+    expect(apps[0]!.role).toBe("Junior Software Engineer");
+    expect(apps[0]!.emails).toHaveLength(2);
   });
 
   it("still links a loosely titled email to a company's only tracker row", () => {
